@@ -23,9 +23,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      # 5433 côté hôte : le 5432 par défaut est déjà pris par une instance
-      # PostgreSQL native sur cette machine (hors de ce projet).
-      - "5433:5432"
+      - "5432:5432"
 
   redis:
     image: redis:7-alpine

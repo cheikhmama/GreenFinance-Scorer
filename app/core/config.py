@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Valeurs par défaut raisonnables pour le développement local.
-    database_url: str = "postgresql+psycopg://greenfinance:changeme@localhost:5433/greenfinance"
+    database_url: str = "postgresql+psycopg://greenfinance:changeme@localhost:5432/greenfinance"
     redis_url: str = "redis://localhost:6379/0"
     app_name: str = "GreenFinance-Scorer"
     app_version: str = "0.1.0"
