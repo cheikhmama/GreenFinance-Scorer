@@ -1,0 +1,36 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # À l'intérieur du réseau Docker, la base est joignable via le nom de
+      # service "db", pas "localhost" (qui désignerait le conteneur api lui-même).
+      DATABASE_URL: postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: greenfinance
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: greenfinance
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # 5433 côté hôte : le 5432 par défaut est déjà pris par une instance
+      # PostgreSQL native sur cette machine (hors de ce projet).
+      - "5433:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
