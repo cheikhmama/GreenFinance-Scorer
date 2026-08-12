@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings",
     "pytest",
     "pytest-cov",
+    "structlog",
 ]
 
 [dependency-groups]
