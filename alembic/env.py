@@ -1,9 +1,20 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlmodel import SQLModel
 
 from alembic import context
+
+# Importés pour leur effet de bord : enregistrer chaque table dans
+# SQLModel.metadata avant que target_metadata ne soit lu par autogenerate.
+from app.audit import models as _audit_models  # noqa: F401
+from app.auth import models as _auth_models  # noqa: F401
+from app.company import models as _company_models  # noqa: F401
+from app.core import models as _core_models  # noqa: F401
 from app.core.config import get_settings
+from app.ingestion import models as _ingestion_models  # noqa: F401
+from app.investor import models as _investor_models  # noqa: F401
+from app.scoring import models as _scoring_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,11 +29,7 @@ if config.config_file_name is not None:
 # jamais d'une valeur en dur dans alembic.ini.
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
