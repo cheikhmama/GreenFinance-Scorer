@@ -22,6 +22,29 @@ dev = [
     "pre-commit",
     "httpx",
 ]
+notebook = [
+    "jupyter",
+    "ipykernel",
+    "docling",
+    "paddlepaddle",
+    "paddleocr",
+    "pymupdf",
+    "faiss-cpu",
+    "FlagEmbedding",
+    "anthropic",
+    "pyyaml",
+    "torch",
+    "torchvision",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]

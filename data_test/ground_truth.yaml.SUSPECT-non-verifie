@@ -1,0 +1,320 @@
+# Vérité terrain du corpus pilote — Étape 4 (validation autonome du pipeline d'extraction).
+#
+# Chaque valeur a été relevée manuellement (lecture directe des PDF sources, page par page)
+# par l'assistant IA qui a préparé ce jeu de données — PAS par un analyste humain indépendant.
+# C'est une réserve méthodologique assumée (voir docs/GreenFinance-Scorer_Etape4_Rapport-Technique.pdf) :
+# à relire ponctuellement avant de faire confiance aveuglément au verdict GO/NO-GO qui en dérive.
+#
+# "page_attendue" est le numéro de page PHYSIQUE dans le fichier PDF (1-indexé, tel que rapporté par
+# pymupdf/Docling), pas le numéro de page imprimé en pied de page — les deux divergent dans certains
+# documents (ex. unilever.pdf a un décalage de 3 pages).
+#
+# "pilier" suit la nomenclature du schéma pivot (Étape 3, app/core/enums.py::Pilier) pour les indicateurs
+# ESG ; les entrées carbone (scope 1/2/3) sont hors nomenclature Pilier — elles correspondent au modèle
+# DonneeCarbone (app/ingestion/models.py), pas IndicateurESG.
+
+entreprises:
+  - nom: apple
+    document: storage/pilot_corpus/apple.pdf
+    annee: 2024
+    indicateurs:
+      - code: scope_1
+        type: carbone
+        valeur_attendue: 55200.0
+        unite: tCO2e
+        page_attendue: 82
+      - code: scope_2_market_based
+        type: carbone
+        valeur_attendue: 3300.0
+        unite: tCO2e
+        page_attendue: 82
+      - code: scope_3
+        type: carbone
+        valeur_attendue: 608300.0
+        unite: tCO2e
+        page_attendue: 82
+      - code: renewable_electricity_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 100.0
+        unite: "%"
+        page_attendue: 86
+      - code: total_employees
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 164000
+        unite: personnes
+        page_attendue: 88
+      - code: waste_diverted_from_landfill
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 600000.0
+        unite: metric_tons
+        page_attendue: 87
+
+  - nom: ingka_group
+    document: storage/pilot_corpus/ingka_group.pdf
+    annee: 2025
+    indicateurs:
+      - code: scope_1
+        type: carbone
+        valeur_attendue: 78537.0
+        unite: tCO2e
+        page_attendue: 70
+      - code: scope_2_market_based
+        type: carbone
+        valeur_attendue: 21460.0
+        unite: tCO2e
+        page_attendue: 70
+      - code: scope_3
+        type: carbone
+        valeur_attendue: 4265957.0
+        unite: tCO2e
+        page_attendue: 70
+      - code: renewable_electricity_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 94.8
+        unite: "%"
+        page_attendue: 26
+      - code: total_employees
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 166458
+        unite: personnes
+        page_attendue: 80
+      - code: women_supervisory_board_pct
+        type: esg
+        pilier: GOUVERNANCE
+        valeur_attendue: 25.0
+        unite: "%"
+        page_attendue: 81
+
+  - nom: totalenergies
+    document: storage/pilot_corpus/totalenergies.pdf
+    annee: 2024
+    indicateurs:
+      - code: scope_1
+        type: carbone
+        valeur_attendue: 33.0
+        unite: MtCO2e
+        page_attendue: 106
+      - code: scope_2_market_based
+        type: carbone
+        valeur_attendue: 1.0
+        unite: MtCO2e
+        page_attendue: 106
+      - code: scope_3_cat11_use_of_sold_products
+        type: carbone
+        valeur_attendue: 342.0
+        unite: MtCO2e
+        page_attendue: 107
+      - code: renewable_electricity_capacity
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 26.0
+        unite: GW
+        page_attendue: 104
+      - code: total_employees
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 102887
+        unite: personnes
+        page_attendue: 110
+      - code: women_senior_executives_pct
+        type: esg
+        pilier: GOUVERNANCE
+        valeur_attendue: 29.5
+        unite: "%"
+        page_attendue: 110
+
+  - nom: unilever
+    document: storage/pilot_corpus/unilever.pdf
+    annee: 2025
+    indicateurs:
+      - code: scope_1_2_combined_market_based
+        type: carbone
+        valeur_attendue: 1.75
+        unite: MtCO2e
+        page_attendue: 232
+      - code: scope_3_energy_industrial
+        type: carbone
+        valeur_attendue: 27.9
+        unite: MtCO2e
+        page_attendue: 233
+      - code: scope_3_forest_land_agriculture
+        type: carbone
+        valeur_attendue: 7.0
+        unite: MtCO2e
+        page_attendue: 233
+      - code: renewable_electricity_purchased_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 85.0
+        unite: "%"
+        page_attendue: 237
+      - code: total_employees_continuing_operations
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 100000
+        unite: personnes
+        page_attendue: 143
+      - code: women_board_pct
+        type: esg
+        pilier: GOUVERNANCE
+        valeur_attendue: 40.0
+        unite: "%"
+        page_attendue: 51
+
+  - nom: microsoft
+    document: storage/pilot_corpus/microsoft.pdf
+    annee: 2024
+    indicateurs:
+      - code: scope_1
+        type: carbone
+        valeur_attendue: 143510.0
+        unite: tCO2e
+        page_attendue: 3
+      - code: scope_2_market_based
+        type: carbone
+        valeur_attendue: 259090.0
+        unite: tCO2e
+        page_attendue: 3
+      - code: scope_3_cat1_purchased_goods_services
+        type: carbone
+        valeur_attendue: 5057000.0
+        unite: tCO2e
+        page_attendue: 3
+      - code: renewable_electricity_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 100.0
+        unite: "%"
+        page_attendue: 6
+      - code: total_energy_consumption
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 30207220.0
+        unite: MWh
+        page_attendue: 6
+      - code: total_waste_generated
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 41290.0
+        unite: metric_tons
+        page_attendue: 7
+
+  - nom: nestle
+    document: storage/pilot_corpus/nestle.pdf
+    annee: 2025
+    indicateurs:
+      - code: scope_1
+        type: carbone
+        valeur_attendue: 2.82
+        unite: MtCO2e
+        page_attendue: 53
+      - code: scope_2_market_based
+        type: carbone
+        valeur_attendue: 0.22
+        unite: MtCO2e
+        page_attendue: 53
+      - code: scope_3_in_scope_net_zero
+        type: carbone
+        valeur_attendue: 66.01
+        unite: MtCO2e
+        page_attendue: 51
+      - code: renewable_electricity_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 98.6
+        unite: "%"
+        page_attendue: 42
+      - code: total_employees
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 271000
+        unite: personnes
+        page_attendue: 106
+      - code: women_total_workforce_pct
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 40.4
+        unite: "%"
+        page_attendue: 105
+
+  - nom: volkswagen
+    document: storage/pilot_corpus/volkswagen.pdf
+    annee: 2025
+    indicateurs:
+      - code: scope_1
+        type: carbone
+        valeur_attendue: 2.4
+        unite: MtCO2e
+        page_attendue: 62
+      - code: scope_2_market_based
+        type: carbone
+        valeur_attendue: 0.4
+        unite: MtCO2e
+        page_attendue: 62
+      - code: scope_3
+        type: carbone
+        valeur_attendue: 883.74
+        unite: MtCO2e
+        page_attendue: 63
+      - code: renewable_electricity_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 74.5
+        unite: "%"
+        page_attendue: 54
+      - code: total_workforce_group
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 602659
+        unite: personnes
+        page_attendue: 147
+      - code: women_top_management_pct_ag
+        type: esg
+        pilier: GOUVERNANCE
+        valeur_attendue: 9.0
+        unite: "%"
+        page_attendue: 243
+
+  - nom: rio_tinto
+    document: storage/pilot_corpus/rio_tinto.pdf
+    annee: 2024
+    indicateurs:
+      - code: scope_1_2_combined_adjusted_equity
+        type: carbone
+        valeur_attendue: 30.7
+        unite: MtCO2e
+        page_attendue: 5
+      - code: scope_3
+        type: carbone
+        valeur_attendue: 574.6
+        unite: MtCO2e
+        page_attendue: 43
+      - code: renewable_electricity_pct
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 78.0
+        unite: "%"
+        page_attendue: 43
+      - code: women_workforce_pct
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 25.2
+        unite: "%"
+        page_attendue: 5
+      - code: total_employees
+        type: esg
+        pilier: SOCIAL
+        valeur_attendue: 59594
+        unite: personnes
+        page_attendue: 269
+      - code: decarbonisation_spend
+        type: esg
+        pilier: ENVIRONNEMENT
+        valeur_attendue: 589.0
+        unite: million_USD
+        page_attendue: 43

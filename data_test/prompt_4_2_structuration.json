@@ -1,0 +1,38 @@
+{
+  "schneider_electric": {
+    "status": "ConversionStatus.SUCCESS",
+    "elapsed_s": 3669.0,
+    "pages_docling": 290,
+    "pages_pymupdf_independant": 290,
+    "pages_correspondent": true,
+    "num_tables": 174,
+    "erreurs": []
+  },
+  "microsoft": {
+    "status": "ConversionStatus.SUCCESS",
+    "elapsed_s": 342.5,
+    "pages_docling": 25,
+    "pages_pymupdf_independant": 25,
+    "pages_correspondent": true,
+    "num_tables": 28,
+    "erreurs": []
+  },
+  "orsted": {
+    "status": "ConversionStatus.SUCCESS",
+    "elapsed_s": 4550.9,
+    "pages_docling": 218,
+    "pages_pymupdf_independant": 218,
+    "pages_correspondent": true,
+    "num_tables": 166,
+    "erreurs": []
+  },
+  "ingka_group": {
+    "status": "ConversionStatus.SUCCESS",
+    "elapsed_s": 2158.0,
+    "pages_docling": 100,
+    "pages_pymupdf_independant": 100,
+    "pages_correspondent": true,
+    "num_tables": 73,
+    "erreurs": []
+  }
+}

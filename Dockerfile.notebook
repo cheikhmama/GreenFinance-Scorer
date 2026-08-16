@@ -1,0 +1,22 @@
+# Image de développement pour le notebook de validation de l'Étape 4 (Prompts 4.1-4.6).
+# Volontairement séparée du Dockerfile de production (app/) : ces dépendances (Docling, PaddleOCR,
+# BGE-M3, FAISS) ne concernent que le pipeline d'extraction en cours de validation, jamais l'API.
+FROM python:3.11-slim
+
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /code
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+RUN uv sync --group notebook --frozen
+
+ENV PATH="/opt/venv/bin:$PATH"
+# Pas de compilateur C++ dans cette image slim : torch.compile échouerait et retenterait en boucle
+# (modèles de structuration Docling). On désactive explicitement, l'exécution eager suffit sur CPU.
+ENV TORCH_COMPILE_DISABLE=1
+ENV TORCHDYNAMO_DISABLE=1

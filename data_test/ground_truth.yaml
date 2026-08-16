@@ -1,0 +1,146 @@
+# Vérité terrain du corpus pilote — Étape 4 (validation autonome du pipeline d'extraction).
+#
+# Provenance : chaque entrée a été établie par un agent de recherche dédié, qui a lu le PDF source
+# directement (outil Read, page par page) et vérifié l'identité de l'entreprise avant d'en extraire
+# une valeur — indépendamment du pipeline Docling/BGE-M3/Claude qui sera testé aux Prompts 4.2-4.5.
+# Chaque fiche a été présentée à l'utilisateur pour relecture avant d'être écrite ici.
+#
+# Corpus pilote réduit à 4 entreprises (décision explicite, en écart avec le plan initial qui en
+# prévoyait 8) : schneider_electric, microsoft, orsted, ingka_group. Les PDF apple, totalenergies,
+# unilever, nestle restent dans storage/pilot_corpus/ (téléchargés lors d'une session précédente) mais
+# sont hors périmètre retenu pour le verdict GO/NO-GO du Prompt 4.6 — leurs valeurs n'ont jamais été
+# vérifiées manuellement et ne doivent pas être réutilisées sans le faire.
+#
+# "page_attendue" est le numéro de page PHYSIQUE dans le fichier PDF (tel que rapporté par l'outil
+# Read), pas nécessairement le numéro imprimé en pied de page.
+
+entreprises:
+  - nom: schneider_electric
+    nom_rapport: "Sustainable Development Report 2025"
+    annee: 2025
+    url: https://www.se.com/ww/en/download/document/2025_Sustainability_Report/
+    document: storage/pilot_corpus/schneider_electric.pdf
+    indicateurs:
+      - code: scope_1
+        valeur_attendue: 100309.0
+        unite: tCO2e
+        page_attendue: 82
+      - code: scope_2_market_based
+        valeur_attendue: 23849.0
+        unite: tCO2e
+        page_attendue: 82
+      - code: scope_2_location_based
+        valeur_attendue: 409343.0
+        unite: tCO2e
+        page_attendue: 82
+      - code: scope_3
+        valeur_attendue: 60581278.0
+        unite: tCO2e
+        page_attendue: "82-83"
+    notes: >
+      Le plan initial de l'Étape 4 citait comme exemple, pour Schneider Electric,
+      "scope_1_2_marketbased_tco2e: 143708, page 346-347" — un chiffre qui ne correspond PAS à ce qui a
+      été vérifié ici (Scope 1+2 market-based combiné = 124158 tCO2e, pages 82-83, dans le Sustainable
+      Development Report 2025). Page 346-347 correspondrait plutôt à l'échelle du Document
+      d'Enregistrement Universel 2025 (~550 pages, non utilisé ici) — probablement une source et/ou une
+      année différente. Discrépance à clarifier avant de trancher entre les deux sources.
+      Un domaine se.com protégé par anti-bot (Akamai) a bloqué les téléchargements directs ; le PDF a
+      été obtenu via le CDN documentaire officiel (download.se.com). Un faux miroir tiers présenté comme
+      le rapport Schneider Electric s'est avéré être un document d'Orange S.A. — détecté et écarté avant
+      usage.
+
+  - nom: microsoft
+    nom_rapport: "2025 Environmental Sustainability Report — Data Fact Sheet"
+    annee: "FY2024 (1 juillet 2023 - 30 juin 2024)"
+    url: https://cdn-dynmedia-1.microsoft.com/is/content/microsoftcorp/microsoft/msc/documents/presentations/CSR/2025-Microsoft-Environmental-Data-Fact-Sheet-PDF.pdf
+    document: storage/pilot_corpus/microsoft.pdf
+    indicateurs:
+      - code: scope_1
+        valeur_attendue: 143510.0
+        unite: tCO2e
+        page_attendue: 3
+      - code: scope_2_market_based
+        valeur_attendue: 259090.0
+        unite: tCO2e
+        page_attendue: 3
+      - code: scope_2_location_based
+        valeur_attendue: 9955368.0
+        unite: tCO2e
+        page_attendue: 3
+      - code: scope_3
+        valeur_attendue: 15140000.0
+        unite: tCO2e
+        page_attendue: 3
+    notes: >
+      Un rapport plus récent (2026 Environmental Sustainability Report, données FY2025) existe mais n'a
+      pas été utilisé — le fichier FY2024 déjà présent dans le corpus a été réutilisé tel quel.
+
+  - nom: orsted
+    nom_rapport: "Annual Report 2025"
+    annee: 2025
+    url: https://cdn.orsted.com/-/media/annual-2025/annual-report-2025.pdf
+    document: storage/pilot_corpus/orsted.pdf
+    cas_test_special: >
+      Ørsted rapporte son empreinte carbone principalement en INTENSITÉ (g CO2e/kWh), pas en valeur
+      absolue — cas volontairement différent des 7 autres entreprises du corpus.
+    indicateurs:
+      - code: intensite_scope_1_2_marketbased
+        valeur_attendue: 4.0
+        unite: gCO2e/kWh
+        page_attendue: 79
+      - code: intensite_scope_1_2_3_hors_cat11
+        valeur_attendue: 69.0
+        unite: gCO2e/kWh
+        page_attendue: 79
+      - code: intensite_scope_1_2_3_total
+        valeur_attendue: 24.0
+        unite: gCO2e/kWh
+        page_attendue: 79
+      - code: scope_1
+        valeur_attendue: 184732.0
+        unite: tCO2e
+        page_attendue: 78
+      - code: scope_2_market_based
+        valeur_attendue: 736.0
+        unite: tCO2e
+        page_attendue: 78
+      - code: scope_2_location_based
+        valeur_attendue: 53100.0
+        unite: tCO2e
+        page_attendue: 78
+      - code: scope_3
+        valeur_attendue: 8012092.0
+        unite: tCO2e
+        page_attendue: 78
+
+  - nom: ingka_group
+    nom_rapport: "Ingka Group Annual Summary and Sustainability Report FY25"
+    annee: "FY25 (1 septembre 2024 - 31 aout 2025)"
+    url: null
+    document: storage/pilot_corpus/ingka_group.pdf
+    indicateurs:
+      - code: scope_1
+        valeur_attendue: 78537.0
+        unite: tCO2e
+        page_attendue: 70
+      - code: scope_2_market_based
+        valeur_attendue: 21460.0
+        unite: tCO2e
+        page_attendue: 70
+      - code: scope_2_location_based
+        valeur_attendue: 703221.0
+        unite: tCO2e
+        page_attendue: 69
+      - code: scope_3
+        valeur_attendue: 4265957.0
+        unite: tCO2e
+        page_attendue: 70
+    notes: >
+      "Ingka Group" est l'entité qui possède/exploite ~87,4% des magasins IKEA, distincte d'Inter IKEA
+      Group (franchiseur, propriétaire de marque). Le scope_3 ci-dessus couvre Ingka Group SEUL : pour
+      FY25, Inter IKEA Group n'a pas encore publié ses données climat (categories Scope 3 partagées
+      marquées N/A dans le rapport source, disponibles seulement avec le rapport FY26 d'Inter IKEA en
+      nov. 2026). Comparaison FY24 (combiné Ingka+Inter IKEA) : 21 709 772 tCO2e de Scope 3 — donc le
+      chiffre FY25 ci-dessus sous-estime largement l'empreinte réelle de la chaîne de valeur IKEA et
+      n'est PAS comparable aux Scope 3 totaux des autres entreprises du corpus sans cette réserve.
+
