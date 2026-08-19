@@ -1,0 +1,87 @@
+/* IBM Plex Sans : substitut web le plus proche d'Aptos (identité de marque définie
+   dans docs/Presentation_GreenFinance_Scorer.md) — sans-serif corporate de gabarit et
+   de graisse comparables, Aptos n'étant pas distribuée en police web. Doit précéder
+   @import "tailwindcss" : la spec CSS exige que les @import passent avant toute autre
+   règle (au-delà de @charset/@layer, que Tailwind introduit). */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* Tokens de marque GreenFinance-Scorer (docs/Presentation_GreenFinance_Scorer.md).
+   Déclarés ici via @theme, la configuration Tailwind CSS-first de Tailwind v4 (plus de
+   tailwind.config.js par défaut) : chaque --color-* devient une classe utilitaire
+   nommée (bg-brand-green, text-brand-blue, ...), à utiliser à la place des couleurs
+   Tailwind par défaut (green-600, etc.) dans tout composant métier de features/*. */
+@theme {
+  --font-sans: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+
+  --color-brand-green: #0f6b4f;
+  --color-brand-green-light: #e8f4ef;
+  --color-brand-blue: #16324f;
+  --color-brand-grey: #5b6573;
+}
+
+/* Tokens sémantiques structurels attendus par les primitives shadcn/ui de
+   shared/ui/ (bg-card, text-destructive, border-border, ring, ...). `shadcn add`
+   sans `shadcn init` préalable (nécessaire pour garder nos alias @/shared/ui/* plutôt
+   que les chemins par défaut) ne les fournit pas automatiquement : ils sont donc
+   posés ici à la main, alignés sur la marque plutôt que sur la palette neutre par
+   défaut de shadcn, pour que primary/ring/accent restent cohérents avec le vert et le
+   bleu du produit sans dupliquer une deuxième palette de marque parallèle. */
+:root {
+  --radius: 0.625rem;
+
+  --background: #ffffff;
+  --foreground: var(--color-brand-blue);
+  --card: #ffffff;
+  --card-foreground: var(--color-brand-blue);
+  --popover: #ffffff;
+  --popover-foreground: var(--color-brand-blue);
+  --primary: var(--color-brand-green);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-brand-green-light);
+  --secondary-foreground: var(--color-brand-blue);
+  --muted: #f4f5f6;
+  --muted-foreground: var(--color-brand-grey);
+  --accent: var(--color-brand-green-light);
+  --accent-foreground: var(--color-brand-blue);
+  --destructive: #b3261e;
+  --border: #e2e5e8;
+  --input: #e2e5e8;
+  --ring: var(--color-brand-green);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+}
