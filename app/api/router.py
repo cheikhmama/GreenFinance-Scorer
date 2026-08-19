@@ -12,11 +12,13 @@ l'instant — les routes réelles arrivent au fil des étapes 9 à 17.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.admin.router import router as admin_router
 from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.company.router import router as company_router
+from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware
 from app.institution.router import router as institution_router
@@ -39,6 +41,13 @@ OPENAPI_TAGS = [
 api_app = FastAPI(title="GreenFinance-Scorer API", version="v1", openapi_tags=OPENAPI_TAGS)
 register_exception_handlers(api_app)
 api_app.add_middleware(CorrelationIdMiddleware)
+api_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_allowed_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 api_app.include_router(auth_router)
 api_app.include_router(admin_router)

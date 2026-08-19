@@ -46,6 +46,36 @@ class PermissionDeniedError(GreenFinanceError):
         super().__init__(code=code, message=message)
 
 
+class TooManyRequestsError(GreenFinanceError):
+    status_code = 429
+
+    def __init__(self, message: str, code: str = "too_many_requests") -> None:
+        super().__init__(code=code, message=message)
+
+
+class UnauthorizedError(GreenFinanceError):
+    """Absence ou invalidité d'authentification — distinct de
+    PermissionDeniedError, qui suppose un utilisateur déjà identifié mais
+    dont le rôle n'autorise pas l'action."""
+
+    status_code = 401
+
+    def __init__(self, message: str, code: str = "unauthorized") -> None:
+        super().__init__(code=code, message=message)
+
+
+class ServiceUnavailableError(GreenFinanceError):
+    """Dépendance d'infrastructure indisponible (ex. Redis pour la limitation
+    de débit du login) — échec fermé explicite en 503, jamais un succès
+    silencieux sans la protection attendue, ni une 500 générique qui
+    masquerait la vraie cause."""
+
+    status_code = 503
+
+    def __init__(self, message: str, code: str = "service_unavailable") -> None:
+        super().__init__(code=code, message=message)
+
+
 def _correlation_id(request: Request) -> str | None:
     return getattr(request.state, "correlation_id", None)
 

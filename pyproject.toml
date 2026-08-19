@@ -10,9 +10,14 @@ dependencies = [
     "alembic",
     "psycopg[binary]",
     "pydantic-settings",
+    "pydantic[email]",
     "pytest",
     "pytest-cov",
     "structlog",
+    "pyjwt",
+    "passlib[bcrypt]",
+    "bcrypt<4.1",  # passlib 1.7.4 ne reconnaît pas l'API de bcrypt >=4.1 (module __about__ retiré)
+    "redis",
 ]
 
 [dependency-groups]
@@ -21,6 +26,7 @@ dev = [
     "mypy",
     "pre-commit",
     "httpx",
+    "types-passlib",
 ]
 notebook = [
     "jupyter",
@@ -45,6 +51,12 @@ torchvision = [{ index = "pytorch-cpu" }]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.ruff.lint.flake8-bugbear]
+# B008 (function call in default argument) est un faux positif pour ces
+# appels : c'est l'idiome FastAPI standard pour l'injection de dépendances,
+# pas un défaut mutable partagé entre appels.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Cookie", "fastapi.Query", "fastapi.Header"]
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]

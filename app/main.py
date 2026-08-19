@@ -5,10 +5,23 @@ import structlog
 from fastapi import FastAPI, Response
 
 from app.api.router import api_app
+
+# Importés pour leur effet de bord : enregistrer chaque table dans le
+# registre SQLAlchemy avant qu'une route ne déclenche la configuration des
+# mappers — même besoin que alembic/env.py. Sans ça, une relationship() à
+# référence différée (ex. Utilisateur.entreprise: Optional["Entreprise"])
+# échoue au premier accès si son module n'a jamais été importé ailleurs.
+from app.audit import models as _audit_models  # noqa: F401
+from app.auth import models as _auth_models  # noqa: F401
+from app.company import models as _company_models  # noqa: F401
+from app.core import models as _core_models  # noqa: F401
 from app.core.config import get_settings
 from app.core.database import DatabaseConnectionError, check_database_connection
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware, configure_logging
+from app.ingestion import models as _ingestion_models  # noqa: F401
+from app.investor import models as _investor_models  # noqa: F401
+from app.scoring import models as _scoring_models  # noqa: F401
 
 settings = get_settings()
 configure_logging(settings.environment)
