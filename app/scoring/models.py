@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import CheckConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -41,15 +42,32 @@ class ConfigurationPonderation(SQLModel, table=True):
 
 
 class ScoreESG(SQLModel, table=True):
+    """Les quatre scores sont bornés 0-100 à la fois côté Pydantic (Field) et côté PostgreSQL
+    (__table_args__, Phase 5 §6) — posé avant l'écriture du moteur de calcul (Étape 12) pour que
+    la table ne puisse jamais accueillir de valeur hors bornes, quelle que soit l'implémentation
+    qui l'écrira."""
+
     __tablename__ = "score_esg"
+    __table_args__ = (
+        CheckConstraint(
+            "valeur_globale BETWEEN 0 AND 100", name="ck_score_esg_valeur_globale_bornee"
+        ),
+        CheckConstraint(
+            "score_environnement BETWEEN 0 AND 100", name="ck_score_esg_environnement_borne"
+        ),
+        CheckConstraint("score_social BETWEEN 0 AND 100", name="ck_score_esg_social_borne"),
+        CheckConstraint(
+            "score_gouvernance BETWEEN 0 AND 100", name="ck_score_esg_gouvernance_borne"
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     rapport_id: uuid.UUID = Field(foreign_key="rapport_esg.id")
     configuration_id: uuid.UUID = Field(foreign_key="configuration_ponderation.id")
-    valeur_globale: float
-    score_environnement: float
-    score_social: float
-    score_gouvernance: float
+    valeur_globale: float = Field(ge=0, le=100)
+    score_environnement: float = Field(ge=0, le=100)
+    score_social: float = Field(ge=0, le=100)
+    score_gouvernance: float = Field(ge=0, le=100)
     date_calcul: datetime = Field(default_factory=utcnow)
 
     rapport: "RapportESG" = Relationship(back_populates="scores")

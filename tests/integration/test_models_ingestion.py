@@ -153,6 +153,107 @@ def test_score_qualite_pcaf_hors_bornes_rejete(session, score_invalide: int) -> 
         )
 
 
+@pytest.mark.parametrize("scope_invalide", [0, 4, -1])
+def test_scope_hors_bornes_rejete_en_base(session, scope_invalide: int) -> None:
+    """Complète test_score_qualite_pcaf_hors_bornes_rejete : ici la construction passe par
+    DonneeCarbone(**kwargs) directe (comme le fait le code applicatif réel, ex.
+    app/ingestion/extractor.py), qui ne déclenche jamais la validation Pydantic — seule la
+    contrainte CHECK côté PostgreSQL (Phase 5 §6) protège ce chemin."""
+    entreprise = _entreprise(session)
+    rapport = _rapport(entreprise.id)
+    session.add(rapport)
+    session.flush()
+    preuve = _preuve(session)
+
+    session.add(
+        DonneeCarbone(
+            rapport_id=rapport.id,
+            scope=scope_invalide,
+            valeur_tonnes_co2e=1.0,
+            annee=2025,
+            methode=MethodeDonnee.RAPPORTEE,
+            score_qualite_pcaf=3,
+            preuve_id=preuve.id,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+    session.rollback()
+
+
+def test_valeur_tonnes_co2e_negative_rejetee_en_base(session) -> None:
+    entreprise = _entreprise(session)
+    rapport = _rapport(entreprise.id)
+    session.add(rapport)
+    session.flush()
+    preuve = _preuve(session)
+
+    session.add(
+        DonneeCarbone(
+            rapport_id=rapport.id,
+            scope=1,
+            valeur_tonnes_co2e=-0.01,
+            annee=2025,
+            methode=MethodeDonnee.RAPPORTEE,
+            score_qualite_pcaf=3,
+            preuve_id=preuve.id,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+    session.rollback()
+
+
+@pytest.mark.parametrize("pcaf_invalide", [0, 6])
+def test_score_qualite_pcaf_hors_bornes_rejete_en_base(session, pcaf_invalide: int) -> None:
+    """Pendant DB de test_score_qualite_pcaf_hors_bornes_rejete (validation Pydantic) : ici
+    construction directe, seule la contrainte CHECK protège."""
+    entreprise = _entreprise(session)
+    rapport = _rapport(entreprise.id)
+    session.add(rapport)
+    session.flush()
+    preuve = _preuve(session)
+
+    session.add(
+        DonneeCarbone(
+            rapport_id=rapport.id,
+            scope=1,
+            valeur_tonnes_co2e=1.0,
+            annee=2025,
+            methode=MethodeDonnee.RAPPORTEE,
+            score_qualite_pcaf=pcaf_invalide,
+            preuve_id=preuve.id,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+    session.rollback()
+
+
+def test_doublon_checksum_meme_entreprise_rejete_en_base(session) -> None:
+    """Anti-doublon applicatif (app/company/rapports.py::_verifier_doublon) complété par une
+    contrainte UNIQUE (Phase 5 §6) : un SELECT-puis-INSERT sans verrou laisse une fenêtre de
+    course entre deux dépôts concurrents du même fichier, que seule la base peut fermer."""
+    entreprise = _entreprise(session)
+    session.add(_rapport(entreprise.id, checksum_sha256="a" * 64))
+    session.flush()
+
+    session.add(_rapport(entreprise.id, checksum_sha256="a" * 64))
+    with pytest.raises(IntegrityError):
+        session.flush()
+    session.rollback()
+
+
+def test_checksum_nul_plusieurs_fois_autorise_meme_entreprise(session) -> None:
+    """Les rapports déposés avant l'introduction du checksum ont checksum_sha256=NULL —
+    PostgreSQL ne compare jamais deux NULL comme égaux dans une contrainte UNIQUE, donc
+    plusieurs rapports sans checksum pour la même entreprise restent valides."""
+    entreprise = _entreprise(session)
+    session.add(_rapport(entreprise.id, checksum_sha256=None))
+    session.add(_rapport(entreprise.id, checksum_sha256=None))
+    session.flush()
+
+
 def test_suppression_rapport_reference_echoue_proprement(session) -> None:
     """Comportement documenté : rapport_id (IndicateurESG, DonneeCarbone) ne
     porte pas de cascade de suppression. Supprimer un RapportESG encore

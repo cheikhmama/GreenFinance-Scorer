@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.auth.models import Utilisateur
 from app.company.models import Entreprise
@@ -93,6 +94,36 @@ def test_rapport_accepte_plusieurs_scores_un_par_configuration(session) -> None:
         config_reference.id,
         config_perso.id,
     }
+
+
+@pytest.mark.parametrize(
+    "champ", ["valeur_globale", "score_environnement", "score_social", "score_gouvernance"]
+)
+@pytest.mark.parametrize("valeur_invalide", [-0.5, 100.5])
+def test_score_hors_bornes_rejete_en_base(session, champ: str, valeur_invalide: float) -> None:
+    """Construction directe ScoreESG(**kwargs) (comme le fera le futur moteur de calcul,
+    Étape 12) : la validation Pydantic (Field ge/le) n'est jamais déclenchée sur ce chemin —
+    seule la contrainte CHECK côté PostgreSQL (Phase 5 §6) protège les 4 scores."""
+    rapport = _rapport(session)
+    configuration = ConfigurationPonderation(
+        nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
+    )
+    session.add(configuration)
+    session.flush()
+
+    valeurs = {
+        "valeur_globale": 50.0,
+        "score_environnement": 50.0,
+        "score_social": 50.0,
+        "score_gouvernance": 50.0,
+    }
+    valeurs[champ] = valeur_invalide
+    session.add(
+        ScoreESG(rapport_id=rapport.id, configuration_id=configuration.id, **valeurs)
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+    session.rollback()
 
 
 def test_utilisateur_id_nul_reserve_a_la_reference(session) -> None:
