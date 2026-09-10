@@ -1,12 +1,18 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpenCheck,
+  Briefcase,
   Building2,
   ClipboardCheck,
   FileText,
+  FlaskConical,
+  FolderKanban,
   History,
   LayoutDashboard,
+  Scale,
+  UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import { Role } from "@/features/auth/schemas";
 
@@ -25,7 +31,7 @@ export interface RoleNavConfig {
 }
 
 /** Navigation réelle par rôle — un seul élément « Tableau de bord » pour les espaces qui n'ont
- * pas encore de sous-pages dédiées (Entreprise, Investisseur, Chercheur, Institution). */
+ * pas encore de sous-pages dédiées (Entreprise). */
 export const roleNavConfig: Record<Role, RoleNavConfig> = {
   [Role.ADMINISTRATEUR]: {
     label: "Administrateur",
@@ -50,14 +56,28 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
   },
   [Role.INVESTISSEUR]: {
     label: "Investisseur",
-    items: [{ to: "/investor", label: "Tableau de bord", icon: LayoutDashboard, end: true }],
+    items: [
+      { to: "/investor", label: "Tableau de bord", icon: LayoutDashboard, end: true },
+      { to: "/investor/entreprises", label: "Entreprises publiées", icon: Building2 },
+      { to: "/investor/comparaison", label: "Comparaison", icon: Scale },
+      { to: "/investor/portefeuilles", label: "Portefeuilles", icon: Wallet },
+    ],
   },
   [Role.CHERCHEUR]: {
     label: "Chercheur",
-    items: [{ to: "/researcher", label: "Tableau de bord", icon: LayoutDashboard, end: true }],
+    items: [
+      { to: "/researcher", label: "Tableau de bord", icon: LayoutDashboard, end: true },
+      { to: "/researcher/entreprises", label: "Données", icon: Building2 },
+      { to: "/researcher/analyses", label: "Analyses", icon: FlaskConical },
+      { to: "/researcher/rattachements", label: "Rattachements", icon: UserPlus },
+    ],
   },
   [Role.INSTITUTION]: {
     label: "Institution",
-    items: [{ to: "/institution", label: "Tableau de bord", icon: LayoutDashboard, end: true }],
+    items: [
+      { to: "/institution", label: "Tableau de bord", icon: LayoutDashboard, end: true },
+      { to: "/institution/chercheurs", label: "Chercheurs", icon: Briefcase },
+      { to: "/institution/projets", label: "Projets", icon: FolderKanban },
+    ],
   },
 };

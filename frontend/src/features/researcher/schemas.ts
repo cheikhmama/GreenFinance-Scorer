@@ -1,8 +1,11 @@
-/**
- * Aucun schéma métier pour l'instant : app/researcher/router.py est encore un
- * router vide côté backend (Étape 17). Ce fichier existe pour respecter la structure
- * de module (routes.tsx / api.ts / schemas.ts / components/) et accueillir les
- * schémas Zod des futures routes de l'espace Chercheur sans avoir à créer le fichier
- * plus tard.
- */
-export {};
+import { z } from "zod";
+
+/** Formulaire de création/modification/correction d'une analyse — entreprise_ids porté par une
+ * sélection multiple (au moins une, jamais une saisie libre : voir CompaniesPicker). */
+export const analyseFormSchema = z.object({
+  titre: z.string().min(1, "Le titre est requis."),
+  contenu: z.string().min(1, "Le contenu est requis."),
+  entreprise_ids: z.array(z.string()).min(1, "Sélectionne au moins une entreprise à comparer."),
+});
+
+export type AnalyseForm = z.infer<typeof analyseFormSchema>;

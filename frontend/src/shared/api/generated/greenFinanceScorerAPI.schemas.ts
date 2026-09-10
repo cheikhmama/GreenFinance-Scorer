@@ -4,8 +4,96 @@
  * GreenFinance-Scorer API
  * OpenAPI spec version: v1
  */
+export interface AffectationPublic {
+  id: string;
+  chercheur_id: string;
+  chercheur_email: string;
+  date_affectation: string;
+}
+
 export interface AffecterAuditeurRequest {
   auditeur_id: string;
+}
+
+export interface AffecterChercheurRequest {
+  chercheur_id: string;
+}
+
+export type DevisePosition = typeof DevisePosition[keyof typeof DevisePosition];
+
+
+export const DevisePosition = {
+  MRU: 'MRU',
+  USD: 'USD',
+  EUR: 'EUR',
+} as const;
+
+export type TypeDureeInvestissement = typeof TypeDureeInvestissement[keyof typeof TypeDureeInvestissement];
+
+
+export const TypeDureeInvestissement = {
+  OUVERTE: 'OUVERTE',
+  FIXE: 'FIXE',
+} as const;
+
+export interface AjouterPositionRequest {
+  entreprise_id: string;
+  montant: number;
+  devise: DevisePosition;
+  type_duree: TypeDureeInvestissement;
+  date_debut: string;
+  date_fin?: string | null;
+}
+
+export type StatutAnalyse = typeof StatutAnalyse[keyof typeof StatutAnalyse];
+
+
+export const StatutAnalyse = {
+  BROUILLON: 'BROUILLON',
+  SOUMISE: 'SOUMISE',
+  VALIDEE: 'VALIDEE',
+  CORRECTION_DEMANDEE: 'CORRECTION_DEMANDEE',
+} as const;
+
+export interface AnalyseDetail {
+  id: string;
+  projet_id: string;
+  chercheur_id: string;
+  titre: string;
+  contenu: string;
+  statut: StatutAnalyse;
+  version: number;
+  analyse_precedente_id: string | null;
+  commentaire_institution: string | null;
+  date_creation: string;
+  date_soumission: string | null;
+  date_decision: string | null;
+  entreprise_ids: string[];
+}
+
+export interface AnalysePublic {
+  id: string;
+  projet_id: string;
+  chercheur_id: string;
+  titre: string;
+  contenu: string;
+  statut: StatutAnalyse;
+  version: number;
+  analyse_precedente_id: string | null;
+  commentaire_institution: string | null;
+  date_creation: string;
+  date_soumission: string | null;
+  date_decision: string | null;
+}
+
+export interface AnalyseResume {
+  id: string;
+  chercheur_id: string;
+  titre: string;
+  statut: StatutAnalyse;
+  version: number;
+  date_creation: string;
+  date_soumission: string | null;
 }
 
 export type DecisionAudit = typeof DecisionAudit[keyof typeof DecisionAudit];
@@ -79,6 +167,32 @@ export interface ChangerRoleRequest {
   role: Role;
 }
 
+/**
+ * Compte CHERCHEUR actif, sélectionnable pour une invitation — même règle "sélection parmi
+ * les acteurs existants" que partout ailleurs (jamais de saisie libre d'identité).
+ */
+export interface ChercheurDisponible {
+  id: string;
+  email: string;
+  nom: string | null;
+}
+
+export interface CreerAnalyseRequest {
+  titre: string;
+  contenu: string;
+  entreprise_ids: string[];
+}
+
+export interface CreerPortefeuilleRequest {
+  nom: string;
+  devise_reference: DevisePosition;
+}
+
+export interface CreerProjetRequest {
+  nom: string;
+  description?: string | null;
+}
+
 export interface CreerUtilisateurRequest {
   email: string;
   nom?: string | null;
@@ -89,6 +203,10 @@ export interface CreerUtilisateurRequest {
 }
 
 export interface DecisionAdminRequest {
+  commentaire?: string | null;
+}
+
+export interface DecisionAnalyseRequest {
   commentaire?: string | null;
 }
 
@@ -120,6 +238,13 @@ export interface DonneeCarboneDetail {
   methode: MethodeDonnee;
   score_qualite_pcaf: number;
   preuve: PreuveDocumentairePublic;
+}
+
+export interface DonneesCarboneAgregees {
+  scope_1: number | null;
+  scope_2_market_based: number | null;
+  scope_2_location_based: number | null;
+  scope_3: number | null;
 }
 
 export type StatutRapport = typeof StatutRapport[keyof typeof StatutRapport];
@@ -158,31 +283,18 @@ export interface EntrepriseAdmin {
   dernier_statut_rapport: StatutRapport | null;
 }
 
-export interface EntreprisePublic {
-  id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
-  logo: string | null;
-  description: string | null;
-  site_officiel: string | null;
-  actif: boolean;
-  montant_minimum_investissement: number | null;
-  date_publication: string | null;
-}
-
-export type ValidationErrorCtx = { [key: string]: unknown };
-
-export interface ValidationError {
-  loc: (string | number)[];
-  msg: string;
-  type: string;
-  input?: unknown;
-  ctx?: ValidationErrorCtx;
-}
-
-export interface HTTPValidationError {
-  detail?: ValidationError[];
+/**
+ * Score de la dernière publication d'une entreprise — jamais fabriqué : absent (tous les
+ * champs à None) si l'entreprise n'a en réalité aucun score calculé, ce qui n'arrive normalement
+ * jamais pour une entreprise publiée (publier_entreprise l'exige), mais reste possible en
+ * lecture défensive.
+ */
+export interface ScoreEntreprisePublic {
+  valeur_globale: number | null;
+  score_environnement: number | null;
+  score_social: number | null;
+  score_gouvernance: number | null;
+  configuration_version: number | null;
 }
 
 export type Pilier = typeof Pilier[keyof typeof Pilier];
@@ -205,6 +317,106 @@ export interface IndicateurESGDetail {
 }
 
 /**
+ * Détail d'une entreprise publiée, avec les indicateurs et données carbone sources (chacun
+ * portant sa preuve documentaire) — c'est ici que l'Investisseur vérifie une source, pas
+ * seulement le score agrégé.
+ */
+export interface EntrepriseDetailInvestisseur {
+  id: string;
+  nom: string;
+  secteur: string;
+  pays: string;
+  logo: string | null;
+  description: string | null;
+  site_officiel: string | null;
+  actif: boolean;
+  montant_minimum_investissement: number | null;
+  date_publication: string | null;
+  score: ScoreEntreprisePublic;
+  carbone: DonneesCarboneAgregees;
+  indicateurs: IndicateurESGDetail[];
+  donnees_carbone: DonneeCarboneDetail[];
+}
+
+export interface EntreprisePublic {
+  id: string;
+  nom: string;
+  secteur: string;
+  pays: string;
+  logo: string | null;
+  description: string | null;
+  site_officiel: string | null;
+  actif: boolean;
+  montant_minimum_investissement: number | null;
+  date_publication: string | null;
+}
+
+/**
+ * Entreprise publiée, telle que consultable par l'Investisseur — étend EntreprisePublic
+ * (déjà utilisé côté Entreprise/Admin) avec le score et les émissions Scope 1/2/3 de son
+ * dernier rapport validé.
+ */
+export interface EntreprisePublieePublic {
+  id: string;
+  nom: string;
+  secteur: string;
+  pays: string;
+  logo: string | null;
+  description: string | null;
+  site_officiel: string | null;
+  actif: boolean;
+  montant_minimum_investissement: number | null;
+  date_publication: string | null;
+  score: ScoreEntreprisePublic;
+  carbone: DonneesCarboneAgregees;
+}
+
+/**
+ * Vue minimale d'une entreprise, imbriquée dans une position — jamais le détail complet
+ * (indicateurs/preuves), qui se consulte séparément via GET /investor/entreprises/{id}.
+ */
+export interface EntrepriseSommaire {
+  id: string;
+  nom: string;
+  secteur: string;
+  pays: string;
+  logo: string | null;
+  actif: boolean;
+}
+
+export type EtatPosition = typeof EtatPosition[keyof typeof EtatPosition];
+
+
+export const EtatPosition = {
+  PLANIFIEE: 'PLANIFIEE',
+  ACTIVE: 'ACTIVE',
+  CLOTUREE: 'CLOTUREE',
+  ENTREPRISE_SUSPENDUE: 'ENTREPRISE_SUSPENDUE',
+} as const;
+
+export interface FermerPositionRequest {
+  date_fin?: string | null;
+}
+
+export type ValidationErrorCtx = { [key: string]: unknown };
+
+export interface ValidationError {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+  input?: unknown;
+  ctx?: ValidationErrorCtx;
+}
+
+export interface HTTPValidationError {
+  detail?: ValidationError[];
+}
+
+export interface InviterChercheurRequest {
+  chercheur_id: string;
+}
+
+/**
  * Vue Administrateur d'une entrée du journal d'audit — aucun champ sensible à masquer, la
  * table elle-même ne contient jamais de secret (voir app/core/audit.py).
  */
@@ -224,6 +436,25 @@ export interface JournalAuditPublic {
 export interface LoginRequest {
   email: string;
   password: string;
+}
+
+export interface ModifierAnalyseRequest {
+  titre: string;
+  contenu: string;
+  entreprise_ids: string[];
+}
+
+/**
+ * Une position ne peut être modifiée que tant qu'elle est encore PLANIFIEE (voir
+ * app/investor/portfolio.py) — l'entreprise concernée n'est jamais modifiable après création,
+ * seule une fermeture puis une nouvelle position permet de changer de cible.
+ */
+export interface ModifierPositionRequest {
+  montant: number;
+  devise: DevisePosition;
+  type_duree: TypeDureeInvestissement;
+  date_debut: string;
+  date_fin?: string | null;
 }
 
 export interface NotificationPublic {
@@ -250,6 +481,14 @@ export interface PageEntreprisePublic {
   pages: number;
 }
 
+export interface PageEntreprisePublieePublic {
+  items: EntreprisePublieePublic[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
 export interface PageJournalAuditPublic {
   items: JournalAuditPublic[];
   page: number;
@@ -260,6 +499,29 @@ export interface PageJournalAuditPublic {
 
 export interface PageNotificationPublic {
   items: NotificationPublic[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface PortefeuilleResume {
+  id: string;
+  nom: string;
+  devise_reference: DevisePosition;
+  montant_total: number;
+  nombre_positions: number;
+  score_esg_agrege: number | null;
+  score_environnement_agrege: number | null;
+  score_social_agrege: number | null;
+  score_gouvernance_agrege: number | null;
+  couverture_esg: number;
+  date_creation: string;
+  archive: boolean;
+}
+
+export interface PagePortefeuilleResume {
+  items: PortefeuilleResume[];
   page: number;
   page_size: number;
   total: number;
@@ -282,6 +544,81 @@ export interface PageUtilisateurPublic {
   page_size: number;
   total: number;
   pages: number;
+}
+
+export interface PositionDetail {
+  id: string;
+  portefeuille_id: string;
+  entreprise: EntrepriseSommaire;
+  montant_investi: number;
+  devise: DevisePosition;
+  montant_converti: number;
+  taux_change_utilise: number | null;
+  poids: number;
+  type_duree: TypeDureeInvestissement;
+  date_debut: string;
+  date_fin: string | null;
+  etat: EtatPosition;
+  score: ScoreEntreprisePublic;
+  date_publication_utilisee: string | null;
+  preuves_disponibles: boolean;
+}
+
+export interface PortefeuilleDetail {
+  id: string;
+  nom: string;
+  devise_reference: DevisePosition;
+  montant_total: number;
+  nombre_positions: number;
+  score_esg_agrege: number | null;
+  score_environnement_agrege: number | null;
+  score_social_agrege: number | null;
+  score_gouvernance_agrege: number | null;
+  couverture_esg: number;
+  date_creation: string;
+  archive: boolean;
+  nombre_positions_planifiees: number;
+  nombre_positions_actives: number;
+  nombre_positions_cloturees: number;
+  positions: PositionDetail[];
+}
+
+export type StatutProjet = typeof StatutProjet[keyof typeof StatutProjet];
+
+
+export const StatutProjet = {
+  OUVERT: 'OUVERT',
+  CLOTURE: 'CLOTURE',
+} as const;
+
+export interface ProjetAffecte {
+  id: string;
+  nom: string;
+  description: string | null;
+  statut: StatutProjet;
+  institution_email: string;
+}
+
+export interface ProjetDetail {
+  id: string;
+  institution_id: string;
+  nom: string;
+  description: string | null;
+  statut: StatutProjet;
+  date_creation: string;
+  date_cloture: string | null;
+  affectations: AffectationPublic[];
+  analyses: AnalyseResume[];
+}
+
+export interface ProjetPublic {
+  id: string;
+  institution_id: string;
+  nom: string;
+  description: string | null;
+  statut: StatutProjet;
+  date_creation: string;
+  date_cloture: string | null;
 }
 
 /**
@@ -321,6 +658,33 @@ export interface RapportESGPublic {
   rapport_precedent_id: string | null;
 }
 
+export type StatutRattachement = typeof StatutRattachement[keyof typeof StatutRattachement];
+
+
+export const StatutRattachement = {
+  EN_ATTENTE: 'EN_ATTENTE',
+  ACCEPTE: 'ACCEPTE',
+  REFUSE: 'REFUSE',
+} as const;
+
+export interface RattachementPublic {
+  id: string;
+  chercheur_id: string;
+  institution_id: string;
+  statut: StatutRattachement;
+  date_invitation: string;
+  date_reponse: string | null;
+}
+
+export interface RenommerPortefeuilleRequest {
+  nom: string;
+}
+
+export interface RepartitionSecteur {
+  secteur: string;
+  montant_usd: number;
+}
+
 export interface SoumettreAvisRequest {
   decision: DecisionAudit;
   commentaire?: string | null;
@@ -340,6 +704,17 @@ export interface TableauDeBordAdmin {
   decisions_a_rendre: number;
   demandes_republication: number;
   utilisateurs_en_attente: number;
+}
+
+export interface TableauDeBordInvestisseur {
+  nombre_portefeuilles: number;
+  nombre_entreprises_publiees: number;
+  taux_couverture_esg_plateforme: number;
+  nombre_nouvelles_publications_suivies: number;
+  repartition_secteur: RepartitionSecteur[];
+  positions_principales: PositionDetail[];
+  publications_recentes: EntreprisePublieePublic[];
+  entreprises_suivies_suspendues: EntrepriseSommaire[];
 }
 
 /**
@@ -456,5 +831,41 @@ page?: number;
  * @maximum 100
  */
 page_size?: number;
+};
+
+export type ListPublishedCompaniesParams = {
+secteur?: string | null;
+pays?: string | null;
+recherche?: string | null;
+page?: number;
+page_size?: number;
+};
+
+export type CompareCompaniesParams = {
+entreprise_ids: string[];
+};
+
+export type ListMyPortfoliosParams = {
+archive?: boolean | null;
+avec_position?: boolean | null;
+recherche?: string | null;
+page?: number;
+page_size?: number;
+};
+
+export type ListPublishedCompaniesForResearcherParams = {
+secteur?: string | null;
+pays?: string | null;
+recherche?: string | null;
+page?: number;
+page_size?: number;
+};
+
+export type CompareCompaniesForResearcherParams = {
+entreprise_ids: string[];
+};
+
+export type ListMyResearchersParams = {
+statut?: StatutRattachement | null;
 };
 
