@@ -499,7 +499,7 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
         ],
     )
     monkeypatch.setattr(
-        "app.ingestion.extractor._call_claude_extraction", lambda **_k: fake_extraction
+        "app.ingestion.extractor._call_llm_extraction", lambda **_k: fake_extraction
     )
 
     def _fake_proof(*, source_pdf_path, nom_document, annee, nombre_pages_total, page, rapport_id):

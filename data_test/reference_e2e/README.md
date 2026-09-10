@@ -16,6 +16,6 @@ Chaque dossier contient :
   `scripts/generate_reference_e2e_reports.py` (ne pas éditer le PDF à la main, éditer le JSON puis
   régénérer).
 
-Une extraction **réelle** (pas simulée) suppose une vraie clé `ANTHROPIC_API_KEY` dans `.env` — un
+Une extraction **réelle** (pas simulée) suppose une vraie clé `GEMINI_API_KEY` dans `.env` — un
 placeholder fait toujours basculer le pipeline vers `_extraction_demo_synthetique`
 (`app/ingestion/extractor.py`), qui ignore le contenu du PDF déposé.

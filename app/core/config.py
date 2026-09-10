@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Marqueurs des valeurs d'exemple de .env.example — jamais acceptables une fois
 # ENVIRONMENT=production (voir Settings._rejeter_placeholders_en_production).
-_MARQUEURS_PLACEHOLDER = ("changeme", "sk-ant-example-replace-me")
+_MARQUEURS_PLACEHOLDER = ("changeme", "gemini-api-key-example-replace-me")
 
 
 class Settings(BaseSettings):
@@ -28,12 +28,12 @@ class Settings(BaseSettings):
     sla_audit_jours: int = 10
 
     @property
-    def anthropic_api_key_is_placeholder(self) -> bool:
+    def gemini_api_key_is_placeholder(self) -> bool:
         """Utilisé par app/ingestion/extractor.py pour basculer sur une extraction synthétique
         de démonstration plutôt que d'échouer à chaque dépôt tant qu'aucune vraie clé n'est
         configurée — jamais vrai en production (_rejeter_placeholders_en_production ci-dessous
         bloque le démarrage dans ce cas)."""
-        return "sk-ant-example-replace-me" in self.anthropic_api_key
+        return "gemini-api-key-example-replace-me" in self.gemini_api_key
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
@@ -54,10 +54,11 @@ class Settings(BaseSettings):
     # Pas de valeur par défaut : une variable manquante doit lever une erreur explicite.
     secret_key: str
     mfa_issuer_name: str
-    anthropic_api_key: str
+    gemini_api_key: str
     storage_backend: str
     storage_path: str
     default_scoring_config: str
+    fx_rates_path: str
     emission_factors_path: str
     environment: str
 
@@ -72,7 +73,7 @@ class Settings(BaseSettings):
         valeurs_sensibles = {
             "SECRET_KEY": self.secret_key,
             "DATABASE_URL": self.database_url,
-            "ANTHROPIC_API_KEY": self.anthropic_api_key,
+            "GEMINI_API_KEY": self.gemini_api_key,
         }
         for nom, valeur in valeurs_sensibles.items():
             if any(marqueur in valeur for marqueur in _MARQUEURS_PLACEHOLDER):

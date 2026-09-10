@@ -2,8 +2,8 @@
 
 Orchestre l'extraction complète d'un rapport déposé : conversion Docling, recherche sémantique
 (bge-m3 + FAISS, en mémoire — la persistance pgvector reste un stub réservé à l'Étape 7, voir
-app/ingestion/semantic_search.py), extraction structurée via Claude avec citation de page, et
-persistance des indicateurs/données carbone/preuves. Cœur porté depuis
+app/ingestion/semantic_search.py), extraction structurée via un LLM (Gemini, tool-calling forcé)
+avec citation de page, et persistance des indicateurs/données carbone/preuves. Cœur porté depuis
 notebooks/_prompt_4_3_indexation.py et notebooks/_prompt_4_4_extraction.py (validés à l'Étape 4).
 
 Point d'entrée pour un déclenchement FastAPI BackgroundTasks (voir app/company/router.py) :
@@ -21,19 +21,21 @@ os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 
 import json
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-import anthropic
 import faiss
 import numpy as np
 import structlog
-from anthropic.types import ToolChoiceToolParam, ToolParam
 from docling_core.types.doc.document import DoclingDocument
 from FlagEmbedding import BGEM3FlagModel
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from sqlmodel import Session
 
 from app.core import storage
@@ -74,23 +76,31 @@ REQUETES_FIXES = [
 ]
 
 # Fenêtre d'extraction (Prompt 4.4) — distincte du seuil TOP_PAGES=8 du benchmark de recherche 4.3,
-# qui ne mesure que la qualité de recherche, pas la fenêtre à donner à Claude.
+# qui ne mesure que la qualité de recherche, pas la fenêtre à donner au LLM d'extraction.
 CONTEXT_TOP_PAGES = 20
 
-CLAUDE_MODEL = "claude-sonnet-5"
+# Modèle Gemini avec palier gratuit (voir Phase 5 — bascule Anthropic->Gemini, compte Anthropic
+# sans crédit). gemini-2.5-flash n'est plus accessible aux nouveaux comptes (confirmé par erreur
+# API 404 en direct) — gemini-3.6-flash est le modèle recommandé actuel. La précision (≥90%
+# valeurs, ≥85% pages, 0% hallucination, data_test/ground_truth.yaml) a été mesurée avec Claude à
+# l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
+EXTRACTION_MODEL = "gemini-3.6-flash"
 
 # Score PCAF non calculé à cette étape (Étape 13, app/carbon/) — placeholder documenté plutôt
 # qu'une valeur inventée qui se ferait passer pour une vraie notation.
 PLACEHOLDER_SCORE_QUALITE_PCAF = 3
 
-EXTRACTION_TOOL: ToolParam = {
-    "name": "extraction_indicateurs",
-    "description": (
+EXTRACTION_TOOL = genai_types.FunctionDeclaration(
+    name="extraction_indicateurs",
+    description=(
         "Extraction structuree des indicateurs ESG/carbone demandes, a partir des extraits de "
         "rapport fournis."
     ),
-    "input_schema": ExtractionEntreprise.model_json_schema(),
-}
+    # Schéma Pydantic passé verbatim (le champ dédié du SDK accepte du JSON Schema standard —
+    # $defs/$ref/anyOf inclus — contrairement à l'ancien dialecte restreint `parameters`), pour ne
+    # jamais dupliquer à la main la définition de app/ingestion/schemas.py::ExtractionEntreprise.
+    parameters_json_schema=ExtractionEntreprise.model_json_schema(),
+)
 
 
 @dataclass(frozen=True)
@@ -138,8 +148,8 @@ def _get_embed_model() -> BGEM3FlagModel:
 
 
 @lru_cache
-def _get_anthropic_client() -> anthropic.Anthropic:
-    return anthropic.Anthropic(api_key=get_settings().anthropic_api_key)
+def _get_gemini_client() -> genai.Client:
+    return genai.Client(api_key=get_settings().gemini_api_key)
 
 
 def _iter_page_chunks(doc: DoclingDocument, max_chars: int = 1200) -> list[dict]:
@@ -231,11 +241,19 @@ def _build_context(search_index: dict, embed_model: BGEM3FlagModel) -> tuple[str
     return context, ordered_pages
 
 
-def _call_claude_extraction(
+# Nombre de tentatives face à une erreur serveur transitoire (503, surcharge du palier gratuit) —
+# jamais sur une ClientError (4xx : clé invalide, modèle inconnu, quota dépassé), qui ne se
+# résoudra pas en réessayant. Constaté en pratique sur gemini-3.6-flash, pas hypothétique.
+_TENTATIVES_APPEL_LLM = 3
+
+
+def _call_llm_extraction(
     *, nom_entreprise: str, context: str, codes: list[str]
 ) -> ExtractionEntreprise:
-    """Tool-use forcé, verbatim du protocole validé au Prompt 4.4. Laisse remonter toute erreur
-    Anthropic telle quelle — run_extraction_pipeline la classe, ne la masque jamais."""
+    """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
+    Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
+    toute erreur non transitoire du fournisseur telle quelle — run_extraction_pipeline la classe,
+    ne la masque jamais."""
     prompt = f"""Tu es un extracteur de donnees ESG/carbone. Voici des extraits d'un rapport d'entreprise
 ({nom_entreprise}), avec le numero de page physique indique avant chaque extrait.
 
@@ -251,21 +269,38 @@ Regles strictes :
 Extraits du rapport :
 {context}
 """
-    tool_choice: ToolChoiceToolParam = {"type": "tool", "name": "extraction_indicateurs"}
-    response = _get_anthropic_client().messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4096,
-        tools=[EXTRACTION_TOOL],
-        tool_choice=tool_choice,
-        messages=[{"role": "user", "content": prompt}],
+    config = genai_types.GenerateContentConfig(
+        tools=[genai_types.Tool(function_declarations=[EXTRACTION_TOOL])],
+        tool_config=genai_types.ToolConfig(
+            function_calling_config=genai_types.FunctionCallingConfig(
+                mode=genai_types.FunctionCallingConfigMode.ANY
+            )
+        ),
     )
-    tool_use = next(block for block in response.content if block.type == "tool_use")
-    return ExtractionEntreprise.model_validate(tool_use.input)
+    for tentative in range(1, _TENTATIVES_APPEL_LLM + 1):
+        try:
+            response = _get_gemini_client().models.generate_content(
+                model=EXTRACTION_MODEL, contents=prompt, config=config
+            )
+            break
+        except genai_errors.ServerError:
+            if tentative == _TENTATIVES_APPEL_LLM:
+                raise
+            logger.warning(
+                "appel_llm_erreur_serveur_transitoire", tentative=tentative, nom_entreprise=nom_entreprise
+            )
+            time.sleep(2**tentative)
+    function_calls = response.function_calls
+    if not function_calls:
+        raise ValueError(
+            "Le modele n'a renvoye aucun appel a l'outil extraction_indicateurs."
+        )
+    return ExtractionEntreprise.model_validate(function_calls[0].args)
 
 
 def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> ExtractionEntreprise:
-    """Résultat synthétique utilisé uniquement quand ANTHROPIC_API_KEY est encore le placeholder
-    de .env.example (Settings.anthropic_api_key_is_placeholder) — jamais en production, où
+    """Résultat synthétique utilisé uniquement quand GEMINI_API_KEY est encore le placeholder
+    de .env.example (Settings.gemini_api_key_is_placeholder) — jamais en production, où
     _rejeter_placeholders_en_production bloque le démarrage dans ce cas. Valeurs rondes et
     strictement croissantes par construction, pour ne jamais être prises pour une vraie
     extraction ; la preuve documentaire associée porte aussi un préfixe "[DEMO]" visible à
@@ -298,7 +333,7 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             source_path = storage.resolve_path(rapport.fichier_source)
             nom_entreprise = rapport.entreprise.nom
             nom_document = Path(rapport.fichier_source).name
-            demo = get_settings().anthropic_api_key_is_placeholder
+            demo = get_settings().gemini_api_key_is_placeholder
             if demo:
                 nom_document = f"[DEMO] {nom_document}"
 
@@ -336,20 +371,20 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             context, pages_used = _build_context(search_index, embed_model)
             logger.info("contexte_assemble", rapport_id=str(rapport_id), n_pages=len(pages_used))
 
-            etape = "appel_claude_echoue"
+            etape = "appel_llm_echoue"
             codes = [cible.code for cible in INDICATEURS_CIBLES]
             if demo:
                 logger.warning(
                     "extraction_demo_synthetique_utilisee",
                     rapport_id=str(rapport_id),
-                    raison="ANTHROPIC_API_KEY est un placeholder (.env) — extraction simulee",
+                    raison="GEMINI_API_KEY est un placeholder (.env) — extraction simulee",
                 )
                 extraction = _extraction_demo_synthetique(nom_entreprise=nom_entreprise, codes=codes)
             else:
-                extraction = _call_claude_extraction(
+                extraction = _call_llm_extraction(
                     nom_entreprise=nom_entreprise, context=context, codes=codes
                 )
-            logger.info("extraction_claude_terminee", rapport_id=str(rapport_id), demo=demo)
+            logger.info("extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo)
 
             etape = "persistance_echouee"
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}

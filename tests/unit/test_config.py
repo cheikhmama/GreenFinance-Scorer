@@ -5,7 +5,7 @@ from app.core.config import Settings
 _CHAMPS_REQUIS_VALIDES = {
     "secret_key": "un-vrai-secret-genere-aleatoirement-32-octets",
     "mfa_issuer_name": "GreenFinance-Scorer",
-    "anthropic_api_key": "sk-ant-un-vrai-jeton",
+    "gemini_api_key": "un-vrai-jeton-gemini",
     "storage_backend": "local",
     "storage_path": "./storage",
     "default_scoring_config": "config/weights/default.yaml",
@@ -59,11 +59,11 @@ def test_production_rejects_a_placeholder_database_url() -> None:
         Settings(**champs)
 
 
-def test_production_rejects_a_placeholder_anthropic_api_key() -> None:
+def test_production_rejects_a_placeholder_gemini_api_key() -> None:
     champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "production"}
-    champs["anthropic_api_key"] = "sk-ant-example-replace-me"
+    champs["gemini_api_key"] = "gemini-api-key-example-replace-me"
 
-    with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(ValueError, match="GEMINI_API_KEY"):
         Settings(**champs)
 
 

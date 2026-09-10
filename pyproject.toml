@@ -27,7 +27,7 @@ dependencies = [
     "pymupdf",
     "faiss-cpu",
     "FlagEmbedding",
-    "anthropic",
+    "google-genai",
     "torch",
     "torchvision",
     # app/scoring/config_schema.py lit config/weights/*.yaml au runtime (Phase 5 §9) — même
@@ -79,7 +79,7 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 # FlagEmbedding (bge-m3) ne fournit ni stubs ni marqueur py.typed, contrairement aux autres
-# dépendances lourdes de l'Étape 5 (docling, faiss, anthropic, pymupdf), qui en ont déjà.
+# dépendances lourdes de l'Étape 5 (docling, faiss, google-genai, pymupdf), qui en ont déjà.
 module = "FlagEmbedding"
 ignore_missing_imports = true
 
