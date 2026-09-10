@@ -10,6 +10,7 @@ Entreprise + Administrateur).
 """
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -35,6 +36,11 @@ class Entreprise(SQLModel, table=True):
         default=None, foreign_key="utilisateur.id"
     )
     montant_minimum_investissement: float | None = None
+    # Signal de publication (Étape 10), nullable comme RapportESG.extraction_terminee_le : sert à
+    # la fois de booléen (publiée dès que non nul) et de "depuis quand". Distinct du statut du
+    # rapport (StatutRapport n'a pas de valeur PUBLIE, et ça reste ainsi) — "valider" un rapport et
+    # "publier" une entreprise sont deux gestes délibérément séparés côté Administrateur.
+    date_publication: datetime | None = Field(default=None)
 
     utilisateur: Optional["Utilisateur"] = Relationship(back_populates="entreprise")
     rapports: list["RapportESG"] = Relationship(back_populates="entreprise")
