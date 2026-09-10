@@ -46,7 +46,8 @@ def test_methode_donnee_values() -> None:
 def test_decision_audit_values() -> None:
     assert {d.value for d in DecisionAudit} == {
         "RECOMMANDE_VALIDATION",
-        "ANOMALIE_SIGNALEE",
+        "RECOMMANDE_REJET",
+        "DEMANDE_CLARIFICATION",
     }
 
 
