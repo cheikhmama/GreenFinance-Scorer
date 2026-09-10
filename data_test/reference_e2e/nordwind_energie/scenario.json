@@ -1,0 +1,35 @@
+{
+  "_a_propos": "Entreprise de référence synthétique — corpus E2E (distinct de data_test/ground_truth.yaml, corpus de rapports réels utilisé pour la précision d'extraction). Voir data_test/reference_e2e/README.md.",
+  "entreprise": {
+    "nom": "Nordwind Energie",
+    "secteur": "Énergie",
+    "pays": "Allemagne"
+  },
+  "rapport": {
+    "fichier": "rapport.pdf",
+    "type": "RAPPORT_ESG",
+    "annee_reporting": 2025
+  },
+  "extraction_attendue": {
+    "indicateurs": [
+      { "code": "scope_1", "cible": "donnee_carbone", "valeur_attendue": 3100.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "scope_2_market_based", "cible": "donnee_carbone", "valeur_attendue": 450.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "scope_2_location_based", "cible": "donnee_carbone", "valeur_attendue": 61000.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "scope_3", "cible": "donnee_carbone", "valeur_attendue": 2100000.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "intensite_scope_1_2_marketbased", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 6.0, "unite": "gCO2e/kWh", "page_attendue": 3 },
+      { "code": "intensite_scope_1_2_3_hors_cat11", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 58.0, "unite": "gCO2e/kWh", "page_attendue": 3 },
+      { "code": "intensite_scope_1_2_3_total", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 31.0, "unite": "gCO2e/kWh", "page_attendue": 3 },
+      { "code": "femmes_management_pourcentage", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 28.0, "unite": "%", "page_attendue": 4 },
+      { "code": "deces_professionnels", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 1.0, "unite": "count", "page_attendue": 4 },
+      { "code": "femmes_conseil_pourcentage", "cible": "indicateur_esg", "pilier": "GOUVERNANCE", "valeur_attendue": 45.0, "unite": "%", "page_attendue": 4 }
+    ]
+  },
+  "audit_attendu": {
+    "decision": "RECOMMANDE_VALIDATION",
+    "commentaire_contient": "conforme"
+  },
+  "decision_admin_attendue": {
+    "statut": "VALIDE"
+  },
+  "publication_attendue": true
+}

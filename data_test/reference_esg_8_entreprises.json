@@ -1,0 +1,603 @@
+{
+  "_a_propos": [
+    "Corpus de référence E/S/G pour 8 entreprises réelles — distinct de data_test/ground_truth.yaml",
+    "(3 entreprises, carbone uniquement, vérité terrain page-par-page pour l'Étape 4).",
+    "Ce fichier ne contient AUCUNE valeur fabriquée : chaque champ vaut soit la valeur communiquée",
+    "par l'utilisateur (issue des rapports officiels de ces entreprises), soit null quand la source",
+    "ne la fournit pas ('N/A' dans le tableau d'origine) — jamais une estimation déguisée en valeur",
+    "réelle (voir la garantie G1 'aucune valeur sans preuve' et G2 'aucune saisie manuelle', actées",
+    "en Phase 0). Rien de ce fichier n'est écrit dans la base applicative : il sert de vérité terrain",
+    "pour valider une future extraction réelle depuis les rapports officiels, une fois les liens PDF",
+    "fournis (url_rapport_officiel/document_local encore vides ci-dessous) et une clé ANTHROPIC_API_KEY",
+    "réelle configurée.",
+    "N'est PAS encore branché à app/ingestion/extractor.py::INDICATEURS_CIBLES — décision explicite,",
+    "en attendant que la méthodologie de scoring (Étape 12/B4) définisse quels indicateurs comptent",
+    "réellement, plutôt que de câbler ~40 codes spéculatifs sans consommateur en aval.",
+    "Points de vigilance transversaux, valables pour les 8 entreprises :",
+    "  - Scope 2 communiqué comme une valeur unique, sans distinction market-based/location-based",
+    "    (contrairement au corpus ground_truth.yaml existant) — à trancher via le rapport officiel.",
+    "  - Les métriques de fréquence d'accidents (TRIFR, AIFR, TRIF, TRIR, LTIFR, TRFR, 'Fréquence',",
+    "    'Taux accidents') utilisent des méthodologies et dénominateurs différents selon l'entreprise —",
+    "    volontairement NON unifiées sous un code commun, pour ne jamais produire une comparaison",
+    "    silencieusement fausse.",
+    "  - Les qualificatifs de 'femmes en management' diffèrent aussi par périmètre (senior management,",
+    "    senior executives, top management, senior leaders, postes de responsabilité) — conservés",
+    "    littéralement par entreprise plutôt que fusionnés."
+  ],
+  "entreprises": [
+    {
+      "nom": "SNIM",
+      "pays_siege": "Mauritanie",
+      "secteur": "Mines",
+      "annee_reporting": 2024,
+      "nom_rapport": "Rapport annuel d'activité de la SNIM 2024",
+      "url_rapport_officiel": "https://snim.com/sites/default/files/SNIM-Rapport-activite-2024.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 0.533655,
+          "scope_2_mtco2e": 0.007076,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": null,
+          "notes": [
+            "Scope 3 absent de la source ('N/A')."
+          ]
+        },
+        "indicateurs": [
+          {
+            "code": "reduction_ges_pourcentage",
+            "valeur": 2.73,
+            "unite": "%"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": 8.36,
+        "femmes_management_pourcentage": 1.25,
+        "femmes_management_perimetre": "postes de responsabilité",
+        "accidents": {
+          "metrique_source": "Fréquence",
+          "valeur": 5.88,
+          "denominateur": null
+        },
+        "deces_professionnels": 1,
+        "indicateurs": [
+          {
+            "code": "accidents_avec_arret",
+            "valeur": 94,
+            "unite": "count"
+          },
+          {
+            "code": "sessions_formation_securite",
+            "valeur": 8187,
+            "unite": "count"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": null,
+        "administrateurs_independants_pourcentage": null,
+        "taille_conseil": 12,
+        "indicateurs": [
+          {
+            "code": "comite_audit_membres",
+            "valeur": 5,
+            "unite": "membres"
+          },
+          {
+            "code": "reunions_ca_par_an",
+            "valeur": 4,
+            "unite": "réunions/an",
+            "note": "source indique '≥4/an' — borne inférieure, pas une valeur exacte."
+          },
+          {
+            "code": "comite_executif_membres",
+            "valeur": 4,
+            "unite": "membres"
+          }
+        ]
+      },
+      "note_verification_lien": "Rapport ANNUEL d'activité, pas un rapport RSE dédié — le RSE le plus récent trouvé sur snim.com est celui de 2023. Les valeurs E/S/G communiquées doivent être vérifiées dans ce rapport annuel ; si absentes, il faudra aussi consulter le Rapport RSE 2023 (https://www.snim.com/fr/rapport-rse-2023)."
+    },
+    {
+      "nom": "Kinross Gold / Tasiast",
+      "pays_siege": "Mauritanie",
+      "secteur": "Mines",
+      "annee_reporting": 2024,
+      "nom_rapport": "Kinross 2024 Sustainability Report",
+      "url_rapport_officiel": "https://s204.q4cdn.com/896213035/files/doc_downloads/2024/sustainability/Kinross-2024-Sustainability-Report.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 1.078,
+          "scope_2_mtco2e": 0.391,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 1.797,
+          "notes": []
+        },
+        "indicateurs": [
+          {
+            "code": "intensite_ges_kg_par_tonne_minerai",
+            "valeur": 11.0,
+            "unite": "kgCO2e/t minerai"
+          },
+          {
+            "code": "energie_renouvelable_pourcentage",
+            "valeur": 24,
+            "unite": "%"
+          },
+          {
+            "code": "electricite_renouvelable_pourcentage",
+            "valeur": 67,
+            "unite": "%"
+          },
+          {
+            "code": "eau_recyclee_pourcentage",
+            "valeur": 75,
+            "unite": "%"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": 14,
+        "femmes_effectif_pourcentage_tasiast": 8,
+        "femmes_management_pourcentage": 22,
+        "femmes_management_perimetre": "senior management",
+        "accidents": {
+          "metrique_source": "TRIFR",
+          "valeur": 0.33,
+          "denominateur": "200 000 heures"
+        },
+        "deces_professionnels": 0,
+        "indicateurs": [
+          {
+            "code": "employes_locaux_pourcentage",
+            "valeur": 99.1,
+            "unite": "%"
+          },
+          {
+            "code": "contribution_communautaire_usd",
+            "valeur": 13000000,
+            "unite": "USD"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": 30,
+        "administrateurs_independants_pourcentage": 90,
+        "taille_conseil": 10,
+        "indicateurs": [
+          {
+            "code": "management_forme_anticorruption_pourcentage",
+            "valeur": 97,
+            "unite": "%"
+          },
+          {
+            "code": "cas_anticorruption_confirmes",
+            "valeur": 0,
+            "unite": "count"
+          }
+        ]
+      },
+      "note_verification_lien": "PDF hébergé sur le CDN officiel des relations investisseurs (Q4/q4cdn.com), lié depuis kinross.com — pas le domaine kinross.com lui-même, mais l'hébergeur standard utilisé par de nombreuses sociétés cotées pour leurs documents IR."
+    },
+    {
+      "nom": "Rio Tinto",
+      "pays_siege": null,
+      "secteur": "Mines",
+      "annee_reporting": 2024,
+      "nom_rapport": "Rio Tinto 2024 Annual Report",
+      "url_rapport_officiel": "https://www.riotinto.com/-/media/content/documents/invest/reports/annual-reports/2024-annual-report.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 23.0,
+          "scope_2_mtco2e": 6.9,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 574.6,
+          "notes": []
+        },
+        "indicateurs": [
+          {
+            "code": "electricite_renouvelable_pourcentage",
+            "valeur": 78,
+            "unite": "%"
+          },
+          {
+            "code": "energie_consommee_pj",
+            "valeur": 490,
+            "unite": "PJ"
+          },
+          {
+            "code": "intensite_ges_par_tonne_cu_eq",
+            "valeur": 6.1,
+            "unite": "tCO2e/t Cu-eq"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": 25.2,
+        "femmes_management_pourcentage": 32,
+        "femmes_management_perimetre": "senior leaders",
+        "accidents": {
+          "metrique_source": "AIFR",
+          "valeur": 0.37,
+          "denominateur": null
+        },
+        "deces_professionnels": 5,
+        "indicateurs": [
+          {
+            "code": "satisfaction_employes_pourcentage",
+            "valeur": 74,
+            "unite": "%"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": 42.8,
+        "femmes_conseil_nombre": 6,
+        "administrateurs_independants_pourcentage": null,
+        "taille_conseil": 14,
+        "indicateurs": []
+      },
+      "note_verification_lien": "Rio Tinto n'a pas publié de rapport climat séparé pour 2024 — les données climat/ESG sont intégrées au Rapport Annuel (pages 41-75, alignées IFRS S2). Un « Sustainability Fact Book 2024 » existe aussi mais au format XLSX, pas PDF."
+    },
+    {
+      "nom": "BHP",
+      "pays_siege": null,
+      "secteur": "Mines",
+      "annee_reporting": "FY2024",
+      "nom_rapport": "BHP Climate Transition Action Plan 2024",
+      "url_rapport_officiel": "https://www.bhp.com/-/media/documents/investors/annual-reports/2024/240827_bhpclimatetransitionactionplan2024.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 8.2,
+          "scope_2_mtco2e": 1.9,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 377.0,
+          "notes": []
+        },
+        "indicateurs": [
+          {
+            "code": "reduction_scope_1_2_vs_reference_pourcentage",
+            "valeur": 32,
+            "unite": "%",
+            "note": "vs référence ajustée"
+          },
+          {
+            "code": "intensite_ges_par_tonne_cu_eq",
+            "valeur": 1.5,
+            "unite": "tCO2e/t Cu-eq"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": 37.1,
+        "femmes_management_pourcentage": 40.9,
+        "femmes_management_perimetre": "senior executives",
+        "accidents": {
+          "metrique_source": "TRIF",
+          "valeur": 4.7,
+          "denominateur": "million heures"
+        },
+        "deces_professionnels": 1,
+        "indicateurs": [
+          {
+            "code": "blessures_haut_potentiel",
+            "valeur": 21,
+            "unite": "count"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": 40,
+        "administrateurs_independants_pourcentage": null,
+        "taille_conseil": null,
+        "indicateurs": []
+      }
+    },
+    {
+      "nom": "TotalEnergies",
+      "pays_siege": null,
+      "secteur": "Énergie",
+      "annee_reporting": 2024,
+      "nom_rapport": "TotalEnergies Sustainability & Climate 2025 Progress Report",
+      "url_rapport_officiel": "https://totalenergies.com/system/files/documents/totalenergies_sustainability-climate-2025-progress-report_2025_fr.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 33,
+          "scope_2_mtco2e": 1,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 342,
+          "notes": [
+            "Scope 3 marqué d'un astérisque dans la source communiquée — probable renvoi méthodologique non reproduit ici ; à vérifier contre le rapport officiel."
+          ]
+        },
+        "indicateurs": [
+          {
+            "code": "methane_kt_ch4",
+            "valeur": 29,
+            "unite": "ktCH4"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": null,
+        "femmes_management_pourcentage": 25.8,
+        "femmes_management_perimetre": "senior management",
+        "femmes_management_pourcentage_secondaire": 29.5,
+        "femmes_management_perimetre_secondaire": "senior executives",
+        "accidents": {
+          "metrique_source": "TRIR",
+          "valeur": 0.55,
+          "denominateur": "million heures"
+        },
+        "deces_professionnels": 1,
+        "indicateurs": [
+          {
+            "code": "incidents_tier_1_2",
+            "valeur": 39,
+            "unite": "count"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": 45,
+        "administrateurs_independants_pourcentage": 82,
+        "taille_conseil": 14,
+        "indicateurs": [
+          {
+            "code": "nationalites_conseil",
+            "valeur": 7,
+            "unite": "count"
+          }
+        ]
+      },
+      "note_verification_lien": "CORRECTION : le rapport intitulé « 2024 Progress Report » (publié mars 2024) couvre en réalité l'exercice 2023, pas 2024 — piège de nommage classique chez TotalEnergies (le rapport porte l'année de publication, pas l'année de reporting). Les données de l'exercice 2024 (celles du tableau fourni) sont dans le « 2025 Progress Report », publié mars 2025 — c'est ce lien qui est retenu ici."
+    },
+    {
+      "nom": "Maersk",
+      "pays_siege": null,
+      "secteur": "Transport maritime",
+      "annee_reporting": 2025,
+      "nom_rapport": "A.P. Møller - Mærsk Annual Report 2025",
+      "url_rapport_officiel": "https://investor.maersk.com/static-files/75fac9de-c2cc-421c-8eaf-17d5c5d86135",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 33.953,
+          "scope_2_mtco2e": 0.313,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 51.183,
+          "notes": []
+        },
+        "indicateurs": [
+          {
+            "code": "total_ges_mtco2e",
+            "valeur": 85.449,
+            "unite": "MtCO2e",
+            "note": "total communiqué directement par la source ; cohérent avec scope1+2+3 (85.449)."
+          },
+          {
+            "code": "evolution_totale_ges_pourcentage",
+            "valeur": 2,
+            "unite": "%",
+            "note": "variation par rapport à l'exercice précédent."
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": null,
+        "femmes_management_pourcentage": 36,
+        "femmes_management_perimetre": "top management",
+        "accidents": {
+          "metrique_source": "LTIF",
+          "valeur": 1.67,
+          "denominateur": null
+        },
+        "deces_professionnels": 0,
+        "indicateurs": [
+          {
+            "code": "engagement_employes_score",
+            "valeur": 83,
+            "unite": "/100"
+          },
+          {
+            "code": "turnover_pourcentage",
+            "valeur": 14,
+            "unite": "%"
+          },
+          {
+            "code": "actions_securite_cloturees",
+            "valeur": 1850,
+            "unite": "count"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": null,
+        "administrateurs_independants_pourcentage": null,
+        "taille_conseil": null,
+        "indicateurs": [
+          {
+            "code": "reunions_comite_audit",
+            "valeur": 7,
+            "unite": "count"
+          },
+          {
+            "code": "presence_reunions_pourcentage",
+            "valeur": 95.2,
+            "unite": "%"
+          },
+          {
+            "code": "signalements_whistleblower",
+            "valeur": 1174,
+            "unite": "count"
+          },
+          {
+            "code": "controles_conformite",
+            "valeur": 67,
+            "unite": "count"
+          }
+        ]
+      },
+      "note_verification_lien": "Sous-domaine investisseurs officiel (investor.maersk.com) — le reporting durabilité de Maersk est intégré au rapport annuel, pas un document séparé."
+    },
+    {
+      "nom": "Unilever",
+      "pays_siege": null,
+      "secteur": "Biens de consommation",
+      "annee_reporting": 2025,
+      "nom_rapport": "Unilever Annual Report and Accounts 2025",
+      "url_rapport_officiel": "https://www.unilever.com/files/unilever-annual-report-and-accounts-2025.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 0.43,
+          "scope_2_mtco2e": 0.06,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 96.55,
+          "notes": []
+        },
+        "indicateurs": [
+          {
+            "code": "total_scope_123_mtco2e",
+            "valeur": 97.04,
+            "unite": "MtCO2e",
+            "note": "total communiqué directement par la source ; cohérent avec scope1+2+3 (97.04)."
+          },
+          {
+            "code": "variation_ges_pourcentage",
+            "valeur": -11,
+            "unite": "%"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": null,
+        "femmes_management_pourcentage": 29,
+        "femmes_management_perimetre": "top management",
+        "accidents": {
+          "metrique_source": "TRFR",
+          "valeur": 0.41,
+          "denominateur": "million heures"
+        },
+        "deces_professionnels": 0,
+        "indicateurs": [
+          {
+            "code": "accidents_total",
+            "valeur": 92,
+            "unite": "count"
+          },
+          {
+            "code": "jours_perdus",
+            "valeur": 1936,
+            "unite": "jours"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": 40,
+        "femmes_conseil_nombre": 4,
+        "administrateurs_independants_pourcentage": 70,
+        "administrateurs_independants_nombre": 7,
+        "taille_conseil": 10,
+        "indicateurs": []
+      },
+      "note_verification_lien": "Un « Sustainability Statement 2025 » séparé existe aussi (extrait du rapport annuel, sans ajustement) : https://www.unilever.com/files/unilever-sustainability-statement.pdf"
+    },
+    {
+      "nom": "Nestlé",
+      "pays_siege": null,
+      "secteur": "Agroalimentaire",
+      "annee_reporting": 2025,
+      "nom_rapport": "Creating Shared Value at Nestlé 2025",
+      "url_rapport_officiel": "https://www.nestle.com/sites/default/files/2026-02/creating-shared-value-nestle-2025.pdf",
+      "document_local": null,
+      "environnement": {
+        "carbone": {
+          "scope_1_mtco2e": 2.82,
+          "scope_2_mtco2e": 0.22,
+          "scope_2_methode_precisee": false,
+          "scope_3_mtco2e": 66.01,
+          "notes": []
+        },
+        "indicateurs": [
+          {
+            "code": "scope_3_hors_perimetre_netzero_mt",
+            "valeur": 8.78,
+            "unite": "MtCO2e"
+          },
+          {
+            "code": "reduction_nette_ges_pourcentage",
+            "valeur": 24.52,
+            "unite": "%"
+          },
+          {
+            "code": "electricite_renouvelable_pourcentage",
+            "valeur": 98.6,
+            "unite": "%"
+          },
+          {
+            "code": "energie_renouvelable_pourcentage",
+            "valeur": 40.6,
+            "unite": "%"
+          },
+          {
+            "code": "eau_prelevee_mm3",
+            "valeur": 96.1,
+            "unite": "Mm³"
+          }
+        ]
+      },
+      "social": {
+        "femmes_effectif_pourcentage": 40.4,
+        "femmes_management_pourcentage": 48.2,
+        "femmes_management_perimetre": "management",
+        "accidents": {
+          "metrique_source": "Taux accidents",
+          "valeur": 1.13,
+          "denominateur": "million heures"
+        },
+        "deces_professionnels": 2,
+        "indicateurs": [
+          {
+            "code": "formation_heures_par_employe",
+            "valeur": 11.7,
+            "unite": "h/employé"
+          },
+          {
+            "code": "retention_conge_parental_pourcentage",
+            "valeur": 91.2,
+            "unite": "%"
+          }
+        ]
+      },
+      "gouvernance": {
+        "femmes_conseil_pourcentage": 36.4,
+        "administrateurs_independants_pourcentage": null,
+        "taille_conseil": 11,
+        "indicateurs": [
+          {
+            "code": "audits_care",
+            "valeur": 223,
+            "unite": "count"
+          },
+          {
+            "code": "signalements_speakup",
+            "valeur": 3753,
+            "unite": "count"
+          },
+          {
+            "code": "signalements_corruption_conflits",
+            "valeur": 225,
+            "unite": "count"
+          }
+        ]
+      },
+      "note_verification_lien": "Un « Non-Financial Statement 2025 » plus détaillé sur les KPI existe aussi en complément, mentionné sur nestle.com/sustainability/performance-reporting."
+    }
+  ]
+}
