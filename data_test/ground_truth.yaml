@@ -5,8 +5,13 @@
 # une valeur — indépendamment du pipeline Docling/BGE-M3/Claude qui sera testé aux Prompts 4.2-4.5.
 # Chaque fiche a été présentée à l'utilisateur pour relecture avant d'être écrite ici.
 #
-# Corpus pilote réduit à 4 entreprises (décision explicite, en écart avec le plan initial qui en
-# prévoyait 8) : schneider_electric, microsoft, orsted, ingka_group. Les PDF apple, totalenergies,
+# Corpus pilote réduit à 3 entreprises (décision explicite du 2026-08-20, en écart avec le plan
+# initial qui en prévoyait 8, puis avec la réduction précédente à 4) : microsoft, orsted, ingka_group.
+# schneider_electric a été retiré du corpus actif : son PDF ("Sustainable Development Report 2025")
+# n'a pas pu être retéléchargé — se.com est protégé par un anti-bot (Akamai) qui bloque aussi bien un
+# accès direct qu'un accès via un outil de fetch dédié, et aucun miroir légitime n'a été trouvé. Trois
+# rapports ont été jugés suffisants pour valider le protocole du Prompt 4.3 (11/15 retrieval_recall_at_8,
+# 73,3 %, deux rapports à 100 %) sans attendre la résolution de ce blocage. Les PDF apple, totalenergies,
 # unilever, nestle restent dans storage/pilot_corpus/ (téléchargés lors d'une session précédente) mais
 # sont hors périmètre retenu pour le verdict GO/NO-GO du Prompt 4.6 — leurs valeurs n'ont jamais été
 # vérifiées manuellement et ne doivent pas être réutilisées sans le faire.
@@ -15,40 +20,6 @@
 # Read), pas nécessairement le numéro imprimé en pied de page.
 
 entreprises:
-  - nom: schneider_electric
-    nom_rapport: "Sustainable Development Report 2025"
-    annee: 2025
-    url: https://www.se.com/ww/en/download/document/2025_Sustainability_Report/
-    document: storage/pilot_corpus/schneider_electric.pdf
-    indicateurs:
-      - code: scope_1
-        valeur_attendue: 100309.0
-        unite: tCO2e
-        page_attendue: 82
-      - code: scope_2_market_based
-        valeur_attendue: 23849.0
-        unite: tCO2e
-        page_attendue: 82
-      - code: scope_2_location_based
-        valeur_attendue: 409343.0
-        unite: tCO2e
-        page_attendue: 82
-      - code: scope_3
-        valeur_attendue: 60581278.0
-        unite: tCO2e
-        page_attendue: "82-83"
-    notes: >
-      Le plan initial de l'Étape 4 citait comme exemple, pour Schneider Electric,
-      "scope_1_2_marketbased_tco2e: 143708, page 346-347" — un chiffre qui ne correspond PAS à ce qui a
-      été vérifié ici (Scope 1+2 market-based combiné = 124158 tCO2e, pages 82-83, dans le Sustainable
-      Development Report 2025). Page 346-347 correspondrait plutôt à l'échelle du Document
-      d'Enregistrement Universel 2025 (~550 pages, non utilisé ici) — probablement une source et/ou une
-      année différente. Discrépance à clarifier avant de trancher entre les deux sources.
-      Un domaine se.com protégé par anti-bot (Akamai) a bloqué les téléchargements directs ; le PDF a
-      été obtenu via le CDN documentaire officiel (download.se.com). Un faux miroir tiers présenté comme
-      le rapport Schneider Electric s'est avéré être un document d'Orange S.A. — détecté et écarté avant
-      usage.
-
   - nom: microsoft
     nom_rapport: "2025 Environmental Sustainability Report — Data Fact Sheet"
     annee: "FY2024 (1 juillet 2023 - 30 juin 2024)"

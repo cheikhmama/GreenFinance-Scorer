@@ -27,8 +27,9 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptio
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
 
+# schneider_electric retire du corpus actif (2026-08-20) : PDF source introuvable, se.com bloque les
+# telechargements automatises par anti-bot (Akamai) -- voir la note en tete de data_test/ground_truth.yaml.
 CORPUS = {
-    "schneider_electric": "storage/pilot_corpus/schneider_electric.pdf",
     "microsoft": "storage/pilot_corpus/microsoft.pdf",
     "orsted": "storage/pilot_corpus/orsted.pdf",
     "ingka_group": "storage/pilot_corpus/ingka_group.pdf",

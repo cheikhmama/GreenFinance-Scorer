@@ -18,6 +18,22 @@ dependencies = [
     "passlib[bcrypt]",
     "bcrypt<4.1",  # passlib 1.7.4 ne reconnaît pas l'API de bcrypt >=4.1 (module __about__ retiré)
     "redis",
+    "python-multipart",  # requis par FastAPI pour UploadFile/Form (POST /company/rapports, Étape 5)
+    # Pipeline d'extraction documentaire (Étape 5) — promues depuis le groupe notebook : l'API en a
+    # besoin au runtime (app/ingestion/docling_pipeline.py, extractor.py), pas seulement les notebooks.
+    "docling",
+    "paddlepaddle",
+    "paddleocr",
+    "pymupdf",
+    "faiss-cpu",
+    "FlagEmbedding",
+    "anthropic",
+    "torch",
+    "torchvision",
+    # app/scoring/config_schema.py lit config/weights/*.yaml au runtime (Phase 5 §9) — même
+    # raisonnement que le bloc ci-dessus, promu du groupe notebook où il ne servait jusqu'ici
+    # qu'à lire data_test/ground_truth.yaml depuis les scripts de validation.
+    "pyyaml>=6.0.2",
 ]
 
 [dependency-groups]
@@ -27,20 +43,11 @@ dev = [
     "pre-commit",
     "httpx",
     "types-passlib",
+    "types-pyyaml",
 ]
 notebook = [
     "jupyter",
     "ipykernel",
-    "docling",
-    "paddlepaddle",
-    "paddleocr",
-    "pymupdf",
-    "faiss-cpu",
-    "FlagEmbedding",
-    "anthropic",
-    "pyyaml",
-    "torch",
-    "torchvision",
 ]
 
 [tool.uv.sources]
@@ -56,10 +63,25 @@ explicit = true
 # B008 (function call in default argument) est un faux positif pour ces
 # appels : c'est l'idiome FastAPI standard pour l'injection de dépendances,
 # pas un défaut mutable partagé entre appels.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Cookie", "fastapi.Query", "fastapi.Header"]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Cookie",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Form",
+    # Fabrique de dépendance RBAC (app/auth/permissions.py) : produit une closure sans état à
+    # chaque appel, même idiome que Depends() lui-même — pas un défaut mutable partagé.
+    "app.auth.permissions.require_role",
+]
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# FlagEmbedding (bge-m3) ne fournit ni stubs ni marqueur py.typed, contrairement aux autres
+# dépendances lourdes de l'Étape 5 (docling, faiss, anthropic, pymupdf), qui en ont déjà.
+module = "FlagEmbedding"
+ignore_missing_imports = true
 
 [build-system]
 requires = ["hatchling"]

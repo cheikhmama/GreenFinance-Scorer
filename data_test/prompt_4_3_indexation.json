@@ -1,0 +1,2120 @@
+{
+  "microsoft": {
+    "n_chunks": 211,
+    "n_indicateurs": 4,
+    "requetes": [
+      "Scope 1, Scope 2 location-based, Scope 2 market-based and Scope 3 greenhouse gas emissions in tonnes of CO2 equivalent (tCO2e)",
+      "Greenhouse gas emissions intensity in grams of CO2 equivalent per kilowatt-hour (gCO2e/kWh)"
+    ],
+    "classement_complet": [
+      {
+        "page": 10,
+        "score": 0.709,
+        "rang": 1
+      },
+      {
+        "page": 2,
+        "score": 0.6868,
+        "rang": 2
+      },
+      {
+        "page": 14,
+        "score": 0.6779,
+        "rang": 3
+      },
+      {
+        "page": 12,
+        "score": 0.6743,
+        "rang": 4
+      },
+      {
+        "page": 11,
+        "score": 0.6743,
+        "rang": 5
+      },
+      {
+        "page": 13,
+        "score": 0.6713,
+        "rang": 6
+      },
+      {
+        "page": 18,
+        "score": 0.65,
+        "rang": 7
+      },
+      {
+        "page": 17,
+        "score": 0.6487,
+        "rang": 8
+      },
+      {
+        "page": 4,
+        "score": 0.643,
+        "rang": 9
+      },
+      {
+        "page": 3,
+        "score": 0.624,
+        "rang": 10
+      },
+      {
+        "page": 5,
+        "score": 0.6214,
+        "rang": 11
+      },
+      {
+        "page": 24,
+        "score": 0.599,
+        "rang": 12
+      },
+      {
+        "page": 8,
+        "score": 0.5989,
+        "rang": 13
+      },
+      {
+        "page": 22,
+        "score": 0.5755,
+        "rang": 14
+      },
+      {
+        "page": 19,
+        "score": 0.5669,
+        "rang": 15
+      },
+      {
+        "page": 15,
+        "score": 0.5586,
+        "rang": 16
+      },
+      {
+        "page": 7,
+        "score": 0.5374,
+        "rang": 17
+      },
+      {
+        "page": 20,
+        "score": 0.5353,
+        "rang": 18
+      },
+      {
+        "page": 9,
+        "score": 0.5147,
+        "rang": 19
+      },
+      {
+        "page": 6,
+        "score": 0.5087,
+        "rang": 20
+      },
+      {
+        "page": 23,
+        "score": 0.5079,
+        "rang": 21
+      },
+      {
+        "page": 16,
+        "score": 0.4891,
+        "rang": 22
+      },
+      {
+        "page": 25,
+        "score": 0.4471,
+        "rang": 23
+      },
+      {
+        "page": 21,
+        "score": 0.4456,
+        "rang": 24
+      },
+      {
+        "page": 1,
+        "score": 0.4409,
+        "rang": 25
+      }
+    ],
+    "pages_top8": [
+      {
+        "page": 10,
+        "score": 0.709,
+        "rang": 1
+      },
+      {
+        "page": 2,
+        "score": 0.6868,
+        "rang": 2
+      },
+      {
+        "page": 14,
+        "score": 0.6779,
+        "rang": 3
+      },
+      {
+        "page": 12,
+        "score": 0.6743,
+        "rang": 4
+      },
+      {
+        "page": 11,
+        "score": 0.6743,
+        "rang": 5
+      },
+      {
+        "page": 13,
+        "score": 0.6713,
+        "rang": 6
+      },
+      {
+        "page": 18,
+        "score": 0.65,
+        "rang": 7
+      },
+      {
+        "page": 17,
+        "score": 0.6487,
+        "rang": 8
+      }
+    ],
+    "rappel_hits": 0,
+    "rappel_taux": 0.0,
+    "details": [
+      {
+        "code": "scope_1",
+        "pages_attendues": [
+          3
+        ],
+        "rang_trouve": 10,
+        "score_trouve": 0.624,
+        "hit_top8": false,
+        "pages_attendues_retrouvees": [
+          3
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_2_market_based",
+        "pages_attendues": [
+          3
+        ],
+        "rang_trouve": 10,
+        "score_trouve": 0.624,
+        "hit_top8": false,
+        "pages_attendues_retrouvees": [
+          3
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_2_location_based",
+        "pages_attendues": [
+          3
+        ],
+        "rang_trouve": 10,
+        "score_trouve": 0.624,
+        "hit_top8": false,
+        "pages_attendues_retrouvees": [
+          3
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_3",
+        "pages_attendues": [
+          3
+        ],
+        "rang_trouve": 10,
+        "score_trouve": 0.624,
+        "hit_top8": false,
+        "pages_attendues_retrouvees": [
+          3
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      }
+    ]
+  },
+  "orsted": {
+    "n_chunks": 1007,
+    "n_indicateurs": 7,
+    "requetes": [
+      "Scope 1, Scope 2 location-based, Scope 2 market-based and Scope 3 greenhouse gas emissions in tonnes of CO2 equivalent (tCO2e)",
+      "Greenhouse gas emissions intensity in grams of CO2 equivalent per kilowatt-hour (gCO2e/kWh)"
+    ],
+    "classement_complet": [
+      {
+        "page": 79,
+        "score": 0.6825,
+        "rang": 1
+      },
+      {
+        "page": 38,
+        "score": 0.6774,
+        "rang": 2
+      },
+      {
+        "page": 80,
+        "score": 0.6758,
+        "rang": 3
+      },
+      {
+        "page": 78,
+        "score": 0.6656,
+        "rang": 4
+      },
+      {
+        "page": 76,
+        "score": 0.6553,
+        "rang": 5
+      },
+      {
+        "page": 57,
+        "score": 0.5877,
+        "rang": 6
+      },
+      {
+        "page": 56,
+        "score": 0.5874,
+        "rang": 7
+      },
+      {
+        "page": 6,
+        "score": 0.578,
+        "rang": 8
+      },
+      {
+        "page": 59,
+        "score": 0.5704,
+        "rang": 9
+      },
+      {
+        "page": 68,
+        "score": 0.5683,
+        "rang": 10
+      },
+      {
+        "page": 84,
+        "score": 0.5667,
+        "rang": 11
+      },
+      {
+        "page": 112,
+        "score": 0.565,
+        "rang": 12
+      },
+      {
+        "page": 49,
+        "score": 0.564,
+        "rang": 13
+      },
+      {
+        "page": 111,
+        "score": 0.562,
+        "rang": 14
+      },
+      {
+        "page": 32,
+        "score": 0.5543,
+        "rang": 15
+      },
+      {
+        "page": 113,
+        "score": 0.5447,
+        "rang": 16
+      },
+      {
+        "page": 70,
+        "score": 0.5428,
+        "rang": 17
+      },
+      {
+        "page": 82,
+        "score": 0.5426,
+        "rang": 18
+      },
+      {
+        "page": 69,
+        "score": 0.5423,
+        "rang": 19
+      },
+      {
+        "page": 73,
+        "score": 0.5403,
+        "rang": 20
+      },
+      {
+        "page": 75,
+        "score": 0.539,
+        "rang": 21
+      },
+      {
+        "page": 85,
+        "score": 0.5384,
+        "rang": 22
+      },
+      {
+        "page": 74,
+        "score": 0.5379,
+        "rang": 23
+      },
+      {
+        "page": 93,
+        "score": 0.5356,
+        "rang": 24
+      },
+      {
+        "page": 58,
+        "score": 0.5348,
+        "rang": 25
+      },
+      {
+        "page": 91,
+        "score": 0.5345,
+        "rang": 26
+      },
+      {
+        "page": 131,
+        "score": 0.5265,
+        "rang": 27
+      },
+      {
+        "page": 72,
+        "score": 0.5252,
+        "rang": 28
+      },
+      {
+        "page": 116,
+        "score": 0.524,
+        "rang": 29
+      },
+      {
+        "page": 217,
+        "score": 0.5233,
+        "rang": 30
+      },
+      {
+        "page": 31,
+        "score": 0.5211,
+        "rang": 31
+      },
+      {
+        "page": 71,
+        "score": 0.5208,
+        "rang": 32
+      },
+      {
+        "page": 114,
+        "score": 0.5202,
+        "rang": 33
+      },
+      {
+        "page": 77,
+        "score": 0.5185,
+        "rang": 34
+      },
+      {
+        "page": 65,
+        "score": 0.5183,
+        "rang": 35
+      },
+      {
+        "page": 170,
+        "score": 0.5166,
+        "rang": 36
+      },
+      {
+        "page": 35,
+        "score": 0.5125,
+        "rang": 37
+      },
+      {
+        "page": 188,
+        "score": 0.5116,
+        "rang": 38
+      },
+      {
+        "page": 139,
+        "score": 0.5102,
+        "rang": 39
+      },
+      {
+        "page": 146,
+        "score": 0.5064,
+        "rang": 40
+      },
+      {
+        "page": 66,
+        "score": 0.5053,
+        "rang": 41
+      },
+      {
+        "page": 67,
+        "score": 0.504,
+        "rang": 42
+      },
+      {
+        "page": 83,
+        "score": 0.5022,
+        "rang": 43
+      },
+      {
+        "page": 109,
+        "score": 0.4993,
+        "rang": 44
+      },
+      {
+        "page": 81,
+        "score": 0.4981,
+        "rang": 45
+      },
+      {
+        "page": 187,
+        "score": 0.4963,
+        "rang": 46
+      },
+      {
+        "page": 47,
+        "score": 0.4933,
+        "rang": 47
+      },
+      {
+        "page": 195,
+        "score": 0.4927,
+        "rang": 48
+      },
+      {
+        "page": 209,
+        "score": 0.4896,
+        "rang": 49
+      },
+      {
+        "page": 90,
+        "score": 0.4895,
+        "rang": 50
+      },
+      {
+        "page": 22,
+        "score": 0.4894,
+        "rang": 51
+      },
+      {
+        "page": 141,
+        "score": 0.4854,
+        "rang": 52
+      },
+      {
+        "page": 103,
+        "score": 0.4845,
+        "rang": 53
+      },
+      {
+        "page": 101,
+        "score": 0.4843,
+        "rang": 54
+      },
+      {
+        "page": 132,
+        "score": 0.4838,
+        "rang": 55
+      },
+      {
+        "page": 87,
+        "score": 0.4837,
+        "rang": 56
+      },
+      {
+        "page": 123,
+        "score": 0.4828,
+        "rang": 57
+      },
+      {
+        "page": 175,
+        "score": 0.4822,
+        "rang": 58
+      },
+      {
+        "page": 3,
+        "score": 0.4786,
+        "rang": 59
+      },
+      {
+        "page": 52,
+        "score": 0.4729,
+        "rang": 60
+      },
+      {
+        "page": 102,
+        "score": 0.4712,
+        "rang": 61
+      },
+      {
+        "page": 145,
+        "score": 0.4709,
+        "rang": 62
+      },
+      {
+        "page": 11,
+        "score": 0.4708,
+        "rang": 63
+      },
+      {
+        "page": 88,
+        "score": 0.4704,
+        "rang": 64
+      },
+      {
+        "page": 89,
+        "score": 0.4701,
+        "rang": 65
+      },
+      {
+        "page": 215,
+        "score": 0.47,
+        "rang": 66
+      },
+      {
+        "page": 151,
+        "score": 0.469,
+        "rang": 67
+      },
+      {
+        "page": 161,
+        "score": 0.4686,
+        "rang": 68
+      },
+      {
+        "page": 178,
+        "score": 0.4673,
+        "rang": 69
+      },
+      {
+        "page": 25,
+        "score": 0.4643,
+        "rang": 70
+      },
+      {
+        "page": 186,
+        "score": 0.4641,
+        "rang": 71
+      },
+      {
+        "page": 193,
+        "score": 0.4636,
+        "rang": 72
+      },
+      {
+        "page": 181,
+        "score": 0.461,
+        "rang": 73
+      },
+      {
+        "page": 167,
+        "score": 0.461,
+        "rang": 74
+      },
+      {
+        "page": 36,
+        "score": 0.4607,
+        "rang": 75
+      },
+      {
+        "page": 143,
+        "score": 0.4602,
+        "rang": 76
+      },
+      {
+        "page": 130,
+        "score": 0.4602,
+        "rang": 77
+      },
+      {
+        "page": 136,
+        "score": 0.4594,
+        "rang": 78
+      },
+      {
+        "page": 129,
+        "score": 0.458,
+        "rang": 79
+      },
+      {
+        "page": 17,
+        "score": 0.4573,
+        "rang": 80
+      },
+      {
+        "page": 122,
+        "score": 0.4572,
+        "rang": 81
+      },
+      {
+        "page": 18,
+        "score": 0.457,
+        "rang": 82
+      },
+      {
+        "page": 86,
+        "score": 0.4551,
+        "rang": 83
+      },
+      {
+        "page": 60,
+        "score": 0.4547,
+        "rang": 84
+      },
+      {
+        "page": 13,
+        "score": 0.4547,
+        "rang": 85
+      },
+      {
+        "page": 37,
+        "score": 0.4543,
+        "rang": 86
+      },
+      {
+        "page": 10,
+        "score": 0.4543,
+        "rang": 87
+      },
+      {
+        "page": 105,
+        "score": 0.4538,
+        "rang": 88
+      },
+      {
+        "page": 176,
+        "score": 0.4535,
+        "rang": 89
+      },
+      {
+        "page": 169,
+        "score": 0.453,
+        "rang": 90
+      },
+      {
+        "page": 148,
+        "score": 0.4527,
+        "rang": 91
+      },
+      {
+        "page": 55,
+        "score": 0.4525,
+        "rang": 92
+      },
+      {
+        "page": 61,
+        "score": 0.4522,
+        "rang": 93
+      },
+      {
+        "page": 21,
+        "score": 0.4519,
+        "rang": 94
+      },
+      {
+        "page": 120,
+        "score": 0.4513,
+        "rang": 95
+      },
+      {
+        "page": 107,
+        "score": 0.4512,
+        "rang": 96
+      },
+      {
+        "page": 200,
+        "score": 0.4499,
+        "rang": 97
+      },
+      {
+        "page": 126,
+        "score": 0.4493,
+        "rang": 98
+      },
+      {
+        "page": 119,
+        "score": 0.4491,
+        "rang": 99
+      },
+      {
+        "page": 2,
+        "score": 0.4488,
+        "rang": 100
+      },
+      {
+        "page": 153,
+        "score": 0.4487,
+        "rang": 101
+      },
+      {
+        "page": 44,
+        "score": 0.4469,
+        "rang": 102
+      },
+      {
+        "page": 189,
+        "score": 0.4467,
+        "rang": 103
+      },
+      {
+        "page": 100,
+        "score": 0.4465,
+        "rang": 104
+      },
+      {
+        "page": 194,
+        "score": 0.4462,
+        "rang": 105
+      },
+      {
+        "page": 62,
+        "score": 0.4442,
+        "rang": 106
+      },
+      {
+        "page": 159,
+        "score": 0.4434,
+        "rang": 107
+      },
+      {
+        "page": 198,
+        "score": 0.4429,
+        "rang": 108
+      },
+      {
+        "page": 127,
+        "score": 0.4405,
+        "rang": 109
+      },
+      {
+        "page": 211,
+        "score": 0.4404,
+        "rang": 110
+      },
+      {
+        "page": 135,
+        "score": 0.44,
+        "rang": 111
+      },
+      {
+        "page": 163,
+        "score": 0.4395,
+        "rang": 112
+      },
+      {
+        "page": 99,
+        "score": 0.4395,
+        "rang": 113
+      },
+      {
+        "page": 134,
+        "score": 0.4385,
+        "rang": 114
+      },
+      {
+        "page": 184,
+        "score": 0.4383,
+        "rang": 115
+      },
+      {
+        "page": 142,
+        "score": 0.4382,
+        "rang": 116
+      },
+      {
+        "page": 104,
+        "score": 0.4381,
+        "rang": 117
+      },
+      {
+        "page": 133,
+        "score": 0.4366,
+        "rang": 118
+      },
+      {
+        "page": 171,
+        "score": 0.4363,
+        "rang": 119
+      },
+      {
+        "page": 144,
+        "score": 0.4357,
+        "rang": 120
+      },
+      {
+        "page": 140,
+        "score": 0.4354,
+        "rang": 121
+      },
+      {
+        "page": 117,
+        "score": 0.435,
+        "rang": 122
+      },
+      {
+        "page": 150,
+        "score": 0.4327,
+        "rang": 123
+      },
+      {
+        "page": 182,
+        "score": 0.4326,
+        "rang": 124
+      },
+      {
+        "page": 203,
+        "score": 0.4325,
+        "rang": 125
+      },
+      {
+        "page": 14,
+        "score": 0.4319,
+        "rang": 126
+      },
+      {
+        "page": 152,
+        "score": 0.4316,
+        "rang": 127
+      },
+      {
+        "page": 185,
+        "score": 0.4312,
+        "rang": 128
+      },
+      {
+        "page": 168,
+        "score": 0.4311,
+        "rang": 129
+      },
+      {
+        "page": 19,
+        "score": 0.4309,
+        "rang": 130
+      },
+      {
+        "page": 124,
+        "score": 0.4308,
+        "rang": 131
+      },
+      {
+        "page": 28,
+        "score": 0.4307,
+        "rang": 132
+      },
+      {
+        "page": 179,
+        "score": 0.4306,
+        "rang": 133
+      },
+      {
+        "page": 183,
+        "score": 0.4298,
+        "rang": 134
+      },
+      {
+        "page": 41,
+        "score": 0.4296,
+        "rang": 135
+      },
+      {
+        "page": 98,
+        "score": 0.4296,
+        "rang": 136
+      },
+      {
+        "page": 128,
+        "score": 0.4288,
+        "rang": 137
+      },
+      {
+        "page": 110,
+        "score": 0.4286,
+        "rang": 138
+      },
+      {
+        "page": 172,
+        "score": 0.428,
+        "rang": 139
+      },
+      {
+        "page": 160,
+        "score": 0.4279,
+        "rang": 140
+      },
+      {
+        "page": 154,
+        "score": 0.4252,
+        "rang": 141
+      },
+      {
+        "page": 50,
+        "score": 0.425,
+        "rang": 142
+      },
+      {
+        "page": 216,
+        "score": 0.4249,
+        "rang": 143
+      },
+      {
+        "page": 147,
+        "score": 0.4244,
+        "rang": 144
+      },
+      {
+        "page": 207,
+        "score": 0.423,
+        "rang": 145
+      },
+      {
+        "page": 64,
+        "score": 0.4221,
+        "rang": 146
+      },
+      {
+        "page": 23,
+        "score": 0.4219,
+        "rang": 147
+      },
+      {
+        "page": 166,
+        "score": 0.4219,
+        "rang": 148
+      },
+      {
+        "page": 26,
+        "score": 0.4218,
+        "rang": 149
+      },
+      {
+        "page": 106,
+        "score": 0.4216,
+        "rang": 150
+      },
+      {
+        "page": 8,
+        "score": 0.4207,
+        "rang": 151
+      },
+      {
+        "page": 173,
+        "score": 0.42,
+        "rang": 152
+      },
+      {
+        "page": 54,
+        "score": 0.4194,
+        "rang": 153
+      },
+      {
+        "page": 162,
+        "score": 0.4193,
+        "rang": 154
+      },
+      {
+        "page": 7,
+        "score": 0.4187,
+        "rang": 155
+      },
+      {
+        "page": 33,
+        "score": 0.4177,
+        "rang": 156
+      },
+      {
+        "page": 9,
+        "score": 0.4175,
+        "rang": 157
+      },
+      {
+        "page": 205,
+        "score": 0.417,
+        "rang": 158
+      },
+      {
+        "page": 48,
+        "score": 0.4168,
+        "rang": 159
+      },
+      {
+        "page": 199,
+        "score": 0.4167,
+        "rang": 160
+      },
+      {
+        "page": 174,
+        "score": 0.4161,
+        "rang": 161
+      },
+      {
+        "page": 206,
+        "score": 0.4156,
+        "rang": 162
+      },
+      {
+        "page": 95,
+        "score": 0.415,
+        "rang": 163
+      },
+      {
+        "page": 108,
+        "score": 0.4149,
+        "rang": 164
+      },
+      {
+        "page": 92,
+        "score": 0.4148,
+        "rang": 165
+      },
+      {
+        "page": 138,
+        "score": 0.4148,
+        "rang": 166
+      },
+      {
+        "page": 201,
+        "score": 0.4148,
+        "rang": 167
+      },
+      {
+        "page": 34,
+        "score": 0.4146,
+        "rang": 168
+      },
+      {
+        "page": 118,
+        "score": 0.4142,
+        "rang": 169
+      },
+      {
+        "page": 137,
+        "score": 0.4142,
+        "rang": 170
+      },
+      {
+        "page": 157,
+        "score": 0.4132,
+        "rang": 171
+      },
+      {
+        "page": 27,
+        "score": 0.412,
+        "rang": 172
+      },
+      {
+        "page": 190,
+        "score": 0.4112,
+        "rang": 173
+      },
+      {
+        "page": 97,
+        "score": 0.4105,
+        "rang": 174
+      },
+      {
+        "page": 30,
+        "score": 0.4097,
+        "rang": 175
+      },
+      {
+        "page": 149,
+        "score": 0.4097,
+        "rang": 176
+      },
+      {
+        "page": 20,
+        "score": 0.4096,
+        "rang": 177
+      },
+      {
+        "page": 51,
+        "score": 0.4094,
+        "rang": 178
+      },
+      {
+        "page": 202,
+        "score": 0.4091,
+        "rang": 179
+      },
+      {
+        "page": 180,
+        "score": 0.4085,
+        "rang": 180
+      },
+      {
+        "page": 165,
+        "score": 0.4072,
+        "rang": 181
+      },
+      {
+        "page": 94,
+        "score": 0.4067,
+        "rang": 182
+      },
+      {
+        "page": 156,
+        "score": 0.4049,
+        "rang": 183
+      },
+      {
+        "page": 197,
+        "score": 0.4028,
+        "rang": 184
+      },
+      {
+        "page": 53,
+        "score": 0.402,
+        "rang": 185
+      },
+      {
+        "page": 29,
+        "score": 0.4014,
+        "rang": 186
+      },
+      {
+        "page": 46,
+        "score": 0.4003,
+        "rang": 187
+      },
+      {
+        "page": 177,
+        "score": 0.3998,
+        "rang": 188
+      },
+      {
+        "page": 204,
+        "score": 0.3993,
+        "rang": 189
+      },
+      {
+        "page": 15,
+        "score": 0.3973,
+        "rang": 190
+      },
+      {
+        "page": 24,
+        "score": 0.395,
+        "rang": 191
+      },
+      {
+        "page": 191,
+        "score": 0.3927,
+        "rang": 192
+      },
+      {
+        "page": 210,
+        "score": 0.392,
+        "rang": 193
+      },
+      {
+        "page": 213,
+        "score": 0.3915,
+        "rang": 194
+      },
+      {
+        "page": 5,
+        "score": 0.3912,
+        "rang": 195
+      },
+      {
+        "page": 39,
+        "score": 0.3906,
+        "rang": 196
+      },
+      {
+        "page": 121,
+        "score": 0.3904,
+        "rang": 197
+      },
+      {
+        "page": 12,
+        "score": 0.3902,
+        "rang": 198
+      },
+      {
+        "page": 214,
+        "score": 0.3897,
+        "rang": 199
+      },
+      {
+        "page": 158,
+        "score": 0.3892,
+        "rang": 200
+      },
+      {
+        "page": 1,
+        "score": 0.388,
+        "rang": 201
+      },
+      {
+        "page": 63,
+        "score": 0.3867,
+        "rang": 202
+      },
+      {
+        "page": 125,
+        "score": 0.3854,
+        "rang": 203
+      },
+      {
+        "page": 115,
+        "score": 0.385,
+        "rang": 204
+      },
+      {
+        "page": 164,
+        "score": 0.3845,
+        "rang": 205
+      },
+      {
+        "page": 96,
+        "score": 0.3813,
+        "rang": 206
+      },
+      {
+        "page": 208,
+        "score": 0.3807,
+        "rang": 207
+      },
+      {
+        "page": 43,
+        "score": 0.3806,
+        "rang": 208
+      },
+      {
+        "page": 192,
+        "score": 0.3787,
+        "rang": 209
+      },
+      {
+        "page": 212,
+        "score": 0.3737,
+        "rang": 210
+      },
+      {
+        "page": 155,
+        "score": 0.3726,
+        "rang": 211
+      },
+      {
+        "page": 16,
+        "score": 0.3622,
+        "rang": 212
+      },
+      {
+        "page": 45,
+        "score": 0.3549,
+        "rang": 213
+      },
+      {
+        "page": 42,
+        "score": 0.3542,
+        "rang": 214
+      },
+      {
+        "page": 4,
+        "score": 0.3537,
+        "rang": 215
+      },
+      {
+        "page": 40,
+        "score": 0.3515,
+        "rang": 216
+      },
+      {
+        "page": 196,
+        "score": 0.3499,
+        "rang": 217
+      },
+      {
+        "page": 218,
+        "score": 0.3373,
+        "rang": 218
+      }
+    ],
+    "pages_top8": [
+      {
+        "page": 79,
+        "score": 0.6825,
+        "rang": 1
+      },
+      {
+        "page": 38,
+        "score": 0.6774,
+        "rang": 2
+      },
+      {
+        "page": 80,
+        "score": 0.6758,
+        "rang": 3
+      },
+      {
+        "page": 78,
+        "score": 0.6656,
+        "rang": 4
+      },
+      {
+        "page": 76,
+        "score": 0.6553,
+        "rang": 5
+      },
+      {
+        "page": 57,
+        "score": 0.5877,
+        "rang": 6
+      },
+      {
+        "page": 56,
+        "score": 0.5874,
+        "rang": 7
+      },
+      {
+        "page": 6,
+        "score": 0.578,
+        "rang": 8
+      }
+    ],
+    "rappel_hits": 7,
+    "rappel_taux": 1.0,
+    "details": [
+      {
+        "code": "intensite_scope_1_2_marketbased",
+        "pages_attendues": [
+          79
+        ],
+        "rang_trouve": 1,
+        "score_trouve": 0.6825,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          79
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "intensite_scope_1_2_3_hors_cat11",
+        "pages_attendues": [
+          79
+        ],
+        "rang_trouve": 1,
+        "score_trouve": 0.6825,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          79
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "intensite_scope_1_2_3_total",
+        "pages_attendues": [
+          79
+        ],
+        "rang_trouve": 1,
+        "score_trouve": 0.6825,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          79
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_1",
+        "pages_attendues": [
+          78
+        ],
+        "rang_trouve": 4,
+        "score_trouve": 0.6656,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          78
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_2_market_based",
+        "pages_attendues": [
+          78
+        ],
+        "rang_trouve": 4,
+        "score_trouve": 0.6656,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          78
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_2_location_based",
+        "pages_attendues": [
+          78
+        ],
+        "rang_trouve": 4,
+        "score_trouve": 0.6656,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          78
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_3",
+        "pages_attendues": [
+          78
+        ],
+        "rang_trouve": 4,
+        "score_trouve": 0.6656,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          78
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      }
+    ]
+  },
+  "ingka_group": {
+    "n_chunks": 397,
+    "n_indicateurs": 4,
+    "requetes": [
+      "Scope 1, Scope 2 location-based, Scope 2 market-based and Scope 3 greenhouse gas emissions in tonnes of CO2 equivalent (tCO2e)",
+      "Greenhouse gas emissions intensity in grams of CO2 equivalent per kilowatt-hour (gCO2e/kWh)"
+    ],
+    "classement_complet": [
+      {
+        "page": 74,
+        "score": 0.6368,
+        "rang": 1
+      },
+      {
+        "page": 72,
+        "score": 0.6177,
+        "rang": 2
+      },
+      {
+        "page": 30,
+        "score": 0.6126,
+        "rang": 3
+      },
+      {
+        "page": 69,
+        "score": 0.6062,
+        "rang": 4
+      },
+      {
+        "page": 71,
+        "score": 0.6025,
+        "rang": 5
+      },
+      {
+        "page": 33,
+        "score": 0.5965,
+        "rang": 6
+      },
+      {
+        "page": 75,
+        "score": 0.5775,
+        "rang": 7
+      },
+      {
+        "page": 70,
+        "score": 0.5741,
+        "rang": 8
+      },
+      {
+        "page": 29,
+        "score": 0.5718,
+        "rang": 9
+      },
+      {
+        "page": 73,
+        "score": 0.5684,
+        "rang": 10
+      },
+      {
+        "page": 21,
+        "score": 0.5608,
+        "rang": 11
+      },
+      {
+        "page": 17,
+        "score": 0.5511,
+        "rang": 12
+      },
+      {
+        "page": 86,
+        "score": 0.551,
+        "rang": 13
+      },
+      {
+        "page": 2,
+        "score": 0.5504,
+        "rang": 14
+      },
+      {
+        "page": 32,
+        "score": 0.5486,
+        "rang": 15
+      },
+      {
+        "page": 26,
+        "score": 0.532,
+        "rang": 16
+      },
+      {
+        "page": 10,
+        "score": 0.5254,
+        "rang": 17
+      },
+      {
+        "page": 98,
+        "score": 0.5178,
+        "rang": 18
+      },
+      {
+        "page": 31,
+        "score": 0.5122,
+        "rang": 19
+      },
+      {
+        "page": 22,
+        "score": 0.5118,
+        "rang": 20
+      },
+      {
+        "page": 67,
+        "score": 0.5105,
+        "rang": 21
+      },
+      {
+        "page": 23,
+        "score": 0.5015,
+        "rang": 22
+      },
+      {
+        "page": 25,
+        "score": 0.5015,
+        "rang": 23
+      },
+      {
+        "page": 34,
+        "score": 0.4996,
+        "rang": 24
+      },
+      {
+        "page": 92,
+        "score": 0.4981,
+        "rang": 25
+      },
+      {
+        "page": 78,
+        "score": 0.4979,
+        "rang": 26
+      },
+      {
+        "page": 65,
+        "score": 0.4971,
+        "rang": 27
+      },
+      {
+        "page": 68,
+        "score": 0.4967,
+        "rang": 28
+      },
+      {
+        "page": 18,
+        "score": 0.494,
+        "rang": 29
+      },
+      {
+        "page": 83,
+        "score": 0.492,
+        "rang": 30
+      },
+      {
+        "page": 88,
+        "score": 0.4913,
+        "rang": 31
+      },
+      {
+        "page": 89,
+        "score": 0.4913,
+        "rang": 32
+      },
+      {
+        "page": 90,
+        "score": 0.4913,
+        "rang": 33
+      },
+      {
+        "page": 91,
+        "score": 0.4912,
+        "rang": 34
+      },
+      {
+        "page": 76,
+        "score": 0.4884,
+        "rang": 35
+      },
+      {
+        "page": 93,
+        "score": 0.4878,
+        "rang": 36
+      },
+      {
+        "page": 96,
+        "score": 0.4844,
+        "rang": 37
+      },
+      {
+        "page": 43,
+        "score": 0.4811,
+        "rang": 38
+      },
+      {
+        "page": 28,
+        "score": 0.4802,
+        "rang": 39
+      },
+      {
+        "page": 24,
+        "score": 0.4802,
+        "rang": 40
+      },
+      {
+        "page": 95,
+        "score": 0.4714,
+        "rang": 41
+      },
+      {
+        "page": 97,
+        "score": 0.471,
+        "rang": 42
+      },
+      {
+        "page": 84,
+        "score": 0.4697,
+        "rang": 43
+      },
+      {
+        "page": 87,
+        "score": 0.4685,
+        "rang": 44
+      },
+      {
+        "page": 38,
+        "score": 0.4678,
+        "rang": 45
+      },
+      {
+        "page": 79,
+        "score": 0.467,
+        "rang": 46
+      },
+      {
+        "page": 46,
+        "score": 0.4633,
+        "rang": 47
+      },
+      {
+        "page": 40,
+        "score": 0.4603,
+        "rang": 48
+      },
+      {
+        "page": 49,
+        "score": 0.4586,
+        "rang": 49
+      },
+      {
+        "page": 77,
+        "score": 0.4573,
+        "rang": 50
+      },
+      {
+        "page": 19,
+        "score": 0.456,
+        "rang": 51
+      },
+      {
+        "page": 15,
+        "score": 0.4554,
+        "rang": 52
+      },
+      {
+        "page": 66,
+        "score": 0.4511,
+        "rang": 53
+      },
+      {
+        "page": 41,
+        "score": 0.4491,
+        "rang": 54
+      },
+      {
+        "page": 82,
+        "score": 0.4483,
+        "rang": 55
+      },
+      {
+        "page": 35,
+        "score": 0.4482,
+        "rang": 56
+      },
+      {
+        "page": 80,
+        "score": 0.4456,
+        "rang": 57
+      },
+      {
+        "page": 6,
+        "score": 0.4428,
+        "rang": 58
+      },
+      {
+        "page": 27,
+        "score": 0.4423,
+        "rang": 59
+      },
+      {
+        "page": 36,
+        "score": 0.442,
+        "rang": 60
+      },
+      {
+        "page": 39,
+        "score": 0.442,
+        "rang": 61
+      },
+      {
+        "page": 48,
+        "score": 0.4406,
+        "rang": 62
+      },
+      {
+        "page": 85,
+        "score": 0.4396,
+        "rang": 63
+      },
+      {
+        "page": 45,
+        "score": 0.4385,
+        "rang": 64
+      },
+      {
+        "page": 94,
+        "score": 0.4348,
+        "rang": 65
+      },
+      {
+        "page": 50,
+        "score": 0.4334,
+        "rang": 66
+      },
+      {
+        "page": 16,
+        "score": 0.433,
+        "rang": 67
+      },
+      {
+        "page": 81,
+        "score": 0.4319,
+        "rang": 68
+      },
+      {
+        "page": 53,
+        "score": 0.4309,
+        "rang": 69
+      },
+      {
+        "page": 11,
+        "score": 0.4307,
+        "rang": 70
+      },
+      {
+        "page": 7,
+        "score": 0.4291,
+        "rang": 71
+      },
+      {
+        "page": 13,
+        "score": 0.4284,
+        "rang": 72
+      },
+      {
+        "page": 44,
+        "score": 0.4276,
+        "rang": 73
+      },
+      {
+        "page": 9,
+        "score": 0.4275,
+        "rang": 74
+      },
+      {
+        "page": 59,
+        "score": 0.4248,
+        "rang": 75
+      },
+      {
+        "page": 56,
+        "score": 0.4248,
+        "rang": 76
+      },
+      {
+        "page": 58,
+        "score": 0.4242,
+        "rang": 77
+      },
+      {
+        "page": 20,
+        "score": 0.421,
+        "rang": 78
+      },
+      {
+        "page": 12,
+        "score": 0.4202,
+        "rang": 79
+      },
+      {
+        "page": 42,
+        "score": 0.4191,
+        "rang": 80
+      },
+      {
+        "page": 14,
+        "score": 0.4186,
+        "rang": 81
+      },
+      {
+        "page": 5,
+        "score": 0.4181,
+        "rang": 82
+      },
+      {
+        "page": 54,
+        "score": 0.4147,
+        "rang": 83
+      },
+      {
+        "page": 55,
+        "score": 0.4133,
+        "rang": 84
+      },
+      {
+        "page": 99,
+        "score": 0.4093,
+        "rang": 85
+      },
+      {
+        "page": 51,
+        "score": 0.408,
+        "rang": 86
+      },
+      {
+        "page": 47,
+        "score": 0.4052,
+        "rang": 87
+      },
+      {
+        "page": 37,
+        "score": 0.4019,
+        "rang": 88
+      },
+      {
+        "page": 3,
+        "score": 0.4013,
+        "rang": 89
+      },
+      {
+        "page": 60,
+        "score": 0.3982,
+        "rang": 90
+      },
+      {
+        "page": 57,
+        "score": 0.3966,
+        "rang": 91
+      },
+      {
+        "page": 64,
+        "score": 0.3955,
+        "rang": 92
+      },
+      {
+        "page": 52,
+        "score": 0.3907,
+        "rang": 93
+      },
+      {
+        "page": 4,
+        "score": 0.3782,
+        "rang": 94
+      },
+      {
+        "page": 61,
+        "score": 0.3776,
+        "rang": 95
+      },
+      {
+        "page": 62,
+        "score": 0.3747,
+        "rang": 96
+      },
+      {
+        "page": 8,
+        "score": 0.3686,
+        "rang": 97
+      },
+      {
+        "page": 1,
+        "score": 0.3576,
+        "rang": 98
+      },
+      {
+        "page": 63,
+        "score": 0.3522,
+        "rang": 99
+      },
+      {
+        "page": 100,
+        "score": 0.345,
+        "rang": 100
+      }
+    ],
+    "pages_top8": [
+      {
+        "page": 74,
+        "score": 0.6368,
+        "rang": 1
+      },
+      {
+        "page": 72,
+        "score": 0.6177,
+        "rang": 2
+      },
+      {
+        "page": 30,
+        "score": 0.6126,
+        "rang": 3
+      },
+      {
+        "page": 69,
+        "score": 0.6062,
+        "rang": 4
+      },
+      {
+        "page": 71,
+        "score": 0.6025,
+        "rang": 5
+      },
+      {
+        "page": 33,
+        "score": 0.5965,
+        "rang": 6
+      },
+      {
+        "page": 75,
+        "score": 0.5775,
+        "rang": 7
+      },
+      {
+        "page": 70,
+        "score": 0.5741,
+        "rang": 8
+      }
+    ],
+    "rappel_hits": 4,
+    "rappel_taux": 1.0,
+    "details": [
+      {
+        "code": "scope_1",
+        "pages_attendues": [
+          70
+        ],
+        "rang_trouve": 8,
+        "score_trouve": 0.5741,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          70
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_2_market_based",
+        "pages_attendues": [
+          70
+        ],
+        "rang_trouve": 8,
+        "score_trouve": 0.5741,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          70
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_2_location_based",
+        "pages_attendues": [
+          69
+        ],
+        "rang_trouve": 4,
+        "score_trouve": 0.6062,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          69
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      },
+      {
+        "code": "scope_3",
+        "pages_attendues": [
+          70
+        ],
+        "rang_trouve": 8,
+        "score_trouve": 0.5741,
+        "hit_top8": true,
+        "pages_attendues_retrouvees": [
+          70
+        ],
+        "pages_attendues_absentes": [],
+        "couverture_pages_attendues": 1.0,
+        "all_expected_pages_retrieved": true
+      }
+    ]
+  },
+  "_global": {
+    "requetes": [
+      "Scope 1, Scope 2 location-based, Scope 2 market-based and Scope 3 greenhouse gas emissions in tonnes of CO2 equivalent (tCO2e)",
+      "Greenhouse gas emissions intensity in grams of CO2 equivalent per kilowatt-hour (gCO2e/kWh)"
+    ],
+    "note": "hit_top8 / retrieval_recall_at_8 est un benchmark de qualite de recherche documentaire. Il ne limite pas l'analyse integrale des rapports dans le systeme metier (Prompt 4.4+), qui traite l'integralite du contenu extrait, pas seulement les 8 meilleures pages.",
+    "rappel_hits": 11,
+    "rappel_total": 15,
+    "rappel_taux": 0.7333
+  }
+}
