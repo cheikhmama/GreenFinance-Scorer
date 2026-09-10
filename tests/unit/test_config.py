@@ -2,6 +2,17 @@ import pytest
 
 from app.core.config import Settings
 
+_CHAMPS_REQUIS_VALIDES = {
+    "secret_key": "un-vrai-secret-genere-aleatoirement-32-octets",
+    "mfa_issuer_name": "GreenFinance-Scorer",
+    "anthropic_api_key": "sk-ant-un-vrai-jeton",
+    "storage_backend": "local",
+    "storage_path": "./storage",
+    "default_scoring_config": "config/weights/default.yaml",
+    "emission_factors_path": "config/carbon/emission_factors.yaml",
+    "database_url": "postgresql+psycopg://greenfinance:un-vrai-mdp@db:5432/greenfinance",
+}
+
 
 def test_cors_allowed_origins_list_splits_on_comma_and_trims_whitespace() -> None:
     settings = Settings.model_construct(cors_allowed_origins=" http://localhost:5173 , http://localhost:4173 ")
@@ -30,3 +41,40 @@ def test_cors_allowed_origins_list_rejects_a_wildcard_mixed_with_real_origins() 
 
     with pytest.raises(ValueError, match="ne doit jamais contenir"):
         _ = settings.cors_allowed_origins_list
+
+
+def test_production_rejects_a_placeholder_secret_key() -> None:
+    champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "production"}
+    champs["secret_key"] = "changeme-dev-secret-key-at-least-32-bytes-long"
+
+    with pytest.raises(ValueError, match="SECRET_KEY"):
+        Settings(**champs)
+
+
+def test_production_rejects_a_placeholder_database_url() -> None:
+    champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "production"}
+    champs["database_url"] = "postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance"
+
+    with pytest.raises(ValueError, match="DATABASE_URL"):
+        Settings(**champs)
+
+
+def test_production_rejects_a_placeholder_anthropic_api_key() -> None:
+    champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "production"}
+    champs["anthropic_api_key"] = "sk-ant-example-replace-me"
+
+    with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
+        Settings(**champs)
+
+
+def test_production_accepts_real_looking_values() -> None:
+    champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "production"}
+
+    Settings(**champs)  # ne lève pas
+
+
+def test_development_tolerates_placeholder_values() -> None:
+    champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "development"}
+    champs["secret_key"] = "changeme-dev-secret-key-at-least-32-bytes-long"
+
+    Settings(**champs)  # ne lève pas — le garde ne s'applique qu'en production

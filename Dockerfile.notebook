@@ -1,6 +1,8 @@
 # Image de développement pour le notebook de validation de l'Étape 4 (Prompts 4.1-4.6).
-# Volontairement séparée du Dockerfile de production (app/) : ces dépendances (Docling, PaddleOCR,
-# BGE-M3, FAISS) ne concernent que le pipeline d'extraction en cours de validation, jamais l'API.
+# Depuis l'Étape 5, Docling/PaddleOCR/BGE-M3/FAISS/Anthropic sont aussi des dépendances de
+# l'API (app/ingestion/), promues dans [project.dependencies] — ce Dockerfile n'ajoute donc plus
+# que les extras interactifs (jupyter, ipykernel) et pyyaml (lecture de ground_truth.yaml par les
+# scripts de validation) au-dessus des dépendances principales, via le groupe `notebook`.
 FROM python:3.11-slim
 
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \

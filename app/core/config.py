@@ -1,6 +1,11 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Marqueurs des valeurs d'exemple de .env.example — jamais acceptables une fois
+# ENVIRONMENT=production (voir Settings._rejeter_placeholders_en_production).
+_MARQUEURS_PLACEHOLDER = ("changeme", "sk-ant-example-replace-me")
 
 
 class Settings(BaseSettings):
@@ -16,6 +21,19 @@ class Settings(BaseSettings):
     # car les routes auth posent un cookie (allow_credentials nécessite une
     # liste explicite, voir app/api/router.py).
     cors_allowed_origins: str = "http://localhost:5173"
+    # Délai au-delà duquel un rapport affecté sans avis rendu (RapportESG.date_affectation) compte
+    # comme "en retard" au dashboard Administrateur — configurable par déploiement (SLA_AUDIT_JOURS
+    # dans .env), pas via un écran admin (aucun n'existe pour cette pondération, cohérent avec
+    # app/scoring/config_schema.py, pas plus exposé).
+    sla_audit_jours: int = 10
+
+    @property
+    def anthropic_api_key_is_placeholder(self) -> bool:
+        """Utilisé par app/ingestion/extractor.py pour basculer sur une extraction synthétique
+        de démonstration plutôt que d'échouer à chaque dépôt tant qu'aucune vraie clé n'est
+        configurée — jamais vrai en production (_rejeter_placeholders_en_production ci-dessous
+        bloque le démarrage dans ce cas)."""
+        return "sk-ant-example-replace-me" in self.anthropic_api_key
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
@@ -42,6 +60,27 @@ class Settings(BaseSettings):
     default_scoring_config: str
     emission_factors_path: str
     environment: str
+
+    @model_validator(mode="after")
+    def _rejeter_placeholders_en_production(self) -> "Settings":
+        """Un déploiement production avec une valeur encore recopiée de
+        .env.example (ex. SECRET_KEY=changeme-...) n'est pas une erreur de
+        config à découvrir en incident — elle doit bloquer le démarrage."""
+        if self.environment != "production":
+            return self
+
+        valeurs_sensibles = {
+            "SECRET_KEY": self.secret_key,
+            "DATABASE_URL": self.database_url,
+            "ANTHROPIC_API_KEY": self.anthropic_api_key,
+        }
+        for nom, valeur in valeurs_sensibles.items():
+            if any(marqueur in valeur for marqueur in _MARQUEURS_PLACEHOLDER):
+                raise ValueError(
+                    f"{nom} contient encore une valeur d'exemple de .env.example — "
+                    "interdit quand ENVIRONMENT=production."
+                )
+        return self
 
 
 @lru_cache

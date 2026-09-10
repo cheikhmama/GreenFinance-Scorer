@@ -25,17 +25,42 @@ jobs:
         run: uv run mypy app/
 
       - name: Start db and redis
-        run: docker compose up -d db redis
-
-      - name: Wait for database to be ready
-        run: |
-          for i in $(seq 1 30); do
-            docker compose exec -T db pg_isready -U greenfinance && break
-            sleep 1
-          done
+        # --wait attend que les healthchecks Compose (docker-compose.yml) passent au vert,
+        # plutôt qu'une boucle pg_isready répétée ici indépendamment.
+        run: docker compose up -d --wait db redis
 
       - name: Prepare environment file
         run: cp .env.example .env
 
       - name: Run tests with coverage
         run: uv run pytest --cov=app --cov-report=term-missing
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check and build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
+
+      - name: Check OpenAPI client is up to date
+        # Régénère depuis l'app FastAPI déjà assemblée (aucun serveur à démarrer, voir
+        # scripts/export_openapi.py) puis échoue si le résultat diffère de ce qui est committé
+        # sous frontend/src/shared/api/generated/ — dérive de contrat détectée avant fusion.
+        working-directory: frontend
+        run: npm run api:check
