@@ -1,0 +1,63 @@
+# Méthodologie de référence GreenFinance Scorer — version 1 (Phase 5 §9).
+#
+# Chaque chiffre ici est une décision méthodologique, pas un détail technique : le changer
+# produit une nouvelle version de la notation, pas juste un ajustement de code. Validée sur les
+# deux entreprises synthétiques de data_test/reference_e2e/ (atlas_industries, nordwind_energie)
+# avant tout usage sur des entreprises réelles.
+#
+# Bornes de normalisation : choisies comme des ordres de grandeur raisonnables pour un premier
+# jet, pas des seuils benchmarkés sur un référentiel sectoriel externe — à réviser (nouvelle
+# version) une fois un vrai corpus d'entreprises comparables disponible.
+#
+# Poids des indicateurs Social/Gouvernance : socle minimal harmonisé retenu après analyse de
+# data_test/reference_esg_8_entreprises.json — seuls les indicateurs présents chez la quasi-
+# totalité des 8 entreprises de référence et directement comparables entre elles (voir le
+# diagnostic associé). Les taux d'accidents du travail et le % d'administrateurs indépendants en
+# sont délibérément exclus : trop hétérogènes (métriques et dénominateurs différents selon
+# l'entreprise) pour ne pas produire une comparaison silencieusement fausse.
+
+version: 1
+nom: "Méthodologie de référence GreenFinance Scorer"
+
+piliers:
+  ENVIRONNEMENT:
+    poids: 0.5
+    indicateurs:
+      intensite_scope_1_2_marketbased:
+        poids: 0.34
+        plus_haut_est_meilleur: false
+        borne_min: 0
+        borne_max: 100
+      intensite_scope_1_2_3_hors_cat11:
+        poids: 0.33
+        plus_haut_est_meilleur: false
+        borne_min: 0
+        borne_max: 200
+      intensite_scope_1_2_3_total:
+        poids: 0.33
+        plus_haut_est_meilleur: false
+        borne_min: 0
+        borne_max: 500
+
+  SOCIAL:
+    poids: 0.25
+    indicateurs:
+      femmes_management_pourcentage:
+        poids: 0.6
+        plus_haut_est_meilleur: true
+        borne_min: 0
+        borne_max: 50
+      deces_professionnels:
+        poids: 0.4
+        plus_haut_est_meilleur: false
+        borne_min: 0
+        borne_max: 5
+
+  GOUVERNANCE:
+    poids: 0.25
+    indicateurs:
+      femmes_conseil_pourcentage:
+        poids: 1.0
+        plus_haut_est_meilleur: true
+        borne_min: 0
+        borne_max: 50

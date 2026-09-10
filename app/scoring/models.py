@@ -43,9 +43,11 @@ class ConfigurationPonderation(SQLModel, table=True):
 
 class ScoreESG(SQLModel, table=True):
     """Les quatre scores sont bornés 0-100 à la fois côté Pydantic (Field) et côté PostgreSQL
-    (__table_args__, Phase 5 §6) — posé avant l'écriture du moteur de calcul (Étape 12) pour que
-    la table ne puisse jamais accueillir de valeur hors bornes, quelle que soit l'implémentation
-    qui l'écrira."""
+    (__table_args__, Phase 5 §6). valeur_globale est toujours renseignée (app/scoring/engine.py
+    refuse de créer un ScoreESG si aucun pilier n'est calculable) ; les trois scores de pilier
+    sont nullables — un pilier sans aucun indicateur trouvé dans le rapport reste NULL plutôt que
+    de recevoir une note fabriquée (0 se lirait comme « pire score possible », pas comme
+    « donnée absente ») ; valeur_globale se recalcule alors sur les seuls piliers présents."""
 
     __tablename__ = "score_esg"
     __table_args__ = (
@@ -65,9 +67,9 @@ class ScoreESG(SQLModel, table=True):
     rapport_id: uuid.UUID = Field(foreign_key="rapport_esg.id")
     configuration_id: uuid.UUID = Field(foreign_key="configuration_ponderation.id")
     valeur_globale: float = Field(ge=0, le=100)
-    score_environnement: float = Field(ge=0, le=100)
-    score_social: float = Field(ge=0, le=100)
-    score_gouvernance: float = Field(ge=0, le=100)
+    score_environnement: float | None = Field(default=None, ge=0, le=100)
+    score_social: float | None = Field(default=None, ge=0, le=100)
+    score_gouvernance: float | None = Field(default=None, ge=0, le=100)
     date_calcul: datetime = Field(default_factory=utcnow)
 
     rapport: "RapportESG" = Relationship(back_populates="scores")
