@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/shared/api/client";
 import type { ApiError } from "@/shared/api/errors";
+import { changePassword, getCurrentUser, login, logout } from "@/shared/api/generated/auth/auth";
+import type { ChangerMotDePasseRequest } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import type { LoginRequest, User } from "./schemas";
 
 /** Clé de cache TanStack Query partagée par useCurrentUser, useLogin et useLogout,
@@ -16,7 +17,7 @@ const CURRENT_USER_QUERY_KEY = ["auth", "me"] as const;
 export function useCurrentUser() {
   return useQuery<User, ApiError>({
     queryKey: CURRENT_USER_QUERY_KEY,
-    queryFn: () => apiFetch<User>("/auth/me"),
+    queryFn: () => getCurrentUser(),
     // Un 401 est un état applicatif normal (utilisateur déconnecté), pas une panne
     // réseau transitoire : ne pas le masquer derrière des tentatives automatiques.
     retry: false,
@@ -29,11 +30,7 @@ export function useLogin() {
   const queryClient = useQueryClient();
 
   return useMutation<User, ApiError, LoginRequest>({
-    mutationFn: (credentials) =>
-      apiFetch<User>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify(credentials),
-      }),
+    mutationFn: (credentials) => login(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user);
     },
@@ -46,10 +43,25 @@ export function useLogout() {
   const queryClient = useQueryClient();
 
   return useMutation<void, ApiError, void>({
-    mutationFn: () => apiFetch<void>("/auth/logout", { method: "POST" }),
+    mutationFn: () => logout(),
     onSuccess: () => {
       queryClient.setQueryData(CURRENT_USER_QUERY_KEY, undefined);
       queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+    },
+  });
+}
+
+/** POST /auth/changer-mot-de-passe — accessible même quand doit_changer_mot_de_passe
+ * bloque le reste de l'API (voir app/core/dependencies.py). La réponse pose une
+ * nouvelle session (doit_changer_mot_de_passe désormais faux) : on l'écrit directement
+ * dans le cache, comme useLogin, plutôt que de forcer un refetch de /auth/me. */
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, ApiError, ChangerMotDePasseRequest>({
+    mutationFn: (payload) => changePassword(payload),
+    onSuccess: (user) => {
+      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user);
     },
   });
 }

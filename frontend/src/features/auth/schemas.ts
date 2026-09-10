@@ -1,36 +1,14 @@
 import { z } from "zod";
+import type { UtilisateurPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 /**
- * Rôles métier tels que définis par `Role` dans app/core/enums.py côté backend.
- * Une union de littéraux plutôt qu'un `enum` TypeScript : `erasableSyntaxOnly` est
- * activé dans tsconfig.app.json, qui interdit les enums (ils émettent du code à
- * l'exécution, donc ne sont pas "effaçables" par une simple suppression de types).
+ * Rôle et forme de l'utilisateur connecté : ré-exportés depuis le client généré (Orval, voir
+ * orval.config.ts) plutôt que redéfinis à la main — une seule source de vérité avec le contrat
+ * backend (app/core/enums.py::Role, app/auth/schemas.py::UtilisateurPublic).
  */
-export const ROLES = [
-  "ADMINISTRATEUR",
-  "ENTREPRISE",
-  "AUDITEUR",
-  "INVESTISSEUR",
-  "CHERCHEUR",
-  "INSTITUTION",
-] as const;
-
-export type Role = (typeof ROLES)[number];
-
-/**
- * Forme exacte renvoyée par POST /auth/login et GET /auth/me (contrat backend
- * app/auth/router.py). Les deux routes renvoient la même représentation de
- * l'utilisateur connecté.
- */
-export const userSchema = z.object({
-  id: z.string(),
-  email: z.string(),
-  role: z.enum(ROLES),
-  date_creation: z.string(),
-  actif: z.boolean(),
-});
-
-export type User = z.infer<typeof userSchema>;
+export { Role };
+export type User = UtilisateurPublic;
 
 /** Corps de POST /auth/login, validé côté client avant tout appel réseau. */
 export const loginRequestSchema = z.object({
@@ -39,3 +17,18 @@ export const loginRequestSchema = z.object({
 });
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+
+/** Formulaire de POST /auth/changer-mot-de-passe — la confirmation n'existe que côté
+ * client (le backend ne reçoit que mot_de_passe_actuel/nouveau_mot_de_passe). */
+export const changerMotDePasseFormSchema = z
+  .object({
+    motDePasseActuel: z.string().min(1, "Le mot de passe actuel est requis"),
+    nouveauMotDePasse: z.string().min(8, "8 caractères minimum"),
+    confirmation: z.string().min(1, "La confirmation est requise"),
+  })
+  .refine((values) => values.nouveauMotDePasse === values.confirmation, {
+    message: "Les deux mots de passe ne correspondent pas.",
+    path: ["confirmation"],
+  });
+
+export type ChangerMotDePasseForm = z.infer<typeof changerMotDePasseFormSchema>;

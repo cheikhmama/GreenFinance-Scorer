@@ -29,10 +29,15 @@ class Utilisateur(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
+    nom: str | None = None
     mot_de_passe_hache: str
     role: Role = Field(sa_column=sa_enum_column(Role))
     date_creation: datetime = Field(default_factory=utcnow)
     actif: bool = Field(default=True)
+    # Vrai pour un compte provisionné par l'Administrateur avec un mot de passe temporaire
+    # (Phase 3 §3.3) : get_current_user (app/core/dependencies.py) bloque alors tout accès hors
+    # d'une liste explicite de routes tant que POST /auth/changer-mot-de-passe n'a pas été appelé.
+    doit_changer_mot_de_passe: bool = Field(default=False)
 
     institution_profil: Optional["InstitutionProfil"] = Relationship(
         back_populates="utilisateur"

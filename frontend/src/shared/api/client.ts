@@ -2,6 +2,23 @@ import { ApiError, type ApiErrorBody } from "./errors";
 
 const API_BASE_URL = "/api/v1";
 
+// Double-soumission CSRF (app/auth/csrf.py) : le cookie __Host-csrf_token est délibérément
+// lisible en JS (httponly=False, voir app/auth/router.py::_ouvrir_session) pour être recopié
+// ici dans l'en-tête X-CSRF-Token sur toute requête mutante — le backend compare les deux.
+const CSRF_COOKIE_NAME = "__Host-csrf_token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function readCsrfCookie(): string | null {
+  const prefix = `${CSRF_COOKIE_NAME}=`;
+  for (const part of document.cookie.split("; ")) {
+    if (part.startsWith(prefix)) {
+      return decodeURIComponent(part.slice(prefix.length));
+    }
+  }
+  return null;
+}
+
 function isApiErrorBody(value: unknown): value is ApiErrorBody {
   return (
     typeof value === "object" &&
@@ -25,11 +42,19 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
  * doit explicitement demander au navigateur de le joindre.
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // FormData (dépôt de fichier, ex. features/company) : jamais de Content-Type manuel — fetch
+  // doit fixer lui-même "multipart/form-data; boundary=..." à partir du corps, un en-tête forcé
+  // à "application/json" romprait silencieusement l'upload côté serveur.
+  const isFormData = init.body instanceof FormData;
+  const method = (init.method ?? "GET").toUpperCase();
+  const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null;
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: "include",
     headers: {
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.body && !isFormData ? { "Content-Type": "application/json" } : {}),
+      ...(csrfToken !== null ? { [CSRF_HEADER_NAME]: csrfToken } : {}),
       ...init.headers,
     },
   });

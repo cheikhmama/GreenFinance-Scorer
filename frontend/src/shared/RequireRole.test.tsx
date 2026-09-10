@@ -43,9 +43,11 @@ describe("RequireRole", () => {
       data: {
         id: "1",
         email: "entreprise@example.com",
+        nom: "Entreprise Test",
         role: "ENTREPRISE",
         date_creation: "",
         actif: true,
+        doit_changer_mot_de_passe: false,
       },
       isLoading: false,
       isError: false,
@@ -59,9 +61,11 @@ describe("RequireRole", () => {
       data: {
         id: "1",
         email: "admin@example.com",
+        nom: "Admin Test",
         role: "ADMINISTRATEUR",
         date_creation: "",
         actif: true,
+        doit_changer_mot_de_passe: false,
       },
       isLoading: false,
       isError: false,

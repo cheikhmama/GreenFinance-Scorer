@@ -1,7 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { isPrototypeEnabled } from "@/features/prototype/routes";
 import { ApiError } from "@/shared/api/errors";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
@@ -95,6 +97,23 @@ export function LoginPage() {
               </Button>
             </form>
           </Form>
+
+          {isPrototypeEnabled ? (
+            <div className="mt-6 border-t pt-5">
+              <p className="text-center text-xs leading-5 text-muted-foreground">
+                Évaluez l’interface sans compte ni backend.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={() => navigate("/prototype")}
+              >
+                <FlaskConical />
+                Ouvrir le prototype interactif
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

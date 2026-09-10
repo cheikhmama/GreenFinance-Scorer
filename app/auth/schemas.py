@@ -22,6 +22,13 @@ class UtilisateurPublic(BaseModel):
 
     id: uuid.UUID
     email: str
+    nom: str | None
     role: Role
     date_creation: datetime
     actif: bool
+    doit_changer_mot_de_passe: bool
+
+
+class ChangerMotDePasseRequest(BaseModel):
+    mot_de_passe_actuel: str
+    nouveau_mot_de_passe: str

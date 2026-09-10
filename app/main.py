@@ -13,6 +13,7 @@ from app.api.router import api_app
 # échoue au premier accès si son module n'a jamais été importé ailleurs.
 from app.audit import models as _audit_models  # noqa: F401
 from app.auth import models as _auth_models  # noqa: F401
+from app.auth.tokens import API_V1_PREFIX
 from app.company import models as _company_models  # noqa: F401
 from app.core import models as _core_models  # noqa: F401
 from app.core.config import get_settings
@@ -41,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 register_exception_handlers(app)
 app.add_middleware(CorrelationIdMiddleware)
-app.mount("/api/v1", api_app)
+app.mount(API_V1_PREFIX, api_app)
 
 
 @app.get("/health")
