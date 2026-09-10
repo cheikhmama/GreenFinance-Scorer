@@ -13,7 +13,9 @@ from app.company import models as _company_models  # noqa: F401
 from app.core import models as _core_models  # noqa: F401
 from app.core.config import get_settings
 from app.ingestion import models as _ingestion_models  # noqa: F401
+from app.institution import models as _institution_models  # noqa: F401
 from app.investor import models as _investor_models  # noqa: F401
+from app.researcher import models as _researcher_models  # noqa: F401
 from app.scoring import models as _scoring_models  # noqa: F401
 
 # this is the Alembic Config object, which provides

@@ -13,12 +13,17 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import InstitutionProfil, Utilisateur
 from app.auth.revocation import revoke_all_sessions
 from app.company.models import Entreprise
 from app.core.audit import auditer
 from app.core.enums import Role
 from app.core.exceptions import NotFoundError, ValidationError
+
+# Quota de départ pour un compte Institution (Étape 17 §quota d'export) — pas encore un champ du
+# formulaire de création (aucune institution réelle n'a encore exprimé un besoin différencié),
+# ajusté directement en base par l'Administrateur si un besoin réel apparaît.
+_QUOTA_EXPORT_INITIAL = 10
 
 
 def lister_utilisateurs_par_role(
@@ -131,6 +136,11 @@ def creer_utilisateur(
             nom=nom_entreprise, secteur=secteur, pays=pays, utilisateur_id=utilisateur.id
         )
         session.add(entreprise)
+    elif role == Role.INSTITUTION:
+        # Sans ce profil, aucun export n'est possible (app/institution/analyses.py exige un
+        # InstitutionProfil pour décrémenter quota_export) — même raisonnement que le profil
+        # Entreprise ci-dessus : créé dans le même geste, jamais après coup.
+        session.add(InstitutionProfil(utilisateur_id=utilisateur.id, quota_export=_QUOTA_EXPORT_INITIAL))
 
     auditer(session, acteur_id, "creation_compte", "Utilisateur", utilisateur.id, "succes")
     session.commit()

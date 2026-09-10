@@ -80,3 +80,21 @@ class DevisePosition(str, Enum):
 class TypeDureeInvestissement(str, Enum):
     OUVERTE = "OUVERTE"
     FIXE = "FIXE"
+
+
+class StatutRattachement(str, Enum):
+    EN_ATTENTE = "EN_ATTENTE"
+    ACCEPTE = "ACCEPTE"
+    REFUSE = "REFUSE"
+
+
+class StatutProjet(str, Enum):
+    OUVERT = "OUVERT"
+    CLOTURE = "CLOTURE"
+
+
+class StatutAnalyse(str, Enum):
+    BROUILLON = "BROUILLON"
+    SOUMISE = "SOUMISE"
+    VALIDEE = "VALIDEE"
+    CORRECTION_DEMANDEE = "CORRECTION_DEMANDEE"

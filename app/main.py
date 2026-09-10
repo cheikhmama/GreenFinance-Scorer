@@ -21,7 +21,9 @@ from app.core.database import DatabaseConnectionError, check_database_connection
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware, configure_logging
 from app.ingestion import models as _ingestion_models  # noqa: F401
+from app.institution import models as _institution_models  # noqa: F401
 from app.investor import models as _investor_models  # noqa: F401
+from app.researcher import models as _researcher_models  # noqa: F401
 from app.scoring import models as _scoring_models  # noqa: F401
 
 settings = get_settings()

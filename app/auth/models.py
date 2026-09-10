@@ -10,17 +10,20 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
-from app.core.enums import Role, sa_enum_column
+from app.core.enums import Role, StatutRattachement, sa_enum_column
 
 if TYPE_CHECKING:
     from app.audit.models import AvisAudit
     from app.company.models import Entreprise
     from app.core.models import Notification
     from app.ingestion.models import RapportESG
+    from app.institution.models import AffectationProjet, Projet
     from app.investor.models import Portefeuille
+    from app.researcher.models import Analyse
     from app.scoring.models import ConfigurationPonderation
 
 
@@ -50,6 +53,9 @@ class Utilisateur(SQLModel, table=True):
     portefeuilles: list["Portefeuille"] = Relationship(back_populates="investisseur")
     avis_rendus: list["AvisAudit"] = Relationship(back_populates="auditeur")
     notifications: list["Notification"] = Relationship(back_populates="utilisateur")
+    projets: list["Projet"] = Relationship(back_populates="institution")
+    affectations_projet: list["AffectationProjet"] = Relationship(back_populates="chercheur")
+    analyses: list["Analyse"] = Relationship(back_populates="chercheur")
 
 
 class InstitutionProfil(SQLModel, table=True):
@@ -66,11 +72,25 @@ class InstitutionProfil(SQLModel, table=True):
 
 
 class ChercheurInstitution(SQLModel, table=True):
-    """Table de rattachement plusieurs-à-plusieurs entre un Utilisateur
-    Chercheur et un Utilisateur Institution."""
+    """Table de rattachement plusieurs-à-plusieurs entre un Utilisateur Chercheur et un
+    Utilisateur Institution (Étape 17). Pas de Relationship() vers Utilisateur : deux FK vers la
+    même table exigeraient chacune un foreign_keys= explicite pour lever l'ambiguïté côté
+    SQLAlchemy — les services interrogent chercheur_id/institution_id directement, plus simple.
+
+    Une invitation refusée n'est jamais recréée en double : l'Institution peut réinviter le même
+    Chercheur, ce qui remet statut à EN_ATTENTE sur la même ligne (voir uq_chercheur_institution
+    ci-dessous, une seule ligne par couple)."""
 
     __tablename__ = "chercheur_institution"
+    __table_args__ = (
+        UniqueConstraint("chercheur_id", "institution_id", name="uq_chercheur_institution"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     chercheur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
     institution_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    statut: StatutRattachement = Field(
+        default=StatutRattachement.EN_ATTENTE, sa_column=sa_enum_column(StatutRattachement)
+    )
+    date_invitation: datetime = Field(default_factory=utcnow)
+    date_reponse: datetime | None = Field(default=None)
