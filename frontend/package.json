@@ -11,7 +11,9 @@
     "format": "biome format --write .",
     "check": "biome check --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "api:generate": "cd .. && uv run python scripts/export_openapi.py && cd frontend && orval",
+    "api:check": "npm run api:generate && git diff --exit-code -- src/shared/api/generated"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -41,6 +43,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "jsdom": "^29.1.1",
+    "orval": "^8.27.0",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",

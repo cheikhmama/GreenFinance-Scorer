@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 
 from app.core.exceptions import (
     NotFoundError,
@@ -7,6 +8,10 @@ from app.core.exceptions import (
     ValidationError,
     register_exception_handlers,
 )
+
+
+class _Payload(BaseModel):
+    annee_reporting: int
 
 
 def _build_test_app() -> FastAPI:
@@ -24,6 +29,12 @@ def _build_test_app() -> FastAPI:
     def boom_validation() -> None:
         raise ValidationError("Champ invalide")
 
+    @app.get("/boom/validation-fields")
+    def boom_validation_fields() -> None:
+        raise ValidationError(
+            "Données invalides.", fields={"annee_reporting": "L'année est invalide."}
+        )
+
     @app.get("/boom/permission")
     def boom_permission() -> None:
         raise PermissionDeniedError("Accès refusé")
@@ -31,6 +42,10 @@ def _build_test_app() -> FastAPI:
     @app.get("/boom/generic")
     def boom_generic() -> None:
         raise ZeroDivisionError("secret-internal-detail")
+
+    @app.post("/boom/body")
+    def boom_body(payload: _Payload) -> None:
+        return None
 
     return app
 
@@ -53,6 +68,45 @@ def test_validation_error_returns_422_structured() -> None:
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
+
+
+def test_validation_error_without_fields_omits_the_key() -> None:
+    body = client.get("/boom/validation").json()
+
+    assert "fields" not in body["error"]
+
+
+def test_validation_error_with_fields_includes_them() -> None:
+    body = client.get("/boom/validation-fields").json()
+
+    assert body["error"]["fields"] == {"annee_reporting": "L'année est invalide."}
+
+
+def test_request_validation_error_follows_the_same_error_contract() -> None:
+    """La validation Pydantic native de FastAPI (corps de requête mal formé) ne doit jamais
+    renvoyer {"detail": [...]} — seulement {"error": {...}}, comme toute autre erreur ici."""
+    response = client.post("/boom/body", json={"annee_reporting": "pas-un-entier"})
+
+    assert response.status_code == 422
+    body = response.json()
+    assert "detail" not in body
+    assert body["error"]["code"] == "validation_error"
+    assert "correlation_id" in body["error"]
+    assert "annee_reporting" in body["error"]["fields"]
+
+
+def test_request_validation_error_on_malformed_json_omits_fields() -> None:
+    """Un corps qui n'est même pas du JSON valide n'a aucun champ précis à isoler — le
+    contrat reste respecté, seulement sans la clé "fields"."""
+    response = client.post(
+        "/boom/body", content=b"not-json-at-all", headers={"content-type": "application/json"}
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert "detail" not in body
+    assert body["error"]["code"] == "validation_error"
+    assert "fields" not in body["error"]
 
 
 def test_permission_denied_error_returns_403_structured() -> None:

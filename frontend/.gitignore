@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Artefact régénéré par `npm run api:generate` (voir scripts/export_openapi.py) — jamais committé,
+# contrairement à src/shared/api/generated/ que ce fichier sert à produire.
+openapi.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
