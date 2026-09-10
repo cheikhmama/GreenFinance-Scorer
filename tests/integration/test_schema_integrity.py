@@ -162,7 +162,9 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     # --- Portefeuille + positions (USD converti, FIXE, OUVERTE) -----------
     investisseur = _utilisateur(session, Role.INVESTISSEUR)
-    portefeuille = Portefeuille(investisseur_id=investisseur.id, nom="Portefeuille vert")
+    portefeuille = Portefeuille(
+        investisseur_id=investisseur.id, nom="Portefeuille vert", devise_reference=DevisePosition.USD
+    )
     session.add(portefeuille)
     session.flush()
 
@@ -188,6 +190,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
             "entreprise_id": entreprise.id,
             "montant_investi": 2000.0,
             "devise": DevisePosition.MRU,
+            "montant_converti": 52.0,
             "type_duree": TypeDureeInvestissement.FIXE,
             "date_debut": debut_fixe,
             "date_fin": debut_fixe + timedelta(days=180),
@@ -199,6 +202,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
             "entreprise_id": entreprise.id,
             "montant_investi": 750.0,
             "devise": DevisePosition.EUR,
+            "montant_converti": 750.0,
             "type_duree": TypeDureeInvestissement.OUVERTE,
             "date_debut": utcnow(),
         }

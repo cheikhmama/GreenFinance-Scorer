@@ -31,7 +31,9 @@ def _entreprise(session, **kwargs) -> Entreprise:
 
 
 def _portefeuille(session, investisseur_id: uuid.UUID) -> Portefeuille:
-    portefeuille = Portefeuille(investisseur_id=investisseur_id, nom="Portefeuille vert")
+    portefeuille = Portefeuille(
+        investisseur_id=investisseur_id, nom="Portefeuille vert", devise_reference=DevisePosition.USD
+    )
     session.add(portefeuille)
     session.flush()
     return portefeuille
@@ -43,6 +45,7 @@ def _base_position(portefeuille_id: uuid.UUID, entreprise_id: uuid.UUID, **kwarg
         "entreprise_id": entreprise_id,
         "montant_investi": 1000.0,
         "devise": DevisePosition.USD,
+        "montant_converti": 1000.0,
         "type_duree": TypeDureeInvestissement.OUVERTE,
         "date_debut": utcnow(),
     }

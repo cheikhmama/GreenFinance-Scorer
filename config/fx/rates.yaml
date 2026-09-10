@@ -1,0 +1,16 @@
+# Taux de change de référence — Espace Investisseur (Étape 15/16).
+#
+# Statiques, pas une API de change en temps réel : décision prise pour garder la conversion
+# déterministe, testable et sans dépendance externe tant qu'un vrai besoin de taux en temps réel
+# n'est pas exprimé (voir app/investor/fx.py). Un montant converti n'est jamais recalculé après
+# coup (PositionPortefeuille.taux_change_utilise est figé à la création) — changer une valeur ici
+# n'affecte que les nouvelles positions, jamais les positions déjà enregistrées.
+#
+# Valeurs indicatives (ordre de grandeur), vers la devise pivot USD — à réviser (nouvelle version)
+# si une vraie source de taux de change est branchée plus tard.
+version: 1
+
+taux_vers_usd:
+  USD: 1.0
+  EUR: 1.08
+  MRU: 0.025

@@ -1,10 +1,7 @@
 """Entités de persistance de l'espace Investisseur : portefeuilles et positions.
 
-Le formulaire de saisie, la conversion de devise affichée en temps réel et
-le calcul du taux de change appartiennent à l'Étape 16 (Espace
-Investisseur) ; ce module ne pose que le schéma qui les rendra possibles.
-Le modèle d'agrégation de portefeuille (app/investor/portfolio.py) reste
-implémenté à l'Étape 15.
+Le formulaire de saisie, la conversion de devise affichée en temps réel et le calcul du taux de
+change sont implémentés dans app/investor/{fx,portfolio}.py (Étape 15/16).
 
 Notes d'implémentation :
 - taux_change_utilise et montant_converti sont figés au moment de la
@@ -13,6 +10,9 @@ Notes d'implémentation :
   durée (FIXE/OUVERTE) s'appliquent aussi bien à la création qu'à une
   fermeture ultérieure d'une position OUVERTE (date_fin renseignée après
   coup), pas seulement à la construction initiale.
+- Portefeuille.devise_reference fixe la devise d'affichage des montants agrégés (taux statiques,
+  voir app/investor/fx.py) ; archive distingue actif/archivé (jamais de suppression brutale d'un
+  portefeuille ayant un historique de positions, voir app/investor/portfolio.py).
 """
 
 import uuid
@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from pydantic import ConfigDict, ValidationInfo, model_validator
+from sqlalchemy import CheckConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -36,7 +37,12 @@ class Portefeuille(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     investisseur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
     nom: str
+    devise_reference: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
     date_creation: datetime = Field(default_factory=utcnow)
+    # Jamais de suppression d'un portefeuille ayant déjà eu une position (voir
+    # app/investor/portfolio.py) — l'archivage est la seule façon de le retirer de la vue "Mes
+    # portefeuilles" par défaut sans perdre son historique.
+    archive: bool = Field(default=False)
 
     investisseur: "Utilisateur" = Relationship(back_populates="portefeuilles")
     positions: list["PositionPortefeuille"] = Relationship(back_populates="portefeuille")
@@ -44,6 +50,9 @@ class Portefeuille(SQLModel, table=True):
 
 class PositionPortefeuille(SQLModel, table=True):
     __tablename__ = "position_portefeuille"
+    __table_args__ = (
+        CheckConstraint("montant_investi > 0", name="ck_position_portefeuille_montant_positif"),
+    )
     model_config = ConfigDict(validate_assignment=True)  # type: ignore[assignment]
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -52,12 +61,15 @@ class PositionPortefeuille(SQLModel, table=True):
     # Montant tel que saisi par l'investisseur, dans la devise ci-dessous.
     montant_investi: float
     devise: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
-    # Nul si aucune conversion n'était nécessaire ; sinon figé à la valeur
-    # en vigueur au moment de la création, jamais recalculé après coup.
+    # Nul si aucune conversion n'était nécessaire (devise == devise de référence du
+    # portefeuille) ; sinon figé à la valeur en vigueur au moment de la création, jamais
+    # recalculé après coup.
     taux_change_utilise: float | None = None
-    # Dans la devise de référence de la plateforme ; nul si aucune
-    # conversion n'était nécessaire.
-    montant_converti: float | None = None
+    # Toujours renseigné, dans la devise de référence du portefeuille — égal à montant_investi
+    # quand aucune conversion n'était nécessaire (voir taux_change_utilise, seul indicateur nul
+    # de ce cas). Jamais nul : l'agrégation de portefeuille (app/investor/portfolio.py) a besoin
+    # d'une valeur exploitable pour CHAQUE position, converties ou non.
+    montant_converti: float
     type_duree: TypeDureeInvestissement = Field(
         sa_column=sa_enum_column(TypeDureeInvestissement)
     )
@@ -76,7 +88,11 @@ class PositionPortefeuille(SQLModel, table=True):
                 raise ValueError(
                     "date_fin est obligatoire pour une position à durée FIXE"
                 )
-            if self.date_debut < utcnow():
+            if self.date_debut.date() < utcnow().date():
+                # Comparaison au jour près (voir cahier des charges : "date de début >= date du
+                # jour"), jamais à l'instant précis — une comparaison datetime exacte échouerait
+                # systématiquement à cause de la latence réseau normale entre la saisie côté
+                # client et la validation côté serveur.
                 raise ValueError(
                     "date_debut doit être postérieure ou égale à la date actuelle "
                     "pour une position FIXE"
@@ -89,6 +105,15 @@ class PositionPortefeuille(SQLModel, table=True):
             if self.date_fin <= self.date_debut:
                 raise ValueError("date_fin doit être postérieure à date_debut")
         elif self.type_duree == TypeDureeInvestissement.OUVERTE:
+            if self.date_fin is None and self.date_debut.date() < utcnow().date():
+                # Comparaison au jour près, même raison que la branche FIXE ci-dessus. La règle
+                # "date_debut >= aujourd'hui" ne s'applique qu'à la création (date_fin encore
+                # nulle) — une fermeture ultérieure (date_fin renseignée après coup) fixe
+                # forcément une date_debut déjà passée, ce n'est jamais une erreur à ce moment-là.
+                raise ValueError(
+                    "date_debut doit être postérieure ou égale à la date actuelle "
+                    "pour une position OUVERTE"
+                )
             if self.date_fin is not None and self.date_fin <= self.date_debut:
                 raise ValueError(
                     "date_fin, si renseignée, doit être postérieure à date_debut"
