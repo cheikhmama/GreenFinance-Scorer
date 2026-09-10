@@ -10,7 +10,7 @@ Un package sous `app/` par grande partie fonctionnelle du projet. La liste et le
 
 | Module | Rôle | Implémenté à |
 |---|---|---|
-| `app/core/` | Infrastructure transverse (config, DB, erreurs, logging, dépendances) | Étapes 1-2 |
+| `app/core/` | Infrastructure transverse (config, DB, erreurs, logging, dépendances) + notifications (seule entité transverse à posséder une surface API : elle n'appartient à aucun espace acteur, voir §2) | Étapes 1-2, Phase 5 §10 |
 | `app/api/` | Point de montage versionné de toutes les routes métier | Étape 2 |
 | `app/auth/` | Authentification et autorisation | Étape 9 |
 | `app/ingestion/` | Extraction documentaire, recherche sémantique, complétude | Étapes 4, 5, 7, 8 |
@@ -45,6 +45,12 @@ Chaque module métier destiné à exposer des routes possède un `router.py` ave
 — même vide de route, comme posé à l'Étape 2 (Prompt 2.2). Les modules qui ne sont pas des surfaces API directes
 (`ingestion`, `scoring`, `carbon`, `explainability`) n'ont pas de `router.py` : leurs résultats sont exposés par
 les modules « espace » qui les consomment (`company`, `investor`, `audit`, `admin`).
+
+Exception délibérée : `app/core/router.py` (Phase 5 §10, notifications). `Notification` n'appartient à aucun
+espace acteur — tout utilisateur authentifié, quel que soit son rôle, consulte et marque lues ses propres
+notifications — la dupliquer dans les six routers « espace » aurait été un copier-coller pur. C'est la seule
+entité de `app/core/models.py` à posséder une surface API propre ; `JournalAudit` reste exposé via
+`app/admin/router.py` (`GET /admin/journal-audit`), réservé à l'Administrateur, donc rattaché à son espace.
 
 ## 3. Point de montage API (`app/api/router.py`)
 

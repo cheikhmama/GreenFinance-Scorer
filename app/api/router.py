@@ -16,11 +16,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.admin.router import router as admin_router
 from app.audit.router import router as audit_router
+from app.auth.csrf import CSRFMiddleware
 from app.auth.router import router as auth_router
 from app.company.router import router as company_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware
+from app.core.router import router as core_router
 from app.institution.router import router as institution_router
 from app.investor.router import router as investor_router
 from app.researcher.router import router as researcher_router
@@ -30,9 +32,33 @@ from app.researcher.router import router as researcher_router
 # maintenant, même sans route active à l'intérieur de son router.
 OPENAPI_TAGS = [
     {"name": "auth", "description": "Authentification et autorisation — Étape 9."},
-    {"name": "admin", "description": "Espace Administrateur — Étape 10."},
-    {"name": "audit", "description": "Espace Auditeur — Étape 11."},
-    {"name": "company", "description": "Espace Entreprise — Étape 10."},
+    {
+        "name": "admin",
+        "description": (
+            "Espace Administrateur — file d'attente, affectation, décision et publication "
+            "(Étape 10 partielle)."
+        ),
+    },
+    {
+        "name": "audit",
+        "description": (
+            "Espace Auditeur — consultation des dossiers assignés et soumission d'avis (Étape 11)."
+        ),
+    },
+    {
+        "name": "company",
+        "description": (
+            "Espace Entreprise — dépôt de rapport, statut d'extraction et détail des données "
+            "extraites (Étapes 5 et 10 partielles) ; reste de l'espace à l'Étape 10."
+        ),
+    },
+    {
+        "name": "notifications",
+        "description": (
+            "Notifications transverses, tous rôles confondus — consultation et marquage lu "
+            "(Phase 5 §10)."
+        ),
+    },
     {"name": "investor", "description": "Espace Investisseur — Étape 16."},
     {"name": "researcher", "description": "Espace Chercheur — Étape 17."},
     {"name": "institution", "description": "Espace Institution — Étape 17."},
@@ -48,8 +74,13 @@ api_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Ajouté après CORS : middleware ajouté en dernier = le plus proche des routes, donc exécuté
+# après CORS/CorrelationId côté requête entrante, et sa réponse traverse quand même CORS/
+# CorrelationId au retour (voir app/auth/csrf.py pour la logique de vérification elle-même).
+api_app.add_middleware(CSRFMiddleware)
 
 api_app.include_router(auth_router)
+api_app.include_router(core_router)
 api_app.include_router(admin_router)
 api_app.include_router(audit_router)
 api_app.include_router(company_router)
