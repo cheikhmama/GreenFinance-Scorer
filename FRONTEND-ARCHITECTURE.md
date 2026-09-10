@@ -11,6 +11,13 @@ métier, §3.1 client généré Orval, etc.) reste au stade « cible » : les me
 jamais être présentées comme déjà livrées tant que ce statut n'a pas été mis à jour dans le même commit que le
 code correspondant.
 
+**Atelier UI multi-acteurs au 2026-08-20.** Un prototype interactif isolé est disponible sous
+`/prototype/*` dans `features/prototype/`. Il utilise exclusivement des données synthétiques partagées et ne
+contourne ni `/auth/me`, ni `RequireRole`, ni les routes métier protégées. Il permet d'évaluer les six espaces,
+les formulaires et les transitions inter-acteurs avant connexion aux API. Il est activé en développement et
+uniquement sur demande dans un build de démonstration avec `VITE_ENABLE_PROTOTYPE=true`. Il ne constitue pas
+une implémentation des services backend décrits comme « cible » dans ce document.
+
 ## 0. Vision produit et principes non négociables
 
 Le frontend est l'interface de décision d'une plateforme ESG et carbone. Sa qualité ne se mesure donc pas au

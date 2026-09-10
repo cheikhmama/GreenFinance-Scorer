@@ -5,6 +5,7 @@ import { authRoutes } from "@/features/auth/routes";
 import { companyRoutes } from "@/features/company/routes";
 import { institutionRoutes } from "@/features/institution/routes";
 import { investorRoutes } from "@/features/investor/routes";
+import { prototypeRoutes } from "@/features/prototype/routes";
 import { researcherRoutes } from "@/features/researcher/routes";
 import { DashboardRedirect } from "@/shared/DashboardRedirect";
 
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
   ...investorRoutes,
   ...researcherRoutes,
   ...institutionRoutes,
+  ...prototypeRoutes,
 ]);
 
 export function App() {
