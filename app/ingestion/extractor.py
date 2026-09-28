@@ -26,7 +26,7 @@ import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import faiss
 import numpy as np
@@ -36,14 +36,18 @@ from FlagEmbedding import BGEM3FlagModel
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
+from app.auth.models import Utilisateur
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import MethodeDonnee, Pilier, StatutRapport
+from app.core.enums import MethodeDonnee, Pilier, Role, StatutRapport
+from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
+from app.ingestion.completeness import calculer_couverture
 from app.ingestion.models import (
+    CouvertureIndicateur,
     DonneeCarbone,
     IndicateurESG,
     PreuveDocumentaire,
@@ -55,29 +59,76 @@ logger = structlog.get_logger(__name__)
 
 _extraction_lock = threading.Lock()
 
-# Verbatim de notebooks/_prompt_4_3_indexation.py / _prompt_4_4_extraction.py pour les deux
-# premières — requêtes fixes, identiques pour tous les rapports, jamais générées à la volée
-# depuis un code d'indicateur. Troisième requête ajoutée en Phase 5 §9 (socle Social/Gouvernance
-# harmonisé, voir config/weights/default.yaml) : sans elle, la recherche sémantique ne
-# retrouverait que les pages carbone/climat et manquerait celles qui discutent la composition du
-# conseil d'administration ou la sécurité au travail sur un rapport de plusieurs centaines de
-# pages — sans effet sur les rapports courts du corpus de test, où CONTEXT_TOP_PAGES couvre déjà
-# la totalité des pages.
-REQUETES_FIXES = [
-    (
-        "Scope 1, Scope 2 location-based, Scope 2 market-based and Scope 3 greenhouse gas emissions "
-        "in tonnes of CO2 equivalent (tCO2e)"
+# Une requête sémantique dédiée par code cible (Phase 6) — remplace les 3 requêtes génériques
+# d'origine (Prompt 4.3/4.4). Sur un rapport de plusieurs centaines de pages, les ~23 codes de
+# INDICATEURS_CIBLES (ci-dessous) sont dispersés sur bien plus de pages qu'un plafond fixe ne peut
+# en couvrir ; une requête générique par thème (carbone/social/gouvernance) noierait un code précis
+# (ex. "administrateurs_independants_pourcentage") derrière des pages plus génériquement
+# pertinentes pour le thème mais pas pour CE code. L'assertion juste après INDICATEURS_CIBLES
+# garantit qu'aucun code n'est jamais invisible à la recherche par simple omission ici.
+REQUETES_PAR_CODE: dict[str, str] = {
+    "scope_1": "Scope 1 direct greenhouse gas emissions in tonnes of CO2 equivalent",
+    "scope_2": (
+        "Scope 2 greenhouse gas emissions (not split market/location-based) in tonnes of "
+        "CO2 equivalent"
     ),
-    "Greenhouse gas emissions intensity in grams of CO2 equivalent per kilowatt-hour (gCO2e/kWh)",
-    (
-        "Percentage of women in management and on the board of directors, workplace fatalities "
-        "and occupational safety"
+    "scope_2_market_based": (
+        "Scope 2 market-based greenhouse gas emissions in tonnes of CO2 equivalent"
     ),
-]
+    "scope_2_location_based": (
+        "Scope 2 location-based greenhouse gas emissions in tonnes of CO2 equivalent"
+    ),
+    "scope_3": (
+        "Scope 3 value chain greenhouse gas emissions in tonnes of CO2 equivalent, including "
+        "any single reported category"
+    ),
+    "intensite_scope_1_2_marketbased": (
+        "Greenhouse gas emissions intensity, market-based, in grams of CO2 equivalent per "
+        "kilowatt-hour"
+    ),
+    "intensite_scope_1_2_3_hors_cat11": (
+        "Greenhouse gas emissions intensity excluding Scope 3 category 11 (use of sold products)"
+    ),
+    "intensite_scope_1_2_3_total": (
+        "Total greenhouse gas emissions intensity including all scopes"
+    ),
+    "femmes_management_pourcentage": "Percentage of women in management positions",
+    "deces_professionnels": "Number of workplace fatalities / occupational deaths",
+    "femmes_conseil_pourcentage": "Percentage of women on the board of directors",
+    "taille_conseil": "Size of the board of directors, number of board members",
+    "administrateurs_independants_pourcentage": (
+        "Percentage of independent directors on the board"
+    ),
+    "effectif_total": "Total number of employees, total workforce headcount",
+    "femmes_effectif_pourcentage": "Percentage of women in the total workforce",
+    "heures_formation_par_employe": "Average training hours per employee",
+    "taux_frequence_accidents": (
+        "Workplace accident frequency rate, lost time injury frequency rate"
+    ),
+    "part_renouvelable_pourcentage": (
+        "Percentage of renewable energy in total energy consumption"
+    ),
+    "dechets_valorises_pourcentage": (
+        "Percentage of waste diverted from disposal / recovered / recycled"
+    ),
+    "score_environnement_declare": "Company's self-reported overall Environmental score or rating",
+    "score_social_declare": "Company's self-reported overall Social score or rating",
+    "score_gouvernance_declare": "Company's self-reported overall Governance score or rating",
+    "score_global_declare": "Company's self-reported overall ESG score or rating",
+}
 
-# Fenêtre d'extraction (Prompt 4.4) — distincte du seuil TOP_PAGES=8 du benchmark de recherche 4.3,
-# qui ne mesure que la qualité de recherche, pas la fenêtre à donner au LLM d'extraction.
-CONTEXT_TOP_PAGES = 20
+# Sélection adaptative du contexte envoyé au LLM (Phase 6, remplace l'ancien CONTEXT_TOP_PAGES=20
+# fixe) — la recherche sémantique porte déjà sur 100% des pages (FAISS exhaustif, voir
+# _search_all_chunks) ; ces constantes bornent uniquement ce qui est effectivement montré au LLM,
+# pour ne jamais envoyer un rapport de plusieurs centaines de pages en entier à chaque appel.
+# Constantes de code (pas de Settings) — même convention que _TENTATIVES_APPEL_LLM ci-dessous,
+# ajustées via PR et revalidées au besoin par scripts/evaluate_extraction_pipeline.py.
+CHARS_PER_TOKEN_ESTIME = 4
+CONTEXT_TOKEN_BUDGET = 24_000
+CONTEXT_TOKEN_BUDGET_RETRY = 12_000
+RELEVANCE_FLOOR_RATIO = 0.5
+NEIGHBOR_RADIUS = 1
+TABLE_SCORE_BOOST = 1.15
 
 # Modèle Gemini avec palier gratuit (voir Phase 5 — bascule Anthropic->Gemini, compte Anthropic
 # sans crédit). gemini-2.5-flash n'est plus accessible aux nouveaux comptes (confirmé par erreur
@@ -106,7 +157,10 @@ EXTRACTION_TOOL = genai_types.FunctionDeclaration(
 @dataclass(frozen=True)
 class CibleIndicateur:
     code: str
-    cible: Literal["donnee_carbone", "indicateur_esg"]
+    # "rapport_score_global" : score transversal auto-déclaré par l'entreprise (ex. "Score global
+    # ESG : 66/100"), écrit directement sur RapportESG.score_global_declare — aucun pilier E/S/G
+    # ne convient à une valeur transversale aux trois.
+    cible: Literal["donnee_carbone", "indicateur_esg", "rapport_score_global"]
     scope: int | None = None
     categorie_ges: str | None = None
     pilier: Pilier | None = None
@@ -115,11 +169,19 @@ class CibleIndicateur:
 # Les 7 codes carbone/environnement déjà validés sur le corpus pilote (voir
 # data_test/ground_truth.yaml), plus le socle Social/Gouvernance harmonisé retenu en Phase 5 §9
 # (voir config/weights/default.yaml et le diagnostic associé — analyse de couverture sur
-# data_test/reference_esg_8_entreprises.json). Pas de catalogue ESG générique ici : seuls les
-# codes qu'une configuration de scoring référence réellement sont ciblés, pour ne jamais extraire
-# une donnée qui n'aurait aucun consommateur en aval.
+# data_test/reference_esg_8_entreprises.json), plus un second lot (ci-dessous) ajouté pour la
+# transparence humaine (Admin/Auditeur/Investisseur consultant un rapport doit voir ce qui y est
+# réellement écrit, avec preuve page par page — garantie G1) : un consommateur légitime distinct
+# du moteur de scoring, qui continue de ne lire que les codes présents dans
+# config/weights/default.yaml (app/scoring/engine.py ignore silencieusement tout code inconnu du
+# YAML — confirmé par lecture directe, aucun risque de modifier un score déjà calculé).
 INDICATEURS_CIBLES: list[CibleIndicateur] = [
     CibleIndicateur("scope_1", "donnee_carbone", scope=1),
+    # Scope 2 non différencié marché/localisation — le cas le plus courant en pratique (voir
+    # data_test/reference_esg_8_entreprises.json, "Scope 2 communiqué comme une valeur unique...
+    # pour les 8 entreprises") : sans ce code, un Scope 2 pourtant explicite dans le rapport ne
+    # matche jamais scope_2_market_based/location_based et disparaît silencieusement.
+    CibleIndicateur("scope_2", "donnee_carbone", scope=2),
     CibleIndicateur(
         "scope_2_market_based", "donnee_carbone", scope=2, categorie_ges="market_based"
     ),
@@ -139,7 +201,49 @@ INDICATEURS_CIBLES: list[CibleIndicateur] = [
     CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pilier.SOCIAL),
     CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pilier.SOCIAL),
     CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    # Second lot — transparence humaine, repris du catalogue déjà pensé dans
+    # data_test/reference_esg_8_entreprises.json (codes déjà nommés, jamais branchés jusqu'ici).
+    # Liste non exhaustive : le pattern (un CibleIndicateur par fait numérique avec page-preuve)
+    # se répète, d'autres codes pourront s'ajouter au fil des rapports rencontrés.
+    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur(
+        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pilier.GOUVERNANCE
+    ),
+    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur(
+        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+    ),
+    CibleIndicateur(
+        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+    ),
+    # Scores auto-déclarés par l'entreprise dans sa propre synthèse ESG — par pilier uniquement
+    # (pas de "global" : Pilier n'a que 3 valeurs, et la plateforme calcule déjà son propre score
+    # officiel via ScoreESG/config/weights/default.yaml ; ajouter un score global auto-déclaré à
+    # côté créerait une confusion entre "ce que l'entreprise prétend" et "ce que la plateforme
+    # calcule" — décision produit à part entière, pas un ajout silencieux ici).
+    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT),
+    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("score_global_declare", "rapport_score_global"),
 ]
+
+assert {c.code for c in INDICATEURS_CIBLES} == set(REQUETES_PAR_CODE), (
+    "Chaque code de INDICATEURS_CIBLES doit avoir exactement une requête sémantique dédiée "
+    "dans REQUETES_PAR_CODE."
+)
+
+# Les 3 codes "score_{pilier}_declare" ci-dessus atterrissent comme des IndicateurESG ordinaires
+# (même branche indicateur_esg que n'importe quel autre code) -- rien ne les distingue en base
+# des indicateurs réellement mesurés. Cette constante est le point unique de vérité pour les en
+# exclure explicitement partout où "les indicateurs extraits" doivent rester séparés de "ce que
+# l'entreprise prétend" (config/weights/default.yaml les exclut déjà par omission ; le PDF de
+# synthèse et RapportESGDetail doivent les exclure/isoler activement, pas par omission silencieuse).
+CODES_AUTO_DECLARES_PAR_PILIER = frozenset(
+    {"score_environnement_declare", "score_social_declare", "score_gouvernance_declare"}
+)
 
 
 @lru_cache
@@ -153,11 +257,21 @@ def _get_gemini_client() -> genai.Client:
 
 
 def _iter_page_chunks(doc: DoclingDocument, max_chars: int = 1200) -> list[dict]:
-    """Reconstitue des chunks de texte associés à leur page d'origine. Une erreur
-    d'export_to_markdown n'est jamais avalée silencieusement — journalisée avec le numéro de page,
-    même règle qu'au Prompt 4.3."""
-    buffers: dict[int, list[str]] = {}
-    for item in list(getattr(doc, "texts", [])) + list(getattr(doc, "tables", [])):
+    """Reconstitue des chunks de texte associés à leur page d'origine, un chunk par item source
+    (texte OU tableau) — jamais deux items fusionnés dans un même chunk avant découpage, contrairement
+    à la version d'origine qui concatenait tout le contenu d'une page avant de trancher en morceaux
+    de max_chars (perdant ainsi la frontière d'un tableau). Chaque chunk porte is_table, lu par
+    _consolidate_by_page pour prioriser légèrement les tableaux (TABLE_SCORE_BOOST) où vivent
+    disproportionnellement les données ESG chiffrées. Une erreur d'export_to_markdown n'est jamais
+    avalée silencieusement — journalisée avec le numéro de page, même règle qu'au Prompt 4.3."""
+    chunks: list[dict] = []
+    # Any (pas object) : les items Docling (TextItem, TableItem...) n'ont pas de base commune
+    # exposant .text/.export_to_markdown — un typage object ferait échouer mypy sur les accès
+    # ci-dessous alors que le code les protège déjà par getattr/hasattr, en duck-typing délibéré.
+    items: list[tuple[bool, Any]] = [(False, t) for t in getattr(doc, "texts", [])] + [
+        (True, t) for t in getattr(doc, "tables", [])
+    ]
+    for is_table, item in items:
         prov = getattr(item, "prov", None)
         if not prov:
             continue
@@ -175,15 +289,10 @@ def _iter_page_chunks(doc: DoclingDocument, max_chars: int = 1200) -> list[dict]
                 content = None
         if not content:
             continue
-        buffers.setdefault(page_no, []).append(content)
-
-    chunks = []
-    for page_no, parts in buffers.items():
-        text = "\n".join(parts)
-        for i in range(0, len(text), max_chars):
-            piece = text[i : i + max_chars].strip()
+        for i in range(0, len(content), max_chars):
+            piece = content[i : i + max_chars].strip()
             if piece:
-                chunks.append({"page": page_no, "text": piece})
+                chunks.append({"page": page_no, "text": piece, "is_table": is_table})
     return chunks
 
 
@@ -214,31 +323,125 @@ def _search_all_chunks(
     ]
 
 
-def _consolidate_by_page(pairs: list[tuple[dict, float]]) -> list[tuple[int, float]]:
-    best_by_page: dict[int, float] = {}
+@dataclass(frozen=True)
+class PageCandidat:
+    """Page candidate au contexte LLM pour UNE requête, avec son meilleur score (déjà boosté si
+    is_table — voir _consolidate_by_page)."""
+
+    page: int
+    score: float
+    is_table: bool
+
+
+def _consolidate_by_page(pairs: list[tuple[dict, float]]) -> list[PageCandidat]:
+    """Meilleur score par page pour une requête. Un chunk table reçoit TABLE_SCORE_BOOST avant
+    comparaison — un score "boosté", utilisé seulement pour ce classement, jamais confondu avec une
+    vraie similarité cosinus ailleurs."""
+    best_by_page: dict[int, tuple[float, bool]] = {}
     for chunk, score in pairs:
         page = chunk["page"]
-        if page not in best_by_page or score > best_by_page[page]:
-            best_by_page[page] = score
-    return sorted(best_by_page.items(), key=lambda item: item[1], reverse=True)
+        boosted = score * TABLE_SCORE_BOOST if chunk["is_table"] else score
+        if page not in best_by_page or boosted > best_by_page[page][0]:
+            best_by_page[page] = (boosted, chunk["is_table"])
+    return sorted(
+        (PageCandidat(page=p, score=s, is_table=t) for p, (s, t) in best_by_page.items()),
+        key=lambda c: c.score,
+        reverse=True,
+    )
 
 
-def _build_context(search_index: dict, embed_model: BGEM3FlagModel) -> tuple[str, list[int]]:
-    chunk_scores = []
-    for requete in REQUETES_FIXES:
-        chunk_scores.extend(_search_all_chunks(search_index, embed_model, requete))
+def _rechercher_par_code(
+    search_index: dict, embed_model: BGEM3FlagModel, codes: list[str]
+) -> dict[str, list[PageCandidat]]:
+    """Une recherche FAISS exhaustive par code (REQUETES_PAR_CODE[code]), consolidée par page.
+    REQUETES_PAR_CODE[code] (jamais .get) : un code sans requête dédiée doit lever une KeyError
+    explicite plutôt que disparaître silencieusement de la recherche."""
+    return {
+        code: _consolidate_by_page(
+            _search_all_chunks(search_index, embed_model, REQUETES_PAR_CODE[code])
+        )
+        for code in codes
+    }
 
-    classement = _consolidate_by_page(chunk_scores)
-    top_pages = {page for page, _score in classement[:CONTEXT_TOP_PAGES]}
 
-    pages_text: dict[int, list[str]] = {}
+def _fusionner_classements(pages_par_code: dict[str, list[PageCandidat]]) -> list[PageCandidat]:
+    """Score global par page = max des scores (déjà boostés table) sur tous les codes fournis —
+    généralise le pooling multi-requêtes de l'ancien _build_context (3 REQUETES_FIXES) à une
+    requête par code."""
+    best: dict[int, PageCandidat] = {}
+    for candidats in pages_par_code.values():
+        for c in candidats:
+            if c.page not in best or c.score > best[c.page].score:
+                best[c.page] = c
+    return sorted(best.values(), key=lambda c: c.score, reverse=True)
+
+
+def _estimer_tokens(texte: str) -> int:
+    """Heuristique caractères→tokens (aucun tokenizer importé aujourd'hui) — CHARS_PER_TOKEN_ESTIME."""
+    return max(1, len(texte) // CHARS_PER_TOKEN_ESTIME)
+
+
+def _selectionner_pages_adaptatif(
+    classement_global: list[PageCandidat], texte_par_page: dict[int, str], budget_tokens: int
+) -> list[int]:
+    """Glouton sur un classement déjà trié décroissant : arrête dès qu'un score tombe sous le
+    plancher de pertinence (RELEVANCE_FLOOR_RATIO du meilleur score — le classement étant trié,
+    tout le reste est encore plus bas, un seul arrêt suffit), ou dès que le budget de tokens serait
+    dépassé — sauf pour la toute première page, toujours incluse même si elle dépasse seule le
+    budget (jamais un contexte vide envoyé au LLM)."""
+    if not classement_global:
+        return []
+    plancher = classement_global[0].score * RELEVANCE_FLOOR_RATIO
+    selection: list[int] = []
+    tokens_cumules = 0
+    for i, candidat in enumerate(classement_global):
+        if candidat.score < plancher:
+            break
+        cout = _estimer_tokens(texte_par_page.get(candidat.page, ""))
+        if i > 0 and tokens_cumules + cout > budget_tokens:
+            break
+        selection.append(candidat.page)
+        tokens_cumules += cout
+    return selection
+
+
+def _elargir_aux_voisins(pages: list[int], pages_disponibles: set[int], radius: int) -> list[int]:
+    """Ajout pur de pages adjacentes (±radius), hors budget et hors plancher : récupère un tableau
+    ou un paragraphe coupé par la page choisie pour son score, jamais un re-filtrage par pertinence.
+    Filtré aux pages qui existent réellement dans le document (pas de page 0, pas au-delà de la
+    dernière)."""
+    elargi = set(pages)
+    for p in pages:
+        for delta in range(-radius, radius + 1):
+            if (p + delta) in pages_disponibles:
+                elargi.add(p + delta)
+    return sorted(elargi)
+
+
+def _build_context(
+    search_index: dict, embed_model: BGEM3FlagModel, codes: list[str], budget_tokens: int
+) -> tuple[str, list[int], dict[str, list[PageCandidat]]]:
+    """Remplace l'ancienne fonction à 2 arguments (REQUETES_FIXES/CONTEXT_TOP_PAGES implicites) :
+    codes et budget_tokens explicites pour être appelable identiquement au 1er passage (tous les
+    codes, CONTEXT_TOKEN_BUDGET) et à la relance (codes manquants seulement,
+    CONTEXT_TOKEN_BUDGET_RETRY — voir run_extraction_pipeline). Renvoie aussi pages_par_code
+    (candidats bruts pré-sélection, un par code) — nécessaire pour juger l'exhaustivité de la
+    recherche par code (statut ABSENT_CONFIRME, voir completeness._absence_confirmee)."""
+    pages_par_code = _rechercher_par_code(search_index, embed_model, codes)
+    classement_global = _fusionner_classements(pages_par_code)
+
+    texte_par_page: dict[int, list[str]] = {}
     for chunk in search_index["chunks"]:
-        if chunk["page"] in top_pages:
-            pages_text.setdefault(chunk["page"], []).append(chunk["text"])
+        texte_par_page.setdefault(chunk["page"], []).append(chunk["text"])
+    texte_par_page_str = {page: "\n".join(parts) for page, parts in texte_par_page.items()}
 
-    ordered_pages = sorted(pages_text)
-    context = "\n\n".join(f"--- Page {p} ---\n" + "\n".join(pages_text[p]) for p in ordered_pages)
-    return context, ordered_pages
+    pages_coeur = _selectionner_pages_adaptatif(classement_global, texte_par_page_str, budget_tokens)
+    pages_finales = _elargir_aux_voisins(pages_coeur, set(texte_par_page_str), NEIGHBOR_RADIUS)
+
+    context = "\n\n".join(
+        f"--- Page {p} ---\n{texte_par_page_str[p]}" for p in pages_finales if p in texte_par_page_str
+    )
+    return context, pages_finales, pages_par_code
 
 
 # Nombre de tentatives face à une erreur serveur transitoire (503, surcharge du palier gratuit) —
@@ -253,7 +456,9 @@ def _call_llm_extraction(
     """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
     Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
     toute erreur non transitoire du fournisseur telle quelle — run_extraction_pipeline la classe,
-    ne la masque jamais."""
+    ne la masque jamais. Signature inchangée par le passage à la sélection adaptative (Phase 6) :
+    c'est ce qui permet d'appeler cette fonction une seconde fois pour la relance groupée sans la
+    modifier (voir run_extraction_pipeline)."""
     prompt = f"""Tu es un extracteur de donnees ESG/carbone. Voici des extraits d'un rapport d'entreprise
 ({nom_entreprise}), avec le numero de page physique indique avant chaque extrait.
 
@@ -264,6 +469,20 @@ Regles strictes :
 - Si un indicateur n'apparait pas explicitement dans les extraits fournis, "trouve" doit etre false et
   "valeur" doit etre null. Ne jamais inventer une valeur ni une page.
 - "page_source" doit etre le numero de page (indique par "--- Page N ---") ou tu as trouve la valeur.
+- Pour "scope_3" : si le rapport ne donne qu'une seule categorie du Scope 3 (ex. "Scope 3
+  categorie 11"), utilise quand meme cette valeur pour "scope_3" plutot que de repondre "trouve":
+  false - c'est la seule donnee Scope 3 disponible dans ce rapport.
+- Quand "trouve" est true, remplis aussi si possible : "valeur_brute" (la valeur telle qu'ecrite
+  litteralement, avec sa mise en forme d'origine), "section" (le titre ou la rubrique la plus
+  proche visible dans les extraits), "citation_source" (une courte citation verbatim, quelques mots,
+  qui justifie la valeur), "annee_valeur" (l'annee a laquelle se rapporte la valeur telle
+  qu'indiquee dans le document, qui peut differer de l'annee de reporting), "confiance" (ELEVE,
+  MOYEN ou FAIBLE selon la clarte de la donnee dans le texte). Laisse ces champs vides plutot que
+  de deviner s'ils ne sont pas clairs.
+- Quand "trouve" est false ET que le document declare EXPLICITEMENT que cet indicateur n'est pas
+  divulgue cette annee (ex. "non communique", "not disclosed"), remplis "non_divulgation_citation"
+  (citation verbatim de cette declaration) et "non_divulgation_page" (sa page). Sinon laisse ces
+  deux champs vides — ne jamais les remplir sur une simple absence silencieuse du document.
 - Reponds pour chacun des {len(codes)} indicateurs demandes, dans le meme ordre.
 
 Extraits du rapport :
@@ -298,6 +517,26 @@ Extraits du rapport :
     return ExtractionEntreprise.model_validate(function_calls[0].args)
 
 
+def _indicateur_trouve(extraction: ExtractionEntreprise, code: str) -> bool:
+    """Même critère que completeness.calculer_couverture : un code compte comme trouvé seulement
+    si le LLM l'a explicitement marqué trouve=true ET fourni une valeur non nulle."""
+    extrait = next((i for i in extraction.indicateurs if i.code == code), None)
+    return bool(extrait and extrait.trouve and extrait.valeur is not None)
+
+
+def _fusionner_extractions(
+    premiere: ExtractionEntreprise, retry: ExtractionEntreprise, codes_manquants: list[str]
+) -> ExtractionEntreprise:
+    """Fusion à sens unique : pour un code de codes_manquants, la réponse de retry REMPLACE celle
+    de premiere (recherche re-ciblée, potentiellement porteuse d'une citation de non-divulgation
+    absente du 1er passage) — jamais l'inverse. Les codes hors codes_manquants restent inchangés,
+    retry ne les a jamais reçus en entrée (voir run_extraction_pipeline) ; un code hors périmètre
+    que le LLM aurait quand même renvoyé par erreur est ignoré."""
+    fusion = {i.code: i for i in premiere.indicateurs}
+    fusion.update({i.code: i for i in retry.indicateurs if i.code in codes_manquants})
+    return ExtractionEntreprise(entreprise=premiere.entreprise, indicateurs=list(fusion.values()))
+
+
 def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> ExtractionEntreprise:
     """Résultat synthétique utilisé uniquement quand GEMINI_API_KEY est encore le placeholder
     de .env.example (Settings.gemini_api_key_is_placeholder) — jamais en production, où
@@ -324,7 +563,23 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             logger.error("extraction_rapport_introuvable", rapport_id=str(rapport_id))
             return
 
-        rapport.statut = StatutRapport.EN_EXTRACTION
+        # Ne régresse jamais un rapport déjà avancé dans le workflow (AFFECTE_AUDITEUR,
+        # EN_VALIDATION, VALIDE...) — seul un rapport pas encore extrait démarre à EN_EXTRACTION.
+        # Sans cette garde, rejouer l'extraction (ex. après élargissement d'INDICATEURS_CIBLES) sur
+        # un rapport déjà affecté à un auditeur effacerait silencieusement cette affectation aux
+        # yeux du statut, alors que auditeur_id resterait renseigné — un vrai bug rencontré en
+        # pratique (SMH/SNDE repassés à EN_EXTRACTION par une ré-extraction alors que déjà
+        # AFFECTE_AUDITEUR).
+        if rapport.statut == StatutRapport.ENVOYE:
+            rapport.statut = StatutRapport.EN_EXTRACTION
+            session.add(rapport)
+            session.commit()
+
+        # Posé à CHAQUE entrée dans le pipeline (dépôt initial ou relance manuelle après échec) —
+        # sert de référence à lister_rapports_extraction_bloquee (app/admin/review_queue.py) pour
+        # détecter un traitement interrompu ; une relance doit repartir d'un chronomètre frais,
+        # pas de celui de la toute première tentative.
+        rapport.extraction_demarree_le = utcnow()
         session.add(rapport)
         session.commit()
 
@@ -368,11 +623,14 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             etape = "indexation_semantique_echouee"
             search_index = _build_search_index(conversion.document)
             embed_model = _get_embed_model()
-            context, pages_used = _build_context(search_index, embed_model)
+            codes = [cible.code for cible in INDICATEURS_CIBLES]
+            context, pages_used, pages_par_code = _build_context(
+                search_index, embed_model, codes, CONTEXT_TOKEN_BUDGET
+            )
             logger.info("contexte_assemble", rapport_id=str(rapport_id), n_pages=len(pages_used))
+            pages_vues_par_code: dict[str, set[int]] = {code: set(pages_used) for code in codes}
 
             etape = "appel_llm_echoue"
-            codes = [cible.code for cible in INDICATEURS_CIBLES]
             if demo:
                 logger.warning(
                     "extraction_demo_synthetique_utilisee",
@@ -384,9 +642,70 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 extraction = _call_llm_extraction(
                     nom_entreprise=nom_entreprise, context=context, codes=codes
                 )
+
+                # Relance groupee (Phase 6) : UN SEUL appel supplementaire couvrant tous les codes
+                # encore manquants apres le 1er passage, jamais un appel par code — le pipeline
+                # tourne sur le palier gratuit Gemini, sans infrastructure de rate-limiting ;
+                # borner a 2 appels/rapport au maximum est la protection qui ne depend pas de
+                # connaitre le quota exact de ce palier.
+                codes_manquants = [code for code in codes if not _indicateur_trouve(extraction, code)]
+                if codes_manquants:
+                    etape = "relance_llm_echouee"
+                    contexte_retry, pages_retry, pages_par_code_retry = _build_context(
+                        search_index, embed_model, codes_manquants, CONTEXT_TOKEN_BUDGET_RETRY
+                    )
+                    if pages_retry:
+                        extraction_retry = _call_llm_extraction(
+                            nom_entreprise=nom_entreprise,
+                            context=contexte_retry,
+                            codes=codes_manquants,
+                        )
+                        extraction = _fusionner_extractions(extraction, extraction_retry, codes_manquants)
+                        for code in codes_manquants:
+                            pages_vues_par_code[code] |= set(pages_retry)
+                        pages_par_code.update(pages_par_code_retry)
+                    etape = "appel_llm_echoue"
             logger.info("extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo)
 
             etape = "persistance_echouee"
+            # Purge des données dérivées d'une extraction précédente sur ce même rapport, pour que
+            # run_extraction_pipeline soit rejouable (ex. après élargissement d'INDICATEURS_CIBLES)
+            # sans dupliquer les lignes. Ne touche jamais RapportESG (le PDF déposé) ni AvisAudit —
+            # seules les données automatiques, best-effort et remplaçables sont concernées.
+            # PreuveDocumentaire n'a pas de rapport_id direct (liée uniquement via le preuve_id des
+            # lignes ci-dessous, et son fichier est stocké sous preuves/{rapport_id}/page_N.pdf,
+            # app/ingestion/proof_generator.py — jamais partagée entre rapports) : ses ids doivent
+            # être collectés avant de supprimer les lignes qui les référencent.
+            anciens_indicateurs = session.exec(
+                select(IndicateurESG).where(IndicateurESG.rapport_id == rapport_id)
+            ).all()
+            anciennes_donnees_carbone = session.exec(
+                select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport_id)
+            ).all()
+            anciennes_couvertures = session.exec(
+                select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport_id)
+            ).all()
+            for ancienne_couverture in anciennes_couvertures:
+                session.delete(ancienne_couverture)
+            anciennes_preuve_ids = {i.preuve_id for i in anciens_indicateurs} | {
+                d.preuve_id for d in anciennes_donnees_carbone
+            }
+            if rapport.score_global_declare_preuve_id is not None:
+                anciennes_preuve_ids.add(rapport.score_global_declare_preuve_id)
+            rapport.score_global_declare = None
+            rapport.score_global_declare_preuve_id = None
+            session.add(rapport)
+            for ancienne_ligne in [*anciens_indicateurs, *anciennes_donnees_carbone]:
+                session.delete(ancienne_ligne)
+            if anciennes_preuve_ids:
+                for ancienne_preuve in session.exec(
+                    select(PreuveDocumentaire).where(
+                        col(PreuveDocumentaire.id).in_(anciennes_preuve_ids)
+                    )
+                ).all():
+                    session.delete(ancienne_preuve)
+            session.flush()
+
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}
             preuves_par_page: dict[int, PreuveDocumentaire] = {}
             for indicateur in extraction.indicateurs:
@@ -434,9 +753,14 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                             methode=MethodeDonnee.RAPPORTEE,
                             score_qualite_pcaf=PLACEHOLDER_SCORE_QUALITE_PCAF,
                             preuve_id=preuve.id,
+                            valeur_brute=indicateur.valeur_brute,
+                            section=indicateur.section,
+                            citation_source=indicateur.citation_source,
+                            annee_valeur=indicateur.annee_valeur,
+                            confiance=indicateur.confiance,
                         )
                     )
-                else:
+                elif cible.cible == "indicateur_esg":
                     assert cible.pilier is not None  # invariant garanti par INDICATEURS_CIBLES
                     session.add(
                         IndicateurESG(
@@ -447,11 +771,78 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                             unite=indicateur.unite or "",
                             methode=MethodeDonnee.RAPPORTEE,
                             preuve_id=preuve.id,
+                            valeur_brute=indicateur.valeur_brute,
+                            section=indicateur.section,
+                            citation_source=indicateur.citation_source,
+                            annee_valeur=indicateur.annee_valeur,
+                            confiance=indicateur.confiance,
                         )
                     )
+                else:  # "rapport_score_global"
+                    rapport.score_global_declare = indicateur.valeur
+                    rapport.score_global_declare_preuve_id = preuve.id
+                    session.add(rapport)
+
+            # Exhaustivité par code (statut ABSENT_CONFIRME, voir completeness._absence_confirmee) :
+            # un code est "recherché exhaustivement" si TOUTES ses pages candidates au-dessus de son
+            # propre plancher de pertinence ont effectivement été montrées au LLM (1er passage +
+            # relance) — jamais déduit du budget global, qui peut avoir écarté des pages pertinentes
+            # pour CE code au profit d'autres codes dans le classement fusionné.
+            pages_examinees_par_code = {code: len(pages_vues_par_code[code]) for code in codes}
+            recherche_exhaustive_par_code = {
+                code: {
+                    candidat.page
+                    for candidat in pages_par_code[code]
+                    if candidat.score >= pages_par_code[code][0].score * RELEVANCE_FLOOR_RATIO
+                }.issubset(pages_vues_par_code[code])
+                for code in codes
+                if pages_par_code.get(code)
+            }
+            for couverture in calculer_couverture(
+                rapport_id, extraction, codes, pages_examinees_par_code, recherche_exhaustive_par_code
+            ):
+                session.add(couverture)
 
             rapport.extraction_terminee_le = utcnow()
+            rapport.extraction_erreur = None
             session.add(rapport)
+
+            # Import différé : app.ingestion.synthesis_report importe
+            # CODES_AUTO_DECLARES_PAR_PILIER depuis ce module -- un import en tête de fichier
+            # créerait un cycle (ce module ne serait pas encore entièrement chargé au moment où
+            # synthesis_report tenterait de lire cette constante).
+            from app.ingestion import synthesis_report
+
+            # Best-effort, délibérément (Phase 6) : un échec de génération du PDF de synthèse ne
+            # doit jamais faire échouer l'extraction elle-même -- les indicateurs sont le résultat
+            # porteur, le PDF de synthèse n'en est qu'une présentation dérivée, régénérable plus
+            # tard (voir aussi app/admin/review_queue.py::valider_rapport, second déclencheur).
+            try:
+                contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
+                storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
+                rapport.rapport_synthese_genere = f"synthese/{rapport_id}.pdf"
+                session.add(rapport)
+            except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+                logger.error(
+                    "synthese_pdf_generation_echouee",
+                    rapport_id=str(rapport_id),
+                    error_type=type(exc_synthese).__name__,
+                )
+
+            admins = session.exec(
+                select(Utilisateur).where(
+                    col(Utilisateur.role) == Role.ADMINISTRATEUR, col(Utilisateur.actif).is_(True)
+                )
+            ).all()
+            for admin in admins:
+                notifier(
+                    session,
+                    admin.id,
+                    "RAPPORT_PRET_A_AFFECTER",
+                    f"Le rapport {rapport.type.value} ({rapport.annee_reporting}) de "
+                    f"{nom_entreprise} est prêt à être affecté à un auditeur.",
+                    id_ressource=rapport_id,
+                )
             session.commit()
             logger.info("extraction_pipeline_reussie", rapport_id=str(rapport_id))
 
@@ -460,7 +851,17 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             # remonter silencieusement dans une BackgroundTask sans observateur.
             session.rollback()
             rapport.extraction_erreur = etape
+            rapport.tentatives_extraction += 1
             session.add(rapport)
+            if rapport.entreprise.utilisateur_id is not None:
+                notifier(
+                    session,
+                    rapport.entreprise.utilisateur_id,
+                    "RAPPORT_EXTRACTION_ECHOUEE",
+                    f"L'extraction de votre rapport {rapport.type.value} ({rapport.annee_reporting}) "
+                    "a échoué. Vous pouvez déposer une nouvelle version.",
+                    id_ressource=rapport_id,
+                )
             session.commit()
             logger.error(
                 "extraction_pipeline_echouee",

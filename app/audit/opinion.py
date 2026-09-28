@@ -8,14 +8,22 @@ ici n'est qu'une recommandation.
 import uuid
 
 import structlog
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
 from app.audit.models import AvisAudit
-from app.core.enums import DecisionAudit, StatutRapport
+from app.auth.models import Utilisateur
+from app.core.enums import DecisionAudit, Role, StatutRapport
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.notifications import notifier
 from app.ingestion.models import RapportESG
 
 logger = structlog.get_logger(__name__)
+
+_LIBELLES_DECISION = {
+    DecisionAudit.RECOMMANDE_VALIDATION: "recommande la validation",
+    DecisionAudit.RECOMMANDE_REJET: "recommande le rejet",
+    DecisionAudit.DEMANDE_CLARIFICATION: "demande une clarification",
+}
 
 
 def soumettre_avis(
@@ -47,6 +55,31 @@ def soumettre_avis(
 
     rapport.statut = StatutRapport.EN_VALIDATION
     session.add(rapport)
+
+    if rapport.entreprise.utilisateur_id is not None:
+        notifier(
+            session,
+            rapport.entreprise.utilisateur_id,
+            "RAPPORT_AVIS_RENDU_ENTREPRISE",
+            f"L'examen de votre rapport {rapport.type.value} ({rapport.annee_reporting}) est "
+            "terminé, en attente de décision finale.",
+            id_ressource=rapport_id,
+        )
+
+    admins = session.exec(
+        select(Utilisateur).where(
+            col(Utilisateur.role) == Role.ADMINISTRATEUR, col(Utilisateur.actif).is_(True)
+        )
+    ).all()
+    for admin in admins:
+        notifier(
+            session,
+            admin.id,
+            "RAPPORT_AVIS_RENDU_ADMIN",
+            f"L'auditeur {_LIBELLES_DECISION[decision]} pour le rapport "
+            f"{rapport.type.value} ({rapport.annee_reporting}) de {rapport.entreprise.nom}.",
+            id_ressource=rapport_id,
+        )
 
     session.commit()
     session.refresh(avis)

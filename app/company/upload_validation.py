@@ -46,3 +46,18 @@ def valider_pdf(contenu: bytes) -> None:
 
 def calculer_checksum(contenu: bytes) -> str:
     return hashlib.sha256(contenu).hexdigest()
+
+
+# Longueur de colonne DB pour nom_fichier_origine (app/ingestion/models.py) — un nom de fichier
+# client n'a aucune limite fiable, cette valeur ne sert qu'à l'affichage donc une troncature
+# silencieuse est sans conséquence fonctionnelle.
+LONGUEUR_MAX_NOM_FICHIER = 255
+
+
+def nettoyer_nom_fichier(nom: str | None) -> str:
+    """Nom de fichier original (client, falsifiable — voir docstring du module) retenu uniquement
+    pour l'affichage, jamais comme chemin de stockage (app/company/rapports.py::_enregistrer_fichier)."""
+    nom = (nom or "").strip()
+    if not nom:
+        return "rapport.pdf"
+    return nom[:LONGUEUR_MAX_NOM_FICHIER]

@@ -11,14 +11,33 @@ from fastapi import BackgroundTasks
 from sqlmodel import Session, col, select
 
 from app.company.models import Entreprise
-from app.company.upload_validation import calculer_checksum, valider_pdf
+from app.company.upload_validation import (
+    calculer_checksum,
+    nettoyer_nom_fichier,
+    valider_pdf,
+)
+from app.company.url_fetch import telecharger_pdf_depuis_url
 from app.core.enums import CanalDepot, StatutRapport, TypeRapport
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.notifications import notifier
 from app.core.storage import resolve_path, save_bytes
 from app.ingestion.extractor import run_extraction_pipeline
 from app.ingestion.models import RapportESG
 
 logger = structlog.get_logger(__name__)
+
+
+def rapport_de_lentreprise(
+    session: Session, rapport_id: uuid.UUID, entreprise_id: uuid.UUID
+) -> RapportESG:
+    """Garde-fou de propriété partagé par toutes les routes de app/company/router.py qui lisent
+    un rapport précis (détail, téléchargement du fichier original, téléchargement du PDF de
+    synthèse) -- même 404 que le rapport n'existe pas ou appartienne à une autre entreprise,
+    jamais de 403, pour ne pas confirmer l'existence d'un rapport_id d'autrui."""
+    rapport = session.get(RapportESG, rapport_id)
+    if rapport is None or rapport.entreprise_id != entreprise_id:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return rapport
 
 
 def lister_mes_rapports(session: Session, entreprise_id: uuid.UUID) -> list[RapportESG]:
@@ -66,6 +85,8 @@ def _creer_rapport(
     contenu: bytes,
     version: int,
     rapport_precedent_id: uuid.UUID | None,
+    nom_fichier_origine: str | None,
+    canal: CanalDepot = CanalDepot.ENTREPRISE,
 ) -> RapportESG:
     entreprise = session.get(Entreprise, entreprise_id)
     if entreprise is not None and not entreprise.actif:
@@ -82,9 +103,10 @@ def _creer_rapport(
         id=rapport_id,
         entreprise_id=entreprise_id,
         type=type_rapport,
-        canal=CanalDepot.ENTREPRISE,
+        canal=canal,
         statut=StatutRapport.ENVOYE,
         fichier_source=chemin_relatif,
+        nom_fichier_origine=nettoyer_nom_fichier(nom_fichier_origine),
         annee_reporting=annee_reporting,
         checksum_sha256=checksum,
         version=version,
@@ -92,6 +114,15 @@ def _creer_rapport(
     )
     try:
         session.add(rapport)
+        if entreprise is not None and entreprise.utilisateur_id is not None:
+            notifier(
+                session,
+                entreprise.utilisateur_id,
+                "RAPPORT_DEPOSE",
+                f"Votre rapport {type_rapport.value} ({annee_reporting}) a bien été reçu et est "
+                "en cours d'extraction.",
+                id_ressource=rapport_id,
+            )
         session.commit()
     except Exception:
         # Transaction compensatoire (Phase 4 §4.2) : le fichier est déjà sur disque, l'insertion
@@ -118,6 +149,7 @@ def deposer_rapport(
     contenu: bytes,
     type_rapport: TypeRapport,
     annee_reporting: int,
+    nom_fichier_origine: str | None,
 ) -> RapportESG:
     return _creer_rapport(
         session,
@@ -128,6 +160,36 @@ def deposer_rapport(
         contenu=contenu,
         version=1,
         rapport_precedent_id=None,
+        nom_fichier_origine=nom_fichier_origine,
+    )
+
+
+def importer_rapport_par_url(
+    session: Session,
+    background_tasks: BackgroundTasks,
+    entreprise_id: uuid.UUID,
+    url: str,
+    type_rapport: TypeRapport,
+    annee_reporting: int,
+) -> RapportESG:
+    """Canal d'import automatique (CanalDepot.AUTOMATIQUE) : le PDF est récupéré côté serveur
+    depuis une URL plutôt que reçu en multipart, mais rejoint ensuite exactement le même chemin
+    que deposer_rapport (checksum, dédoublonnage, validation PDF, stockage, extraction en tâche
+    de fond) -- seule la provenance du contenu change. La récupération elle-même (résolution DNS,
+    garde-fous anti-SSRF, plafond de taille en flux) vit dans app/company/url_fetch.py, jamais
+    ici : ce module orchestre, il ne refait pas la validation réseau."""
+    contenu = telecharger_pdf_depuis_url(url)
+    return _creer_rapport(
+        session,
+        background_tasks,
+        entreprise_id=entreprise_id,
+        type_rapport=type_rapport,
+        annee_reporting=annee_reporting,
+        contenu=contenu,
+        version=1,
+        rapport_precedent_id=None,
+        nom_fichier_origine=None,
+        canal=CanalDepot.AUTOMATIQUE,
     )
 
 
@@ -138,6 +200,7 @@ def creer_correction(
     entreprise_id: uuid.UUID,
     contenu: bytes,
     annee_reporting: int,
+    nom_fichier_origine: str | None,
 ) -> RapportESG:
     """Dépose une nouvelle version en réponse à une demande de correction. Le rapport précédent
     n'est jamais modifié — il reste DEMANDE_CORRECTION indéfiniment, seule une nouvelle ligne
@@ -161,4 +224,5 @@ def creer_correction(
         contenu=contenu,
         version=precedent.version + 1,
         rapport_precedent_id=precedent.id,
+        nom_fichier_origine=nom_fichier_origine,
     )

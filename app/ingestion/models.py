@@ -20,7 +20,9 @@ from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     MethodeDonnee,
+    NiveauConfiance,
     Pilier,
+    StatutCouvertureIndicateur,
     StatutRapport,
     TypeRapport,
     sa_enum_column,
@@ -53,6 +55,12 @@ class RapportESG(SQLModel, table=True):
         default=StatutRapport.ENVOYE, sa_column=sa_enum_column(StatutRapport)
     )
     fichier_source: str
+    # Nom du fichier PDF tel que fourni par le client au dépôt (Entreprise), affiché tel quel dans
+    # les espaces Entreprise/Admin/Auditeur à la place du type de rapport (RAPPORT_ANNUEL, etc.) —
+    # jamais utilisé comme chemin de stockage (voir _enregistrer_fichier, app/company/rapports.py),
+    # uniquement pour l'affichage. Nullable : les rapports déposés avant cette colonne n'ont pas
+    # cette valeur.
+    nom_fichier_origine: str | None = Field(default=None)
     # Persisté dès le dépôt (Phase 4 §4.3) — auparavant transmis uniquement en paramètre au
     # pipeline d'extraction (run_extraction_pipeline) puis perdu, aucune trace si l'extraction
     # échouait ou devait être rejouée plus tard. Nullable comme extraction_terminee_le/
@@ -74,6 +82,13 @@ class RapportESG(SQLModel, table=True):
     # seulement une chaîne de classification fixe — voir app/ingestion/extractor.py.
     extraction_terminee_le: datetime | None = Field(default=None)
     extraction_erreur: str | None = Field(default=None)
+    # Résilience de l'extraction (Phase 6) : distinct de date_depot, posé au tout début de
+    # run_extraction_pipeline — sert de référence pour détecter un traitement interrompu (process
+    # tué en cours de route) : EN_EXTRACTION sans extraction_erreur ni extraction_terminee_le au
+    # bout d'un délai anormal (settings.extraction_timeout_minutes) signale un rapport bloqué,
+    # jamais un simple "encore en cours". tentatives_extraction compte les échecs, exposé à l'Admin.
+    extraction_demarree_le: datetime | None = Field(default=None)
+    tentatives_extraction: int = Field(default=0)
     # Versioning (Phase 4 §4.1) : une correction ne réécrit jamais l'original — elle crée une
     # nouvelle ligne, rapport_precedent_id pointant vers celle qu'elle remplace. version=1 par
     # défaut pour un dépôt initial, jamais recalculé après coup. Pas de Relationship() ORM
@@ -84,6 +99,25 @@ class RapportESG(SQLModel, table=True):
     # Empreinte du contenu déposé (Phase 4 §4.2) — détecte un doublon avant tout traitement.
     # Nul pour les rapports déposés avant cette passe.
     checksum_sha256: str | None = Field(default=None, index=True)
+    # Score ESG global tel qu'auto-déclaré par l'entreprise dans sa propre synthèse (ex. "Score
+    # global ESG : 66/100") — distinct de ScoreESG (le score officiel, calculé indépendamment par
+    # la plateforme via app/scoring/engine.py). Vit sur RapportESG et non comme IndicateurESG car
+    # Pilier n'a que 3 valeurs (ENVIRONNEMENT/SOCIAL/GOUVERNANCE), aucune ne convient à un score
+    # transversal. Toujours accompagné de sa preuve documentaire (même garantie G1 "aucune valeur
+    # sans preuve" que tout le reste) — jamais l'un sans l'autre en pratique (voir
+    # app/ingestion/extractor.py), mais la FK reste nullable comme le reste du pipeline
+    # d'extraction (rapports antérieurs à cette colonne, extraction pas encore passée).
+    score_global_declare: float | None = Field(default=None)
+    score_global_declare_preuve_id: uuid.UUID | None = Field(
+        default=None, foreign_key="preuve_documentaire.id"
+    )
+    # Chemin de stockage (app/core/storage.py) du dernier PDF de synthèse généré par la
+    # plateforme (app/ingestion/synthesis_report.py) — jamais versionné séparément, remplacé à
+    # chaque régénération (fin d'extraction avec le score officiel encore "en attente", puis
+    # régénéré après validation avec le score réel — voir app/admin/review_queue.py). Nullable :
+    # absent pour un rapport dont l'extraction n'a pas encore produit ce PDF, ou dont la
+    # génération a échoué (best-effort, ne bloque jamais extraction_terminee_le).
+    rapport_synthese_genere: str | None = Field(default=None)
 
     entreprise: "Entreprise" = Relationship(back_populates="rapports")
     auditeur: Optional["Utilisateur"] = Relationship(back_populates="rapports_audites")
@@ -91,6 +125,8 @@ class RapportESG(SQLModel, table=True):
     donnees_carbone: list["DonneeCarbone"] = Relationship(back_populates="rapport")
     scores: list["ScoreESG"] = Relationship(back_populates="rapport")
     avis_audit: list["AvisAudit"] = Relationship(back_populates="rapport")
+    score_global_declare_preuve: Optional["PreuveDocumentaire"] = Relationship()
+    couvertures: list["CouvertureIndicateur"] = Relationship(back_populates="rapport")
 
 
 class PreuveDocumentaire(SQLModel, table=True):
@@ -119,6 +155,19 @@ class IndicateurESG(SQLModel, table=True):
     unite: str
     methode: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
     preuve_id: uuid.UUID = Field(foreign_key="preuve_documentaire.id")
+    # Champs étendus de traçabilité (Phase 6) — renseignés par le LLM d'extraction quand
+    # disponibles, jamais fabriqués : None reste None plutôt qu'une valeur inventée (même garantie
+    # que valeur/page_source). valeur_brute conserve la mise en forme d'origine (valeur est la
+    # version numérique normalisée) ; section/citation_source donnent à l'Auditeur une trace
+    # vérifiable au-delà du simple numéro de page ; annee_valeur peut différer de
+    # DonneeCarbone.annee/l'année de reporting déclarée au dépôt.
+    valeur_brute: str | None = Field(default=None)
+    section: str | None = Field(default=None)
+    citation_source: str | None = Field(default=None)
+    annee_valeur: int | None = Field(default=None)
+    confiance: NiveauConfiance | None = Field(
+        default=None, sa_column=sa_enum_column(NiveauConfiance, nullable=True)
+    )
 
     rapport: RapportESG = Relationship(back_populates="indicateurs")
     preuve: PreuveDocumentaire = Relationship(back_populates="indicateurs")
@@ -150,9 +199,42 @@ class DonneeCarbone(SQLModel, table=True):
     methode: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
     score_qualite_pcaf: int = Field(ge=1, le=5)
     preuve_id: uuid.UUID = Field(foreign_key="preuve_documentaire.id")
+    # Champs étendus de traçabilité (Phase 6) — voir IndicateurESG ci-dessus pour la justification,
+    # identique ici.
+    valeur_brute: str | None = Field(default=None)
+    section: str | None = Field(default=None)
+    citation_source: str | None = Field(default=None)
+    annee_valeur: int | None = Field(default=None)
+    confiance: NiveauConfiance | None = Field(
+        default=None, sa_column=sa_enum_column(NiveauConfiance, nullable=True)
+    )
 
     rapport: RapportESG = Relationship(back_populates="donnees_carbone")
     preuve: PreuveDocumentaire = Relationship(back_populates="donnees_carbone")
+
+
+class CouvertureIndicateur(SQLModel, table=True):
+    """Persiste, pour CHAQUE code de INDICATEURS_CIBLES (pas seulement les trouvés), ce que le
+    LLM a réellement répondu à l'extraction. Sert deux besoins distincts avec la même donnée :
+    signaler à l'écran qu'une donnée est absente plutôt que de la laisser silencieusement invisible
+    (transparence, décision produit), et distinguer les 3 statuts (voir StatutCouvertureIndicateur,
+    app/core/enums.py) pour juger si la sélection adaptative de pages (app/ingestion/extractor.py)
+    fait manquer des indicateurs sur un long rapport. Une ligne par (rapport, code) — remplacée à
+    chaque nouvelle tentative d'extraction du même rapport (voir run_extraction_pipeline, même
+    purge que IndicateurESG)."""
+
+    __tablename__ = "couverture_indicateur"
+    __table_args__ = (
+        UniqueConstraint("rapport_id", "code", name="uq_couverture_indicateur_rapport_code"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    rapport_id: uuid.UUID = Field(foreign_key="rapport_esg.id")
+    code: str
+    statut: StatutCouvertureIndicateur = Field(sa_column=sa_enum_column(StatutCouvertureIndicateur))
+    pages_examinees: int
+
+    rapport: RapportESG = Relationship(back_populates="couvertures")
 
 
 class SignalementEcart(SQLModel, table=True):
