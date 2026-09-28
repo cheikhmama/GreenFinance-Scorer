@@ -56,6 +56,23 @@ class MethodeDonnee(str, Enum):
     CALCULEE = "CALCULEE"
 
 
+class StatutCouvertureIndicateur(str, Enum):
+    """Statut à 3 valeurs d'un code cible pour un rapport (Phase 6, remplace l'ancien booléen
+    CouvertureIndicateur.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
+    sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
+    simple absence dans les pages examinées, qui reste NON_TROUVE."""
+
+    TROUVE = "TROUVE"
+    NON_TROUVE = "NON_TROUVE"
+    ABSENT_CONFIRME = "ABSENT_CONFIRME"
+
+
+class NiveauConfiance(str, Enum):
+    ELEVE = "ELEVE"
+    MOYEN = "MOYEN"
+    FAIBLE = "FAIBLE"
+
+
 class DecisionAudit(str, Enum):
     RECOMMANDE_VALIDATION = "RECOMMANDE_VALIDATION"
     RECOMMANDE_REJET = "RECOMMANDE_REJET"

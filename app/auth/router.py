@@ -2,24 +2,38 @@
 de passe).
 
 Statut : Phase 3 (durcissement de la session, voir app/auth/{tokens,revocation,csrf}.py) —
-cookie __Host-, révocation Redis par génération de session, jeton CSRF signé, garde
-doit_changer_mot_de_passe. Le MFA reste hors périmètre, réservé à une phase dédiée
-(app/core/config.py, mfa_issuer_name).
+cookie __Host-, révocation Redis par génération de session, jeton CSRF signé. Le MFA reste hors
+périmètre, réservé à une phase dédiée (app/core/config.py, mfa_issuer_name).
 """
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Response, UploadFile
 from sqlmodel import Session, select
 
+from app.auth.activation import activer_compte
+from app.auth.avatar import construire_avatar_data_uri
 from app.auth.csrf import generate_csrf_token
 from app.auth.hashing import hash_password, verify_password
 from app.auth.models import Utilisateur
+from app.auth.password_reset import (
+    demander_reinitialisation,
+    reinitialiser_mot_de_passe,
+)
 from app.auth.rate_limit import (
     clear_login_attempts,
     enforce_login_rate_limit,
     register_failed_login_attempt,
 )
 from app.auth.revocation import current_generation, revoke_all_sessions
-from app.auth.schemas import ChangerMotDePasseRequest, LoginRequest, UtilisateurPublic
+from app.auth.schemas import (
+    ActiverCompteRequest,
+    ChangerMotDePasseRequest,
+    DemanderReinitialisationRequest,
+    LoginRequest,
+    ModifierProfilRequest,
+    ReinitialiserMotDePasseRequest,
+    UtilisateurPublic,
+    VerifierMotDePasseRequest,
+)
 from app.auth.tokens import (
     ACCESS_TOKEN_TTL,
     COOKIE_NAME,
@@ -28,7 +42,7 @@ from app.auth.tokens import (
 )
 from app.core.audit import auditer
 from app.core.dependencies import get_current_user, get_session
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import UnauthorizedError, ValidationError
 
 router = APIRouter(tags=["auth"])
 
@@ -82,7 +96,12 @@ def login(
     enforce_login_rate_limit(payload.email)
 
     user = session.exec(select(Utilisateur).where(Utilisateur.email == payload.email)).first()
-    if user is None or not user.actif or not verify_password(payload.password, user.mot_de_passe_hache):
+    if (
+        user is None
+        or not user.actif
+        or user.mot_de_passe_hache is None
+        or not verify_password(payload.password, user.mot_de_passe_hache)
+    ):
         register_failed_login_attempt(payload.email)
         auditer(
             session,
@@ -101,6 +120,46 @@ def login(
 
     _ouvrir_session(response, user, current_generation(user.id))
     return user
+
+
+@router.post(
+    "/auth/mot-de-passe-oublie",
+    status_code=204,
+    operation_id="demanderReinitialisationMotDePasse",
+    summary="Demander un lien de réinitialisation de mot de passe",
+)
+def mot_de_passe_oublie(
+    payload: DemanderReinitialisationRequest,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> None:
+    demander_reinitialisation(session, payload.email, background_tasks)
+
+
+@router.post(
+    "/auth/reinitialiser-mot-de-passe",
+    status_code=204,
+    operation_id="reinitialiserMotDePasse",
+    summary="Poser un nouveau mot de passe à partir d'un jeton de réinitialisation",
+)
+def reinitialiser_mot_de_passe_route(
+    payload: ReinitialiserMotDePasseRequest,
+    session: Session = Depends(get_session),
+) -> None:
+    reinitialiser_mot_de_passe(session, payload.token, payload.nouveau_mot_de_passe)
+
+
+@router.post(
+    "/auth/activer-compte",
+    status_code=204,
+    operation_id="activateAccount",
+    summary="Poser son mot de passe et activer un compte à partir d'un jeton d'activation",
+)
+def activer_compte_route(
+    payload: ActiverCompteRequest,
+    session: Session = Depends(get_session),
+) -> None:
+    activer_compte(session, payload.token, payload.nouveau_mot_de_passe)
 
 
 @router.post(
@@ -130,6 +189,102 @@ def me(current_user: Utilisateur = Depends(get_current_user)) -> Utilisateur:
     return current_user
 
 
+@router.patch(
+    "/auth/me",
+    response_model=UtilisateurPublic,
+    operation_id="updateMyProfile",
+    summary="Modifier mon nom et mon e-mail",
+)
+def modifier_mon_profil(
+    payload: ModifierProfilRequest,
+    current_user: Utilisateur = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> Utilisateur:
+    ancien_email = current_user.email
+    if payload.email != ancien_email:
+        existant = session.exec(
+            select(Utilisateur).where(Utilisateur.email == payload.email)
+        ).first()
+        if existant is not None:
+            raise ValidationError("Un compte existe déjà avec cet e-mail.", code="email_deja_utilise")
+        auditer(
+            session,
+            current_user.id,
+            "modification_email",
+            "Utilisateur",
+            current_user.id,
+            "succes",
+            ancienne_valeur=ancien_email,
+            nouvelle_valeur=payload.email,
+        )
+
+    current_user.nom = payload.nom
+    current_user.email = payload.email
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return current_user
+
+
+@router.post(
+    "/auth/me/avatar",
+    response_model=UtilisateurPublic,
+    operation_id="uploadMyAvatar",
+    summary="Ajouter ou remplacer ma photo de profil",
+)
+def televerser_mon_avatar(
+    fichier: UploadFile,
+    current_user: Utilisateur = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> Utilisateur:
+    contenu = fichier.file.read()
+    current_user.avatar = construire_avatar_data_uri(contenu)
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return current_user
+
+
+@router.delete(
+    "/auth/me/avatar",
+    response_model=UtilisateurPublic,
+    operation_id="deleteMyAvatar",
+    summary="Retirer ma photo de profil",
+)
+def supprimer_mon_avatar(
+    current_user: Utilisateur = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> Utilisateur:
+    current_user.avatar = None
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return current_user
+
+
+@router.post(
+    "/auth/verifier-mot-de-passe",
+    status_code=204,
+    operation_id="verifyMyPassword",
+    summary="Vérifier mon mot de passe actuel, sans rien modifier (étape 1 du changement)",
+)
+def verifier_mon_mot_de_passe(
+    payload: VerifierMotDePasseRequest,
+    current_user: Utilisateur = Depends(get_current_user),
+) -> None:
+    # Même bac à sable de débit que la connexion : un attaquant en possession d'une session volée
+    # ne connaît pas forcément le mot de passe, cette route ne doit pas devenir un oracle
+    # illimité pour le deviner (voir app/auth/rate_limit.py).
+    enforce_login_rate_limit(current_user.email)
+    # Un compte authentifié a nécessairement déjà un mot de passe (login/activer-compte le
+    # garantissent avant d'ouvrir une session) — jamais None ici.
+    assert current_user.mot_de_passe_hache is not None
+    if not verify_password(payload.mot_de_passe, current_user.mot_de_passe_hache):
+        register_failed_login_attempt(current_user.email)
+        raise UnauthorizedError("Mot de passe actuel invalide.", code="invalid_credentials")
+    clear_login_attempts(current_user.email)
+
+
 @router.post(
     "/auth/changer-mot-de-passe",
     response_model=UtilisateurPublic,
@@ -142,11 +297,12 @@ def changer_mot_de_passe(
     current_user: Utilisateur = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> Utilisateur:
+    # Voir verifier_mon_mot_de_passe ci-dessus : jamais None pour un compte déjà authentifié.
+    assert current_user.mot_de_passe_hache is not None
     if not verify_password(payload.mot_de_passe_actuel, current_user.mot_de_passe_hache):
         raise UnauthorizedError("Mot de passe actuel invalide.", code="invalid_credentials")
 
     current_user.mot_de_passe_hache = hash_password(payload.nouveau_mot_de_passe)
-    current_user.doit_changer_mot_de_passe = False
     session.add(current_user)
     auditer(
         session,

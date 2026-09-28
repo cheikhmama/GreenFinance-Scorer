@@ -9,35 +9,19 @@ ailleurs dans une route métier.
 
 import uuid
 
-from fastapi import Cookie, Depends, Request
+from fastapi import Cookie, Depends
 from sqlmodel import Session
 
 from app.auth.models import Utilisateur
 from app.auth.revocation import is_session_revoked
-from app.auth.tokens import (
-    API_V1_PREFIX,
-    COOKIE_NAME,
-    InvalidTokenError,
-    decode_access_token,
-)
+from app.auth.tokens import COOKIE_NAME, InvalidTokenError, decode_access_token
 from app.core.database import get_session
-from app.core.exceptions import PermissionDeniedError, UnauthorizedError
+from app.core.exceptions import UnauthorizedError
 
 __all__ = ["get_current_user", "get_session"]
 
-# Routes accessibles même quand doit_changer_mot_de_passe est vrai (Phase 3 §3.3) : juste assez
-# pour que le compte puisse changer son mot de passe et se déconnecter, jamais le reste de l'API
-# métier tant que ce n'est pas fait. request.url.path conserve le préfixe de montage complet à
-# l'intérieur d'api_app (voir API_V1_PREFIX, app/auth/tokens.py).
-_ROUTES_AUTORISEES_AVANT_CHANGEMENT_MDP = {
-    f"{API_V1_PREFIX}/auth/me",
-    f"{API_V1_PREFIX}/auth/changer-mot-de-passe",
-    f"{API_V1_PREFIX}/auth/logout",
-}
-
 
 def get_current_user(
-    request: Request,
     session: Session = Depends(get_session),
     access_token: str | None = Cookie(default=None, alias=COOKIE_NAME),
 ) -> Utilisateur:
@@ -57,11 +41,5 @@ def get_current_user(
     user = session.get(Utilisateur, user_id)
     if user is None or not user.actif:
         raise UnauthorizedError("Compte introuvable ou désactivé.", code="not_authenticated")
-
-    if user.doit_changer_mot_de_passe and request.url.path not in _ROUTES_AUTORISEES_AVANT_CHANGEMENT_MDP:
-        raise PermissionDeniedError(
-            "Le mot de passe doit être changé avant de continuer.",
-            code="password_change_required",
-        )
 
     return user

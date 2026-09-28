@@ -7,20 +7,24 @@ ARCHITECTURE.md §1).
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import structlog
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
 
 from app.audit.models import AvisAudit
+from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Entreprise
+from app.core import storage
+from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import StatutRapport
+from app.core.enums import DevisePosition, StatutRapport
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
+from app.ingestion import synthesis_report
 from app.ingestion.models import RapportESG
-from app.scoring.engine import calculer_score
+from app.scoring.engine import calculer_score, score_officiel
 from app.scoring.models import ScoreESG
 
 logger = structlog.get_logger(__name__)
@@ -48,6 +52,194 @@ def lister_rapports_en_validation(session: Session) -> list[RapportESG]:
             .order_by(col(AvisAudit.date_avis))
         ).all()
     )
+
+
+def lister_rapports_echec_extraction(session: Session) -> list[RapportESG]:
+    """Rapports dont l'extraction a échoué (extraction_erreur renseigné) — invisibles de
+    lister_rapports_a_affecter, qui ne filtre que sur extraction_terminee_le : un succès renseigne
+    l'un, un échec renseigne l'autre, jamais les deux (voir app/ingestion/extractor.py). Sans
+    cette vue, un rapport déposé par une Entreprise reste bloqué en EN_EXTRACTION indéfiniment,
+    invisible de tout tableau de bord Admin."""
+    return list(
+        session.exec(
+            select(RapportESG)
+            .where(
+                RapportESG.statut == StatutRapport.EN_EXTRACTION,
+                col(RapportESG.extraction_erreur).is_not(None),
+            )
+            .order_by(col(RapportESG.date_depot))
+        ).all()
+    )
+
+
+def lister_rapports_extraction_bloquee(session: Session) -> list[RapportESG]:
+    """Rapports EN_EXTRACTION sans extraction_erreur ni extraction_terminee_le, dont la dernière
+    tentative a démarré il y a plus de settings.extraction_timeout_minutes — un traitement
+    interrompu (process tué en cours de route) laisse exactement cette signature, indiscernable
+    d'un rapport "encore en cours" sans ce délai. Distincte de lister_rapports_echec_extraction
+    (échec classifié, avec cause) : ici la cause est inconnue, seule la durée anormale le signale."""
+    seuil = utcnow() - timedelta(minutes=get_settings().extraction_timeout_minutes)
+    return list(
+        session.exec(
+            select(RapportESG)
+            .where(
+                RapportESG.statut == StatutRapport.EN_EXTRACTION,
+                col(RapportESG.extraction_erreur).is_(None),
+                col(RapportESG.extraction_terminee_le).is_(None),
+                col(RapportESG.extraction_demarree_le).is_not(None),
+                col(RapportESG.extraction_demarree_le) < seuil,
+            )
+            .order_by(col(RapportESG.extraction_demarree_le))
+        ).all()
+    )
+
+
+def relancer_extraction(session: Session, rapport_id: uuid.UUID) -> RapportESG:
+    """Autorise une nouvelle tentative d'extraction pour un rapport en échec classifié OU bloqué
+    au-delà du délai — jamais pour un rapport encore normalement en cours ou déjà avancé dans le
+    workflow. La remise à zéro de extraction_erreur DANS CETTE MÊME transaction est la garde de
+    concurrence : un second appel simultané relit un extraction_erreur déjà None et se fait
+    rejeter par la vérification ci-dessous, sans verrou applicatif supplémentaire — même principe
+    que les autres gardes d'état de ce fichier. La programmation effective de
+    run_extraction_pipeline (BackgroundTasks) reste du ressort de la route, pas de cette fonction
+    de service (voir app/admin/router.py)."""
+    rapport = session.get(RapportESG, rapport_id)
+    if rapport is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    if rapport.statut != StatutRapport.EN_EXTRACTION:
+        raise ValidationError(
+            "Seul un rapport en cours d'extraction peut être relancé.", code="transition_invalide"
+        )
+
+    seuil = utcnow() - timedelta(minutes=get_settings().extraction_timeout_minutes)
+    en_echec_classifie = rapport.extraction_erreur is not None
+    bloque_par_timeout = (
+        rapport.extraction_terminee_le is None
+        and rapport.extraction_demarree_le is not None
+        and rapport.extraction_demarree_le < seuil
+    )
+    if not (en_echec_classifie or bloque_par_timeout):
+        raise ValidationError(
+            "Ce rapport n'est ni en échec ni bloqué : rien à relancer.", code="relance_impossible"
+        )
+    if rapport.annee_reporting is None:
+        # Rapport antérieur à l'introduction de cette colonne (nullable, voir app/ingestion/
+        # models.py) — run_extraction_pipeline exige un int, jamais None. Cas résiduel de données
+        # historiques, pas un chemin normal : pas de correctif automatique, juste un refus clair.
+        raise ValidationError(
+            "Ce rapport n'a pas d'année de reporting renseignée : relance impossible.",
+            code="annee_reporting_manquante",
+        )
+
+    rapport.extraction_erreur = None
+    session.add(rapport)
+    session.commit()
+    session.refresh(rapport)
+    logger.info("extraction_relancee", rapport_id=str(rapport_id))
+    return rapport
+
+
+def lister_rapports_orphelins_en_validation(session: Session) -> list[RapportESG]:
+    """Rapports EN_VALIDATION sans aucun avis d'audit associé — invisibles à la fois de
+    lister_rapports_en_validation (INNER JOIN sur AvisAudit) et de lister_rapports_a_affecter
+    (mauvais statut) : un état orphelin permanent, sans file où l'Admin pourrait même le
+    remarquer. Voir _rapport_en_validation ci-dessous, qui documente pourquoi cet état est
+    aujourd'hui inatteignable via l'API seule (soumettre_avis crée toujours l'avis dans la même
+    transaction que la transition EN_VALIDATION) — gardé en visibilité de défense, au cas où des
+    données injectées hors parcours applicatif (ou un futur chemin de code) l'atteindraient."""
+    sous_requete_avec_avis = select(AvisAudit.rapport_id)
+    return list(
+        session.exec(
+            select(RapportESG).where(
+                RapportESG.statut == StatutRapport.EN_VALIDATION,
+                col(RapportESG.id).not_in(sous_requete_avec_avis),
+            )
+        ).all()
+    )
+
+
+def lister_rapports_en_retard(session: Session) -> list[RapportESG]:
+    """Rapports affectés à un auditeur depuis plus longtemps que le délai attendu
+    (settings.sla_audit_jours) sans qu'aucune décision n'ait encore été prise — extrait de
+    construire_tableau_de_bord (app/admin/dashboard.py), qui jusqu'ici ne faisait que les compter
+    (audits_en_retard) sans jamais les lister nommément."""
+    seuil_retard = utcnow() - timedelta(days=get_settings().sla_audit_jours)
+    return list(
+        session.exec(
+            select(RapportESG)
+            .where(
+                RapportESG.statut == StatutRapport.AFFECTE_AUDITEUR,
+                col(RapportESG.date_affectation).is_not(None),
+                col(RapportESG.date_affectation) < seuil_retard,
+            )
+            .order_by(col(RapportESG.date_affectation))
+        ).all()
+    )
+
+
+def lister_tous_les_rapports(
+    session: Session,
+    *,
+    statut: StatutRapport | None = None,
+    page: int = 1,
+    page_size: int = 3,
+) -> tuple[list[RapportESG], int]:
+    """Vue globale de tous les rapports, tous statuts confondus, avec filtre optionnel sur le
+    statut — contrairement aux files ci-dessus (chacune scopée à une étape précise du workflow),
+    sert le suivi transverse depuis le tableau de bord (ex. "rapports validés", "rapports
+    rejetés"), pour lequel aucune liste nommée n'existait jusqu'ici, seulement un compteur."""
+    filtres: list[ColumnElement[bool]] = []
+    if statut is not None:
+        filtres.append(col(RapportESG.statut) == statut)
+
+    total = session.exec(select(func.count()).select_from(RapportESG).where(*filtres)).one()
+    items = list(
+        session.exec(
+            select(RapportESG)
+            .where(*filtres)
+            .order_by(col(RapportESG.date_depot).desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).all()
+    )
+    return items, total
+
+
+def lister_entreprises_a_republier(
+    session: Session,
+    *,
+    page: int = 1,
+    page_size: int = 3,
+) -> tuple[list[Entreprise], int]:
+    """Entreprises déjà publiées dont un rapport a été validé APRÈS la date de publication : la
+    fiche publique ne reflète plus le dernier état validé — extrait de construire_tableau_de_bord,
+    qui jusqu'ici ne faisait que les compter (demandes_republication) sans jamais les lister
+    nommément."""
+    republication_existe = (
+        select(RapportESG.id)
+        .where(
+            col(RapportESG.entreprise_id) == Entreprise.id,
+            col(RapportESG.statut) == StatutRapport.VALIDE,
+            col(RapportESG.date_depot) > Entreprise.date_publication,
+        )
+        .exists()
+    )
+    filtres: list[ColumnElement[bool]] = [
+        col(Entreprise.date_publication).is_not(None),
+        republication_existe,
+    ]
+
+    total = session.exec(select(func.count()).select_from(Entreprise).where(*filtres)).one()
+    items = list(
+        session.exec(
+            select(Entreprise)
+            .where(*filtres)
+            .order_by(col(Entreprise.nom))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).all()
+    )
+    return items, total
 
 
 def lister_avis(session: Session, rapport_id: uuid.UUID) -> list[AvisAudit]:
@@ -118,7 +310,13 @@ def _decider(
     rapport.statut = statut
     session.add(rapport)
     if rapport.entreprise.utilisateur_id is not None:
-        notifier(session, rapport.entreprise.utilisateur_id, type_notification, message)
+        notifier(
+            session,
+            rapport.entreprise.utilisateur_id,
+            type_notification,
+            f"{rapport.type.value} ({rapport.annee_reporting}) : {message}",
+            id_ressource=rapport_id,
+        )
     session.commit()
     session.refresh(rapport)
     logger.info("rapport_decision", rapport_id=str(rapport_id), statut=statut.value)
@@ -136,17 +334,62 @@ def valider_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | 
     rapport.statut = StatutRapport.VALIDE
     session.add(rapport)
     calculer_score(session, rapport_id)
+
+    # Second déclencheur de génération du PDF de synthèse (app/ingestion/synthesis_report.py) :
+    # le premier, à la fin de l'extraction, ne pouvait afficher qu'un score "en attente" -- ici le
+    # score officiel vient d'être calculé, on régénère le même fichier (chemin de stockage
+    # inchangé) pour qu'il le reflète. Best-effort comme au premier déclencheur : un échec ici ne
+    # doit jamais empêcher la validation elle-même.
+    try:
+        contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
+        storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
+        rapport.rapport_synthese_genere = f"synthese/{rapport_id}.pdf"
+        session.add(rapport)
+    except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+        logger.error(
+            "synthese_pdf_regeneration_echouee",
+            rapport_id=str(rapport_id),
+            error_type=type(exc_synthese).__name__,
+        )
+
     if rapport.entreprise.utilisateur_id is not None:
         notifier(
             session,
             rapport.entreprise.utilisateur_id,
             "RAPPORT_VALIDE",
-            commentaire or "Votre rapport a été validé.",
+            f"{rapport.type.value} ({rapport.annee_reporting}) : "
+            f"{commentaire or 'Votre rapport a été validé.'}",
+            id_ressource=rapport_id,
         )
     session.commit()
     session.refresh(rapport)
     logger.info("rapport_decision", rapport_id=str(rapport_id), statut=StatutRapport.VALIDE.value)
     return rapport
+
+
+def recalculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
+    """Action de récupération pour un rapport VALIDE sans ScoreESG — état incohérent qui bloque
+    sinon indéfiniment publier_entreprise (code score_manquant) sans aucun moyen de s'en sortir
+    depuis l'UI. Inatteignable via le parcours normal (valider_rapport calcule toujours le score
+    dans la même transaction que la transition VALIDE), mais peut survenir sur des données
+    historiques injectées hors parcours applicatif. Lève score_incalculable (ValidationError,
+    propagée telle quelle par calculer_score) si le vocabulaire d'indicateurs du rapport ne
+    recoupe toujours aucun indicateur de la configuration de référence — jamais un score fabriqué
+    sans substance, même ici."""
+    rapport = session.get(RapportESG, rapport_id)
+    if rapport is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    if rapport.statut != StatutRapport.VALIDE:
+        raise ValidationError(
+            "Seul un rapport validé peut voir son score recalculé.", code="transition_invalide"
+        )
+    if score_officiel(session, rapport_id) is not None:
+        raise ValidationError("Ce rapport a déjà un score calculé.", code="score_deja_calcule")
+    score = calculer_score(session, rapport_id)
+    session.commit()
+    session.refresh(score)
+    logger.info("score_recalcule", rapport_id=str(rapport_id))
+    return score
 
 
 def rejeter_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | None) -> RapportESG:
@@ -216,10 +459,10 @@ def lister_toutes_les_entreprises(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Entreprise, int, StatutRapport | None]], int]:
+) -> tuple[list[tuple[Entreprise, int, StatutRapport | None, uuid.UUID | None]], int]:
     """Page de TOUTES les entreprises (contrairement à lister_entreprises_publiables, sans filtre
     sur le statut de rapport ni la publication) — vue de suivi pour l'Administrateur, avec un
-    résumé par entreprise : nombre de rapports déposés et statut du plus récent (None si aucun
+    résumé par entreprise : nombre de rapports déposés, statut et id du plus récent (None si aucun
     rapport, ex. une entreprise provisionnée sans compte rattaché). Même pagination par
     offset/limit que les autres listes Admin."""
     filtres: list[ColumnElement[bool]] = []
@@ -248,9 +491,9 @@ def lister_toutes_les_entreprises(
     rapports = (
         list(
             session.exec(
-                select(RapportESG.entreprise_id, RapportESG.statut, RapportESG.date_depot).where(
-                    col(RapportESG.entreprise_id).in_(ids)
-                )
+                select(
+                    RapportESG.entreprise_id, RapportESG.id, RapportESG.statut, RapportESG.date_depot
+                ).where(col(RapportESG.entreprise_id).in_(ids))
             ).all()
         )
         if ids
@@ -258,17 +501,18 @@ def lister_toutes_les_entreprises(
     )
 
     nb_par_entreprise: dict[uuid.UUID, int] = {}
-    dernier_par_entreprise: dict[uuid.UUID, tuple[datetime, StatutRapport]] = {}
-    for entreprise_id, statut, date_depot in rapports:
+    dernier_par_entreprise: dict[uuid.UUID, tuple[datetime, uuid.UUID, StatutRapport]] = {}
+    for entreprise_id, rapport_id, statut, date_depot in rapports:
         nb_par_entreprise[entreprise_id] = nb_par_entreprise.get(entreprise_id, 0) + 1
         plus_recent = dernier_par_entreprise.get(entreprise_id)
         if plus_recent is None or date_depot > plus_recent[0]:
-            dernier_par_entreprise[entreprise_id] = (date_depot, StatutRapport(statut))
+            dernier_par_entreprise[entreprise_id] = (date_depot, rapport_id, StatutRapport(statut))
 
     resultats = [
         (
             entreprise,
             nb_par_entreprise.get(entreprise.id, 0),
+            dernier_par_entreprise[entreprise.id][2] if entreprise.id in dernier_par_entreprise else None,
             dernier_par_entreprise[entreprise.id][1] if entreprise.id in dernier_par_entreprise else None,
         )
         for entreprise in entreprises
@@ -312,6 +556,7 @@ def publier_entreprise(session: Session, entreprise_id: uuid.UUID) -> Entreprise
             entreprise.utilisateur_id,
             "ENTREPRISE_PUBLIEE",
             "Votre entreprise est maintenant publiée sur la plateforme.",
+            id_ressource=entreprise_id,
         )
     session.commit()
     session.refresh(entreprise)
@@ -337,6 +582,7 @@ def suspendre_entreprise(session: Session, entreprise_id: uuid.UUID) -> Entrepri
             entreprise.utilisateur_id,
             "ENTREPRISE_SUSPENDUE",
             "Votre entreprise a été suspendue : aucun nouveau rapport ne peut être déposé.",
+            id_ressource=entreprise_id,
         )
     session.commit()
     session.refresh(entreprise)
@@ -357,8 +603,90 @@ def reactiver_entreprise(session: Session, entreprise_id: uuid.UUID) -> Entrepri
             entreprise.utilisateur_id,
             "ENTREPRISE_REACTIVEE",
             "Votre entreprise a été réactivée : le dépôt de rapports est de nouveau possible.",
+            id_ressource=entreprise_id,
         )
     session.commit()
     session.refresh(entreprise)
     logger.info("entreprise_reactivee", entreprise_id=str(entreprise_id))
+    return entreprise
+
+
+def consulter_entreprise_admin(session: Session, entreprise_id: uuid.UUID) -> Entreprise:
+    entreprise = session.get(Entreprise, entreprise_id)
+    if entreprise is None:
+        raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
+    return entreprise
+
+
+def resume_rapports_entreprise(
+    session: Session, entreprise_id: uuid.UUID
+) -> tuple[int, StatutRapport | None, uuid.UUID | None]:
+    """Même résumé (nombre de rapports + statut et id du plus récent) que
+    lister_toutes_les_entreprises, pour une seule entreprise — utilisé par les routes qui
+    renvoient une EntrepriseAdmin après une action ponctuelle (détail, modification, logo), où
+    une jointure batchée n'a pas de sens."""
+    rapports = session.exec(
+        select(RapportESG.id, RapportESG.statut, RapportESG.date_depot).where(
+            RapportESG.entreprise_id == entreprise_id
+        )
+    ).all()
+    if not rapports:
+        return 0, None, None
+    dernier_id, dernier_statut, _ = max(rapports, key=lambda rapport: rapport[2])
+    return len(rapports), StatutRapport(dernier_statut), dernier_id
+
+
+def modifier_entreprise_admin(
+    session: Session,
+    entreprise_id: uuid.UUID,
+    *,
+    nom: str,
+    secteur: str,
+    pays: str,
+    description: str | None,
+    site_officiel: str | None,
+    montant_minimum_investissement: float | None,
+    devise_montant_minimum: DevisePosition | None,
+) -> Entreprise:
+    """Remplace le profil complet d'une entreprise — jamais de logique métier dérivée ici,
+    seulement l'affectation des champs fournis (voir ModifierEntrepriseAdminRequest pour la
+    contrainte "ensemble ou aucun" sur le couple montant/devise). Le logo n'est délibérément pas
+    de la partie, voir televerser_logo_entreprise/supprimer_logo_entreprise ci-dessous."""
+    entreprise = consulter_entreprise_admin(session, entreprise_id)
+
+    entreprise.nom = nom
+    entreprise.secteur = secteur
+    entreprise.pays = pays
+    entreprise.description = description
+    entreprise.site_officiel = site_officiel
+    entreprise.montant_minimum_investissement = montant_minimum_investissement
+    entreprise.devise_montant_minimum = devise_montant_minimum
+    session.add(entreprise)
+    session.commit()
+    session.refresh(entreprise)
+    logger.info("entreprise_modifiee", entreprise_id=str(entreprise_id))
+    return entreprise
+
+
+def televerser_logo_entreprise(session: Session, entreprise_id: uuid.UUID, contenu: bytes) -> Entreprise:
+    """Valide et encode le logo en data URI via la même fonction que Utilisateur.avatar
+    (app/auth/avatar.py::construire_avatar_data_uri) — la vérification par signature binaire
+    réelle ne dépend d'aucune notion propre à un compte utilisateur, la réutiliser évite de
+    dupliquer une règle de sécurité (frontière fichier non fiable) dans deux modules."""
+    entreprise = consulter_entreprise_admin(session, entreprise_id)
+    entreprise.logo = construire_avatar_data_uri(contenu)
+    session.add(entreprise)
+    session.commit()
+    session.refresh(entreprise)
+    logger.info("entreprise_logo_televerse", entreprise_id=str(entreprise_id))
+    return entreprise
+
+
+def supprimer_logo_entreprise(session: Session, entreprise_id: uuid.UUID) -> Entreprise:
+    entreprise = consulter_entreprise_admin(session, entreprise_id)
+    entreprise.logo = None
+    session.add(entreprise)
+    session.commit()
+    session.refresh(entreprise)
+    logger.info("entreprise_logo_supprime", entreprise_id=str(entreprise_id))
     return entreprise

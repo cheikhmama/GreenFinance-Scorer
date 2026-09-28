@@ -49,6 +49,10 @@ class Notification(SQLModel, table=True):
     utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
     message: str
     type: str
+    # Cible de redirection au clic (ex. l'id d'un RapportESG) — jamais de FK stricte : le type de
+    # ressource varie selon `type` (rapport, entreprise, ...) et certains types n'en ont pas
+    # (ex. une invitation de rattachement, qui renvoie vers une liste, pas un id précis).
+    id_ressource: uuid.UUID | None = Field(default=None)
     date_envoi: datetime = Field(default_factory=utcnow)
     lu: bool = Field(default=False)
 

@@ -1,24 +1,26 @@
-"""Gestion des comptes utilisateurs par l'Administrateur — consultation, création, désactivation
-et changement de rôle (Phase 3 §3.3).
+"""Gestion des comptes utilisateurs par l'Administrateur — consultation, création,
+désactivation/réactivation (Phase 3 §3.3). Le rôle d'un compte se fixe à sa création et n'est
+plus jamais modifié après coup (chaque rôle porte son propre espace et ses propres permissions).
 
 Sert aussi de brique de sélection pour les relations acteur-à-acteur du système (ex. affectation
 d'un rapport à un auditeur, app/audit/assignment.py) : un acteur choisit toujours un compte déjà
 enregistré et correspondant au rôle recherché, jamais une identité saisie librement.
 """
 
-import secrets
 import uuid
 
+from fastapi import BackgroundTasks
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
 
-from app.auth.hashing import hash_password
+from app.auth.activation import envoyer_lien_activation
 from app.auth.models import InstitutionProfil, Utilisateur
 from app.auth.revocation import revoke_all_sessions
 from app.company.models import Entreprise
 from app.core.audit import auditer
+from app.core.email import EmailDeliveryError, ensure_email_configured
 from app.core.enums import Role
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 
 # Quota de départ pour un compte Institution (Étape 17 §quota d'export) — pas encore un champ du
 # formulaire de création (aucune institution réelle n'a encore exprimé un besoin différencié),
@@ -32,24 +34,27 @@ def lister_utilisateurs_par_role(
     *,
     recherche: str | None = None,
     inclure_inactifs: bool = False,
-    doit_changer_mot_de_passe: bool | None = None,
+    en_attente_activation: bool | None = None,
     page: int = 1,
     page_size: int = 3,
 ) -> tuple[list[Utilisateur], int]:
     """Page de comptes d'un rôle donné, filtrée par e-mail OU nom si `recherche` est fourni —
     seuls les comptes actifs par défaut, tous si `inclure_inactifs` (nécessaire pour retrouver un
-    compte à réactiver, sinon invisible dès qu'il est désactivé). `doit_changer_mot_de_passe`
-    retrouve les comptes provisionnés dont le mot de passe temporaire n'a pas encore été changé
-    (tuile "en attente" du tableau de bord, app/admin/dashboard.py, qui calcule son compteur tous
-    rôles confondus — ce filtre reste scopé à un rôle, comme le reste de cette liste).
+    compte à réactiver, sinon invisible dès qu'il est désactivé). `en_attente_activation`
+    retrouve les comptes provisionnés qui n'ont pas encore cliqué leur lien d'activation (tuile
+    "en attente" du tableau de bord, app/admin/dashboard.py, qui calcule son compteur tous rôles
+    confondus — ce filtre reste scopé à un rôle, comme le reste de cette liste).
 
     Pagination par offset/limit — le total ne descend jamais à la base entière : seule la page
     demandée est chargée (voir app/core/schemas.py::Page, posé pour ce cas précisément)."""
     filtres: list[ColumnElement[bool]] = [col(Utilisateur.role) == role]
     if not inclure_inactifs:
         filtres.append(col(Utilisateur.actif).is_(True))
-    if doit_changer_mot_de_passe is not None:
-        filtres.append(col(Utilisateur.doit_changer_mot_de_passe).is_(doit_changer_mot_de_passe))
+    if en_attente_activation is not None:
+        if en_attente_activation:
+            filtres.append(col(Utilisateur.date_activation).is_(None))
+        else:
+            filtres.append(col(Utilisateur.date_activation).is_not(None))
     if recherche:
         motif = f"%{recherche}%"
         filtres.append(or_(col(Utilisateur.email).ilike(motif), col(Utilisateur.nom).ilike(motif)))
@@ -67,6 +72,22 @@ def lister_utilisateurs_par_role(
     return items, total
 
 
+def lister_utilisateurs_en_attente(session: Session) -> list[Utilisateur]:
+    """Comptes actifs, tous rôles confondus, qui n'ont pas encore cliqué leur lien d'activation —
+    extrait de construire_tableau_de_bord (app/admin/dashboard.py), qui jusqu'ici ne faisait que
+    les compter (utilisateurs_en_attente). lister_utilisateurs_par_role exige un rôle unique ;
+    cette vue transverse sert le raccourci "Utilisateurs en attente" du tableau de bord, qui
+    n'est scopé à aucun rôle précis."""
+    return list(
+        session.exec(
+            select(Utilisateur).where(
+                col(Utilisateur.date_activation).is_(None),
+                col(Utilisateur.actif).is_(True),
+            )
+        ).all()
+    )
+
+
 def creer_utilisateur(
     session: Session,
     acteur_id: uuid.UUID,
@@ -77,11 +98,13 @@ def creer_utilisateur(
     nom_entreprise: str | None = None,
     secteur: str | None = None,
     pays: str | None = None,
-) -> tuple[Utilisateur, str]:
-    """Provisionne un compte avec un mot de passe temporaire à usage unique — aucune
-    infrastructure d'e-mail : le mot de passe est renvoyé une seule fois dans la réponse HTTP
-    (app/admin/schemas.py::UtilisateurCree), à relayer manuellement. doit_changer_mot_de_passe
-    force le changement dès la première connexion (voir app/core/dependencies.py).
+) -> Utilisateur:
+    """Provisionne un compte sans mot de passe — aucun secret généré ni transmis par
+    l'Administrateur : le compte reste sans mot de passe (mot_de_passe_hache=None,
+    date_activation=None) jusqu'à ce que la personne titulaire clique le lien d'activation reçu
+    par e-mail (app/auth/activation.py::envoyer_lien_activation, appelée par le routeur juste
+    après ce retour). Échoue avant toute écriture si le SMTP n'est pas configuré — créer un compte
+    qu'il devient ensuite impossible d'activer serait pire qu'un refus immédiat.
 
     nom est le nom de la personne/institution titulaire du compte. L'Administrateur ne le saisit
     pas systématiquement (formulaire de création simplifié) — quand absent, déduit de la partie
@@ -114,18 +137,24 @@ def creer_utilisateur(
                 fields=champs_manquants,
             )
 
+    try:
+        ensure_email_configured()
+    except EmailDeliveryError as exc:
+        raise ServiceUnavailableError(
+            "Service d'activation de compte temporairement indisponible. Réessayez plus tard."
+        ) from exc
+
     existant = session.exec(select(Utilisateur).where(Utilisateur.email == email)).first()
     if existant is not None:
         raise ValidationError("Un compte existe déjà avec cet e-mail.", code="email_deja_utilise")
 
-    mot_de_passe_temporaire = secrets.token_urlsafe(12)
     utilisateur = Utilisateur(
         email=email,
         nom=nom or email.split("@")[0],
-        mot_de_passe_hache=hash_password(mot_de_passe_temporaire),
+        mot_de_passe_hache=None,
         role=role,
         actif=True,
-        doit_changer_mot_de_passe=True,
+        date_activation=None,
     )
     session.add(utilisateur)
     session.flush()  # attribue utilisateur.id avant de construire l'entrée d'audit / l'entreprise
@@ -145,7 +174,25 @@ def creer_utilisateur(
     auditer(session, acteur_id, "creation_compte", "Utilisateur", utilisateur.id, "succes")
     session.commit()
     session.refresh(utilisateur)
-    return utilisateur, mot_de_passe_temporaire
+    return utilisateur
+
+
+def renvoyer_lien_activation(
+    session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID, background_tasks: BackgroundTasks
+) -> None:
+    """Régénère et renvoie un lien d'activation — filet de secours pour un lien expiré ou un
+    e-mail non reçu : sans cette action, un tel compte resterait bloqué indéfiniment (le flux
+    « mot de passe oublié », app/auth/password_reset.py, ne fonctionne que pour un compte qui a
+    déjà un mot de passe, donc jamais pour un compte encore en attente d'activation)."""
+    utilisateur = session.get(Utilisateur, cible_id)
+    if utilisateur is None:
+        raise NotFoundError("Utilisateur introuvable.", code="utilisateur_introuvable")
+    if utilisateur.date_activation is not None:
+        raise ValidationError("Ce compte est déjà activé.", code="compte_deja_active")
+
+    envoyer_lien_activation(session, utilisateur, background_tasks)
+    auditer(session, acteur_id, "renvoi_lien_activation", "Utilisateur", utilisateur.id, "succes")
+    session.commit()
 
 
 def desactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID) -> Utilisateur:
@@ -192,37 +239,4 @@ def reactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid
     )
     session.commit()
     session.refresh(utilisateur)
-    return utilisateur
-
-
-def changer_role(session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID, nouveau_role: Role) -> Utilisateur:
-    if nouveau_role == Role.ADMINISTRATEUR:
-        raise ValidationError(
-            "Ce formulaire ne permet pas d'attribuer le rôle Administrateur.",
-            code="role_non_autorise",
-        )
-
-    utilisateur = session.get(Utilisateur, cible_id)
-    if utilisateur is None:
-        raise NotFoundError("Utilisateur introuvable.", code="utilisateur_introuvable")
-
-    ancien_role = utilisateur.role
-    utilisateur.role = nouveau_role
-    session.add(utilisateur)
-    auditer(
-        session,
-        acteur_id,
-        "changement_role",
-        "Utilisateur",
-        cible_id,
-        "succes",
-        ancienne_valeur=ancien_role.value,
-        nouvelle_valeur=nouveau_role.value,
-    )
-    session.commit()
-    session.refresh(utilisateur)
-
-    # Un jeton déjà émis porte l'ancien rôle (claim "role", app/auth/tokens.py) : le laisser
-    # valide laisserait agir sous une autorisation périmée jusqu'à expiration naturelle.
-    revoke_all_sessions(cible_id)
     return utilisateur

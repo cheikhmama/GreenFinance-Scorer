@@ -33,14 +33,23 @@ class Utilisateur(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
     nom: str | None = None
-    mot_de_passe_hache: str
+    # Data URI complet (voir app/company/models.py::Entreprise.logo, même convention) — jamais un
+    # fichier séparé sur disque, une image d'avatar reste petite (voir
+    # app/auth/avatar.py::TAILLE_MAX_OCTETS).
+    avatar: str | None = None
+    # None tant que le compte n'a pas été activé (voir date_activation ci-dessous) : un compte
+    # provisionné par l'Administrateur n'a d'abord aucun mot de passe, la personne titulaire pose
+    # le sien elle-même via le lien d'activation (app/auth/activation.py).
+    mot_de_passe_hache: str | None = None
     role: Role = Field(sa_column=sa_enum_column(Role))
     date_creation: datetime = Field(default_factory=utcnow)
     actif: bool = Field(default=True)
-    # Vrai pour un compte provisionné par l'Administrateur avec un mot de passe temporaire
-    # (Phase 3 §3.3) : get_current_user (app/core/dependencies.py) bloque alors tout accès hors
-    # d'une liste explicite de routes tant que POST /auth/changer-mot-de-passe n'a pas été appelé.
-    doit_changer_mot_de_passe: bool = Field(default=False)
+    # None tant qu'un compte provisionné par l'Administrateur (Phase 3 §3.3) n'a pas encore été
+    # activé via le lien reçu par e-mail (app/auth/activation.py::activer_compte, qui pose
+    # mot_de_passe_hache et cette date dans le même geste) — login (app/auth/router.py) refuse
+    # toute tentative tant que mot_de_passe_hache est None, jamais besoin de vérifier ce champ
+    # séparément ailleurs.
+    date_activation: datetime | None = Field(default=None)
 
     institution_profil: Optional["InstitutionProfil"] = Relationship(
         back_populates="utilisateur"
@@ -56,6 +65,45 @@ class Utilisateur(SQLModel, table=True):
     projets: list["Projet"] = Relationship(back_populates="institution")
     affectations_projet: list["AffectationProjet"] = Relationship(back_populates="chercheur")
     analyses: list["Analyse"] = Relationship(back_populates="chercheur")
+
+
+class ReinitialisationMotDePasse(SQLModel, table=True):
+    """Jeton à usage unique pour le flux « mot de passe oublié » (app/auth/password_reset.py).
+
+    Le jeton en clair n'est jamais persisté : seul son empreinte SHA-256 (jeton_hache) l'est,
+    même logique que ne jamais stocker un mot de passe en clair — un vidage de cette table ne
+    doit permettre de rejouer aucun lien déjà émis. Une ligne est à usage unique (utilise_le
+    posé à la consommation) et expire après app/auth/password_reset.py::TOKEN_TTL, qu'elle ait
+    servi ou non."""
+
+    __tablename__ = "reinitialisation_mot_de_passe"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id", index=True)
+    jeton_hache: str = Field(unique=True, index=True)
+    date_creation: datetime = Field(default_factory=utcnow)
+    date_expiration: datetime
+    utilise_le: datetime | None = Field(default=None)
+
+
+class ActivationCompte(SQLModel, table=True):
+    """Jeton à usage unique pour le flux d'activation d'un compte provisionné par
+    l'Administrateur (app/auth/activation.py) — pendant de ReinitialisationMotDePasse ci-dessus
+    pour la première connexion plutôt qu'un mot de passe oublié, table dédiée plutôt que
+    réutilisée pour ne mélanger ni le sens ni le cycle de vie des deux flux.
+
+    Le jeton en clair n'est jamais persisté : seule son empreinte SHA-256 (jeton_hache) l'est.
+    Une ligne est à usage unique (utilise_le posé à la consommation) et expire après
+    app/auth/activation.py::ACTIVATION_TOKEN_TTL, qu'elle ait servi ou non."""
+
+    __tablename__ = "activation_compte"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id", index=True)
+    jeton_hache: str = Field(unique=True, index=True)
+    date_creation: datetime = Field(default_factory=utcnow)
+    date_expiration: datetime
+    utilise_le: datetime | None = Field(default=None)
 
 
 class InstitutionProfil(SQLModel, table=True):
@@ -94,3 +142,7 @@ class ChercheurInstitution(SQLModel, table=True):
     )
     date_invitation: datetime = Field(default_factory=utcnow)
     date_reponse: datetime | None = Field(default=None)
+    # Texte libre optionnel renseigné par l'Institution à l'invitation (conditions de
+    # collaboration, périmètre annoncé...) — consultable par le Chercheur avant sa réponse. Pas de
+    # système juridique dédié : un simple champ texte suffit (voir échange Étape 17bis).
+    conditions_collaboration: str | None = Field(default=None)

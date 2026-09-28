@@ -5,27 +5,25 @@ routes qui ne renvoient chacune qu'un entier. Réutilise les requêtes déjà é
 d'attente (app/admin/review_queue.py) plutôt que de dupliquer leurs filtres.
 """
 
-from datetime import timedelta
-
 from sqlmodel import Session, col, func, select
 
 from app.admin.review_queue import (
+    lister_entreprises_a_republier,
     lister_rapports_a_affecter,
+    lister_rapports_echec_extraction,
+    lister_rapports_en_retard,
     lister_rapports_en_validation,
+    lister_rapports_orphelins_en_validation,
 )
 from app.admin.schemas import TableauDeBordAdmin
+from app.admin.utilisateurs import lister_utilisateurs_en_attente
 from app.auth.models import Utilisateur
 from app.company.models import Entreprise
-from app.core.config import get_settings
-from app.core.database import utcnow
-from app.core.enums import StatutRapport
+from app.core.enums import Role, StatutRapport
 from app.ingestion.models import RapportESG
 
 
 def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
-    settings = get_settings()
-    seuil_retard = utcnow() - timedelta(days=settings.sla_audit_jours)
-
     entreprises_inscrites = session.exec(select(func.count()).select_from(Entreprise)).one()
     rapports_soumis = session.exec(select(func.count()).select_from(RapportESG)).one()
     rapports_valides = session.exec(
@@ -43,41 +41,22 @@ def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
         .select_from(Entreprise)
         .where(col(Entreprise.date_publication).is_not(None))
     ).one()
-    audits_en_retard = session.exec(
-        select(func.count())
-        .select_from(RapportESG)
-        .where(
-            col(RapportESG.statut) == StatutRapport.AFFECTE_AUDITEUR,
-            col(RapportESG.date_affectation).is_not(None),
-            col(RapportESG.date_affectation) < seuil_retard,
-        )
-    ).one()
 
-    # Une entreprise déjà publiée dont un rapport a été validé APRÈS sa date de publication : la
-    # fiche publique ne reflète plus le dernier état validé.
-    republication_existe = (
-        select(RapportESG.id)
-        .where(
-            col(RapportESG.entreprise_id) == Entreprise.id,
-            col(RapportESG.statut) == StatutRapport.VALIDE,
-            col(RapportESG.date_depot) > Entreprise.date_publication,
-        )
-        .exists()
+    _, total_a_republier = lister_entreprises_a_republier(session, page=1, page_size=1)
+
+    # Une seule requête groupée plutôt qu'un COUNT par rôle — comptes actifs uniquement (un compte
+    # désactivé n'a plus de raison d'être suivi comme effectif de la plateforme ici). ENTREPRISE
+    # n'y figure pas : entreprises_inscrites (compte les fiches Entreprise, pas les comptes
+    # Utilisateur liés) est la mesure pertinente pour ce rôle, les deux nombres peuvent diverger
+    # (une Entreprise peut être "sans compte", voir app/admin/schemas.py::EntrepriseAdmin) — les
+    # afficher tous les deux côte à côte sèmerait la confusion plutôt que d'informer.
+    comptes_par_role = dict(
+        session.exec(
+            select(Utilisateur.role, func.count())
+            .where(col(Utilisateur.actif).is_(True))
+            .group_by(col(Utilisateur.role))
+        ).all()
     )
-    demandes_republication = session.exec(
-        select(func.count())
-        .select_from(Entreprise)
-        .where(col(Entreprise.date_publication).is_not(None), republication_existe)
-    ).one()
-
-    utilisateurs_en_attente = session.exec(
-        select(func.count())
-        .select_from(Utilisateur)
-        .where(
-            col(Utilisateur.doit_changer_mot_de_passe).is_(True),
-            col(Utilisateur.actif).is_(True),
-        )
-    ).one()
 
     return TableauDeBordAdmin(
         entreprises_inscrites=entreprises_inscrites,
@@ -85,9 +64,16 @@ def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
         rapports_valides=rapports_valides,
         rapports_rejetes=rapports_rejetes,
         entreprises_publiees=entreprises_publiees,
-        audits_en_retard=audits_en_retard,
+        audits_en_retard=len(lister_rapports_en_retard(session)),
         rapports_a_affecter=len(lister_rapports_a_affecter(session)),
         decisions_a_rendre=len(lister_rapports_en_validation(session)),
-        demandes_republication=demandes_republication,
-        utilisateurs_en_attente=utilisateurs_en_attente,
+        demandes_republication=total_a_republier,
+        utilisateurs_en_attente=len(lister_utilisateurs_en_attente(session)),
+        rapports_echec_extraction=len(lister_rapports_echec_extraction(session)),
+        rapports_orphelins=len(lister_rapports_orphelins_en_validation(session)),
+        administrateurs_actifs=comptes_par_role.get(Role.ADMINISTRATEUR, 0),
+        auditeurs_actifs=comptes_par_role.get(Role.AUDITEUR, 0),
+        investisseurs_actifs=comptes_par_role.get(Role.INVESTISSEUR, 0),
+        chercheurs_actifs=comptes_par_role.get(Role.CHERCHEUR, 0),
+        institutions_actives=comptes_par_role.get(Role.INSTITUTION, 0),
     )

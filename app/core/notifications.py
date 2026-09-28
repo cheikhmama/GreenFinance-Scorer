@@ -14,10 +14,23 @@ from app.core.exceptions import NotFoundError
 from app.core.models import Notification
 
 
-def notifier(session: Session, utilisateur_id: uuid.UUID, type_: str, message: str) -> Notification:
+def notifier(
+    session: Session,
+    utilisateur_id: uuid.UUID,
+    type_: str,
+    message: str,
+    *,
+    id_ressource: uuid.UUID | None = None,
+) -> Notification:
     """Construit et ajoute une Notification à la session — ne commit jamais : l'appelant
-    contrôle la limite de la transaction (même convention que le reste du projet)."""
-    notification = Notification(utilisateur_id=utilisateur_id, type=type_, message=message)
+    contrôle la limite de la transaction (même convention que le reste du projet).
+
+    id_ressource permet au frontend de résoudre un lien de redirection au clic (voir
+    shared/notifications/api.ts::resolveNotificationLink) — omis pour les types dont la cible
+    est une liste plutôt qu'un élément précis (ex. une invitation de rattachement)."""
+    notification = Notification(
+        utilisateur_id=utilisateur_id, type=type_, message=message, id_ressource=id_ressource
+    )
     session.add(notification)
     return notification
 

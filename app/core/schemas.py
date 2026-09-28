@@ -38,5 +38,6 @@ class NotificationPublic(BaseModel):
     id: uuid.UUID
     type: str
     message: str
+    id_ressource: uuid.UUID | None
     date_envoi: datetime
     lu: bool
