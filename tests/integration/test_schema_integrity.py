@@ -129,6 +129,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.add(config_chercheur)
     session.flush()
 
+    assert config_chercheur.utilisateur is not None
     assert config_chercheur.utilisateur.id == chercheur.id
     assert config_chercheur in chercheur.configurations_ponderation
 

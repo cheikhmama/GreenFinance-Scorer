@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -9,7 +10,9 @@ from app.scoring.config_schema import (
     charger_configuration_depuis_fichier,
 )
 
-_BASE = {
+# dict[str, Any], pas un TypedDict : cette fixture n'existe que pour nourrir model_validate
+# (qui accepte une structure arbitraire), jamais lue champ par champ avec des types précis.
+_BASE: dict[str, Any] = {
     "version": 1,
     "nom": "Test",
     "piliers": {
@@ -119,7 +122,22 @@ def test_borne_max_inferieure_ou_egale_a_borne_min_est_rejetee() -> None:
 
 
 def test_fichier_de_reference_reel_est_valide() -> None:
-    """config/weights/default.yaml (Phase 5 §9) doit toujours passer ce même schéma -- une
-    régression ici serait une erreur de méthodologie silencieuse, pas juste un test qui casse."""
+    """config/weights/default.yaml (Phase 5 §9, élargi v2) doit toujours passer ce même schéma --
+    une régression ici serait une erreur de méthodologie silencieuse, pas juste un test qui casse."""
     configuration = charger_configuration_depuis_fichier(Path("config/weights/default.yaml"))
-    assert configuration.piliers[Pilier.SOCIAL].indicateurs["femmes_management_pourcentage"].poids == 0.6
+    assert configuration.version == 2
+    assert configuration.piliers[Pilier.SOCIAL].indicateurs["femmes_management_pourcentage"].poids == 0.35
+    # v2 ajoute 3 indicateurs (un par pilier concerné hors Gouvernance) -- jamais le tonnage
+    # carbone brut ni les scores auto-déclarés, exclus par principe (voir le commentaire du YAML).
+    assert "part_renouvelable_pourcentage" in configuration.piliers[Pilier.ENVIRONNEMENT].indicateurs
+    assert "dechets_valorises_pourcentage" in configuration.piliers[Pilier.ENVIRONNEMENT].indicateurs
+    assert "femmes_effectif_pourcentage" in configuration.piliers[Pilier.SOCIAL].indicateurs
+    for pilier_codes in (
+        configuration.piliers[Pilier.ENVIRONNEMENT].indicateurs,
+        configuration.piliers[Pilier.SOCIAL].indicateurs,
+        configuration.piliers[Pilier.GOUVERNANCE].indicateurs,
+    ):
+        assert "score_environnement_declare" not in pilier_codes
+        assert "score_social_declare" not in pilier_codes
+        assert "score_gouvernance_declare" not in pilier_codes
+        assert not any(code.startswith("scope_") for code in pilier_codes)

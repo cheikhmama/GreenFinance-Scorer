@@ -1,20 +1,27 @@
-"""Isole la base utilisée par les tests de la base de développement.
+"""Isole la base et le stockage fichiers utilisés par les tests de ceux du développement.
 
-Sans ceci, tous les tests d'intégration tapent directement sur `app.core.database.engine`, donc
-sur la MÊME base Postgres que le développement/la vérification manuelle — chaque run pytest y
-laisse des centaines de comptes/entreprises de test (aucune isolation transactionnelle par test,
-voir tests/integration/conftest.py::session : le rollback n'annule que ce qui n'a pas été commit,
-et les handlers de route commitent toujours par conception).
+Sans l'isolation base, tous les tests d'intégration tapent directement sur
+`app.core.database.engine`, donc sur la MÊME base Postgres que le développement/la vérification
+manuelle — chaque run pytest y laisse des centaines de comptes/entreprises de test (aucune
+isolation transactionnelle par test, voir tests/integration/conftest.py::session : le rollback
+n'annule que ce qui n'a pas été commit, et les handlers de route commitent toujours par
+conception). Sans l'isolation stockage, les PDF envoyés via POST /company/rapports pendant les
+tests s'écrivent sous le vrai STORAGE_PATH (./storage) — même défaut, mêmes conséquences : ça a
+rempli storage/rapports/test/ et laissé 230+ dossiers UUID orphelins (jamais nettoyés par un
+DELETE puisque les lignes RapportESG correspondantes vivent dans la base de test, droppée à part).
 
 Ce module doit s'exécuter avant TOUT import de app.* dans la session pytest — d'où sa position à
 la racine de tests/, chargée avant tests/integration/conftest.py (qui importe déjà
-app.core.database au niveau module). DATABASE_URL est réécrit en variable d'environnement pour
-pointer vers une base séparée (créée si besoin) avant que app.core.database ne construise son
-engine au moment de son propre import — pydantic-settings donne priorité à une variable
-d'environnement réelle sur la valeur lue dans .env.
+app.core.database au niveau module). DATABASE_URL et STORAGE_PATH sont réécrits en variables
+d'environnement avant que app.core.config ne construise Settings (get_settings, @lru_cache) au
+premier appel — pydantic-settings donne priorité à une variable d'environnement réelle sur la
+valeur lue dans .env.
 """
 
+import atexit
 import os
+import shutil
+import tempfile
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
@@ -69,3 +76,9 @@ if not _base_url:
 _test_url = os.environ.get("TEST_DATABASE_URL") or _derive_test_url(_base_url)
 _ensure_database_exists(_base_url, _test_url)
 os.environ["DATABASE_URL"] = _test_url
+
+# Dossier jetable pour STORAGE_PATH, supprimé à la fin du run pytest -- symétrique de
+# l'isolation DATABASE_URL ci-dessus.
+_test_storage_dir = tempfile.mkdtemp(prefix="greenfinance_test_storage_")
+atexit.register(shutil.rmtree, _test_storage_dir, ignore_errors=True)
+os.environ["STORAGE_PATH"] = _test_storage_dir

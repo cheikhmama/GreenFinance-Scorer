@@ -1,12 +1,15 @@
+import base64
 import uuid
 from datetime import timedelta
+from unittest.mock import Mock
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from app.audit.models import AvisAudit
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import ActivationCompte, Utilisateur
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Entreprise
 from app.core import storage
@@ -29,6 +32,19 @@ from app.scoring.engine import obtenir_configuration_reference
 from app.scoring.models import ScoreESG
 
 client = TestClient(app, base_url="https://testserver")
+
+
+@pytest.fixture(autouse=True)
+def _smtp_configure(monkeypatch):
+    """creer_utilisateur refuse toute création si le SMTP n'est pas configuré
+    (app/admin/utilisateurs.py::ensure_email_configured) — ces tests n'ont besoin ni d'un vrai
+    envoi ni d'une tentative réseau réelle depuis la tâche de fond qui poste le lien d'activation
+    (app/auth/activation.py::_envoyer_lien)."""
+    settings = get_settings().model_copy(
+        update={"smtp_host": "smtp.example.com", "mail_from": "no-reply@example.com"}
+    )
+    monkeypatch.setattr("app.core.email.get_settings", lambda: settings)
+    monkeypatch.setattr("app.auth.activation.send_email", Mock())
 
 
 def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass", actif: bool = True) -> Utilisateur:
@@ -247,7 +263,7 @@ def test_lister_utilisateurs_avec_role_entreprise_est_rejete(session) -> None:
     assert response.json()["error"]["code"] == "permission_denied"
 
 
-def test_creer_utilisateur_genere_un_mot_de_passe_temporaire_qui_fonctionne(session) -> None:
+def test_creer_utilisateur_envoie_un_lien_dactivation(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     authed_client = _login(admin.email, "s3cret-pass")
     email_cible = f"nouveau-{uuid.uuid4()}@example.com"
@@ -262,15 +278,21 @@ def test_creer_utilisateur_genere_un_mot_de_passe_temporaire_qui_fonctionne(sess
     assert body["email"] == email_cible
     assert body["role"] == "AUDITEUR"
     assert body["actif"] is True
-    mot_de_passe_temporaire = body["mot_de_passe_temporaire"]
-    assert len(mot_de_passe_temporaire) > 8
+    assert "mot_de_passe_temporaire" not in body
 
-    # Le mot de passe temporaire fonctionne réellement pour se connecter.
+    # Aucun mot de passe n'est généré — le compte reste inutilisable tant que le lien
+    # d'activation à usage unique n'a pas été consommé.
     login_response = client.post(
-        "/api/v1/auth/login", json={"email": email_cible, "password": mot_de_passe_temporaire}
+        "/api/v1/auth/login", json={"email": email_cible, "password": "peu-importe"}
     )
-    assert login_response.status_code == 200
-    assert login_response.json()["doit_changer_mot_de_passe"] is True
+    assert login_response.status_code == 401
+
+    activation = session.exec(
+        select(ActivationCompte).where(ActivationCompte.utilisateur_id == uuid.UUID(body["id"]))
+    ).first()
+    assert activation is not None
+    assert activation.utilise_le is None
+    assert activation.date_expiration > utcnow()
 
 
 def test_creer_utilisateur_sans_nom_le_deduit_de_lemail(session) -> None:
@@ -365,15 +387,14 @@ def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(sessio
     assert entreprise.secteur == "Industrie"
     assert entreprise.pays == "France"
 
-    # Le compte peut immédiatement déposer un rapport — la relation n'est plus manquante.
-    authed_entreprise = _login(email_cible, response.json()["mot_de_passe_temporaire"])
-    authed_entreprise.post(
-        "/api/v1/auth/changer-mot-de-passe",
-        json={
-            "mot_de_passe_actuel": response.json()["mot_de_passe_temporaire"],
-            "nouveau_mot_de_passe": "nouveau-mdp-1234",
-        },
-    )
+    # Le compte peut déposer un rapport une fois activé — la relation n'est plus manquante.
+    compte = session.get(Utilisateur, utilisateur_id)
+    assert compte is not None
+    compte.mot_de_passe_hache = hash_password("s3cret-pass")
+    compte.date_activation = utcnow()
+    session.add(compte)
+    session.commit()
+    authed_entreprise = _login(email_cible, "s3cret-pass")
     liste_response = authed_entreprise.get("/api/v1/company/rapports")
     assert liste_response.status_code == 200
 
@@ -409,41 +430,6 @@ def test_creer_utilisateur_avec_role_entreprise_est_rejete(session) -> None:
     assert response.status_code == 403
 
 
-def test_un_compte_avec_mot_de_passe_temporaire_ne_peut_pas_encore_utiliser_lapi_metier(session) -> None:
-    """Preuve d'intégration du garde posé dans get_current_user (app/core/dependencies.py) —
-    voir aussi tests/unit/test_dependencies.py pour la version isolée de cette règle."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_client = _login(admin.email, "s3cret-pass")
-    email_cible = f"temp-{uuid.uuid4()}@example.com"
-    create_response = admin_client.post(
-        "/api/v1/admin/utilisateurs",
-        json={"email": email_cible, "nom": "Compte Temporaire", "role": "AUDITEUR"},
-    )
-    mot_de_passe_temporaire = create_response.json()["mot_de_passe_temporaire"]
-
-    nouveau_client = _login(email_cible, mot_de_passe_temporaire)
-
-    blocked_response = nouveau_client.get("/api/v1/audit/rapports")
-    assert blocked_response.status_code == 403
-    assert blocked_response.json()["error"]["code"] == "password_change_required"
-
-    # /auth/me reste accessible, c'est ce qui permet au frontend de détecter l'état et de
-    # rediriger vers l'écran de changement de mot de passe.
-    assert nouveau_client.get("/api/v1/auth/me").status_code == 200
-
-    change_response = nouveau_client.post(
-        "/api/v1/auth/changer-mot-de-passe",
-        json={
-            "mot_de_passe_actuel": mot_de_passe_temporaire,
-            "nouveau_mot_de_passe": "un-nouveau-secret-3",
-        },
-    )
-    assert change_response.status_code == 200
-
-    unblocked_response = nouveau_client.get("/api/v1/audit/rapports")
-    assert unblocked_response.status_code == 200
-
-
 def test_desactiver_utilisateur_revoque_ses_sessions_en_cours(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     admin_client = _login(admin.email, "s3cret-pass")
@@ -467,44 +453,9 @@ def test_desactiver_utilisateur_inconnu_est_404(session) -> None:
     assert response.status_code == 404
 
 
-def test_changer_role_revoque_les_sessions_en_cours_et_change_bien_le_role(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_client = _login(admin.email, "s3cret-pass")
-    cible = _create_utilisateur(session, Role.CHERCHEUR)
-    cible_client = _login(cible.email, "s3cret-pass")
-    assert cible_client.get("/api/v1/auth/me").status_code == 200
-
-    response = admin_client.post(
-        f"/api/v1/admin/utilisateurs/{cible.id}/role", json={"role": "AUDITEUR"}
-    )
-
-    assert response.status_code == 200
-    assert response.json()["role"] == "AUDITEUR"
-    # L'ancienne session, qui porte encore le rôle CHERCHEUR dans son jeton, ne doit plus
-    # fonctionner : la laisser vivre laisserait agir sous une autorisation périmée.
-    assert cible_client.get("/api/v1/auth/me").status_code == 401
-
-    relogged = _login(cible.email, "s3cret-pass")
-    assert relogged.get("/api/v1/auth/me").json()["role"] == "AUDITEUR"
-
-
-def test_changer_role_refuse_le_role_administrateur(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_client = _login(admin.email, "s3cret-pass")
-    cible = _create_utilisateur(session, Role.CHERCHEUR)
-
-    response = admin_client.post(
-        f"/api/v1/admin/utilisateurs/{cible.id}/role", json={"role": "ADMINISTRATEUR"}
-    )
-
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "role_non_autorise"
-
-
-def test_creation_desactivation_et_changement_de_role_sont_journalises(session) -> None:
-    """Phase 3 §3.5 — ces trois actions de cycle de vie de compte tracent l'acteur qui a agi
-    (l'administrateur), pas le compte cible, avec les anciennes/nouvelles valeurs pour le
-    changement de rôle."""
+def test_creation_et_desactivation_de_compte_sont_journalisees(session) -> None:
+    """Phase 3 §3.5 — ces deux actions de cycle de vie de compte tracent l'acteur qui a agi
+    (l'administrateur), pas le compte cible."""
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     admin_client = _login(admin.email, "s3cret-pass")
     cible = _create_utilisateur(session, Role.CHERCHEUR)
@@ -513,7 +464,6 @@ def test_creation_desactivation_et_changement_de_role_sont_journalises(session) 
         "/api/v1/admin/utilisateurs",
         json={"email": f"journal-{uuid.uuid4()}@example.com", "nom": "Journal", "role": "AUDITEUR"},
     )
-    admin_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/role", json={"role": "AUDITEUR"})
     admin_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/desactiver")
 
     entrees = session.exec(
@@ -521,13 +471,7 @@ def test_creation_desactivation_et_changement_de_role_sont_journalises(session) 
     ).all()
     actions = [e.action for e in entrees]
     assert "creation_compte" in actions
-    assert "changement_role" in actions
     assert "desactivation_compte" in actions
-
-    changement = next(e for e in entrees if e.action == "changement_role")
-    assert changement.ancienne_valeur == "CHERCHEUR"
-    assert changement.nouvelle_valeur == "AUDITEUR"
-    assert changement.id_ressource == cible.id
 
 
 def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
@@ -881,11 +825,185 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
     assert items[str(orpheline.id)]["utilisateur_id"] is None
     assert items[str(orpheline.id)]["nombre_rapports"] == 0
     assert items[str(orpheline.id)]["dernier_statut_rapport"] is None
+    assert items[str(orpheline.id)]["dernier_rapport_id"] is None
 
     assert items[str(avec_compte.id)]["utilisateur_id"] == str(utilisateur.id)
     assert items[str(avec_compte.id)]["nombre_rapports"] == 2
     # Le plus récent des deux rapports (par date_depot), pas le premier créé.
     assert items[str(avec_compte.id)]["dernier_statut_rapport"] == plus_recent.statut.value
+    assert items[str(avec_compte.id)]["dernier_rapport_id"] == str(plus_recent.id)
+
+
+_PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+
+
+def test_consulter_entreprise_admin_retourne_le_detail_complet(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, utilisateur = _create_entreprise_avec_utilisateur(session)
+    entreprise.description = "Une description."
+    entreprise.site_officiel = "https://exemple.test"
+    session.add(entreprise)
+    session.commit()
+    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.REJETE)
+
+    authed_client = _login(admin.email, "s3cret-pass")
+    response = authed_client.get(f"/api/v1/admin/entreprises/{entreprise.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["nom"] == entreprise.nom
+    assert body["description"] == "Une description."
+    assert body["site_officiel"] == "https://exemple.test"
+    assert body["utilisateur_id"] == str(utilisateur.id)
+    assert body["nombre_rapports"] == 1
+    assert body["dernier_statut_rapport"] == StatutRapport.REJETE.value
+    assert body["dernier_rapport_id"] == str(rapport.id)
+
+
+def test_consulter_entreprise_admin_inconnue_est_404(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.get(f"/api/v1/admin/entreprises/{uuid.uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "entreprise_introuvable"
+
+
+def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        f"/api/v1/admin/entreprises/{entreprise.id}",
+        json={
+            "nom": "Nouveau Nom",
+            "secteur": "Énergie",
+            "pays": "Mauritanie",
+            "description": "Description mise à jour.",
+            "site_officiel": "https://nouveau-site.test",
+            "montant_minimum_investissement": 1000.0,
+            "devise_montant_minimum": "USD",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["nom"] == "Nouveau Nom"
+    assert body["secteur"] == "Énergie"
+    assert body["pays"] == "Mauritanie"
+    assert body["description"] == "Description mise à jour."
+    assert body["site_officiel"] == "https://nouveau-site.test"
+    assert body["montant_minimum_investissement"] == 1000.0
+    assert body["devise_montant_minimum"] == "USD"
+    # Réponse au même format que le détail -- pas de refetch nécessaire côté frontend.
+    assert "nombre_rapports" in body
+    assert "utilisateur_id" in body
+
+
+def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        f"/api/v1/admin/entreprises/{entreprise.id}",
+        json={
+            "nom": entreprise.nom,
+            "secteur": entreprise.secteur,
+            "pays": entreprise.pays,
+            "montant_minimum_investissement": 1000.0,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_modifier_entreprise_refuse_nom_vide(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        f"/api/v1/admin/entreprises/{entreprise.id}",
+        json={"nom": "   ", "secteur": entreprise.secteur, "pays": entreprise.pays},
+    )
+
+    assert response.status_code == 422
+
+
+def test_modifier_entreprise_inconnue_est_404(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        f"/api/v1/admin/entreprises/{uuid.uuid4()}",
+        json={"nom": "X", "secteur": "Y", "pays": "Z"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "entreprise_introuvable"
+
+
+def test_televerser_puis_supprimer_logo_entreprise(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    upload = authed_client.post(
+        f"/api/v1/admin/entreprises/{entreprise.id}/logo",
+        files={"fichier": ("logo.png", _PNG_1X1, "image/png")},
+    )
+    assert upload.status_code == 200
+    assert upload.json()["logo"].startswith("data:image/png;base64,")
+
+    delete = authed_client.delete(f"/api/v1/admin/entreprises/{entreprise.id}/logo")
+    assert delete.status_code == 200
+    assert delete.json()["logo"] is None
+
+
+def test_televerser_logo_entreprise_non_image_est_refuse(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.post(
+        f"/api/v1/admin/entreprises/{entreprise.id}/logo",
+        files={"fichier": ("pas-une-image.txt", b"contenu texte quelconque", "image/png")},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "signature_invalide"
+
+
+def test_televerser_logo_entreprise_inconnue_est_404(session) -> None:
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.post(
+        f"/api/v1/admin/entreprises/{uuid.uuid4()}/logo",
+        files={"fichier": ("logo.png", _PNG_1X1, "image/png")},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "entreprise_introuvable"
+
+
+def test_logo_entreprise_routes_avec_role_entreprise_sont_rejetees(session) -> None:
+    user = _create_utilisateur(session, Role.ENTREPRISE)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(user.email, "s3cret-pass")
+
+    response = authed_client.post(
+        f"/api/v1/admin/entreprises/{entreprise.id}/logo",
+        files={"fichier": ("logo.png", _PNG_1X1, "image/png")},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "permission_denied"
 
 
 def test_publier_happy_path_et_idempotence(session) -> None:
@@ -1190,27 +1308,186 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
     assert apres_posterieur["demandes_republication"] - avant["demandes_republication"] == 1
 
 
-def test_lister_utilisateurs_filtre_par_mot_de_passe_temporaire(session) -> None:
+def test_lister_utilisateurs_filtre_par_en_attente_activation(session) -> None:
     marqueur = f"marqueur-{uuid.uuid4()}"
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     en_attente = _create_utilisateur_avec_email(
         session, Role.AUDITEUR, f"{marqueur}-attente@example.com"
     )
-    en_attente.doit_changer_mot_de_passe = True
-    deja_change = _create_utilisateur_avec_email(
+    en_attente.date_activation = None
+    deja_active = _create_utilisateur_avec_email(
         session, Role.AUDITEUR, f"{marqueur}-ok@example.com"
     )
-    deja_change.doit_changer_mot_de_passe = False
-    session.add_all([en_attente, deja_change])
+    deja_active.date_activation = utcnow()
+    session.add_all([en_attente, deja_active])
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": marqueur, "doit_changer_mot_de_passe": True},
+        params={"role": "AUDITEUR", "recherche": marqueur, "en_attente_activation": True},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["id"] == str(en_attente.id)
+
+
+def test_lister_rapports_echec_extraction_filtre_correctement(session) -> None:
+    """Un échec d'extraction (extraction_erreur renseigné) doit être visible quelque part côté
+    Admin — invisible de /admin/rapports/a-affecter, qui ne filtre que sur
+    extraction_terminee_le (voir BUG-017)."""
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    echec = _create_rapport(
+        session,
+        entreprise.id,
+        statut=StatutRapport.EN_EXTRACTION,
+        extraction_erreur="appel_claude_echoue",
+    )
+    en_cours = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_EXTRACTION)
+    qualifiant = _create_rapport(
+        session,
+        entreprise.id,
+        statut=StatutRapport.EN_EXTRACTION,
+        extraction_terminee_le=utcnow(),
+    )
+
+    authed_client = _login(admin.email, "s3cret-pass")
+    response = authed_client.get("/api/v1/admin/rapports/echec-extraction")
+
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()]
+    assert str(echec.id) in ids
+    assert str(en_cours.id) not in ids
+    assert str(qualifiant.id) not in ids
+
+
+def test_lister_rapports_orphelins_en_validation(session) -> None:
+    """Un rapport EN_VALIDATION sans aucun avis d'audit est un état incohérent, inatteignable via
+    l'API seule (voir app/admin/review_queue.py::_rapport_en_validation) mais qui doit rester
+    visible d'une file Admin s'il survient (données historiques) — jamais invisible de partout à
+    la fois comme avant ce correctif (voir BUG-018)."""
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    orphelin = _create_rapport(
+        session,
+        entreprise.id,
+        statut=StatutRapport.EN_VALIDATION,
+        extraction_terminee_le=utcnow(),
+    )
+    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    avec_avis = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
+
+    authed_client = _login(admin.email, "s3cret-pass")
+    response = authed_client.get("/api/v1/admin/rapports/orphelins")
+
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()]
+    assert str(orphelin.id) in ids
+    assert str(avec_avis.id) not in ids
+
+    normale = authed_client.get("/api/v1/admin/rapports/en-validation")
+    ids_normale = [item["id"] for item in normale.json()]
+    assert str(orphelin.id) not in ids_normale
+    assert str(avec_avis.id) in ids_normale
+
+
+def test_verifier_score_calculable_route(session) -> None:
+    """Aperçu avant décision (BUG-019) : un rapport dont les indicateurs ne recoupent aucun code
+    de la configuration de référence doit être signalé non calculable AVANT que l'Admin ne
+    clique Valider, jamais seulement après coup."""
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+
+    calculable = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
+
+    non_calculable = _create_rapport(
+        session,
+        entreprise.id,
+        statut=StatutRapport.EN_VALIDATION,
+        extraction_terminee_le=utcnow(),
+    )
+    preuve = PreuveDocumentaire(
+        nom_document="rapport-test.pdf",
+        annee=2025,
+        nombre_pages_total=1,
+        page_debut=1,
+        page_fin=1,
+        pdf_extrait_genere="preuves/test/page_1.pdf",
+    )
+    session.add(preuve)
+    session.flush()
+    session.add(
+        IndicateurESG(
+            rapport_id=non_calculable.id,
+            pilier=Pilier.SOCIAL,
+            code="effectif_total",
+            valeur=1200.0,
+            unite="personnes",
+            methode=MethodeDonnee.RAPPORTEE,
+            preuve_id=preuve.id,
+        )
+    )
+    session.commit()
+
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    reponse_calculable = authed_client.get(f"/api/v1/admin/rapports/{calculable.id}/score-verification")
+    assert reponse_calculable.status_code == 200
+    assert reponse_calculable.json()["calculable"] is True
+
+    reponse_non_calculable = authed_client.get(
+        f"/api/v1/admin/rapports/{non_calculable.id}/score-verification"
+    )
+    assert reponse_non_calculable.status_code == 200
+    assert reponse_non_calculable.json()["calculable"] is False
+
+
+def test_recalculer_score_route(session) -> None:
+    """Action de récupération (BUG-020) pour un rapport VALIDE historiquement sans ScoreESG —
+    état inatteignable via le parcours normal mais qui doit avoir une issue explicite depuis
+    l'UI plutôt que de bloquer publier_entreprise indéfiniment sans recours."""
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+
+    sans_score = _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
+    preuve = PreuveDocumentaire(
+        nom_document="rapport-test.pdf",
+        annee=2025,
+        nombre_pages_total=1,
+        page_debut=1,
+        page_fin=1,
+        pdf_extrait_genere="preuves/test/page_1.pdf",
+    )
+    session.add(preuve)
+    session.flush()
+    session.add(
+        IndicateurESG(
+            rapport_id=sans_score.id,
+            pilier=Pilier.GOUVERNANCE,
+            code="femmes_conseil_pourcentage",
+            valeur=40.0,
+            unite="%",
+            methode=MethodeDonnee.RAPPORTEE,
+            preuve_id=preuve.id,
+        )
+    )
+    session.commit()
+
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    reponse = authed_client.post(f"/api/v1/admin/rapports/{sans_score.id}/recalculer-score")
+    assert reponse.status_code == 200
+    assert reponse.json()["valeur_globale"] is not None
+
+    deja_calcule = authed_client.post(f"/api/v1/admin/rapports/{sans_score.id}/recalculer-score")
+    assert deja_calcule.status_code == 422
+    assert deja_calcule.json()["error"]["code"] == "score_deja_calcule"
+
+    non_valide = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_EXTRACTION)
+    reponse_invalide = authed_client.post(f"/api/v1/admin/rapports/{non_valide.id}/recalculer-score")
+    assert reponse_invalide.status_code == 422
+    assert reponse_invalide.json()["error"]["code"] == "transition_invalide"

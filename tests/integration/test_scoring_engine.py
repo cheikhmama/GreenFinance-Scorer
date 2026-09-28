@@ -3,12 +3,18 @@ import uuid
 import pytest
 from sqlmodel import col, func, select
 
+from app.auth.hashing import hash_password
+from app.auth.models import Utilisateur
 from app.company.models import Entreprise
-from app.core.enums import CanalDepot, MethodeDonnee, Pilier, TypeRapport
+from app.core.enums import CanalDepot, MethodeDonnee, Pilier, Role, TypeRapport
 from app.core.exceptions import ValidationError
 from app.ingestion.models import IndicateurESG, PreuveDocumentaire, RapportESG
-from app.scoring.engine import calculer_score, obtenir_configuration_reference
-from app.scoring.models import ConfigurationPonderation
+from app.scoring.engine import (
+    calculer_score,
+    obtenir_configuration_reference,
+    score_officiel,
+)
+from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 
 def _rapport(session) -> RapportESG:
@@ -67,6 +73,11 @@ _INDICATEURS_ATLAS = {
 
 
 def test_calcul_complet_trois_piliers(session) -> None:
+    """_INDICATEURS_ATLAS ne fournit que les 6 codes v1 -- sous la méthodologie v2 (Phase 5 §9,
+    élargie), les 3 nouveaux codes (part_renouvelable_pourcentage, dechets_valorises_pourcentage,
+    femmes_effectif_pourcentage) sont donc absents et leurs piliers se repondèrent sur ce qui
+    reste présent, exactement comme test_indicateur_manquant_repondere_le_pilier -- valeurs
+    attendues recalculées en conséquence (voir config/weights/default.yaml pour les poids v2)."""
     rapport = _rapport(session)
     preuve = _preuve(session)
     for (pilier, code), valeur in _INDICATEURS_ATLAS.items():
@@ -76,10 +87,10 @@ def test_calcul_complet_trois_piliers(session) -> None:
     score = calculer_score(session, rapport.id)
     session.commit()
 
-    assert score.score_environnement == pytest.approx(49.78, abs=0.05)
-    assert score.score_social == pytest.approx(82.0, abs=0.01)
+    assert score.score_environnement == pytest.approx(49.91, abs=0.01)
+    assert score.score_social == pytest.approx(86.0, abs=0.01)
     assert score.score_gouvernance == pytest.approx(80.0, abs=0.01)
-    assert score.valeur_globale == pytest.approx(65.39, abs=0.05)
+    assert score.valeur_globale == pytest.approx(66.45, abs=0.01)
 
 
 def test_indicateur_manquant_repondere_le_pilier(session) -> None:
@@ -151,3 +162,88 @@ def test_obtenir_configuration_reference_est_idempotent(session) -> None:
         .where(col(ConfigurationPonderation.utilisateur_id).is_(None))
     ).one()
     assert apres - avant <= 1  # au plus une ligne créée par ce test, jamais deux
+
+
+def test_score_officiel_ignore_un_score_personnalise_du_meme_rapport(session) -> None:
+    """Un rapport peut porter plusieurs ScoreESG (un par ConfigurationPonderation) — score_officiel
+    ne doit jamais retomber sur un `.first()` non filtré : seul le score calculé sous la
+    configuration de référence fait foi, jamais une pondération personnalisée d'un tiers."""
+    rapport = _rapport(session)
+    session.commit()
+
+    reference = obtenir_configuration_reference(session)
+    score_reference = ScoreESG(rapport_id=rapport.id, configuration_id=reference.id, valeur_globale=70.0)
+    session.add(score_reference)
+    session.commit()
+
+    utilisateur = Utilisateur(
+        email=f"chercheur-{uuid.uuid4()}@example.com",
+        mot_de_passe_hache=hash_password("s3cret-pass"),
+        role=Role.CHERCHEUR,
+    )
+    session.add(utilisateur)
+    session.commit()
+    configuration_perso = ConfigurationPonderation(
+        nom="Pondération personnalisée", version=1, fichier_yaml="x", utilisateur_id=utilisateur.id
+    )
+    session.add(configuration_perso)
+    session.commit()
+    # Score personnalisé ajouté APRÈS le score de référence, pour vérifier qu'aucun tri implicite
+    # par date/insertion ne le fait passer devant : seul configuration_id doit trancher.
+    session.add(
+        ScoreESG(rapport_id=rapport.id, configuration_id=configuration_perso.id, valeur_globale=12.0)
+    )
+    session.commit()
+
+    officiel = score_officiel(session, rapport.id)
+    assert officiel is not None
+    assert officiel.id == score_reference.id
+    assert officiel.valeur_globale == 70.0
+
+
+def test_score_officiel_absent_si_rapport_non_score(session) -> None:
+    rapport = _rapport(session)
+    session.commit()
+
+    assert score_officiel(session, rapport.id) is None
+
+
+def test_changement_de_version_cree_une_nouvelle_configuration_et_invalide_lancien_score_officiel(
+    session,
+) -> None:
+    """Comportement réel, pas juste théorique : passer default.yaml en v2 (Phase 5 §9) crée une
+    nouvelle ligne ConfigurationPonderation distincte de toute ligne v1 déjà en base -- et
+    score_officiel(), qui ne filtre que sur la configuration de référence COURANTE, redevient None
+    pour un rapport scoré sous une ancienne version tant qu'il n'est pas recalculé (voir
+    scripts/recalculer_scores_v2.py pour la reprise en masse après un tel changement)."""
+    rapport = _rapport(session)
+    preuve = _preuve(session)
+    _ajouter_indicateur(
+        session, rapport.id, preuve.id, Pilier.GOUVERNANCE, "femmes_conseil_pourcentage", 40.0
+    )
+    session.commit()
+
+    configuration_v1_simulee = ConfigurationPonderation(
+        nom="Ancienne référence", version=1, fichier_yaml="config/weights/default.yaml"
+    )
+    session.add(configuration_v1_simulee)
+    session.commit()
+    score_sous_v1 = ScoreESG(
+        rapport_id=rapport.id, configuration_id=configuration_v1_simulee.id, valeur_globale=70.0
+    )
+    session.add(score_sous_v1)
+    session.commit()
+
+    reference_courante = obtenir_configuration_reference(session)
+
+    assert reference_courante.id != configuration_v1_simulee.id
+    assert reference_courante.version == 2
+    assert score_officiel(session, rapport.id) is None
+
+    score_recalcule = calculer_score(session, rapport.id)
+    session.commit()
+
+    assert score_recalcule.configuration_id == reference_courante.id
+    officiel = score_officiel(session, rapport.id)
+    assert officiel is not None
+    assert officiel.id == score_recalcule.id

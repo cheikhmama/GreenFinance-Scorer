@@ -19,6 +19,7 @@ from app.core.enums import (
     StatutRapport,
     TypeRapport,
 )
+from app.core.models import Notification
 from app.ingestion.models import (
     DonneeCarbone,
     IndicateurESG,
@@ -165,6 +166,38 @@ def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
     avis = session.exec(select(AvisAudit).where(AvisAudit.rapport_id == rapport.id)).first()
     assert avis is not None
     assert avis.auditeur_id == auditeur.id
+
+
+def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
+    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin_inactif = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin_inactif.actif = False
+    session.add(admin_inactif)
+    session.commit()
+    rapport = _create_rapport_affecte(session, auditeur.id)
+    authed_client = _login(auditeur.email, "s3cret-pass")
+
+    authed_client.post(
+        f"/api/v1/audit/rapports/{rapport.id}/avis",
+        json={"decision": "RECOMMANDE_REJET", "commentaire": "Données incohérentes."},
+    )
+
+    notification = session.exec(
+        select(Notification).where(
+            Notification.utilisateur_id == admin.id, Notification.type == "RAPPORT_AVIS_RENDU_ADMIN"
+        )
+    ).one()
+    assert notification.id_ressource == rapport.id
+    assert "rejet" in notification.message
+
+    notification_inactif = session.exec(
+        select(Notification).where(
+            Notification.utilisateur_id == admin_inactif.id,
+            Notification.type == "RAPPORT_AVIS_RENDU_ADMIN",
+        )
+    ).first()
+    assert notification_inactif is None
 
 
 def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
