@@ -1,8 +1,8 @@
-import { Scale, Search } from "lucide-react";
+import { Calendar, Globe, MapPin, Search, X } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
-import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -10,51 +10,55 @@ import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { usePublishedCompanies } from "../api";
 
-/** Liste des entreprises publiées, avec sélection multiple pour la comparaison (au moins 2,
- * voir GET /investor/comparaison). Pagination "Voir plus" (même pattern que UsersSection). */
+/** Liste des entreprises publiées, présentées en cards volontairement sobres (logo, nom,
+ * secteur, pays, quelques informations générales) — jamais le score ESG, les scores E/S/G ni le
+ * montant minimum d'investissement ici : ces données détaillées restent réservées à la fiche
+ * dédiée (voir CompanyDetailPage.tsx), accessible en cliquant sur la card. Le filtre secteur vit
+ * dans l'URL (?secteur=...) pour rester partageable en lien direct, entre autres depuis le
+ * Dashboard (voir InvestorDashboardPage.tsx::RepartitionSecteurCard). */
 export function CompaniesPage() {
   const [recherche, setRecherche] = useState("");
-  const [selection, setSelection] = useState<string[]>([]);
   const rechercheDebattue = useDebouncedValue(recherche);
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const secteur = searchParams.get("secteur");
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    usePublishedCompanies({ recherche: rechercheDebattue });
+    usePublishedCompanies({ recherche: rechercheDebattue, secteur: secteur ?? undefined });
 
   const entreprises = data?.pages.flatMap((page) => page.items) ?? [];
-
-  function toggleSelection(id: string) {
-    setSelection((current) =>
-      current.includes(id) ? current.filter((v) => v !== id) : [...current, id],
-    );
-  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Investisseur"
-        title="Entreprises publiées"
-        description="Score ESG et émissions Scope 1/2/3 des entreprises dont les données ont été validées et publiées."
-        action={
-          selection.length >= 2 ? (
-            <Button onClick={() => navigate(`/investor/comparaison?ids=${selection.join(",")}`)}>
-              <Scale className="mr-2 size-4" />
-              Comparer ({selection.length})
-            </Button>
-          ) : undefined
-        }
+        title="Entreprises"
+        description="Parcourez les entreprises dont les données ont été validées et publiées. Cliquez sur une entreprise pour consulter sa fiche ESG complète."
       />
 
-      <label htmlFor="entreprises-recherche" className="relative block max-w-sm">
-        <span className="sr-only">Rechercher une entreprise</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
-        <Input
-          id="entreprises-recherche"
-          value={recherche}
-          onChange={(event) => setRecherche(event.target.value)}
-          placeholder="Rechercher par nom ou secteur"
-          className="pl-9"
-        />
-      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="entreprises-recherche" className="relative block max-w-sm flex-1">
+          <span className="sr-only">Rechercher une entreprise</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+          <Input
+            id="entreprises-recherche"
+            value={recherche}
+            onChange={(event) => setRecherche(event.target.value)}
+            placeholder="Rechercher par nom ou secteur"
+            className="pl-9"
+          />
+        </label>
+        {secteur ? (
+          <Badge variant="secondary" className="gap-1 py-1">
+            Secteur : {secteur}
+            <button
+              type="button"
+              onClick={() => setSearchParams({})}
+              aria-label="Retirer le filtre secteur"
+            >
+              <X className="size-3" />
+            </button>
+          </Badge>
+        ) : null}
+      </div>
 
       {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
       {isError ? <p className="text-destructive">Impossible de charger les entreprises.</p> : null}
@@ -62,42 +66,47 @@ export function CompaniesPage() {
         <p className="text-brand-grey">Aucune entreprise publiée pour l'instant.</p>
       ) : null}
 
-      <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {entreprises.map((entreprise) => (
-          <Card key={entreprise.id}>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+          <Link key={entreprise.id} to={`/investor/entreprises/${entreprise.id}`} className="group block">
+            <Card className="h-full transition group-hover:border-brand-green group-hover:shadow-md">
+              <CardContent className="flex h-full flex-col gap-3">
                 <div className="flex items-start gap-3">
-                  <label className="mt-1 flex items-center gap-2">
-                    <span className="sr-only">Sélectionner {entreprise.nom} pour comparaison</span>
-                    <input
-                      type="checkbox"
-                      checked={selection.includes(entreprise.id)}
-                      onChange={() => toggleSelection(entreprise.id)}
-                    />
-                  </label>
-                  <div>
-                    <Link
-                      to={`/investor/entreprises/${entreprise.id}`}
-                      className="text-base font-semibold text-brand-blue underline-offset-2 hover:underline"
-                    >
-                      {entreprise.nom}
-                    </Link>
-                    <p className="text-sm text-brand-grey">
-                      {entreprise.secteur} — {entreprise.pays}
-                    </p>
+                  <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-14 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-brand-blue">{entreprise.nom}</p>
+                    <Badge variant="secondary" className="mt-1">
+                      {entreprise.secteur}
+                    </Badge>
                   </div>
                 </div>
-                {entreprise.montant_minimum_investissement !== null ? (
-                  <Badge variant="outline">
-                    Minimum {entreprise.montant_minimum_investissement.toLocaleString("fr-FR")}
-                  </Badge>
+
+                <p className="flex items-center gap-1.5 text-sm text-brand-grey">
+                  <MapPin className="size-3.5 shrink-0" />
+                  {entreprise.pays}
+                </p>
+
+                {entreprise.description ? (
+                  <p className="line-clamp-2 text-sm text-brand-grey">{entreprise.description}</p>
                 ) : null}
-              </div>
-              <ScoreSummary score={entreprise.score} />
-              <CarbonSummary carbone={entreprise.carbone} />
-            </CardContent>
-          </Card>
+
+                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
+                  {entreprise.site_officiel ? (
+                    <span className="flex min-w-0 items-center gap-1">
+                      <Globe className="size-3.5 shrink-0" />
+                      <span className="truncate">{entreprise.site_officiel}</span>
+                    </span>
+                  ) : null}
+                  {entreprise.date_publication ? (
+                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                      <Calendar className="size-3.5 shrink-0" />
+                      Publiée le {new Date(entreprise.date_publication).toLocaleDateString("fr-FR")}
+                    </span>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

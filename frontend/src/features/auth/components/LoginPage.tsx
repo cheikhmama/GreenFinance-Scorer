@@ -1,20 +1,21 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FlaskConical } from "lucide-react";
+import { ArrowRight, FlaskConical, LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { isPrototypeEnabled } from "@/features/prototype/routes";
 import { ApiError } from "@/shared/api/errors";
+import { AuthLayout } from "@/shared/layout/AuthLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { useLogin } from "../api";
 import { type LoginRequest, loginRequestSchema } from "../schemas";
+import { PasswordInput } from "./PasswordInput";
 
 /**
- * Écran de connexion — seule route publique du module auth. Les tableaux de bord
+ * Écran de connexion. Les tableaux de bord
  * par rôle sont protégés par <RequireRole> (shared/RequireRole.tsx) et redirigent ici
  * en l'absence de session valide ; en cas de succès, on redirige vers /dashboard, qui
  * route ensuite vers l'espace correspondant au rôle de l'utilisateur
@@ -31,6 +32,7 @@ export function LoginPage() {
   });
 
   function onSubmit(values: LoginRequest) {
+    if (login.isPending) return;
     setServerError(null);
     login.mutate(values, {
       onSuccess: () => navigate("/dashboard", { replace: true }),
@@ -41,81 +43,105 @@ export function LoginPage() {
         setServerError(
           error instanceof ApiError && error.code === "invalid_credentials"
             ? "Adresse e-mail ou mot de passe incorrect."
-            : "Une erreur inattendue est survenue. Veuillez réessayer.",
+            : error instanceof ApiError && error.status === 429
+              ? "Trop de tentatives de connexion. Veuillez réessayer plus tard."
+              : "Une erreur inattendue est survenue. Veuillez réessayer.",
         );
       },
     });
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-brand-green-light px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-brand-green">GreenFinance-Scorer</CardTitle>
-          <CardDescription>Connectez-vous à votre espace.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-              {serverError ? (
-                <Alert variant="destructive">
-                  <AlertTitle>Connexion impossible</AlertTitle>
-                  <AlertDescription>{serverError}</AlertDescription>
-                </Alert>
-              ) : null}
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>E-mail</FormLabel>
-                    <FormControl>
-                      <Input type="email" autoComplete="username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mot de passe</FormLabel>
-                    <FormControl>
-                      <Input type="password" autoComplete="current-password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button type="submit" className="w-full" disabled={login.isPending}>
-                {login.isPending ? "Connexion..." : "Se connecter"}
-              </Button>
-            </form>
-          </Form>
-
-          {isPrototypeEnabled ? (
-            <div className="mt-6 border-t pt-5">
-              <p className="text-center text-xs leading-5 text-muted-foreground">
-                Évaluez l’interface sans compte ni backend.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-3 w-full"
-                onClick={() => navigate("/prototype")}
-              >
-                <FlaskConical />
-                Ouvrir le prototype interactif
-              </Button>
-            </div>
+    <AuthLayout eyebrow="BIENVENUE SUR GREENFINANCE">
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-5"
+          aria-busy={login.isPending}
+          noValidate
+        >
+          {serverError ? (
+            <Alert variant="destructive">
+              <AlertTitle>Connexion impossible</AlertTitle>
+              <AlertDescription>{serverError}</AlertDescription>
+            </Alert>
           ) : null}
-        </CardContent>
-      </Card>
-    </div>
+
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>E-mail</FormLabel>
+                <FormControl>
+                  <Input
+                    type="email"
+                    autoComplete="username"
+                    placeholder="vous@organisation.fr"
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    readOnly={login.isPending}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mot de passe</FormLabel>
+                <FormControl>
+                  <PasswordInput
+                    autoComplete="current-password"
+                    placeholder="Votre mot de passe"
+                    readOnly={login.isPending}
+                    {...field}
+                  />
+                </FormControl>
+                <Link
+                  to="/mot-de-passe-oublie"
+                  className="w-fit text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Mot de passe oublié ?
+                </Link>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button type="submit" className="w-full" disabled={login.isPending}>
+            {login.isPending ? (
+              <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />
+            ) : null}
+            {login.isPending ? "Connexion en cours…" : "Se connecter"}
+            {!login.isPending ? <ArrowRight aria-hidden="true" /> : null}
+          </Button>
+        </form>
+      </Form>
+
+      <p className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+        <LockKeyhole size={13} aria-hidden="true" />
+        Un accès sécurisé à votre espace professionnel
+      </p>
+
+      {isPrototypeEnabled ? (
+        <div className="mt-6 border-t pt-5">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-auto min-h-11 w-full whitespace-normal py-2"
+            onClick={() => navigate("/prototype")}
+          >
+            <FlaskConical aria-hidden="true" />
+            Explorer la démonstration
+          </Button>
+        </div>
+      ) : null}
+    </AuthLayout>
   );
 }

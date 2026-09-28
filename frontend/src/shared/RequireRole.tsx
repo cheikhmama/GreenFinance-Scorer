@@ -34,13 +34,6 @@ export function RequireRole({ allowedRoles, children }: RequireRoleProps) {
     return <Navigate to="/login" replace />;
   }
 
-  // Un compte fraîchement provisionné (mot de passe temporaire) n'a accès à rien du
-  // reste de l'API tant qu'il n'est pas changé (app/core/dependencies.py) — envoyer
-  // ici plutôt que de laisser la page métier tourner indéfiniment sur ses requêtes.
-  if (user.doit_changer_mot_de_passe) {
-    return <Navigate to="/changer-mot-de-passe" replace />;
-  }
-
   if (!allowedRoles.includes(user.role)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-4 text-center">

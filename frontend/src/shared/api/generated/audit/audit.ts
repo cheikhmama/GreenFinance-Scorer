@@ -59,6 +59,31 @@ export const getAssignedReport = async (rapportId: string, options?: RequestInit
 );}
 
 
+export const getGetEvidenceFileForAuditUrl = (rapportId: string,
+    preuveId: string,) => {
+
+
+
+
+  return `/audit/rapports/${rapportId}/preuves/${preuveId}/fichier`
+}
+
+/**
+ * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
+ */
+export const getEvidenceFileForAudit = async (rapportId: string,
+    preuveId: string, options?: RequestInit): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetEvidenceFileForAuditUrl(rapportId,preuveId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getListMyAuditOpinionsUrl = () => {
 
 

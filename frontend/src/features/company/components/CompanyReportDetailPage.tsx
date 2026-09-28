@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -24,7 +25,7 @@ export function CompanyReportDetailPage() {
     return (
       <div className="p-8">
         <p className="text-destructive">Rapport introuvable.</p>
-        <Link to="/company" className="text-brand-green underline underline-offset-2">
+        <Link to="/company/rapports" className="text-brand-green underline underline-offset-2">
           Retour à la liste
         </Link>
       </div>
@@ -34,7 +35,7 @@ export function CompanyReportDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/company" className="text-sm text-brand-green underline underline-offset-2">
+        <Link to="/company/rapports" className="text-sm text-brand-green underline underline-offset-2">
           ← Mes rapports
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
@@ -49,9 +50,12 @@ export function CompanyReportDetailPage() {
             {rapport.rapport_precedent_id ? " (correction)" : ""}
           </span>
         </div>
-        {rapport.extraction_erreur ? (
+        {/* Même garde que CompanyReportsPage.tsx : extraction_erreur peut survivre à une
+            extraction depuis réussie (relance échouée sur un rapport déjà avancé dans le
+            workflow) -- n'afficher que tant que c'est encore actionnable. */}
+        {rapport.extraction_erreur && rapport.statut === "EN_EXTRACTION" ? (
           <p className="mt-2 text-sm text-destructive">
-            Échec d'extraction : {rapport.extraction_erreur}
+            Échec d'extraction : {libelleCauseExtraction(rapport.extraction_erreur)}
           </p>
         ) : null}
       </div>
@@ -65,6 +69,19 @@ export function CompanyReportDetailPage() {
           <CardTitle>Indicateurs ESG</CardTitle>
         </CardHeader>
         <CardContent>
+          {rapport.score_global_declare !== null ? (
+            <p className="mb-3 text-sm">
+              Score ESG global auto-déclaré par l'entreprise :{" "}
+              <strong className="text-brand-blue">{rapport.score_global_declare}/100</strong>
+              {rapport.score_global_declare_preuve ? (
+                <span className="text-brand-grey">
+                  {" "}
+                  — {rapport.score_global_declare_preuve.nom_document} — p.
+                  {rapport.score_global_declare_preuve.page_debut}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           {rapport.indicateurs.length === 0 ? (
             <p className="text-brand-grey">Aucun indicateur extrait pour l'instant.</p>
           ) : (

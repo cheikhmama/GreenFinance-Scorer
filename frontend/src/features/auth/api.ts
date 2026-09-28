@@ -1,7 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
-import { changePassword, getCurrentUser, login, logout } from "@/shared/api/generated/auth/auth";
-import type { ChangerMotDePasseRequest } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import {
+  changePassword,
+  deleteMyAvatar,
+  demanderReinitialisationMotDePasse,
+  getCurrentUser,
+  login,
+  logout,
+  reinitialiserMotDePasse,
+  updateMyProfile,
+  uploadMyAvatar,
+  verifyMyPassword,
+} from "@/shared/api/generated/auth/auth";
+import type {
+  ChangerMotDePasseRequest,
+  DemanderReinitialisationRequest,
+  ModifierProfilRequest,
+  ReinitialiserMotDePasseRequest,
+  VerifierMotDePasseRequest,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import type { LoginRequest, User } from "./schemas";
 
 /** Clé de cache TanStack Query partagée par useCurrentUser, useLogin et useLogout,
@@ -37,6 +54,22 @@ export function useLogin() {
   });
 }
 
+/** Demande publique : la réponse ne révèle jamais si le compte existe. */
+export function useRequestPasswordReset() {
+  return useMutation<void, ApiError, DemanderReinitialisationRequest>({
+    mutationFn: (payload) => demanderReinitialisationMotDePasse(payload),
+    retry: false,
+  });
+}
+
+/** Consomme le lien reçu par e-mail, sans ouvrir automatiquement de session. */
+export function useResetPassword() {
+  return useMutation<void, ApiError, ReinitialiserMotDePasseRequest>({
+    mutationFn: (payload) => reinitialiserMotDePasse(payload),
+    retry: false,
+  });
+}
+
 /** POST /auth/logout (204, pas de corps). Vide le cache de useCurrentUser pour que
  * RequireRole redirige immédiatement vers /login sans attendre un refetch. */
 export function useLogout() {
@@ -51,10 +84,55 @@ export function useLogout() {
   });
 }
 
-/** POST /auth/changer-mot-de-passe — accessible même quand doit_changer_mot_de_passe
- * bloque le reste de l'API (voir app/core/dependencies.py). La réponse pose une
- * nouvelle session (doit_changer_mot_de_passe désormais faux) : on l'écrit directement
- * dans le cache, comme useLogin, plutôt que de forcer un refetch de /auth/me. */
+/** PATCH /auth/me — modifie le nom affiché et l'e-mail, jamais le rôle (voir
+ * app/auth/schemas.py::ModifierProfilRequest). Écrit directement le résultat dans le cache de
+ * useCurrentUser, comme useLogin, plutôt que de forcer un refetch. */
+export function useUpdateMyProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, ApiError, ModifierProfilRequest>({
+    mutationFn: (payload) => updateMyProfile(payload),
+    onSuccess: (user) => {
+      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user);
+    },
+  });
+}
+
+/** POST /auth/me/avatar (multipart) — remplace l'avatar existant s'il y en avait déjà un. */
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, ApiError, File>({
+    mutationFn: (fichier) => uploadMyAvatar({ fichier }),
+    onSuccess: (user) => {
+      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user);
+    },
+  });
+}
+
+/** DELETE /auth/me/avatar — retour à l'avatar par défaut (initiales). */
+export function useDeleteAvatar() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, ApiError, void>({
+    mutationFn: () => deleteMyAvatar(),
+    onSuccess: (user) => {
+      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user);
+    },
+  });
+}
+
+/** POST /auth/verifier-mot-de-passe (204) — étape 1 du changement de mot de passe progressif,
+ * ne modifie rien, sert uniquement à afficher une erreur au bon endroit avant l'étape 2. */
+export function useVerifyPassword() {
+  return useMutation<void, ApiError, VerifierMotDePasseRequest>({
+    mutationFn: (payload) => verifyMyPassword(payload),
+  });
+}
+
+/** POST /auth/changer-mot-de-passe — parcours volontaire depuis le Profil. La réponse pose
+ * une nouvelle session : on l'écrit directement dans le cache, comme useLogin, plutôt que de
+ * forcer un refetch de /auth/me. */
 export function useChangePassword() {
   const queryClient = useQueryClient();
 

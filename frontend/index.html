@@ -2,9 +2,20 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
+    <meta name="referrer" content="no-referrer" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GreenFinance-Scorer</title>
+    <script>
+      // Applique la classe `dark` avant le premier paint pour éviter un flash du mauvais thème —
+      // doit rester synchronisé avec shared/theme/ThemeProvider.tsx (même clé, même repli sur
+      // prefers-color-scheme).
+      (function () {
+        var stocke = localStorage.getItem("gfs-theme");
+        var sombre = stocke === "dark" || (stocke !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (sombre) document.documentElement.classList.add("dark");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

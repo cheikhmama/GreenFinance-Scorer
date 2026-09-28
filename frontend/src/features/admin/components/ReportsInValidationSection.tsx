@@ -1,7 +1,11 @@
+import { FileCheck2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useReportsInValidation } from "../api";
 
 /** File de décision (Phase 4 §4.4) — un avis d'audit a déjà été rendu ; la décision elle-même
@@ -15,10 +19,10 @@ export function ReportsInValidationSection() {
         <CardTitle>Rapports en attente de décision</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+        {isLoading ? <CardListSkeleton count={2} /> : null}
         {isError ? <p className="text-destructive">Impossible de charger la file.</p> : null}
         {!isLoading && !isError && rapports?.length === 0 ? (
-          <p className="text-brand-grey">Aucun rapport en attente de décision.</p>
+          <EmptyState icon={FileCheck2} message="Aucun rapport en attente de décision." />
         ) : null}
         {rapports && rapports.length > 0 ? (
           <ul className="divide-y">
@@ -32,12 +36,9 @@ export function ReportsInValidationSection() {
                     {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
                   </span>
                 </div>
-                <Link
-                  to={`/admin/rapports/${rapport.id}`}
-                  className="text-brand-green underline underline-offset-2"
-                >
-                  Décider
-                </Link>
+                <Button asChild size="sm">
+                  <Link to={`/admin/rapports/${rapport.id}`}>Décider</Link>
+                </Button>
               </li>
             ))}
           </ul>

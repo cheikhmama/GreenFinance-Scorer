@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import {
   getCompanyReport,
+  getMyCompanyProfile,
   listCompanyReports,
   submitCompanyReport,
   submitCompanyReportCorrection,
@@ -9,6 +10,7 @@ import {
 import type {
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
+  EntreprisePublic,
   RapportESGDetail,
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
@@ -30,6 +32,15 @@ export function useCompanyReport(rapportId: string) {
     queryKey: reportQueryKey(rapportId),
     queryFn: () => getCompanyReport(rapportId),
     enabled: rapportId.length > 0,
+  });
+}
+
+/** GET /company/profil — la fiche entreprise telle que vue par les investisseurs, en lecture
+ * seule (l'édition reste réservée à l'Admin, voir ARCHITECTURE.md gouvernance Phase 0). */
+export function useMyCompanyProfile() {
+  return useQuery<EntreprisePublic, ApiError>({
+    queryKey: ["company", "profil"],
+    queryFn: () => getMyCompanyProfile(),
   });
 }
 

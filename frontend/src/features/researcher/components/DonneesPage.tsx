@@ -1,13 +1,15 @@
-import { Scale, Search } from "lucide-react";
+import { Building2, Scale, Search } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
-import { usePublishedCompaniesForResearcher } from "../api";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
+import { MAX_ENTREPRISES_COMPARAISON, usePublishedCompaniesForResearcher } from "../api";
 
 /** Liste des entreprises publiées — données de base sur lesquelles construire une analyse
  * (voir AnalysesPage). Sélection multiple pour comparaison, même principe que
@@ -23,8 +25,16 @@ export function DonneesPage() {
   const entreprises = data?.pages.flatMap((page) => page.items) ?? [];
 
   function toggleSelection(id: string) {
-    setSelection((current) => (current.includes(id) ? current.filter((v) => v !== id) : [...current, id]));
+    setSelection((current) => {
+      if (current.includes(id)) return current.filter((v) => v !== id);
+      // Plafond serveur (app/investor/entreprises.py::_MAX_ENTREPRISES_COMPARAISON) — refusé ici
+      // plutôt que via une erreur générique après avoir déjà cliqué sur « Comparer ».
+      if (current.length >= MAX_ENTREPRISES_COMPARAISON) return current;
+      return [...current, id];
+    });
   }
+
+  const plafondAtteint = selection.length >= MAX_ENTREPRISES_COMPARAISON;
 
   return (
     <div className="space-y-6">
@@ -54,11 +64,22 @@ export function DonneesPage() {
         />
       </label>
 
-      {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+      {isLoading ? <CardListSkeleton /> : null}
       {isError ? <p className="text-destructive">Impossible de charger les entreprises.</p> : null}
+      {!isLoading && !isError && entreprises.length === 0 ? (
+        <EmptyState icon={Building2} message="Aucune entreprise ne correspond à cette recherche." />
+      ) : null}
+      {plafondAtteint ? (
+        <p className="text-sm text-brand-grey">
+          Maximum {MAX_ENTREPRISES_COMPARAISON} entreprises pour une comparaison — décochez-en une
+          pour en choisir une autre.
+        </p>
+      ) : null}
 
       <div className="space-y-4">
-        {entreprises.map((entreprise) => (
+        {entreprises.map((entreprise) => {
+          const selectionnee = selection.includes(entreprise.id);
+          return (
           <Card key={entreprise.id}>
             <CardContent className="space-y-4">
               <div className="flex items-start gap-3">
@@ -66,7 +87,8 @@ export function DonneesPage() {
                   <span className="sr-only">Sélectionner {entreprise.nom} pour comparaison</span>
                   <input
                     type="checkbox"
-                    checked={selection.includes(entreprise.id)}
+                    checked={selectionnee}
+                    disabled={!selectionnee && plafondAtteint}
                     onChange={() => toggleSelection(entreprise.id)}
                   />
                 </label>
@@ -86,7 +108,8 @@ export function DonneesPage() {
               <CarbonSummary carbone={entreprise.carbone} />
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {entreprises.length > 0 && hasNextPage ? (

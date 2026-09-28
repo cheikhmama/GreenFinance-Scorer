@@ -9,7 +9,6 @@ import type {
   CompareCompaniesParams,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
-  EntreprisePublieePublic,
   FermerPositionRequest,
   ListMyPortfoliosParams,
   ListPublishedCompaniesParams,
@@ -78,6 +77,31 @@ export const getPublishedCompanyDetail = async (entrepriseId: string, options?: 
 );}
 
 
+export const getGetEvidenceFileUrl = (entrepriseId: string,
+    preuveId: string,) => {
+
+
+
+
+  return `/investor/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
+}
+
+/**
+ * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
+ */
+export const getEvidenceFile = async (entrepriseId: string,
+    preuveId: string, options?: RequestInit): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetEvidenceFileUrl(entrepriseId,preuveId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getCompareCompaniesUrl = (params: CompareCompaniesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -100,11 +124,11 @@ export const getCompareCompaniesUrl = (params: CompareCompaniesParams,) => {
 }
 
 /**
- * @summary Comparer plusieurs entreprises publiées (score, Scope 1/2/3)
+ * @summary Comparer jusqu'à 4 entreprises publiées (score, indicateurs, carbone détaillés)
  */
-export const compareCompanies = async (params: CompareCompaniesParams, options?: RequestInit): Promise<EntreprisePublieePublic[]> => {
+export const compareCompanies = async (params: CompareCompaniesParams, options?: RequestInit): Promise<EntrepriseDetailInvestisseur[]> => {
 
-  return apiFetch<EntreprisePublieePublic[]>(getCompareCompaniesUrl(params),
+  return apiFetch<EntrepriseDetailInvestisseur[]>(getCompareCompaniesUrl(params),
   {
     ...options,
     method: 'GET'

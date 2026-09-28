@@ -10,6 +10,7 @@ import {
   History,
   LayoutDashboard,
   Scale,
+  Upload,
   UserPlus,
   Users,
   Wallet,
@@ -28,13 +29,17 @@ export interface NavItem {
 export interface RoleNavConfig {
   label: string;
   items: NavItem[];
+  /** Route du Profil de ce rôle — rendue à part, fixée en bas de la sidebar (voir
+   * AppShell.tsx), jamais mélangée aux `items` : le Profil n'est pas une page métier de
+   * l'espace comme les autres, c'est le compte de la personne connectée. */
+  profilTo: string;
 }
 
-/** Navigation réelle par rôle — un seul élément « Tableau de bord » pour les espaces qui n'ont
- * pas encore de sous-pages dédiées (Entreprise). */
+/** Navigation réelle par rôle. */
 export const roleNavConfig: Record<Role, RoleNavConfig> = {
   [Role.ADMINISTRATEUR]: {
     label: "Administrateur",
+    profilTo: "/admin/profil",
     items: [
       { to: "/admin", label: "Tableau de bord", icon: LayoutDashboard, end: true },
       { to: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
@@ -45,10 +50,16 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
   },
   [Role.ENTREPRISE]: {
     label: "Entreprise",
-    items: [{ to: "/company", label: "Tableau de bord", icon: LayoutDashboard, end: true }],
+    profilTo: "/company/profil",
+    items: [
+      { to: "/company", label: "Tableau de bord", icon: LayoutDashboard, end: true },
+      { to: "/company/rapports", label: "Mes rapports", icon: FileText },
+      { to: "/company/deposer", label: "Déposer un rapport", icon: Upload },
+    ],
   },
   [Role.AUDITEUR]: {
     label: "Auditeur",
+    profilTo: "/audit/profil",
     items: [
       { to: "/audit", label: "Dossiers affectés", icon: ClipboardCheck, end: true },
       { to: "/audit/historique", label: "Historique", icon: BookOpenCheck },
@@ -56,28 +67,34 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
   },
   [Role.INVESTISSEUR]: {
     label: "Investisseur",
+    profilTo: "/investor/profil",
     items: [
       { to: "/investor", label: "Tableau de bord", icon: LayoutDashboard, end: true },
-      { to: "/investor/entreprises", label: "Entreprises publiées", icon: Building2 },
+      { to: "/investor/entreprises", label: "Entreprises", icon: Building2 },
       { to: "/investor/comparaison", label: "Comparaison", icon: Scale },
       { to: "/investor/portefeuilles", label: "Portefeuilles", icon: Wallet },
     ],
   },
   [Role.CHERCHEUR]: {
     label: "Chercheur",
+    profilTo: "/researcher/profil",
     items: [
       { to: "/researcher", label: "Tableau de bord", icon: LayoutDashboard, end: true },
       { to: "/researcher/entreprises", label: "Données", icon: Building2 },
+      { to: "/researcher/projets", label: "Mes projets", icon: FolderKanban },
       { to: "/researcher/analyses", label: "Analyses", icon: FlaskConical },
       { to: "/researcher/rattachements", label: "Rattachements", icon: UserPlus },
     ],
   },
   [Role.INSTITUTION]: {
     label: "Institution",
+    profilTo: "/institution/profil",
     items: [
       { to: "/institution", label: "Tableau de bord", icon: LayoutDashboard, end: true },
+      { to: "/institution/entreprises", label: "Entreprises", icon: Building2 },
       { to: "/institution/chercheurs", label: "Chercheurs", icon: Briefcase },
       { to: "/institution/projets", label: "Projets", icon: FolderKanban },
+      { to: "/institution/analyses", label: "Analyses", icon: FlaskConical },
     ],
   },
 };

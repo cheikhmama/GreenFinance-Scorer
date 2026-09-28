@@ -3,6 +3,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApiError } from "./shared/api/errors";
+import { ThemeProvider } from "./shared/theme/ThemeProvider";
+import { ConfirmProvider } from "./shared/ui/confirm-dialog";
 import "./index.css";
 
 // Un 400/401/403/404 est un état applicatif (entrée invalide, session absente, accès refusé,
@@ -30,8 +32,12 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

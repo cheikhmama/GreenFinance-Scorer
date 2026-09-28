@@ -1,47 +1,58 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { Select } from "@/shared/ui/select";
-import {
-  useChangeUserRole,
-  useCreateUser,
-  useDeactivateUser,
-  useReactivateUser,
-  useUsersByRole,
-} from "../api";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { useCreateUser, useDeactivateUser, useReactivateUser, useUsersByRole } from "../api";
 import {
   type CreerUtilisateurForm,
   creerUtilisateurSchema,
   ROLES_ATTRIBUABLES,
+  ROLES_CONSULTABLES,
   Role,
   type RoleAttribuable,
 } from "../schemas";
 
-/** Gestion des comptes (Phase 3 §3.3) — création, désactivation/réactivation, changement de rôle
- * contrôlé. Le mot de passe temporaire n'est jamais affiché dans cette interface (aucun compte
+/** Gestion des comptes (Phase 3 §3.3) — création, désactivation/réactivation. Le rôle se fixe à
+ * la création (voir FormulaireCreation) et n'est plus jamais modifiable ensuite — chaque rôle
+ * porte son propre espace et ses propres permissions, les mélanger après coup n'a pas de sens
+ * métier. Le mot de passe temporaire n'est jamais affiché dans cette interface (aucun compte
  * n'a de moyen de le récupérer autrement qu'à l'écran — voir plan de provisioning par e-mail).
  *
  * Recherche et pagination sont portées par l'API (GET /admin/utilisateurs?recherche=&page=&
  * page_size=) : 3 comptes chargés au départ, "Voir plus" charge 3 comptes de plus depuis la base
  * à chaque clic, jusqu'à épuisement de la liste pour la recherche/rôle en cours. */
 export function UsersSection() {
-  const [roleAffiche, setRoleAffiche] = useState<RoleAttribuable>(Role.AUDITEUR);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const parametreRole = searchParams.get("role");
+  const roleAffiche: Role = ROLES_CONSULTABLES.includes(parametreRole as Role)
+    ? (parametreRole as Role)
+    : Role.AUDITEUR;
+  // Le formulaire de création n'accepte jamais ADMINISTRATEUR (voir ROLES_ATTRIBUABLES) — si on
+  // parcourt les comptes Administrateur au moment d'ouvrir la modale, retombe sur le premier rôle
+  // réellement attribuable plutôt que de présélectionner un rôle que le formulaire refuserait.
+  const roleCreationParDefaut = ROLES_ATTRIBUABLES.includes(roleAffiche as RoleAttribuable)
+    ? (roleAffiche as RoleAttribuable)
+    : ROLES_ATTRIBUABLES[0];
   const [recherche, setRecherche] = useState("");
-  const [inclureInactifs, setInclureInactifs] = useState(false);
-  const [enAttente, setEnAttente] = useState(false);
   const [modaleOuverte, setModaleOuverte] = useState(false);
   const rechercheDebattue = useDebouncedValue(recherche);
+  // Comptes désactivés toujours inclus (jamais de bascule dans l'UI) : sans ça, un compte
+  // désactivé disparaîtrait de cette liste et son bouton "Réactiver" deviendrait inatteignable.
   const {
     data,
     isLoading,
@@ -49,11 +60,25 @@ export function UsersSection() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useUsersByRole(roleAffiche, rechercheDebattue, inclureInactifs, enAttente);
+  } = useUsersByRole(roleAffiche, rechercheDebattue, true);
   const deactivate = useDeactivateUser(roleAffiche);
   const reactivate = useReactivateUser(roleAffiche);
-  const changeRole = useChangeUserRole(roleAffiche);
+  const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
+
+  async function desactiver(utilisateurId: string, email: string) {
+    const confirme = await confirm({
+      title: "Désactiver ce compte ?",
+      description: `${email} ne pourra plus se connecter et ses sessions en cours seront immédiatement révoquées. Vous pourrez le réactiver à tout moment.`,
+      confirmLabel: "Désactiver",
+    });
+    if (!confirme) return;
+    setActionError(null);
+    deactivate.mutate(utilisateurId, {
+      onError: (err) =>
+        setActionError(err instanceof ApiError ? err.message : "Échec de la désactivation."),
+    });
+  }
 
   const utilisateurs = data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -72,24 +97,15 @@ export function UsersSection() {
             <DialogHeader>
               <DialogTitle>Créer un utilisateur</DialogTitle>
             </DialogHeader>
-            <FormulaireCreation roleAffiche={roleAffiche} onCreated={() => setModaleOuverte(false)} />
+            <FormulaireCreation
+              roleAffiche={roleCreationParDefaut}
+              onCreated={() => setModaleOuverte(false)}
+            />
           </DialogContent>
         </Dialog>
 
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-brand-grey">Rôle :</span>
-            <Select
-              value={roleAffiche}
-              onChange={(event) => setRoleAffiche(event.target.value as RoleAttribuable)}
-              className="w-48"
-            >
-              {ROLES_ATTRIBUABLES.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </Select>
             <label htmlFor="utilisateurs-recherche" className="relative min-w-56 flex-1">
               <span className="sr-only">Rechercher un utilisateur par e-mail ou nom</span>
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
@@ -101,140 +117,102 @@ export function UsersSection() {
                 className="pl-9"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm text-brand-grey">
-              <input
-                type="checkbox"
-                checked={inclureInactifs}
-                onChange={(event) => setInclureInactifs(event.target.checked)}
-              />
-              Afficher les comptes désactivés
-            </label>
-            <label className="flex items-center gap-2 text-sm text-brand-grey">
-              <input
-                type="checkbox"
-                checked={enAttente}
-                onChange={(event) => setEnAttente(event.target.checked)}
-              />
-              Mot de passe temporaire non changé
-            </label>
+            <span className="text-sm text-brand-grey">Rôle :</span>
+            <Select
+              value={roleAffiche}
+              onChange={(event) =>
+                setSearchParams(
+                  (params) => {
+                    params.set("role", event.target.value);
+                    return params;
+                  },
+                  { replace: true },
+                )
+              }
+              className="w-48"
+            >
+              {ROLES_CONSULTABLES.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </Select>
           </div>
 
-          {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : null}
           {isError ? <p className="text-destructive">Impossible de charger les comptes.</p> : null}
           {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
           {!isLoading && !isError && utilisateurs.length === 0 ? (
-            <p className="text-brand-grey">
-              {inclureInactifs ? "Aucun compte pour ce rôle." : "Aucun compte actif pour ce rôle."}
-            </p>
+            <EmptyState icon={Users} message="Aucun compte pour ce rôle." />
           ) : null}
           {utilisateurs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-grey">
-                    <th className="py-2 pr-4 font-medium">Compte</th>
-                    <th className="py-2 pr-4 font-medium">Historique</th>
-                    <th className="py-2 pr-4 font-medium">Changer de rôle</th>
-                    <th className="py-2 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {utilisateurs.map((utilisateur) => (
-                    <tr key={utilisateur.id} className="border-b last:border-0">
-                      <td className="py-3 pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-brand-blue">{utilisateur.email}</span>
-                          {!utilisateur.actif ? (
-                            <Badge variant="secondary">désactivé</Badge>
-                          ) : null}
-                          {utilisateur.doit_changer_mot_de_passe ? (
-                            <Badge variant="warning">mot de passe temporaire</Badge>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Link
-                          to={`/admin/journal-audit?concerne=${utilisateur.id}`}
-                          className="text-brand-green underline underline-offset-2"
-                        >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Compte</TableHead>
+                  <TableHead>Historique</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {utilisateurs.map((utilisateur) => (
+                  <TableRow key={utilisateur.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="text-brand-blue">{utilisateur.email}</span>
+                        {!utilisateur.actif ? (
+                          <Badge variant="secondary">désactivé</Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/admin/journal-audit?concerne=${utilisateur.id}`}>
                           Historique
                         </Link>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Select
-                          defaultValue=""
-                          className="w-44"
-                          onChange={(event) => {
-                            const nouveauRole = event.target.value as RoleAttribuable;
-                            if (!nouveauRole) return;
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      {utilisateur.actif ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={deactivate.isPending}
+                          onClick={() => desactiver(utilisateur.id, utilisateur.email)}
+                        >
+                          Désactiver
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reactivate.isPending}
+                          onClick={() => {
                             setActionError(null);
-                            changeRole.mutate(
-                              { utilisateurId: utilisateur.id, payload: { role: nouveauRole } },
-                              {
-                                onError: (err) =>
-                                  setActionError(
-                                    err instanceof ApiError
-                                      ? err.message
-                                      : "Échec du changement de rôle.",
-                                  ),
-                              },
-                            );
+                            reactivate.mutate(utilisateur.id, {
+                              onError: (err) =>
+                                setActionError(
+                                  err instanceof ApiError
+                                    ? err.message
+                                    : "Échec de la réactivation.",
+                                ),
+                            });
                           }}
                         >
-                          <option value="">Changer de rôle…</option>
-                          {ROLES_ATTRIBUABLES.filter((role) => role !== roleAffiche).map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
-                          ))}
-                        </Select>
-                      </td>
-                      <td className="py-3">
-                        {utilisateur.actif ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={deactivate.isPending}
-                            onClick={() => {
-                              setActionError(null);
-                              deactivate.mutate(utilisateur.id, {
-                                onError: (err) =>
-                                  setActionError(
-                                    err instanceof ApiError
-                                      ? err.message
-                                      : "Échec de la désactivation.",
-                                  ),
-                              });
-                            }}
-                          >
-                            Désactiver
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={reactivate.isPending}
-                            onClick={() => {
-                              setActionError(null);
-                              reactivate.mutate(utilisateur.id, {
-                                onError: (err) =>
-                                  setActionError(
-                                    err instanceof ApiError
-                                      ? err.message
-                                      : "Échec de la réactivation.",
-                                  ),
-                              });
-                            }}
-                          >
-                            Réactiver
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          Réactiver
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : null}
           {utilisateurs.length > 0 && hasNextPage ? (
             <div>
@@ -262,7 +240,7 @@ function FormulaireCreation({
   onCreated: () => void;
 }) {
   const createUser = useCreateUser();
-  const [motDePasseTemporaire, setMotDePasseTemporaire] = useState<string | null>(null);
+  const [compteCree, setCompteCree] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm<CreerUtilisateurForm>({
@@ -273,10 +251,10 @@ function FormulaireCreation({
 
   function onSubmit(values: CreerUtilisateurForm) {
     setServerError(null);
-    setMotDePasseTemporaire(null);
+    setCompteCree(null);
     createUser.mutate(values, {
       onSuccess: (utilisateur) => {
-        setMotDePasseTemporaire(utilisateur.mot_de_passe_temporaire);
+        setCompteCree(utilisateur.email);
         form.reset({ email: "", role: roleAffiche, nom_entreprise: "", secteur: "", pays: "" });
       },
       onError: (error) => {
@@ -285,14 +263,14 @@ function FormulaireCreation({
     });
   }
 
-  if (motDePasseTemporaire) {
+  if (compteCree) {
     return (
       <div className="space-y-4">
         <Alert>
           <AlertTitle>Compte créé</AlertTitle>
           <AlertDescription>
-            Mot de passe temporaire à relayer maintenant, il ne sera plus jamais affiché :{" "}
-            <code className="font-mono font-semibold">{motDePasseTemporaire}</code>
+            Un lien d'activation a été envoyé à <span className="font-semibold">{compteCree}</span>{" "}
+            — le compte pourra s'y connecter dès qu'il aura posé son propre mot de passe.
           </AlertDescription>
         </Alert>
         <Button onClick={onCreated}>Fermer</Button>

@@ -1,7 +1,11 @@
+import { FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { PageHeader } from "@/shared/ui/page-header";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useCompanyReports } from "../api";
 
 export function AdminCompanyReportsPage() {
@@ -19,10 +23,10 @@ export function AdminCompanyReportsPage() {
         ← Entreprises
       </Link>
 
-      {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+      {isLoading ? <CardListSkeleton count={3} /> : null}
       {isError ? <p className="text-destructive">Impossible de charger les rapports.</p> : null}
       {!isLoading && !isError && rapports && rapports.length === 0 ? (
-        <p className="text-brand-grey">Aucun rapport déposé par cette entreprise.</p>
+        <EmptyState icon={FileText} message="Aucun rapport déposé par cette entreprise." />
       ) : null}
       {rapports && rapports.length > 0 ? (
         <ul className="divide-y rounded-lg border">
@@ -41,12 +45,9 @@ export function AdminCompanyReportsPage() {
                 <Badge variant={variantStatutRapport(rapport.statut)}>
                   {libelleStatutRapport(rapport.statut)}
                 </Badge>
-                <Link
-                  to={`/admin/rapports/${rapport.id}`}
-                  className="text-sm text-brand-green underline underline-offset-2"
-                >
-                  Ouvrir
-                </Link>
+                <Button asChild size="sm" variant="outline">
+                  <Link to={`/admin/rapports/${rapport.id}`}>Ouvrir</Link>
+                </Button>
               </div>
             </li>
           ))}

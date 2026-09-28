@@ -9,8 +9,9 @@ import type {
   AnalysePublic,
   CompareCompaniesForResearcherParams,
   CreerAnalyseRequest,
+  DocumentProjetPublic,
   EntrepriseDetailInvestisseur,
-  EntreprisePublieePublic,
+  EntreprisePerimetrePublic,
   ListPublishedCompaniesForResearcherParams,
   ModifierAnalyseRequest,
   PageEntreprisePublieePublic,
@@ -73,6 +74,31 @@ export const getPublishedCompanyDetailForResearcher = async (entrepriseId: strin
 );}
 
 
+export const getGetEvidenceFileForResearcherUrl = (entrepriseId: string,
+    preuveId: string,) => {
+
+
+
+
+  return `/researcher/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
+}
+
+/**
+ * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
+ */
+export const getEvidenceFileForResearcher = async (entrepriseId: string,
+    preuveId: string, options?: RequestInit): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetEvidenceFileForResearcherUrl(entrepriseId,preuveId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getCompareCompaniesForResearcherUrl = (params: CompareCompaniesForResearcherParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -95,11 +121,11 @@ export const getCompareCompaniesForResearcherUrl = (params: CompareCompaniesForR
 }
 
 /**
- * @summary Comparer plusieurs entreprises publiées (score, Scope 1/2/3)
+ * @summary Comparer jusqu'à 4 entreprises publiées (score, indicateurs, carbone détaillés)
  */
-export const compareCompaniesForResearcher = async (params: CompareCompaniesForResearcherParams, options?: RequestInit): Promise<EntreprisePublieePublic[]> => {
+export const compareCompaniesForResearcher = async (params: CompareCompaniesForResearcherParams, options?: RequestInit): Promise<EntrepriseDetailInvestisseur[]> => {
 
-  return apiFetch<EntreprisePublieePublic[]>(getCompareCompaniesForResearcherUrl(params),
+  return apiFetch<EntrepriseDetailInvestisseur[]>(getCompareCompaniesForResearcherUrl(params),
   {
     ...options,
     method: 'GET'
@@ -192,6 +218,52 @@ export const getListMyAssignedProjectsUrl = () => {
 export const listMyAssignedProjects = async ( options?: RequestInit): Promise<ProjetAffecte[]> => {
 
   return apiFetch<ProjetAffecte[]>(getListMyAssignedProjectsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListProjectScopeForResearcherUrl = (projetId: string,) => {
+
+
+
+
+  return `/researcher/projets/${projetId}/perimetre`
+}
+
+/**
+ * @summary Lister les entreprises autorisées dans le périmètre d'un projet affecté
+ */
+export const listProjectScopeForResearcher = async (projetId: string, options?: RequestInit): Promise<EntreprisePerimetrePublic[]> => {
+
+  return apiFetch<EntreprisePerimetrePublic[]>(getListProjectScopeForResearcherUrl(projetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListProjectDocumentsForResearcherUrl = (projetId: string,) => {
+
+
+
+
+  return `/researcher/projets/${projetId}/documents`
+}
+
+/**
+ * @summary Lister les documents mis à disposition sur un projet affecté
+ */
+export const listProjectDocumentsForResearcher = async (projetId: string, options?: RequestInit): Promise<DocumentProjetPublic[]> => {
+
+  return apiFetch<DocumentProjetPublic[]>(getListProjectDocumentsForResearcherUrl(projetId),
   {
     ...options,
     method: 'GET'
@@ -356,6 +428,29 @@ return apiFetch<AnalyseDetail>(getCorrectAnalysisUrl(analyseId),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(modifierAnalyseRequest)
+  }
+);}
+
+
+export const getGetAnalysisHistoryUrl = (analyseId: string,) => {
+
+
+
+
+  return `/researcher/analyses/${analyseId}/historique`
+}
+
+/**
+ * @summary Reconstruire la chaîne complète des versions d'une analyse (v1 -> correction -> v2 -> ...)
+ */
+export const getAnalysisHistory = async (analyseId: string, options?: RequestInit): Promise<AnalysePublic[]> => {
+
+  return apiFetch<AnalysePublic[]>(getGetAnalysisHistoryUrl(analyseId),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 

@@ -1,6 +1,8 @@
+import { Building2 } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -11,7 +13,9 @@ import { Textarea } from "@/shared/ui/textarea";
 import {
   exportAnalysisFile,
   useAnalysisDetailForInstitution,
+  useAnalysisHistoryForInstitution,
   useApproveAnalysis,
+  useCompanyDetailForInstitution,
   useRequestAnalysisCorrection,
 } from "../api";
 
@@ -53,6 +57,8 @@ export function AnalyseDetailPage() {
         action={<Badge variant={variantStatutAnalyse(analyse.statut)}>{libelleStatutAnalyse(analyse.statut)}</Badge>}
       />
 
+      <HistoriqueVersions analyseId={analyse.id} versionActuelle={analyse.version} />
+
       {analyse.commentaire_institution ? (
         <Alert>
           <AlertTitle>Votre dernier commentaire</AlertTitle>
@@ -60,6 +66,20 @@ export function AnalyseDetailPage() {
         </Alert>
       ) : null}
       {erreur ? <p className="text-sm text-destructive">{erreur}</p> : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+            <Building2 className="size-4" />
+            Entreprises comparées
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {analyse.entreprise_ids.map((entrepriseId) => (
+            <EntrepriseComparee key={entrepriseId} entrepriseId={entrepriseId} />
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -121,5 +141,79 @@ export function AnalyseDetailPage() {
         </Button>
       ) : null}
     </div>
+  );
+}
+
+function EntrepriseComparee({ entrepriseId }: { entrepriseId: string }) {
+  const { data: entreprise, isLoading } = useCompanyDetailForInstitution(entrepriseId);
+
+  if (isLoading || !entreprise) {
+    return <div className="h-10 animate-pulse rounded-md bg-muted" />;
+  }
+
+  return (
+    <Link
+      to={`/institution/entreprises/${entrepriseId}`}
+      className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
+    >
+      <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-8" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-brand-blue">{entreprise.nom}</p>
+        <p className="truncate text-xs text-brand-grey">{entreprise.secteur}</p>
+      </div>
+    </Link>
+  );
+}
+
+/** Reconstruit la chaîne complète v1 -> correction -> v2 -> ... -> validation finale (voir
+ * app/researcher/analyses.py::lister_versions) — n'affiche rien si l'analyse n'a qu'une seule
+ * version, l'historique n'apportant alors aucune information. */
+function HistoriqueVersions({
+  analyseId,
+  versionActuelle,
+}: {
+  analyseId: string;
+  versionActuelle: number;
+}) {
+  const { data: versions } = useAnalysisHistoryForInstitution(analyseId);
+
+  if (!versions || versions.length <= 1) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base text-brand-blue">Historique des versions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {versions.map((version) => (
+          <div
+            key={version.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
+          >
+            <div className="flex items-center gap-2">
+              <span className={version.version === versionActuelle ? "font-semibold text-brand-blue" : "text-brand-grey"}>
+                Version {version.version}
+              </span>
+              {version.version === versionActuelle ? (
+                <span className="text-xs text-brand-grey">(consultée)</span>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={variantStatutAnalyse(version.statut)}>
+                {libelleStatutAnalyse(version.statut)}
+              </Badge>
+              {version.id !== analyseId ? (
+                <Link
+                  to={`/institution/analyses/${version.id}`}
+                  className="text-brand-green underline-offset-2 hover:underline"
+                >
+                  Consulter
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

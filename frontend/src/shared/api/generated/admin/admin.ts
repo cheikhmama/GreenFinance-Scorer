@@ -6,21 +6,40 @@
  */
 import type {
   AffecterAuditeurRequest,
+  ApercuActeursAdmin,
   AvisAuditAdmin,
-  ChangerRoleRequest,
+  BodyUploadCompanyLogo,
   CreerUtilisateurRequest,
   DecisionAdminRequest,
+  EntrepriseAdmin,
   EntreprisePublic,
   ListAllCompaniesParams,
+  ListAllReportsParams,
+  ListAnalysesAdminParams,
   ListAuditLogParams,
+  ListAuditorWorkloadParams,
+  ListCompaniesToRepublishParams,
+  ListCompaniesWithScoreParams,
+  ListPortfoliosAdminParams,
+  ListProjectsAdminParams,
   ListPublishableCompaniesParams,
   ListUsersByRoleParams,
+  ModifierEntrepriseAdminRequest,
+  PageAnalyseAdmin,
+  PageChargeAuditeurAdmin,
   PageEntrepriseAdmin,
+  PageEntrepriseAvecScoreAdmin,
   PageEntreprisePublic,
   PageJournalAuditPublic,
+  PagePortefeuilleAdmin,
+  PageProjetAdmin,
+  PageRapportESGPublic,
   PageUtilisateurPublic,
+  PerformanceESGAdmin,
   RapportESGDetail,
   RapportESGPublic,
+  ScoreESG,
+  ScoreVerificationAdmin,
   TableauDeBordAdmin,
   UtilisateurCree,
   UtilisateurPublic
@@ -70,7 +89,7 @@ export const getCreateUserUrl = () => {
 }
 
 /**
- * @summary Provisionner un compte avec un mot de passe temporaire à usage unique
+ * @summary Provisionner un compte et lui envoyer un lien d'activation par e-mail
  */
 export const createUser = async (creerUtilisateurRequest: CreerUtilisateurRequest, options?: RequestInit): Promise<UtilisateurCree> => {
 
@@ -86,6 +105,52 @@ return apiFetch<UtilisateurCree>(getCreateUserUrl(),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(creerUtilisateurRequest)
+  }
+);}
+
+
+export const getListUsersAwaitingActivationUrl = () => {
+
+
+
+
+  return `/admin/utilisateurs/en-attente`
+}
+
+/**
+ * @summary Lister les comptes actifs, tous rôles confondus, qui n'ont pas encore cliqué leur lien d'activation
+ */
+export const listUsersAwaitingActivation = async ( options?: RequestInit): Promise<UtilisateurPublic[]> => {
+
+  return apiFetch<UtilisateurPublic[]>(getListUsersAwaitingActivationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getResendActivationLinkUrl = (utilisateurId: string,) => {
+
+
+
+
+  return `/admin/utilisateurs/${utilisateurId}/renvoyer-activation`
+}
+
+/**
+ * @summary Régénérer et renvoyer le lien d'activation d'un compte pas encore activé
+ */
+export const resendActivationLink = async (utilisateurId: string, options?: RequestInit): Promise<void> => {
+
+  return apiFetch<void>(getResendActivationLinkUrl(utilisateurId),
+  {
+    ...options,
+    method: 'POST'
+
+
   }
 );}
 
@@ -136,32 +201,55 @@ export const reactivateUser = async (utilisateurId: string, options?: RequestIni
 );}
 
 
-export const getChangeUserRoleUrl = (utilisateurId: string,) => {
+export const getListAllReportsUrl = (params?: ListAllReportsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/admin/utilisateurs/${utilisateurId}/role`
+  return stringifiedParams.length > 0 ? `/admin/rapports?${stringifiedParams}` : `/admin/rapports`
 }
 
 /**
- * @summary Changer le rôle d'un compte utilisateur
+ * @summary Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut
  */
-export const changeUserRole = async (utilisateurId: string,
-    changerRoleRequest: ChangerRoleRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const listAllReports = async (params?: ListAllReportsParams, options?: RequestInit): Promise<PageRapportESGPublic> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return apiFetch<UtilisateurPublic>(getChangeUserRoleUrl(utilisateurId),
+  return apiFetch<PageRapportESGPublic>(getListAllReportsUrl(params),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(changerRoleRequest)
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListOverdueReportsUrl = () => {
+
+
+
+
+  return `/admin/rapports/en-retard`
+}
+
+/**
+ * @summary Lister les rapports affectés à un auditeur au-delà du délai attendu, sans décision rendue
+ */
+export const listOverdueReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+
+  return apiFetch<RapportESGPublic[]>(getListOverdueReportsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 
@@ -183,6 +271,75 @@ export const listReportsToAssign = async ( options?: RequestInit): Promise<Rappo
   {
     ...options,
     method: 'GET'
+
+
+  }
+);}
+
+
+export const getListFailedExtractionReportsUrl = () => {
+
+
+
+
+  return `/admin/rapports/echec-extraction`
+}
+
+/**
+ * @summary Lister les rapports dont l'extraction automatique a échoué
+ */
+export const listFailedExtractionReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+
+  return apiFetch<RapportESGPublic[]>(getListFailedExtractionReportsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListStuckExtractionReportsUrl = () => {
+
+
+
+
+  return `/admin/rapports/extraction-bloquee`
+}
+
+/**
+ * @summary Lister les rapports dont l'extraction semble interrompue (aucune erreur, aucune fin)
+ */
+export const listStuckExtractionReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+
+  return apiFetch<RapportESGPublic[]>(getListStuckExtractionReportsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getRetryExtractionUrl = (rapportId: string,) => {
+
+
+
+
+  return `/admin/rapports/${rapportId}/relancer-extraction`
+}
+
+/**
+ * @summary Relancer l'extraction d'un rapport en échec ou bloqué
+ */
+export const retryExtraction = async (rapportId: string, options?: RequestInit): Promise<RapportESGPublic> => {
+
+  return apiFetch<RapportESGPublic>(getRetryExtractionUrl(rapportId),
+  {
+    ...options,
+    method: 'POST'
 
 
   }
@@ -219,6 +376,36 @@ return apiFetch<RapportESGPublic>(getAssignReportAuditorUrl(rapportId),
 );}
 
 
+export const getListAuditorWorkloadUrl = (params?: ListAuditorWorkloadParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/admin/auditeurs/charge?${stringifiedParams}` : `/admin/auditeurs/charge`
+}
+
+/**
+ * @summary Lister la charge de travail (dossiers affectés, en retard, avis rendus) par Auditeur actif
+ */
+export const listAuditorWorkload = async (params?: ListAuditorWorkloadParams, options?: RequestInit): Promise<PageChargeAuditeurAdmin> => {
+
+  return apiFetch<PageChargeAuditeurAdmin>(getListAuditorWorkloadUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getListReportsInValidationUrl = () => {
 
 
@@ -236,6 +423,75 @@ export const listReportsInValidation = async ( options?: RequestInit): Promise<R
   {
     ...options,
     method: 'GET'
+
+
+  }
+);}
+
+
+export const getListOrphanReportsInValidationUrl = () => {
+
+
+
+
+  return `/admin/rapports/orphelins`
+}
+
+/**
+ * @summary Lister les rapports en attente de décision mais sans aucun avis d'audit (état incohérent)
+ */
+export const listOrphanReportsInValidation = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+
+  return apiFetch<RapportESGPublic[]>(getListOrphanReportsInValidationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getVerifyReportScorabilityUrl = (rapportId: string,) => {
+
+
+
+
+  return `/admin/rapports/${rapportId}/score-verification`
+}
+
+/**
+ * @summary Vérifier, avant décision, si ce rapport pourra être scoré
+ */
+export const verifyReportScorability = async (rapportId: string, options?: RequestInit): Promise<ScoreVerificationAdmin> => {
+
+  return apiFetch<ScoreVerificationAdmin>(getVerifyReportScorabilityUrl(rapportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getRecalculateReportScoreUrl = (rapportId: string,) => {
+
+
+
+
+  return `/admin/rapports/${rapportId}/recalculer-score`
+}
+
+/**
+ * @summary Recalculer le score d'un rapport validé qui en est dépourvu (état incohérent)
+ */
+export const recalculateReportScore = async (rapportId: string, options?: RequestInit): Promise<ScoreESG> => {
+
+  return apiFetch<ScoreESG>(getRecalculateReportScoreUrl(rapportId),
+  {
+    ...options,
+    method: 'POST'
 
 
   }
@@ -484,6 +740,66 @@ export const listPublishableCompanies = async (params?: ListPublishableCompanies
 );}
 
 
+export const getListCompaniesToRepublishUrl = (params?: ListCompaniesToRepublishParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/admin/entreprises/a-republier?${stringifiedParams}` : `/admin/entreprises/a-republier`
+}
+
+/**
+ * @summary Lister les entreprises publiées dont un rapport a été validé après la dernière publication
+ */
+export const listCompaniesToRepublish = async (params?: ListCompaniesToRepublishParams, options?: RequestInit): Promise<PageEntreprisePublic> => {
+
+  return apiFetch<PageEntreprisePublic>(getListCompaniesToRepublishUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListCompaniesWithScoreUrl = (params?: ListCompaniesWithScoreParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/admin/entreprises/scores?${stringifiedParams}` : `/admin/entreprises/scores`
+}
+
+/**
+ * @summary Lister les entreprises publiées avec leur score ESG admissible, filtrable par secteur/pays
+ */
+export const listCompaniesWithScore = async (params?: ListCompaniesWithScoreParams, options?: RequestInit): Promise<PageEntrepriseAvecScoreAdmin> => {
+
+  return apiFetch<PageEntrepriseAvecScoreAdmin>(getListCompaniesWithScoreUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getPublishCompanyUrl = (entrepriseId: string,) => {
 
 
@@ -547,6 +863,108 @@ export const reactivateCompany = async (entrepriseId: string, options?: RequestI
   {
     ...options,
     method: 'POST'
+
+
+  }
+);}
+
+
+export const getGetCompanyAdminUrl = (entrepriseId: string,) => {
+
+
+
+
+  return `/admin/entreprises/${entrepriseId}`
+}
+
+/**
+ * @summary Consulter le profil complet d'une entreprise, quel que soit son statut
+ */
+export const getCompanyAdmin = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseAdmin> => {
+
+  return apiFetch<EntrepriseAdmin>(getGetCompanyAdminUrl(entrepriseId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getUpdateCompanyProfileUrl = (entrepriseId: string,) => {
+
+
+
+
+  return `/admin/entreprises/${entrepriseId}`
+}
+
+/**
+ * @summary Mettre à jour le profil d'une entreprise (identité, description, site officiel, montant minimum)
+ */
+export const updateCompanyProfile = async (entrepriseId: string,
+    modifierEntrepriseAdminRequest: ModifierEntrepriseAdminRequest, options?: RequestInit): Promise<EntrepriseAdmin> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<EntrepriseAdmin>(getUpdateCompanyProfileUrl(entrepriseId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(modifierEntrepriseAdminRequest)
+  }
+);}
+
+
+export const getUploadCompanyLogoUrl = (entrepriseId: string,) => {
+
+
+
+
+  return `/admin/entreprises/${entrepriseId}/logo`
+}
+
+/**
+ * @summary Ajouter ou remplacer le logo d'une entreprise
+ */
+export const uploadCompanyLogo = async (entrepriseId: string,
+    bodyUploadCompanyLogo: BodyUploadCompanyLogo, options?: RequestInit): Promise<EntrepriseAdmin> => {
+    const formData = new FormData();
+formData.append(`fichier`, bodyUploadCompanyLogo.fichier);
+
+  return apiFetch<EntrepriseAdmin>(getUploadCompanyLogoUrl(entrepriseId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+export const getDeleteCompanyLogoUrl = (entrepriseId: string,) => {
+
+
+
+
+  return `/admin/entreprises/${entrepriseId}/logo`
+}
+
+/**
+ * @summary Retirer le logo d'une entreprise
+ */
+export const deleteCompanyLogo = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseAdmin> => {
+
+  return apiFetch<EntrepriseAdmin>(getDeleteCompanyLogoUrl(entrepriseId),
+  {
+    ...options,
+    method: 'DELETE'
 
 
   }
@@ -620,6 +1038,142 @@ export const getGetAdminDashboardUrl = () => {
 export const getAdminDashboard = async ( options?: RequestInit): Promise<TableauDeBordAdmin> => {
 
   return apiFetch<TableauDeBordAdmin>(getGetAdminDashboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetAdminActorsOverviewUrl = () => {
+
+
+
+
+  return `/admin/apercu-acteurs`
+}
+
+/**
+ * @summary Statistiques agrégées des espaces Auditeur, Investisseur, Chercheur et Institution
+ */
+export const getAdminActorsOverview = async ( options?: RequestInit): Promise<ApercuActeursAdmin> => {
+
+  return apiFetch<ApercuActeursAdmin>(getGetAdminActorsOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetAdminESGPerformanceUrl = () => {
+
+
+
+
+  return `/admin/performance-esg`
+}
+
+/**
+ * @summary Score ESG global/E/S/G moyen et couverture, sur le périmètre des entreprises publiées
+ */
+export const getAdminESGPerformance = async ( options?: RequestInit): Promise<PerformanceESGAdmin> => {
+
+  return apiFetch<PerformanceESGAdmin>(getGetAdminESGPerformanceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListPortfoliosAdminUrl = (params?: ListPortfoliosAdminParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/admin/portefeuilles?${stringifiedParams}` : `/admin/portefeuilles`
+}
+
+/**
+ * @summary Lister tous les portefeuilles non archivés, tous Investisseurs confondus
+ */
+export const listPortfoliosAdmin = async (params?: ListPortfoliosAdminParams, options?: RequestInit): Promise<PagePortefeuilleAdmin> => {
+
+  return apiFetch<PagePortefeuilleAdmin>(getListPortfoliosAdminUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListAnalysesAdminUrl = (params?: ListAnalysesAdminParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/admin/analyses?${stringifiedParams}` : `/admin/analyses`
+}
+
+/**
+ * @summary Lister toutes les analyses Chercheur, filtrable par statut
+ */
+export const listAnalysesAdmin = async (params?: ListAnalysesAdminParams, options?: RequestInit): Promise<PageAnalyseAdmin> => {
+
+  return apiFetch<PageAnalyseAdmin>(getListAnalysesAdminUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListProjectsAdminUrl = (params?: ListProjectsAdminParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/admin/projets?${stringifiedParams}` : `/admin/projets`
+}
+
+/**
+ * @summary Lister tous les projets Institution, filtrable par statut
+ */
+export const listProjectsAdmin = async (params?: ListProjectsAdminParams, options?: RequestInit): Promise<PageProjetAdmin> => {
+
+  return apiFetch<PageProjetAdmin>(getListProjectsAdminUrl(params),
   {
     ...options,
     method: 'GET'

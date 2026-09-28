@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import { CarbonTable, IndicatorsTable, PreuveLien } from "@/shared/esg/EvidenceTables";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -13,6 +14,13 @@ import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 import { useAssignedReport, useSubmitOpinion } from "../api";
 import { DecisionAudit, type SoumettreAvisForm, soumettreAvisSchema } from "../schemas";
+
+/** URL construite en dur, même patron que les CompanyDetailPage.tsx des espaces Investisseur/
+ * Chercheur/Institution (voir frontend/src/shared/esg/EvidenceTables.tsx) — pas d'attente sur la
+ * régénération du client Orval, la route existe déjà (app/audit/router.py::consulter_preuve_route). */
+function construireUrlPreuveAudit(rapportId: string, preuveId: string): string {
+  return `/api/v1/audit/rapports/${rapportId}/preuves/${preuveId}/fichier`;
+}
 
 export function AuditReportDetailPage() {
   const { rapportId } = useParams<{ rapportId: string }>();
@@ -44,81 +52,38 @@ export function AuditReportDetailPage() {
         </Badge>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Indicateurs ESG</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dossier.indicateurs.length === 0 ? (
-            <p className="text-brand-grey">Aucun indicateur extrait.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-grey">
-                    <th className="py-2 pr-4 font-medium">Pilier</th>
-                    <th className="py-2 pr-4 font-medium">Code</th>
-                    <th className="py-2 pr-4 font-medium">Valeur</th>
-                    <th className="py-2 pr-4 font-medium">Méthode</th>
-                    <th className="py-2 font-medium">Preuve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dossier.indicateurs.map((indicateur) => (
-                    <tr key={indicateur.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{indicateur.pilier}</td>
-                      <td className="py-2 pr-4">{indicateur.code}</td>
-                      <td className="py-2 pr-4">
-                        {indicateur.valeur} {indicateur.unite}
-                      </td>
-                      <td className="py-2 pr-4">{indicateur.methode}</td>
-                      <td className="py-2 text-brand-grey">
-                        {indicateur.preuve.nom_document} — p.{indicateur.preuve.page_debut}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {dossier.score_global_declare !== null ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Score ESG global auto-déclaré</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">
+              <strong className="text-brand-blue">{dossier.score_global_declare}/100</strong>
+              {dossier.score_global_declare_preuve ? (
+                <span className="ml-2 text-brand-grey">
+                  —{" "}
+                  <PreuveLien
+                    preuve={dossier.score_global_declare_preuve}
+                    url={construireUrlPreuveAudit(dossier.id, dossier.score_global_declare_preuve.id)}
+                  />
+                </span>
+              ) : null}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Données carbone</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dossier.donnees_carbone.length === 0 ? (
-            <p className="text-brand-grey">Aucune donnée carbone extraite.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-grey">
-                    <th className="py-2 pr-4 font-medium">Scope</th>
-                    <th className="py-2 pr-4 font-medium">Valeur</th>
-                    <th className="py-2 pr-4 font-medium">Qualité PCAF</th>
-                    <th className="py-2 font-medium">Preuve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dossier.donnees_carbone.map((donnee) => (
-                    <tr key={donnee.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">Scope {donnee.scope}</td>
-                      <td className="py-2 pr-4">{donnee.valeur_tonnes_co2e} tCO2e</td>
-                      <td className="py-2 pr-4">{donnee.score_qualite_pcaf}/5</td>
-                      <td className="py-2 text-brand-grey">
-                        {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <IndicatorsTable
+        indicateurs={dossier.indicateurs}
+        couverture={dossier.couverture}
+        construireUrlPreuve={(preuveId) => construireUrlPreuveAudit(dossier.id, preuveId)}
+      />
+
+      <CarbonTable
+        donneesCarbone={dossier.donnees_carbone}
+        construireUrlPreuve={(preuveId) => construireUrlPreuveAudit(dossier.id, preuveId)}
+      />
 
       {dossier.statut === "AFFECTE_AUDITEUR" ? (
         <FormulaireAvis rapportId={dossier.id} />

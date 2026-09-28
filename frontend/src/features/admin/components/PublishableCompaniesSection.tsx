@@ -1,10 +1,12 @@
-import { Search } from "lucide-react";
+import { CheckCircle2, Search } from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "@/shared/api/errors";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { Input } from "@/shared/ui/input";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { usePublishableCompanies, usePublishCompany } from "../api";
 
 /** Entreprises ayant au moins un rapport validé, pas encore publiées — publier est un geste
@@ -41,11 +43,14 @@ export function PublishableCompaniesSection() {
           />
         </label>
 
-        {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+        {isLoading ? <CardListSkeleton count={3} /> : null}
         {isError ? <p className="text-destructive">Impossible de charger la liste.</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!isLoading && !isError && entreprises.length === 0 ? (
-          <p className="text-brand-grey">Aucune entreprise en attente de publication.</p>
+          <EmptyState
+            icon={CheckCircle2}
+            message="Aucune entreprise en attente de publication."
+          />
         ) : null}
         {entreprises.length > 0 ? (
           <ul className="divide-y">

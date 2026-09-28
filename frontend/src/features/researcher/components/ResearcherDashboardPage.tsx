@@ -28,6 +28,7 @@ export function ResearcherDashboardPage() {
           value={projets?.length ?? "—"}
           hint="Sur des institutions rattachées"
           icon={<FolderKanban className="size-5" />}
+          to="/researcher/projets"
         />
         <StatCard
           label="Analyses"

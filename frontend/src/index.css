@@ -6,11 +6,24 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
+/* Bascule du mode sombre par classe plutôt que par prefers-color-scheme (comportement par
+   défaut de Tailwind v4) : la classe `dark` est posée sur <html> par shared/theme/ThemeProvider,
+   pilotée par le bouton de AppShell — jamais uniquement par la préférence système, pour que le
+   choix explicite de l'utilisateur soit toujours respecté. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Tokens de marque GreenFinance-Scorer (docs/Presentation_GreenFinance_Scorer.md).
    Déclarés ici via @theme, la configuration Tailwind CSS-first de Tailwind v4 (plus de
    tailwind.config.js par défaut) : chaque --color-* devient une classe utilitaire
    nommée (bg-brand-green, text-brand-blue, ...), à utiliser à la place des couleurs
-   Tailwind par défaut (green-600, etc.) dans tout composant métier de features/*. */
+   Tailwind par défaut (green-600, etc.) dans tout composant métier de features/*.
+
+   brand-blue/brand-grey/brand-green(-light) sont redéfinies plus bas sous .dark : elles portent
+   la quasi-totalité du texte/des icônes de la plateforme (text-brand-blue, text-brand-grey, ...),
+   donc les faire basculer avec le thème propage le mode sombre à tout composant métier sans
+   toucher un seul fichier de features/*. brand-navy reste volontairement fixe dans les deux
+   thèmes : c'est la couleur de surface pleine (sidebar, bandeau de profil), pas du texte — la
+   faire varier casserait le contraste du texte blanc qu'elle porte. */
 @theme {
   --font-sans: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
 
@@ -18,6 +31,7 @@
   --color-brand-green-light: #e8f4ef;
   --color-brand-blue: #16324f;
   --color-brand-grey: #5b6573;
+  --color-brand-navy: #16324f;
 }
 
 /* Tokens sémantiques structurels attendus par les primitives shadcn/ui de
@@ -84,4 +98,22 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
   }
+}
+
+/* Mode sombre — même structure de tokens que :root ci-dessus, valeurs adaptées à un fond
+   marine plutôt qu'une simple inversion. --destructive n'est volontairement pas redéfini :
+   button.tsx/badge.tsx l'atténuent déjà à l'opacité (dark:bg-destructive/60) plutôt que de
+   dupliquer une deuxième teinte de rouge par thème. */
+.dark {
+  --color-brand-blue: #e7edf4;
+  --color-brand-grey: #93a6ba;
+  --color-brand-green: #1f9d73;
+  --color-brand-green-light: #123326;
+
+  --background: #0b1c2c;
+  --card: #122a3d;
+  --popover: #122a3d;
+  --muted: #16324a;
+  --border: #1f3a52;
+  --input: #2a4560;
 }

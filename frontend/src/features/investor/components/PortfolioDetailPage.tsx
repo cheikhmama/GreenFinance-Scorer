@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import {
   formatMontant,
   formatPourcentage,
@@ -18,16 +19,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
+import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Select } from "@/shared/ui/select";
 import {
   exportPortfolioFile,
   useAddPosition,
   useArchivePortfolio,
   useClosePosition,
+  useCompanyDetail,
   useDeletePortfolio,
   useDeletePosition,
   usePortfolioDetail,
-  usePublishedCompanies,
   useRenamePortfolio,
   useRestorePortfolio,
   useUpdatePosition,
@@ -36,20 +38,27 @@ import {
   type AjouterPositionForm,
   ajouterPositionSchema,
   DEVISES,
+  type RenommerPortefeuilleForm,
+  renommerPortefeuilleSchema,
   TYPES_DUREE,
   TypeDureeInvestissement,
 } from "../schemas";
-import type { PositionDetail } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { EntrepriseCombobox } from "./EntrepriseCombobox";
+import type {
+  EntreprisePublieePublic,
+  PositionDetail,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export function PortfolioDetailPage() {
   const { portefeuilleId = "" } = useParams();
   const navigate = useNavigate();
   const { data: portefeuille, isLoading, isError } = usePortfolioDetail(portefeuilleId);
-  const renommer = useRenamePortfolio(portefeuilleId);
   const archiver = useArchivePortfolio(portefeuilleId);
   const restaurer = useRestorePortfolio(portefeuilleId);
   const supprimer = useDeletePortfolio();
+  const confirm = useConfirm();
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
+  const [renommerOuvert, setRenommerOuvert] = useState(false);
   const [positionAModifier, setPositionAModifier] = useState<PositionDetail | null>(null);
   const [positionAFermer, setPositionAFermer] = useState<PositionDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -57,16 +66,15 @@ export function PortfolioDetailPage() {
   if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
   if (isError || !portefeuille) return <p className="text-destructive">Portefeuille introuvable.</p>;
 
-  function renommerPortefeuille() {
-    if (!portefeuille) return;
-    const nom = window.prompt("Nouveau nom du portefeuille", portefeuille.nom);
-    if (!nom) return;
-    renommer.mutate({ nom });
-  }
-
-  function supprimerPortefeuille() {
+  async function supprimerPortefeuille() {
     if (!portefeuille || portefeuille.nombre_positions > 0) return;
-    if (!window.confirm("Supprimer définitivement ce portefeuille ?")) return;
+    const confirme = await confirm({
+      title: "Supprimer ce portefeuille ?",
+      description: `« ${portefeuille.nom} » sera définitivement supprimé. Cette action est irréversible.`,
+      confirmLabel: "Supprimer",
+      destructive: true,
+    });
+    if (!confirme) return;
     supprimer.mutate(portefeuille.id, { onSuccess: () => navigate("/investor/portefeuilles") });
   }
 
@@ -78,7 +86,7 @@ export function PortfolioDetailPage() {
         description={`Créé le ${new Date(portefeuille.date_creation).toLocaleDateString("fr-FR")}.`}
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={renommerPortefeuille}>
+            <Button variant="outline" size="sm" onClick={() => setRenommerOuvert(true)}>
               Renommer
             </Button>
             {portefeuille.archive ? (
@@ -113,40 +121,57 @@ export function PortfolioDetailPage() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Synthese
-          label="Montant total"
-          value={formatMontant(portefeuille.montant_total, portefeuille.devise_reference)}
-        />
-        <Synthese label="Score ESG agrégé" value={formatScore(portefeuille.score_esg_agrege)} />
-        <Synthese label="Couverture ESG" value={formatPourcentage(portefeuille.couverture_esg)} />
-        <Synthese
-          label="Positions"
-          value={`${portefeuille.nombre_positions_actives} actives · ${portefeuille.nombre_positions_planifiees} planifiées · ${portefeuille.nombre_positions_cloturees} clôturées`}
-        />
-      </div>
+      {portefeuille.nombre_positions > 0 ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Synthese
+              label="Montant total"
+              value={formatMontant(portefeuille.montant_total, portefeuille.devise_reference)}
+            />
+            <Synthese label="Score ESG agrégé" value={formatScore(portefeuille.score_esg_agrege)} />
+            <Synthese label="Couverture ESG" value={formatPourcentage(portefeuille.couverture_esg)} />
+            <Synthese
+              label="Positions"
+              value={`${portefeuille.nombre_positions_actives} actives · ${portefeuille.nombre_positions_planifiees} planifiées · ${portefeuille.nombre_positions_cloturees} clôturées`}
+            />
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Synthese label="Environnement (E)" value={formatScore(portefeuille.score_environnement_agrege)} />
-        <Synthese label="Social (S)" value={formatScore(portefeuille.score_social_agrege)} />
-        <Synthese label="Gouvernance (G)" value={formatScore(portefeuille.score_gouvernance_agrege)} />
-      </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Synthese
+              label="Environnement (E)"
+              value={formatScore(portefeuille.score_environnement_agrege)}
+            />
+            <Synthese label="Social (S)" value={formatScore(portefeuille.score_social_agrege)} />
+            <Synthese label="Gouvernance (G)" value={formatScore(portefeuille.score_gouvernance_agrege)} />
+          </div>
+        </>
+      ) : null}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Positions</CardTitle>
-          {!portefeuille.archive ? (
+          {!portefeuille.archive && portefeuille.nombre_positions > 0 ? (
             <Button size="sm" onClick={() => setAjoutOuvert(true)}>
-              Ajouter une position
+              Créer une position
             </Button>
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
           {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
           {portefeuille.positions.length === 0 ? (
-            <p className="text-brand-grey">Aucune position pour l'instant.</p>
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-brand-grey">Ce portefeuille ne contient encore aucune position.</p>
+              {!portefeuille.archive ? (
+                <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
+              ) : null}
+            </div>
           ) : (
             <div className="overflow-x-auto">
+              <p className="pb-2 text-xs text-brand-grey">
+                « Modifier » et « Supprimer » ne sont proposés que pour une position encore
+                planifiée (non commencée) — une position déjà active fait partie de l'historique
+                réel du portefeuille et ne peut plus être effacée.
+              </p>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-brand-grey">
@@ -155,6 +180,7 @@ export function PortfolioDetailPage() {
                     <th className="py-2 pr-4 font-medium">Poids</th>
                     <th className="py-2 pr-4 font-medium">Durée</th>
                     <th className="py-2 pr-4 font-medium">État</th>
+                    <th className="py-2 pr-4 font-medium">Date de fermeture</th>
                     <th className="py-2 pr-4 font-medium">Score ESG</th>
                     <th className="py-2 font-medium">Actions</th>
                   </tr>
@@ -163,8 +189,11 @@ export function PortfolioDetailPage() {
                   {portefeuille.positions.map((position) => (
                     <tr key={position.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
-                        <p className="font-medium text-brand-blue">{position.entreprise.nom}</p>
-                        <p className="text-xs text-brand-grey">{position.entreprise.secteur}</p>
+                        <CompanyIdentity
+                          nom={position.entreprise.nom}
+                          logo={position.entreprise.logo}
+                          secteur={position.entreprise.secteur}
+                        />
                       </td>
                       <td className="py-2 pr-4">
                         <p>{formatMontant(position.montant_investi, position.devise)}</p>
@@ -183,9 +212,17 @@ export function PortfolioDetailPage() {
                           {libelleEtatPosition(position.etat)}
                         </Badge>
                       </td>
+                      <td className="py-2 pr-4">
+                        {position.date_fin
+                          ? new Date(position.date_fin).toLocaleDateString("fr-FR")
+                          : "—"}
+                      </td>
                       <td className="py-2 pr-4">{formatScore(position.score.valeur_globale)}</td>
                       <td className="py-2">
                         <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" asChild>
+                            <Link to={`/investor/entreprises/${position.entreprise.id}`}>Détails</Link>
+                          </Button>
                           {position.etat === "PLANIFIEE" ? (
                             <>
                               <Button
@@ -203,7 +240,7 @@ export function PortfolioDetailPage() {
                             </>
                           ) : null}
                           {position.type_duree === TypeDureeInvestissement.OUVERTE &&
-                          position.etat !== "CLOTUREE" ? (
+                          position.date_fin === null ? (
                             <Button size="sm" variant="outline" onClick={() => setPositionAFermer(position)}>
                               Fermer
                             </Button>
@@ -218,6 +255,19 @@ export function PortfolioDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={renommerOuvert} onOpenChange={setRenommerOuvert}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renommer le portefeuille</DialogTitle>
+          </DialogHeader>
+          <FormulaireRenommer
+            portefeuilleId={portefeuille.id}
+            nomActuel={portefeuille.nom}
+            onDone={() => setRenommerOuvert(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={ajoutOuvert} onOpenChange={setAjoutOuvert}>
         <DialogContent>
@@ -285,13 +335,20 @@ function SupprimerPositionButton({
   onError: (message: string) => void;
 }) {
   const deletePosition = useDeletePosition(portefeuilleId);
+  const confirm = useConfirm();
   return (
     <Button
       size="sm"
       variant="outline"
       disabled={deletePosition.isPending}
-      onClick={() => {
-        if (!window.confirm("Supprimer cette position planifiée ?")) return;
+      onClick={async () => {
+        const confirme = await confirm({
+          title: "Supprimer cette position ?",
+          description: "Cette position planifiée sera définitivement supprimée. Cette action est irréversible.",
+          confirmLabel: "Supprimer",
+          destructive: true,
+        });
+        if (!confirme) return;
         deletePosition.mutate(positionId, {
           onError: (error) =>
             onError(error instanceof ApiError ? error.message : "Échec de la suppression."),
@@ -300,6 +357,66 @@ function SupprimerPositionButton({
     >
       Supprimer
     </Button>
+  );
+}
+
+function FormulaireRenommer({
+  portefeuilleId,
+  nomActuel,
+  onDone,
+}: {
+  portefeuilleId: string;
+  nomActuel: string;
+  onDone: () => void;
+}) {
+  const renommer = useRenamePortfolio(portefeuilleId);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const form = useForm<RenommerPortefeuilleForm>({
+    resolver: zodResolver(renommerPortefeuilleSchema),
+    defaultValues: { nom: nomActuel },
+  });
+
+  function onSubmit(values: RenommerPortefeuilleForm) {
+    setServerError(null);
+    renommer.mutate(values, {
+      onSuccess: onDone,
+      onError: (error) =>
+        setServerError(error instanceof ApiError ? error.message : "Échec du renommage."),
+    });
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {serverError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Renommage impossible</AlertTitle>
+            <AlertDescription>{serverError}</AlertDescription>
+          </Alert>
+        ) : null}
+        <FormField
+          control={form.control}
+          name="nom"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nom du portefeuille</FormLabel>
+              <FormControl>
+                <Input autoFocus {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onDone}>
+            Annuler
+          </Button>
+          <Button type="submit" disabled={renommer.isPending}>
+            {renommer.isPending ? "Enregistrement..." : "Confirmer"}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }
 
@@ -370,9 +487,14 @@ function FormulairePosition({
 }) {
   const addPosition = useAddPosition(portefeuilleId);
   const updatePosition = useUpdatePosition(portefeuilleId);
-  const [rechercheEntreprise, setRechercheEntreprise] = useState("");
-  const { data } = usePublishedCompanies({ recherche: rechercheEntreprise });
-  const entreprisesDisponibles = data?.pages.flatMap((page) => page.items) ?? [];
+  const [entrepriseSelectionnee, setEntrepriseSelectionnee] = useState<EntreprisePublieePublic | null>(
+    null,
+  );
+  // En modification, l'entreprise est figée sur la position existante (jamais changeable, voir
+  // le formulaire plus bas) — on récupère son montant minimum pré-converti via la même route que
+  // la fiche détaillée, plutôt que de le dupliquer dans PositionDetail.entreprise.
+  const { data: entrepriseDetail } = useCompanyDetail(position?.entreprise.id ?? "");
+  const entrepriseActive = position ? entrepriseDetail : entrepriseSelectionnee;
   const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm<AjouterPositionForm>({
@@ -398,6 +520,10 @@ function FormulairePosition({
         },
   });
   const typeDuree = form.watch("type_duree");
+  const deviseChoisie = form.watch("devise");
+  const montantSaisi = form.watch("montant");
+  const minimumPourDevise = entrepriseActive?.montant_minimum_par_devise?.[deviseChoisie] ?? null;
+  const montantInsuffisant = minimumPourDevise !== null && montantSaisi < minimumPourDevise;
 
   function onSubmit(values: AjouterPositionForm) {
     setServerError(null);
@@ -440,29 +566,39 @@ function FormulairePosition({
           <FormField
             control={form.control}
             name="entreprise_id"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
                 <FormLabel>Entreprise publiée</FormLabel>
-                <Input
-                  placeholder="Rechercher une entreprise..."
-                  value={rechercheEntreprise}
-                  onChange={(event) => setRechercheEntreprise(event.target.value)}
-                  className="mb-2"
-                />
                 <FormControl>
-                  <Select {...field}>
-                    <option value="">Sélectionner...</option>
-                    {entreprisesDisponibles.map((entreprise) => (
-                      <option key={entreprise.id} value={entreprise.id}>
-                        {entreprise.nom} — {entreprise.secteur}
-                      </option>
-                    ))}
-                  </Select>
+                  <EntrepriseCombobox
+                    onSelect={(entreprise) => {
+                      form.setValue("entreprise_id", entreprise.id, { shouldValidate: true });
+                      setEntrepriseSelectionnee(entreprise);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+        ) : null}
+
+        {entrepriseActive ? (
+          <div className="space-y-2 rounded-md bg-slate-50 px-3 py-2">
+            <CompanyIdentity
+              nom={entrepriseActive.nom}
+              logo={entrepriseActive.logo}
+              avatarClassName="size-8"
+            />
+            <p className="text-sm text-brand-grey">
+              Montant minimum requis :{" "}
+              <strong className={montantInsuffisant ? "text-destructive" : "text-brand-blue"}>
+                {minimumPourDevise === null
+                  ? "aucun minimum imposé"
+                  : formatMontant(minimumPourDevise, deviseChoisie)}
+              </strong>
+            </p>
+          </div>
         ) : null}
 
         <div className="grid grid-cols-2 gap-4">
@@ -476,8 +612,20 @@ function FormulairePosition({
                   <Input
                     type="number"
                     step="0.01"
+                    min={0}
+                    aria-invalid={montantInsuffisant}
                     value={field.value}
-                    onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                    onKeyDown={(event) => {
+                      // Bloque la frappe du signe moins à la source — le clamp ci-dessous reste
+                      // le filet de sécurité pour les autres façons d'entrer une valeur négative
+                      // (collage, flèches, molette).
+                      if (event.key === "-") event.preventDefault();
+                    }}
+                    onChange={(event) => {
+                      // Math.max(0, NaN) vaut NaN (champ vidé, laissé tel quel pour le message
+                      // "requis" de FormMessage) — jamais une valeur négative propagée au form.
+                      field.onChange(Math.max(0, event.target.valueAsNumber));
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -553,7 +701,7 @@ function FormulairePosition({
           ) : null}
         </div>
 
-        <Button type="submit" className="w-full" disabled={enCours}>
+        <Button type="submit" className="w-full" disabled={enCours || montantInsuffisant}>
           {enCours ? "Enregistrement..." : position ? "Enregistrer les modifications" : "Ajouter"}
         </Button>
       </form>

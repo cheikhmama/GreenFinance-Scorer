@@ -8,9 +8,12 @@ export { DevisePosition, TypeDureeInvestissement };
 export const DEVISES = Object.values(DevisePosition);
 export const TYPES_DUREE = Object.values(TypeDureeInvestissement);
 
+// Même limite que côté serveur (app/investor/entreprises.py::_MAX_ENTREPRISES_COMPARAISON) —
+// jamais laisser composer une sélection que le backend refusera ensuite.
+export const MAX_SELECTION_COMPARAISON = 4;
+
 export const creerPortefeuilleSchema = z.object({
   nom: z.string().min(1, "Le nom est requis."),
-  devise_reference: z.enum(DevisePosition),
 });
 
 export type CreerPortefeuilleForm = z.infer<typeof creerPortefeuilleSchema>;

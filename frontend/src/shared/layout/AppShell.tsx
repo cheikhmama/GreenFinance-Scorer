@@ -1,9 +1,13 @@
-import { LogOut, Menu, X } from "lucide-react";
+import { ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useCurrentUser, useLogout } from "@/features/auth/api";
+import { NotificationBell } from "@/shared/notifications/NotificationBell";
+import { UserAvatar } from "@/shared/profile/UserAvatar";
+import { useTheme } from "@/shared/theme/ThemeProvider";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/cn";
+import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { roleNavConfig } from "./roleNav";
 
 /**
@@ -18,6 +22,8 @@ import { roleNavConfig } from "./roleNav";
 export function AppShell() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
+  const confirm = useConfirm();
+  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // RequireRole a déjà garanti une session valide avant de monter ce composant ; ce garde-fou ne
@@ -25,6 +31,21 @@ export function AppShell() {
   if (!user) return null;
 
   const config = roleNavConfig[user.role];
+
+  // Commun aux 6 espaces (Admin, Entreprise, Auditeur, Investisseur, Chercheur, Institution) :
+  // AppShell est le contenant partagé par tous, jamais dupliqué par espace — une seule popup de
+  // confirmation ici suffit à couvrir la plateforme entière. Pas de style "destructive" (voir
+  // shared/ui/confirm-dialog.tsx) : se déconnecter est réversible, contrairement à une suppression.
+  async function seDeconnecter() {
+    const confirme = await confirm({
+      title: "Se déconnecter ?",
+      description: "Vous devrez vous reconnecter pour accéder à nouveau à votre espace.",
+      confirmLabel: "Confirmer la déconnexion",
+      cancelLabel: "Annuler",
+    });
+    if (!confirme) return;
+    logout.mutate();
+  }
 
   const sidebar = (
     <>
@@ -74,30 +95,45 @@ export function AppShell() {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-green text-xs font-semibold text-white">
-            {user.email.slice(0, 2).toUpperCase()}
-          </span>
+      <div className="border-t border-white/10 p-3">
+        <NavLink
+          to={config.profilTo}
+          onClick={() => setMobileOpen(false)}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-3 rounded-xl p-3 transition",
+              isActive ? "bg-white/10 text-white shadow-sm" : "text-slate-300 hover:bg-white/5 hover:text-white",
+            )
+          }
+        >
+          <UserAvatar
+            nom={user.nom ?? user.email}
+            avatar={user.avatar}
+            fallback="icone"
+            className="size-9 shrink-0 text-xs"
+          />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold text-white">{user.email}</span>
-            <span className="block truncate text-[11px] text-slate-400">{config.label}</span>
+            <span className="block truncate text-xs font-semibold text-white">
+              {user.nom || user.email}
+            </span>
+            <span className="block truncate text-[11px] text-slate-400">Profil</span>
           </span>
-        </div>
+          <ChevronRight className="size-4 shrink-0 text-slate-500" />
+        </NavLink>
       </div>
     </>
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f8f7]">
+    <div className="min-h-screen bg-background">
       <a
         href="#app-content"
-        className="fixed left-4 top-2 z-[70] -translate-y-20 rounded bg-white px-4 py-2 text-sm font-semibold text-brand-blue shadow focus:translate-y-0"
+        className="fixed left-4 top-2 z-[70] -translate-y-20 rounded bg-card px-4 py-2 text-sm font-semibold text-brand-blue shadow focus:translate-y-0"
       >
         Aller au contenu
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-brand-blue lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-brand-navy lg:flex">
         {sidebar}
       </aside>
 
@@ -105,18 +141,18 @@ export function AppShell() {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-brand-blue/50"
+            className="absolute inset-0 bg-brand-navy/50"
             aria-label="Fermer le menu"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative flex h-full w-72 flex-col bg-brand-blue shadow-2xl">
+          <aside className="relative flex h-full w-72 flex-col bg-brand-navy shadow-2xl">
             {sidebar}
           </aside>
         </div>
       ) : null}
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur sm:px-6 lg:px-8">
           <Button
             variant="ghost"
             size="icon"
@@ -134,11 +170,20 @@ export function AppShell() {
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-brand-grey sm:inline">{user.email}</span>
+            <NotificationBell />
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => logout.mutate()}
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+              title={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+            >
+              {theme === "dark" ? <Sun /> : <Moon />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={seDeconnecter}
               disabled={logout.isPending}
               aria-label="Se déconnecter"
               title="Se déconnecter"

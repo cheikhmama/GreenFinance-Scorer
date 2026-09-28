@@ -3,6 +3,7 @@ import { adminRoutes } from "@/features/admin/routes";
 import { auditRoutes } from "@/features/audit/routes";
 import { authRoutes } from "@/features/auth/routes";
 import { companyRoutes } from "@/features/company/routes";
+import { contactRoutes } from "@/features/contact/routes";
 import { institutionRoutes } from "@/features/institution/routes";
 import { investorRoutes } from "@/features/investor/routes";
 import { prototypeRoutes } from "@/features/prototype/routes";
@@ -18,6 +19,7 @@ const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/dashboard" replace /> },
   { path: "/dashboard", element: <DashboardRedirect /> },
   ...authRoutes,
+  ...contactRoutes,
   ...adminRoutes,
   ...companyRoutes,
   ...auditRoutes,

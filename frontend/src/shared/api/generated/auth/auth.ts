@@ -5,9 +5,15 @@
  * OpenAPI spec version: v1
  */
 import type {
+  ActiverCompteRequest,
+  BodyUploadMyAvatar,
   ChangerMotDePasseRequest,
+  DemanderReinitialisationRequest,
   LoginRequest,
-  UtilisateurPublic
+  ModifierProfilRequest,
+  ReinitialiserMotDePasseRequest,
+  UtilisateurPublic,
+  VerifierMotDePasseRequest
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
@@ -37,6 +43,93 @@ return apiFetch<UtilisateurPublic>(getLoginUrl(),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(loginRequest)
+  }
+);}
+
+
+export const getDemanderReinitialisationMotDePasseUrl = () => {
+
+
+
+
+  return `/auth/mot-de-passe-oublie`
+}
+
+/**
+ * @summary Demander un lien de réinitialisation de mot de passe
+ */
+export const demanderReinitialisationMotDePasse = async (demanderReinitialisationRequest: DemanderReinitialisationRequest, options?: RequestInit): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<void>(getDemanderReinitialisationMotDePasseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(demanderReinitialisationRequest)
+  }
+);}
+
+
+export const getReinitialiserMotDePasseUrl = () => {
+
+
+
+
+  return `/auth/reinitialiser-mot-de-passe`
+}
+
+/**
+ * @summary Poser un nouveau mot de passe à partir d'un jeton de réinitialisation
+ */
+export const reinitialiserMotDePasse = async (reinitialiserMotDePasseRequest: ReinitialiserMotDePasseRequest, options?: RequestInit): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<void>(getReinitialiserMotDePasseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reinitialiserMotDePasseRequest)
+  }
+);}
+
+
+export const getActivateAccountUrl = () => {
+
+
+
+
+  return `/auth/activer-compte`
+}
+
+/**
+ * @summary Poser son mot de passe et activer un compte à partir d'un jeton d'activation
+ */
+export const activateAccount = async (activerCompteRequest: ActiverCompteRequest, options?: RequestInit): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<void>(getActivateAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(activerCompteRequest)
   }
 );}
 
@@ -83,6 +176,112 @@ export const getCurrentUser = async ( options?: RequestInit): Promise<Utilisateu
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getUpdateMyProfileUrl = () => {
+
+
+
+
+  return `/auth/me`
+}
+
+/**
+ * @summary Modifier mon nom et mon e-mail
+ */
+export const updateMyProfile = async (modifierProfilRequest: ModifierProfilRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<UtilisateurPublic>(getUpdateMyProfileUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(modifierProfilRequest)
+  }
+);}
+
+
+export const getUploadMyAvatarUrl = () => {
+
+
+
+
+  return `/auth/me/avatar`
+}
+
+/**
+ * @summary Ajouter ou remplacer ma photo de profil
+ */
+export const uploadMyAvatar = async (bodyUploadMyAvatar: BodyUploadMyAvatar, options?: RequestInit): Promise<UtilisateurPublic> => {
+    const formData = new FormData();
+formData.append(`fichier`, bodyUploadMyAvatar.fichier);
+
+  return apiFetch<UtilisateurPublic>(getUploadMyAvatarUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+export const getDeleteMyAvatarUrl = () => {
+
+
+
+
+  return `/auth/me/avatar`
+}
+
+/**
+ * @summary Retirer ma photo de profil
+ */
+export const deleteMyAvatar = async ( options?: RequestInit): Promise<UtilisateurPublic> => {
+
+  return apiFetch<UtilisateurPublic>(getDeleteMyAvatarUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+export const getVerifyMyPasswordUrl = () => {
+
+
+
+
+  return `/auth/verifier-mot-de-passe`
+}
+
+/**
+ * @summary Vérifier mon mot de passe actuel, sans rien modifier (étape 1 du changement)
+ */
+export const verifyMyPassword = async (verifierMotDePasseRequest: VerifierMotDePasseRequest, options?: RequestInit): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<void>(getVerifyMyPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(verifierMotDePasseRequest)
   }
 );}
 

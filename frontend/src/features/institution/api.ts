@@ -1,39 +1,78 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import { downloadFile } from "@/shared/api/download";
 import {
+  addCompanyToProjectScope,
+  addDocumentToProject,
   approveAnalysis,
   assignResearcherToProject,
   closeProject,
   createProject,
   getAnalysisDetailForInstitution,
+  getAnalysisHistoryForInstitution,
+  getMyInstitutionProfile,
   getProjectDetail,
+  getPublishedCompanyDetailForInstitution,
   inviteResearcher,
   listAvailableResearchers,
+  listMyAnalysesForInstitution,
   listMyProjects,
   listMyResearchers,
+  listProjectDocuments,
+  listProjectScope,
+  listPublishedCompaniesForInstitution,
   requestAnalysisCorrection,
 } from "@/shared/api/generated/institution/institution";
 import type {
   AffectationPublic,
   AffecterChercheurRequest,
+  AjouterDocumentRequest,
+  AjouterEntreprisePerimetreRequest,
   AnalyseDetail,
+  AnalyseInstitutionPublic,
   AnalysePublic,
   ChercheurDisponible,
   CreerProjetRequest,
   DecisionAnalyseRequest,
+  DocumentProjetPublic,
+  EntreprisePerimetrePublic,
+  EntrepriseDetailInvestisseur,
+  InstitutionProfilPublic,
   InviterChercheurRequest,
+  PageEntreprisePublieePublic,
   ProjetDetail,
   ProjetPublic,
   RattachementPublic,
+  StatutAnalyse,
   StatutRattachement,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+
+export const TAILLE_PAGE_INSTITUTION = 10;
 
 const CHERCHEURS_DISPONIBLES_KEY = ["institution", "chercheurs", "disponibles"] as const;
 const MES_CHERCHEURS_KEY = ["institution", "chercheurs"] as const;
 const PROJETS_KEY = ["institution", "projets"] as const;
 const projetKey = (id: string) => ["institution", "projets", id] as const;
+const perimetreKey = (projetId: string) => ["institution", "projets", projetId, "perimetre"] as const;
+const documentsKey = (projetId: string) => ["institution", "projets", projetId, "documents"] as const;
+const MES_ANALYSES_KEY = ["institution", "analyses"] as const;
 const analyseKey = (id: string) => ["institution", "analyses", id] as const;
+const historiqueKey = (id: string) => ["institution", "analyses", id, "historique"] as const;
+const ENTREPRISES_KEY = ["institution", "entreprises"] as const;
+const entrepriseKey = (id: string) => ["institution", "entreprises", id] as const;
+
+function pageSuivante<T extends { page: number; pages: number }>(dernierePage: T): number | undefined {
+  return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
+}
+
+/** GET /institution/profil — quota d'export restant, en lecture seule (décrémenté
+ * automatiquement à chaque export réel, voir useExport côté analyses). */
+export function useMyInstitutionProfile() {
+  return useQuery<InstitutionProfilPublic, ApiError>({
+    queryKey: ["institution", "profil"],
+    queryFn: () => getMyInstitutionProfile(),
+  });
+}
 
 export function useAvailableResearchers() {
   return useQuery<ChercheurDisponible[], ApiError>({
@@ -85,6 +124,74 @@ export function useProjectDetail(projetId: string) {
   });
 }
 
+/** Périmètre du projet (ProjetEntreprise) — les entreprises que le Chercheur affecté pourra
+ * comparer dans une analyse (voir app/researcher/analyses.py::
+ * _verifier_perimetre_et_recuperer_snapshots). */
+export function useProjectScope(projetId: string) {
+  return useQuery<EntreprisePerimetrePublic[], ApiError>({
+    queryKey: perimetreKey(projetId),
+    queryFn: () => listProjectScope(projetId),
+    enabled: projetId.length > 0,
+  });
+}
+
+export function useAddCompanyToScope(projetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<EntreprisePerimetrePublic, ApiError, AjouterEntreprisePerimetreRequest>({
+    mutationFn: (payload) => addCompanyToProjectScope(projetId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: perimetreKey(projetId) });
+      queryClient.invalidateQueries({ queryKey: projetKey(projetId) });
+    },
+  });
+}
+
+/** Documents explicitement mis à disposition (ProjetDocument) — distinct du périmètre : une
+ * entreprise autorisée n'y donne pas automatiquement accès à son rapport tant qu'il n'est pas
+ * ici (voir app/institution/projets.py::ajouter_document). */
+export function useProjectDocuments(projetId: string) {
+  return useQuery<DocumentProjetPublic[], ApiError>({
+    queryKey: documentsKey(projetId),
+    queryFn: () => listProjectDocuments(projetId),
+    enabled: projetId.length > 0,
+  });
+}
+
+export function useAddDocument(projetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<DocumentProjetPublic, ApiError, AjouterDocumentRequest>({
+    mutationFn: (payload) => addDocumentToProject(projetId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: documentsKey(projetId) });
+      queryClient.invalidateQueries({ queryKey: projetKey(projetId) });
+    },
+  });
+}
+
+/** Catalogue des entreprises publiées — sert à composer le périmètre d'un projet (recherche par
+ * nom/secteur), jamais une saisie libre d'identité (même principe que partout ailleurs). */
+export function usePublishedCompaniesForInstitution(filtres: { recherche?: string }) {
+  return useInfiniteQuery<PageEntreprisePublieePublic, ApiError>({
+    queryKey: [...ENTREPRISES_KEY, filtres],
+    queryFn: ({ pageParam }) =>
+      listPublishedCompaniesForInstitution({
+        recherche: filtres.recherche || undefined,
+        page: pageParam as number,
+        page_size: TAILLE_PAGE_INSTITUTION,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: pageSuivante,
+  });
+}
+
+export function useCompanyDetailForInstitution(entrepriseId: string) {
+  return useQuery<EntrepriseDetailInvestisseur, ApiError>({
+    queryKey: entrepriseKey(entrepriseId),
+    queryFn: () => getPublishedCompanyDetailForInstitution(entrepriseId),
+    enabled: entrepriseId.length > 0,
+  });
+}
+
 export function useAssignResearcher(projetId: string) {
   const queryClient = useQueryClient();
   return useMutation<AffectationPublic, ApiError, AffecterChercheurRequest>({
@@ -103,6 +210,16 @@ export function useCloseProject(projetId: string) {
       queryClient.invalidateQueries({ queryKey: PROJETS_KEY });
       queryClient.invalidateQueries({ queryKey: projetKey(projetId) });
     },
+  });
+}
+
+/** Toutes les analyses reçues, tous projets confondus — seule vue d'ensemble permettant de
+ * repérer ce qui reste à décider sans ouvrir chaque projet un par un (voir ProjectDetailPage,
+ * qui ne montre que les analyses d'un seul projet à la fois). */
+export function useMyAnalysesForInstitution(statut?: StatutAnalyse) {
+  return useQuery<AnalyseInstitutionPublic[], ApiError>({
+    queryKey: [...MES_ANALYSES_KEY, statut],
+    queryFn: () => listMyAnalysesForInstitution({ statut }),
   });
 }
 
@@ -133,6 +250,16 @@ export function useRequestAnalysisCorrection(analyseId: string, projetId: string
       queryClient.invalidateQueries({ queryKey: analyseKey(analyseId) });
       queryClient.invalidateQueries({ queryKey: projetKey(projetId) });
     },
+  });
+}
+
+/** Chaîne complète des versions (v1 -> correction -> v2 -> ...), reconstruite côté serveur à
+ * partir de n'importe quelle version — voir app/researcher/analyses.py::lister_versions. */
+export function useAnalysisHistoryForInstitution(analyseId: string) {
+  return useQuery<AnalysePublic[], ApiError>({
+    queryKey: historiqueKey(analyseId),
+    queryFn: () => getAnalysisHistoryForInstitution(analyseId),
+    enabled: analyseId.length > 0,
   });
 }
 

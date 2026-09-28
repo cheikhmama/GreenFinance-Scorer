@@ -1,9 +1,12 @@
+import { ClipboardCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { Select } from "@/shared/ui/select";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAssignReport, useReportsToAssign, useUtilisateursSelectionnables } from "../api";
 import { Role } from "../schemas";
 
@@ -20,10 +23,10 @@ export function ReportsToAssignSection() {
         <CardTitle>Rapports à affecter</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+        {isLoading ? <CardListSkeleton count={2} /> : null}
         {isError ? <p className="text-destructive">Impossible de charger la file.</p> : null}
         {!isLoading && !isError && rapports?.length === 0 ? (
-          <p className="text-brand-grey">Aucun rapport en attente d'affectation.</p>
+          <EmptyState icon={ClipboardCheck} message="Aucun rapport en attente d'affectation." />
         ) : null}
         {rapports && rapports.length > 0 ? (
           <ul className="divide-y">
@@ -71,10 +74,7 @@ function LigneAffectation({
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <Link
-          to={`/admin/rapports/${rapportId}`}
-          className="font-medium text-brand-blue underline underline-offset-2"
-        >
+        <Link to={`/admin/rapports/${rapportId}`} className="font-semibold text-brand-blue hover:underline">
           {type}
         </Link>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -22,7 +22,6 @@ import type {
   AjouterPositionRequest,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
-  EntreprisePublieePublic,
   FermerPositionRequest,
   ModifierPositionRequest,
   PageEntreprisePublieePublic,
@@ -80,7 +79,7 @@ export function useCompanyDetail(entrepriseId: string) {
 /** GET /investor/comparaison — activée seulement à partir de 2 entreprises sélectionnées, une
  * comparaison à une seule entreprise n'a pas de sens. */
 export function useCompareCompanies(entrepriseIds: string[]) {
-  return useQuery<EntreprisePublieePublic[], ApiError>({
+  return useQuery<EntrepriseDetailInvestisseur[], ApiError>({
     queryKey: ["investor", "comparaison", entrepriseIds],
     queryFn: () => compareCompanies({ entreprise_ids: entrepriseIds }),
     enabled: entrepriseIds.length >= 2,

@@ -4,6 +4,23 @@
  * GreenFinance-Scorer API
  * OpenAPI spec version: v1
  */
+/**
+ * POST /auth/activer-compte — jeton reçu via le lien envoyé à la création du compte
+ * (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 7 jours, usage unique).
+ */
+export interface ActiverCompteRequest {
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  token: string;
+  /**
+     * @minLength 8
+     * @maxLength 72
+     */
+  nouveau_mot_de_passe: string;
+}
+
 export interface AffectationPublic {
   id: string;
   chercheur_id: string;
@@ -17,6 +34,14 @@ export interface AffecterAuditeurRequest {
 
 export interface AffecterChercheurRequest {
   chercheur_id: string;
+}
+
+export interface AjouterDocumentRequest {
+  rapport_id: string;
+}
+
+export interface AjouterEntreprisePerimetreRequest {
+  entreprise_id: string;
 }
 
 export type DevisePosition = typeof DevisePosition[keyof typeof DevisePosition];
@@ -38,6 +63,7 @@ export const TypeDureeInvestissement = {
 
 export interface AjouterPositionRequest {
   entreprise_id: string;
+  /** @exclusiveMinimum 0 */
   montant: number;
   devise: DevisePosition;
   type_duree: TypeDureeInvestissement;
@@ -55,6 +81,23 @@ export const StatutAnalyse = {
   CORRECTION_DEMANDEE: 'CORRECTION_DEMANDEE',
 } as const;
 
+/**
+ * Une ligne du détail derrière "Analyses par statut" (app/researcher/analyses.py::
+ * lister_analyses_admin). Une ligne = une version précise, jamais fusionnée avec ses versions
+ * précédentes/suivantes (voir Analyse.analyse_precedente_id).
+ */
+export interface AnalyseAdmin {
+  id: string;
+  titre: string;
+  statut: StatutAnalyse;
+  version: number;
+  chercheur_email: string;
+  projet_nom: string;
+  date_creation: string;
+  date_soumission: string | null;
+  date_decision: string | null;
+}
+
 export interface AnalyseDetail {
   id: string;
   projet_id: string;
@@ -69,6 +112,23 @@ export interface AnalyseDetail {
   date_soumission: string | null;
   date_decision: string | null;
   entreprise_ids: string[];
+}
+
+/**
+ * AnalyseResume enrichi du projet d'origine — nécessaire ici (contrairement à
+ * ProjetDetail.analyses) puisque cette liste traverse tous les projets de l'institution à la
+ * fois, voir app/institution/router.py::lister_mes_analyses_route.
+ */
+export interface AnalyseInstitutionPublic {
+  id: string;
+  chercheur_id: string;
+  titre: string;
+  statut: StatutAnalyse;
+  version: number;
+  date_creation: string;
+  date_soumission: string | null;
+  projet_id: string;
+  projet_nom: string;
 }
 
 export interface AnalysePublic {
@@ -94,6 +154,58 @@ export interface AnalyseResume {
   version: number;
   date_creation: string;
   date_soumission: string | null;
+}
+
+/**
+ * Voir app/audit/assignment.py::statistiques_charge_globale — comptes_actifs et
+ * audits_en_retard vivent déjà dans TableauDeBordAdmin, pas répétés ici.
+ */
+export interface StatistiquesAuditeursAdmin {
+  dossiers_affectes: number;
+  avis_rendus: number;
+}
+
+/**
+ * Voir app/investor/portfolio.py::statistiques_admin — comptes_actifs vit déjà dans
+ * TableauDeBordAdmin, pas répété ici.
+ */
+export interface StatistiquesInvestisseursAdmin {
+  portefeuilles_non_archives: number;
+  positions_declarees: number;
+  entreprises_distinctes: number;
+}
+
+/**
+ * Voir app/researcher/analyses.py::statistiques_admin — comptes_actifs vit déjà dans
+ * TableauDeBordAdmin, pas répété ici.
+ */
+export interface StatistiquesChercheursAdmin {
+  chercheurs_affectes_projets_ouverts: number;
+  analyses_brouillon: number;
+  analyses_soumises: number;
+  analyses_validees: number;
+  analyses_correction_demandee: number;
+}
+
+/**
+ * Voir app/institution/projets.py::statistiques_admin — comptes_actifs vit déjà dans
+ * TableauDeBordAdmin, pas répété ici.
+ */
+export interface StatistiquesInstitutionsAdmin {
+  projets_ouverts: number;
+  projets_clotures: number;
+  invitations_en_attente: number;
+  analyses_a_examiner: number;
+}
+
+/**
+ * Voir app/admin/apercu.py::construire_apercu_acteurs.
+ */
+export interface ApercuActeursAdmin {
+  auditeurs: StatistiquesAuditeursAdmin;
+  investisseurs: StatistiquesInvestisseursAdmin;
+  chercheurs: StatistiquesChercheursAdmin;
+  institutions: StatistiquesInstitutionsAdmin;
 }
 
 export type DecisionAudit = typeof DecisionAudit[keyof typeof DecisionAudit];
@@ -138,6 +250,14 @@ export interface BodySubmitCompanyReportCorrection {
   annee_reporting: number;
 }
 
+export interface BodyUploadCompanyLogo {
+  fichier: Blob;
+}
+
+export interface BodyUploadMyAvatar {
+  fichier: Blob;
+}
+
 export type CanalDepot = typeof CanalDepot[keyof typeof CanalDepot];
 
 
@@ -151,20 +271,16 @@ export interface ChangerMotDePasseRequest {
   nouveau_mot_de_passe: string;
 }
 
-export type Role = typeof Role[keyof typeof Role];
-
-
-export const Role = {
-  ADMINISTRATEUR: 'ADMINISTRATEUR',
-  ENTREPRISE: 'ENTREPRISE',
-  AUDITEUR: 'AUDITEUR',
-  INVESTISSEUR: 'INVESTISSEUR',
-  CHERCHEUR: 'CHERCHEUR',
-  INSTITUTION: 'INSTITUTION',
-} as const;
-
-export interface ChangerRoleRequest {
-  role: Role;
+/**
+ * Une ligne du détail derrière "Dossiers affectés" (app/audit/assignment.py::
+ * lister_charge_auditeurs).
+ */
+export interface ChargeAuditeurAdmin {
+  auditeur_id: string;
+  email: string;
+  dossiers_affectes: number;
+  dossiers_en_retard: number;
+  avis_rendus: number;
 }
 
 /**
@@ -177,6 +293,42 @@ export interface ChercheurDisponible {
   nom: string | null;
 }
 
+export interface ContactMessageRequest {
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  nom: string;
+  /** @maxLength 254 */
+  email: string;
+  /**
+     * @minLength 3
+     * @maxLength 150
+     */
+  sujet: string;
+  /**
+     * @minLength 20
+     * @maxLength 5000
+     */
+  message: string;
+}
+
+export interface CouvertureIndicateurPublic {
+  code: string;
+  trouve: boolean;
+}
+
+/**
+ * Transparence sur ce qui manque (décision produit, voir app/ingestion/completeness.py) :
+ * total_cibles/trouves permettent d'afficher "14/23 indicateurs communiqués" plutôt que de
+ * laisser deviner une absence à partir d'un tiret muet ; codes_manquants liste précisément quoi.
+ */
+export interface CouvertureResume {
+  total_cibles: number;
+  trouves: number;
+  codes_manquants: string[];
+}
+
 export interface CreerAnalyseRequest {
   titre: string;
   contenu: string;
@@ -185,13 +337,28 @@ export interface CreerAnalyseRequest {
 
 export interface CreerPortefeuilleRequest {
   nom: string;
-  devise_reference: DevisePosition;
 }
 
 export interface CreerProjetRequest {
   nom: string;
   description?: string | null;
+  objectif?: string | null;
+  date_debut?: string | null;
+  date_fin_prevue?: string | null;
+  date_limite?: string | null;
 }
+
+export type Role = typeof Role[keyof typeof Role];
+
+
+export const Role = {
+  ADMINISTRATEUR: 'ADMINISTRATEUR',
+  ENTREPRISE: 'ENTREPRISE',
+  AUDITEUR: 'AUDITEUR',
+  INVESTISSEUR: 'INVESTISSEUR',
+  CHERCHEUR: 'CHERCHEUR',
+  INSTITUTION: 'INSTITUTION',
+} as const;
 
 export interface CreerUtilisateurRequest {
   email: string;
@@ -208,6 +375,23 @@ export interface DecisionAdminRequest {
 
 export interface DecisionAnalyseRequest {
   commentaire?: string | null;
+}
+
+/**
+ * POST /auth/mot-de-passe-oublie — réponse indépendante du fait que l'e-mail
+ * corresponde ou non à un compte (voir app/auth/password_reset.py::demander_reinitialisation).
+ */
+export interface DemanderReinitialisationRequest {
+  email: string;
+}
+
+export interface DocumentProjetPublic {
+  id: string;
+  rapport_id: string;
+  entreprise_id: string;
+  entreprise_nom: string;
+  annee_reporting: number | null;
+  date_ajout: string;
 }
 
 export type MethodeDonnee = typeof MethodeDonnee[keyof typeof MethodeDonnee];
@@ -277,10 +461,27 @@ export interface EntrepriseAdmin {
   site_officiel: string | null;
   actif: boolean;
   montant_minimum_investissement: number | null;
+  devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
   utilisateur_id: string | null;
   nombre_rapports: number;
   dernier_statut_rapport: StatutRapport | null;
+  dernier_rapport_id: string | null;
+}
+
+/**
+ * Une ligne du détail derrière les cartes de performance ESG — score_* à None quand
+ * l'entreprise n'a pas de score admissible, jamais 0 (voir PerformanceESGAdmin).
+ */
+export interface EntrepriseAvecScoreAdmin {
+  id: string;
+  nom: string;
+  secteur: string;
+  pays: string;
+  score_global: number | null;
+  score_environnement: number | null;
+  score_social: number | null;
+  score_gouvernance: number | null;
 }
 
 /**
@@ -331,11 +532,22 @@ export interface EntrepriseDetailInvestisseur {
   site_officiel: string | null;
   actif: boolean;
   montant_minimum_investissement: number | null;
+  devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
   score: ScoreEntreprisePublic;
   carbone: DonneesCarboneAgregees;
+  montant_minimum_par_devise: Partial<Record<DevisePosition, number>> | null;
   indicateurs: IndicateurESGDetail[];
   donnees_carbone: DonneeCarboneDetail[];
+  couverture: CouvertureResume;
+}
+
+export interface EntreprisePerimetrePublic {
+  id: string;
+  entreprise_id: string;
+  entreprise_nom: string;
+  dernier_rapport_id: string | null;
+  date_ajout: string;
 }
 
 export interface EntreprisePublic {
@@ -348,13 +560,16 @@ export interface EntreprisePublic {
   site_officiel: string | null;
   actif: boolean;
   montant_minimum_investissement: number | null;
+  devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
 }
 
 /**
  * Entreprise publiée, telle que consultable par l'Investisseur — étend EntreprisePublic
- * (déjà utilisé côté Entreprise/Admin) avec le score et les émissions Scope 1/2/3 de son
- * dernier rapport validé.
+ * (déjà utilisé côté Entreprise/Admin) avec le score, les émissions Scope 1/2/3 de son dernier
+ * rapport validé, et son montant minimum d'investissement pré-converti dans les 3 devises (voir
+ * app/investor/entreprises.py::montant_minimum_par_devise) — le frontend n'a qu'à lire la
+ * valeur de la devise déjà choisie pour la position, jamais de conversion côté client.
  */
 export interface EntreprisePublieePublic {
   id: string;
@@ -366,9 +581,11 @@ export interface EntreprisePublieePublic {
   site_officiel: string | null;
   actif: boolean;
   montant_minimum_investissement: number | null;
+  devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
   score: ScoreEntreprisePublic;
   carbone: DonneesCarboneAgregees;
+  montant_minimum_par_devise: Partial<Record<DevisePosition, number>> | null;
 }
 
 /**
@@ -412,8 +629,17 @@ export interface HTTPValidationError {
   detail?: ValidationError[];
 }
 
+/**
+ * Lecture seule — quota_export n'est jamais modifié ici, seulement consommé par
+ * app/institution/analyses.py::_consommer_quota_export au fil des exports réels.
+ */
+export interface InstitutionProfilPublic {
+  quota_export: number;
+}
+
 export interface InviterChercheurRequest {
   chercheur_id: string;
+  conditions_collaboration?: string | null;
 }
 
 /**
@@ -445,11 +671,31 @@ export interface ModifierAnalyseRequest {
 }
 
 /**
+ * Remplace entièrement le profil d'une entreprise (identité, description, site officiel,
+ * montant minimum) — jamais un patch partiel champ par champ, même principe que
+ * CreerUtilisateurRequest pour nom_entreprise/secteur/pays. Le logo suit un circuit séparé
+ * (POST/DELETE /admin/entreprises/{id}/logo, voir plus bas) : un fichier binaire validé par sa
+ * signature réelle n'a pas sa place dans un payload JSON de chaîne libre. montant_minimum_
+ * investissement et devise_montant_minimum se renseignent toujours ensemble ou se vident tous
+ * les deux ensemble, jamais un montant minimum sans sa devise (voir app/company/models.py).
+ */
+export interface ModifierEntrepriseAdminRequest {
+  nom: string;
+  secteur: string;
+  pays: string;
+  description?: string | null;
+  site_officiel?: string | null;
+  montant_minimum_investissement?: number | null;
+  devise_montant_minimum?: DevisePosition | null;
+}
+
+/**
  * Une position ne peut être modifiée que tant qu'elle est encore PLANIFIEE (voir
  * app/investor/portfolio.py) — l'entreprise concernée n'est jamais modifiable après création,
  * seule une fermeture puis une nouvelle position permet de changer de cible.
  */
 export interface ModifierPositionRequest {
+  /** @exclusiveMinimum 0 */
   montant: number;
   devise: DevisePosition;
   type_duree: TypeDureeInvestissement;
@@ -457,16 +703,53 @@ export interface ModifierPositionRequest {
   date_fin?: string | null;
 }
 
+/**
+ * Auto-service, restreint à nom et email — jamais role : fixé une seule fois à la création
+ * du compte (app/admin/utilisateurs.py::creer_utilisateur), jamais modifiable ensuite, ni par
+ * l'Admin ni par l'intéressé. L'email reste l'identifiant de connexion :
+ * app/auth/router.py::modifier_mon_profil vérifie son unicité avant d'accepter le changement,
+ * comme creer_utilisateur le fait à la création.
+ */
+export interface ModifierProfilRequest {
+  nom: string;
+  email: string;
+}
+
 export interface NotificationPublic {
   id: string;
   type: string;
   message: string;
+  id_ressource: string | null;
   date_envoi: string;
   lu: boolean;
 }
 
+export interface PageAnalyseAdmin {
+  items: AnalyseAdmin[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface PageChargeAuditeurAdmin {
+  items: ChargeAuditeurAdmin[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
 export interface PageEntrepriseAdmin {
   items: EntrepriseAdmin[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface PageEntrepriseAvecScoreAdmin {
+  items: EntrepriseAvecScoreAdmin[];
   page: number;
   page_size: number;
   total: number;
@@ -505,6 +788,29 @@ export interface PageNotificationPublic {
   pages: number;
 }
 
+/**
+ * Une ligne du détail derrière "Portefeuilles non archivés" (app/investor/portfolio.py::
+ * lister_portefeuilles_admin). montant_total dans devise_reference, jamais additionné entre
+ * portefeuilles de devises différentes.
+ */
+export interface PortefeuilleAdmin {
+  id: string;
+  nom: string;
+  investisseur_email: string;
+  devise_reference: DevisePosition;
+  nombre_positions: number;
+  montant_total: number;
+  date_creation: string;
+}
+
+export interface PagePortefeuilleAdmin {
+  items: PortefeuilleAdmin[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
 export interface PortefeuilleResume {
   id: string;
   nom: string;
@@ -528,14 +834,71 @@ export interface PagePortefeuilleResume {
   pages: number;
 }
 
+export type StatutProjet = typeof StatutProjet[keyof typeof StatutProjet];
+
+
+export const StatutProjet = {
+  OUVERT: 'OUVERT',
+  CLOTURE: 'CLOTURE',
+} as const;
+
+/**
+ * Une ligne du détail derrière "Projets ouverts/clôturés" (app/institution/projets.py::
+ * lister_projets_admin).
+ */
+export interface ProjetAdmin {
+  id: string;
+  nom: string;
+  statut: StatutProjet;
+  institution_email: string;
+  nombre_chercheurs: number;
+  date_creation: string;
+  date_limite: string | null;
+  date_cloture: string | null;
+}
+
+export interface PageProjetAdmin {
+  items: ProjetAdmin[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface RapportESGPublic {
+  id: string;
+  entreprise_id: string;
+  type: TypeRapport;
+  canal: CanalDepot;
+  date_depot: string;
+  statut: StatutRapport;
+  fichier_source: string;
+  nom_fichier_origine: string | null;
+  annee_reporting: number | null;
+  extraction_terminee_le: string | null;
+  extraction_erreur: string | null;
+  tentatives_extraction: number;
+  version: number;
+  rapport_precedent_id: string | null;
+}
+
+export interface PageRapportESGPublic {
+  items: RapportESGPublic[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
 export interface UtilisateurPublic {
   id: string;
   email: string;
   nom: string | null;
+  avatar: string | null;
   role: Role;
   date_creation: string;
   actif: boolean;
-  doit_changer_mot_de_passe: boolean;
+  date_activation: string | null;
 }
 
 export interface PageUtilisateurPublic {
@@ -544,6 +907,26 @@ export interface PageUtilisateurPublic {
   page_size: number;
   total: number;
   pages: number;
+}
+
+export interface TrancheScorePublic {
+  borne_min: number;
+  borne_max: number;
+  nombre_entreprises: number;
+}
+
+/**
+ * Voir app/admin/apercu.py::calculer_performance_esg — score_*_moyen est None quand aucune
+ * entreprise du périmètre n'a de valeur exploitable pour ce pilier, jamais 0.
+ */
+export interface PerformanceESGAdmin {
+  score_global_moyen: number | null;
+  score_environnement_moyen: number | null;
+  score_social_moyen: number | null;
+  score_gouvernance_moyen: number | null;
+  entreprises_avec_score: number;
+  entreprises_perimetre: number;
+  distribution: TrancheScorePublic[];
 }
 
 export interface PositionDetail {
@@ -583,18 +966,14 @@ export interface PortefeuilleDetail {
   positions: PositionDetail[];
 }
 
-export type StatutProjet = typeof StatutProjet[keyof typeof StatutProjet];
-
-
-export const StatutProjet = {
-  OUVERT: 'OUVERT',
-  CLOTURE: 'CLOTURE',
-} as const;
-
 export interface ProjetAffecte {
   id: string;
   nom: string;
   description: string | null;
+  objectif: string | null;
+  date_debut: string | null;
+  date_fin_prevue: string | null;
+  date_limite: string | null;
   statut: StatutProjet;
   institution_email: string;
 }
@@ -604,11 +983,17 @@ export interface ProjetDetail {
   institution_id: string;
   nom: string;
   description: string | null;
+  objectif: string | null;
+  date_debut: string | null;
+  date_fin_prevue: string | null;
+  date_limite: string | null;
   statut: StatutProjet;
   date_creation: string;
   date_cloture: string | null;
   affectations: AffectationPublic[];
   analyses: AnalyseResume[];
+  perimetre: EntreprisePerimetrePublic[];
+  documents: DocumentProjetPublic[];
 }
 
 export interface ProjetPublic {
@@ -616,6 +1001,10 @@ export interface ProjetPublic {
   institution_id: string;
   nom: string;
   description: string | null;
+  objectif: string | null;
+  date_debut: string | null;
+  date_fin_prevue: string | null;
+  date_limite: string | null;
   statut: StatutProjet;
   date_creation: string;
   date_cloture: string | null;
@@ -634,28 +1023,18 @@ export interface RapportESGDetail {
   date_depot: string;
   statut: StatutRapport;
   fichier_source: string;
+  nom_fichier_origine: string | null;
   annee_reporting: number | null;
   extraction_terminee_le: string | null;
   extraction_erreur: string | null;
+  tentatives_extraction: number;
   version: number;
   rapport_precedent_id: string | null;
   indicateurs: IndicateurESGDetail[];
   donnees_carbone: DonneeCarboneDetail[];
-}
-
-export interface RapportESGPublic {
-  id: string;
-  entreprise_id: string;
-  type: TypeRapport;
-  canal: CanalDepot;
-  date_depot: string;
-  statut: StatutRapport;
-  fichier_source: string;
-  annee_reporting: number | null;
-  extraction_terminee_le: string | null;
-  extraction_erreur: string | null;
-  version: number;
-  rapport_precedent_id: string | null;
+  score_global_declare: number | null;
+  score_global_declare_preuve: PreuveDocumentairePublic | null;
+  readonly couverture: CouvertureResume;
 }
 
 export type StatutRattachement = typeof StatutRattachement[keyof typeof StatutRattachement];
@@ -670,10 +1049,32 @@ export const StatutRattachement = {
 export interface RattachementPublic {
   id: string;
   chercheur_id: string;
+  chercheur_email: string;
+  chercheur_nom: string | null;
   institution_id: string;
+  institution_email: string;
+  institution_nom: string | null;
   statut: StatutRattachement;
   date_invitation: string;
   date_reponse: string | null;
+  conditions_collaboration: string | null;
+}
+
+/**
+ * POST /auth/reinitialiser-mot-de-passe — jeton reçu via le lien généré par la demande
+ * ci-dessus (app/auth/password_reset.py::TOKEN_TTL, 30 minutes, usage unique).
+ */
+export interface ReinitialiserMotDePasseRequest {
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  token: string;
+  /**
+     * @minLength 8
+     * @maxLength 72
+     */
+  nouveau_mot_de_passe: string;
 }
 
 export interface RenommerPortefeuilleRequest {
@@ -683,6 +1084,38 @@ export interface RenommerPortefeuilleRequest {
 export interface RepartitionSecteur {
   secteur: string;
   montant_usd: number;
+}
+
+/**
+ * Les quatre scores sont bornés 0-100 à la fois côté Pydantic (Field) et côté PostgreSQL
+ * (__table_args__, Phase 5 §6). valeur_globale est toujours renseignée (app/scoring/engine.py
+ * refuse de créer un ScoreESG si aucun pilier n'est calculable) ; les trois scores de pilier
+ * sont nullables — un pilier sans aucun indicateur trouvé dans le rapport reste NULL plutôt que
+ * de recevoir une note fabriquée (0 se lirait comme « pire score possible », pas comme
+ * « donnée absente ») ; valeur_globale se recalcule alors sur les seuls piliers présents.
+ */
+export interface ScoreESG {
+  id?: string;
+  rapport_id: string;
+  configuration_id: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  valeur_globale: number;
+  score_environnement?: number | null;
+  score_social?: number | null;
+  score_gouvernance?: number | null;
+  date_calcul?: string;
+}
+
+/**
+ * Aperçu, sans rien persister, de si un rapport EN_VALIDATION pourrait être scoré —
+ * affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::score_calculable),
+ * plutôt que de le laisser découvrir l'échec après coup.
+ */
+export interface ScoreVerificationAdmin {
+  calculable: boolean;
 }
 
 export interface SoumettreAvisRequest {
@@ -704,6 +1137,13 @@ export interface TableauDeBordAdmin {
   decisions_a_rendre: number;
   demandes_republication: number;
   utilisateurs_en_attente: number;
+  rapports_echec_extraction: number;
+  rapports_orphelins: number;
+  administrateurs_actifs: number;
+  auditeurs_actifs: number;
+  investisseurs_actifs: number;
+  chercheurs_actifs: number;
+  institutions_actives: number;
 }
 
 export interface TableauDeBordInvestisseur {
@@ -712,15 +1152,14 @@ export interface TableauDeBordInvestisseur {
   taux_couverture_esg_plateforme: number;
   nombre_nouvelles_publications_suivies: number;
   repartition_secteur: RepartitionSecteur[];
-  positions_principales: PositionDetail[];
   publications_recentes: EntreprisePublieePublic[];
   entreprises_suivies_suspendues: EntrepriseSommaire[];
 }
 
 /**
- * Réponse de la création d'un compte — mot_de_passe_temporaire n'apparaît qu'ici, une
- * seule fois, jamais journalisé ni renvoyé par une autre route (voir app/admin/utilisateurs.py
- * et app/core/audit.py).
+ * Réponse de la création d'un compte — jamais de mot de passe ici : un lien d'activation
+ * est envoyé par e-mail à la personne titulaire (voir app/admin/utilisateurs.py::creer_utilisateur
+ * et app/auth/activation.py).
  */
 export interface UtilisateurCree {
   id: string;
@@ -729,7 +1168,16 @@ export interface UtilisateurCree {
   role: Role;
   date_creation: string;
   actif: boolean;
-  mot_de_passe_temporaire: string;
+}
+
+/**
+ * Étape 1 du changement de mot de passe progressif côté frontend — vérifie sans rien
+ * modifier, pour afficher une erreur au bon endroit avant même de proposer un nouveau mot de
+ * passe. Jamais de contenu retourné au-delà du statut HTTP : ni confirmer ni infirmer autre
+ * chose que "ce mot de passe est-il le bon" (voir app/auth/router.py::verifier_mon_mot_de_passe).
+ */
+export interface VerifierMotDePasseRequest {
+  mot_de_passe: string;
 }
 
 export type ListMyNotificationsParams = {
@@ -759,9 +1207,41 @@ recherche?: string | null;
  */
 inclure_inactifs?: boolean;
 /**
- * Filtrer sur le mot de passe temporaire non changé
+ * Filtrer sur les comptes qui n'ont pas encore cliqué leur lien d'activation
  */
-doit_changer_mot_de_passe?: boolean | null;
+en_attente_activation?: boolean | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+page_size?: number;
+};
+
+export type ListAllReportsParams = {
+/**
+ * Filtre sur le statut du rapport
+ */
+statut?: StatutRapport | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+page_size?: number;
+};
+
+export type ListAuditorWorkloadParams = {
+/**
+ * Filtre sur l'e-mail
+ */
+recherche?: string | null;
 /**
  * @minimum 1
  */
@@ -805,6 +1285,32 @@ page?: number;
 page_size?: number;
 };
 
+export type ListCompaniesToRepublishParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+page_size?: number;
+};
+
+export type ListCompaniesWithScoreParams = {
+secteur?: string | null;
+pays?: string | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+page_size?: number;
+};
+
 export type ListAuditLogParams = {
 acteur_id?: string | null;
 action?: string | null;
@@ -829,6 +1335,48 @@ page?: number;
 /**
  * @minimum 1
  * @maximum 100
+ */
+page_size?: number;
+};
+
+export type ListPortfoliosAdminParams = {
+/**
+ * Filtre sur le nom du portefeuille ou l'e-mail
+ */
+recherche?: string | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+page_size?: number;
+};
+
+export type ListAnalysesAdminParams = {
+statut?: StatutAnalyse | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+page_size?: number;
+};
+
+export type ListProjectsAdminParams = {
+statut?: StatutProjet | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 50
  */
 page_size?: number;
 };
@@ -867,5 +1415,17 @@ entreprise_ids: string[];
 
 export type ListMyResearchersParams = {
 statut?: StatutRattachement | null;
+};
+
+export type ListPublishedCompaniesForInstitutionParams = {
+secteur?: string | null;
+pays?: string | null;
+recherche?: string | null;
+page?: number;
+page_size?: number;
+};
+
+export type ListMyAnalysesForInstitutionParams = {
+statut?: StatutAnalyse | null;
 };
 

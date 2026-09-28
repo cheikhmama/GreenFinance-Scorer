@@ -7,11 +7,35 @@
 import type {
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
+  EntreprisePublic,
   RapportESGDetail,
   RapportESGPublic
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
+
+export const getGetMyCompanyProfileUrl = () => {
+
+
+
+
+  return `/company/profil`
+}
+
+/**
+ * @summary Consulter la fiche de mon entreprise, telle que vue par les investisseurs
+ */
+export const getMyCompanyProfile = async ( options?: RequestInit): Promise<EntreprisePublic> => {
+
+  return apiFetch<EntreprisePublic>(getGetMyCompanyProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
 
 export const getListCompanyReportsUrl = () => {
 

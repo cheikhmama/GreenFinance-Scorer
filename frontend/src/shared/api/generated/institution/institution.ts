@@ -7,19 +7,52 @@
 import type {
   AffectationPublic,
   AffecterChercheurRequest,
+  AjouterDocumentRequest,
+  AjouterEntreprisePerimetreRequest,
   AnalyseDetail,
+  AnalyseInstitutionPublic,
   AnalysePublic,
   ChercheurDisponible,
   CreerProjetRequest,
   DecisionAnalyseRequest,
+  DocumentProjetPublic,
+  EntrepriseDetailInvestisseur,
+  EntreprisePerimetrePublic,
+  InstitutionProfilPublic,
   InviterChercheurRequest,
+  ListMyAnalysesForInstitutionParams,
   ListMyResearchersParams,
+  ListPublishedCompaniesForInstitutionParams,
+  PageEntreprisePublieePublic,
   ProjetDetail,
   ProjetPublic,
   RattachementPublic
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
+
+export const getGetMyInstitutionProfileUrl = () => {
+
+
+
+
+  return `/institution/profil`
+}
+
+/**
+ * @summary Consulter mon quota d'export restant
+ */
+export const getMyInstitutionProfile = async ( options?: RequestInit): Promise<InstitutionProfilPublic> => {
+
+  return apiFetch<InstitutionProfilPublic>(getGetMyInstitutionProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
 
 export const getListAvailableResearchersUrl = () => {
 
@@ -94,6 +127,84 @@ export const getListMyResearchersUrl = (params?: ListMyResearchersParams,) => {
 export const listMyResearchers = async (params?: ListMyResearchersParams, options?: RequestInit): Promise<RattachementPublic[]> => {
 
   return apiFetch<RattachementPublic[]>(getListMyResearchersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListPublishedCompaniesForInstitutionUrl = (params?: ListPublishedCompaniesForInstitutionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/institution/entreprises?${stringifiedParams}` : `/institution/entreprises`
+}
+
+/**
+ * @summary Lister les entreprises publiées, pour composer le périmètre d'un projet
+ */
+export const listPublishedCompaniesForInstitution = async (params?: ListPublishedCompaniesForInstitutionParams, options?: RequestInit): Promise<PageEntreprisePublieePublic> => {
+
+  return apiFetch<PageEntreprisePublieePublic>(getListPublishedCompaniesForInstitutionUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetPublishedCompanyDetailForInstitutionUrl = (entrepriseId: string,) => {
+
+
+
+
+  return `/institution/entreprises/${entrepriseId}`
+}
+
+/**
+ * @summary Consulter le détail d'une entreprise publiée (indicateurs, carbone, preuves)
+ */
+export const getPublishedCompanyDetailForInstitution = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseDetailInvestisseur> => {
+
+  return apiFetch<EntrepriseDetailInvestisseur>(getGetPublishedCompanyDetailForInstitutionUrl(entrepriseId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetEvidenceFileForInstitutionUrl = (entrepriseId: string,
+    preuveId: string,) => {
+
+
+
+
+  return `/institution/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
+}
+
+/**
+ * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
+ */
+export const getEvidenceFileForInstitution = async (entrepriseId: string,
+    preuveId: string, options?: RequestInit): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetEvidenceFileForInstitutionUrl(entrepriseId,preuveId),
   {
     ...options,
     method: 'GET'
@@ -231,6 +342,142 @@ export const closeProject = async (projetId: string, options?: RequestInit): Pro
 );}
 
 
+export const getAddCompanyToProjectScopeUrl = (projetId: string,) => {
+
+
+
+
+  return `/institution/projets/${projetId}/perimetre`
+}
+
+/**
+ * @summary Ajouter une entreprise publiée au périmètre autorisé du projet
+ */
+export const addCompanyToProjectScope = async (projetId: string,
+    ajouterEntreprisePerimetreRequest: AjouterEntreprisePerimetreRequest, options?: RequestInit): Promise<EntreprisePerimetrePublic> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<EntreprisePerimetrePublic>(getAddCompanyToProjectScopeUrl(projetId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(ajouterEntreprisePerimetreRequest)
+  }
+);}
+
+
+export const getListProjectScopeUrl = (projetId: string,) => {
+
+
+
+
+  return `/institution/projets/${projetId}/perimetre`
+}
+
+/**
+ * @summary Lister les entreprises autorisées dans le périmètre du projet
+ */
+export const listProjectScope = async (projetId: string, options?: RequestInit): Promise<EntreprisePerimetrePublic[]> => {
+
+  return apiFetch<EntreprisePerimetrePublic[]>(getListProjectScopeUrl(projetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getAddDocumentToProjectUrl = (projetId: string,) => {
+
+
+
+
+  return `/institution/projets/${projetId}/documents`
+}
+
+/**
+ * @summary Mettre à disposition le rapport publié d'une entreprise du périmètre
+ */
+export const addDocumentToProject = async (projetId: string,
+    ajouterDocumentRequest: AjouterDocumentRequest, options?: RequestInit): Promise<DocumentProjetPublic> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<DocumentProjetPublic>(getAddDocumentToProjectUrl(projetId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(ajouterDocumentRequest)
+  }
+);}
+
+
+export const getListProjectDocumentsUrl = (projetId: string,) => {
+
+
+
+
+  return `/institution/projets/${projetId}/documents`
+}
+
+/**
+ * @summary Lister les documents mis à disposition sur le projet
+ */
+export const listProjectDocuments = async (projetId: string, options?: RequestInit): Promise<DocumentProjetPublic[]> => {
+
+  return apiFetch<DocumentProjetPublic[]>(getListProjectDocumentsUrl(projetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListMyAnalysesForInstitutionUrl = (params?: ListMyAnalysesForInstitutionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/institution/analyses?${stringifiedParams}` : `/institution/analyses`
+}
+
+/**
+ * @summary Lister mes analyses reçues, tous projets confondus
+ */
+export const listMyAnalysesForInstitution = async (params?: ListMyAnalysesForInstitutionParams, options?: RequestInit): Promise<AnalyseInstitutionPublic[]> => {
+
+  return apiFetch<AnalyseInstitutionPublic[]>(getListMyAnalysesForInstitutionUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getGetAnalysisDetailForInstitutionUrl = (analyseId: string,) => {
 
 
@@ -310,6 +557,29 @@ return apiFetch<AnalysePublic>(getRequestAnalysisCorrectionUrl(analyseId),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(decisionAnalyseRequest)
+  }
+);}
+
+
+export const getGetAnalysisHistoryForInstitutionUrl = (analyseId: string,) => {
+
+
+
+
+  return `/institution/analyses/${analyseId}/historique`
+}
+
+/**
+ * @summary Reconstruire la chaîne complète des versions d'une analyse (v1 -> correction -> v2 -> ...)
+ */
+export const getAnalysisHistoryForInstitution = async (analyseId: string, options?: RequestInit): Promise<AnalysePublic[]> => {
+
+  return apiFetch<AnalysePublic[]>(getGetAnalysisHistoryForInstitutionUrl(analyseId),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 

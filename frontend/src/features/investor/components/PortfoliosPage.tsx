@@ -16,7 +16,7 @@ import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
 import { useCreatePortfolio, useMyPortfolios } from "../api";
-import { type CreerPortefeuilleForm, creerPortefeuilleSchema, DEVISES } from "../schemas";
+import { type CreerPortefeuilleForm, creerPortefeuilleSchema } from "../schemas";
 
 export function PortfoliosPage() {
   const [recherche, setRecherche] = useState("");
@@ -118,7 +118,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<CreerPortefeuilleForm>({
     resolver: zodResolver(creerPortefeuilleSchema),
-    defaultValues: { nom: "", devise_reference: DEVISES[0] },
+    defaultValues: { nom: "" },
   });
 
   function onSubmit(values: CreerPortefeuilleForm) {
@@ -148,25 +148,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
               <FormLabel>Nom du portefeuille</FormLabel>
               <FormControl>
                 <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="devise_reference"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Devise de référence</FormLabel>
-              <FormControl>
-                <Select {...field}>
-                  {DEVISES.map((devise) => (
-                    <option key={devise} value={devise}>
-                      {devise}
-                    </option>
-                  ))}
-                </Select>
               </FormControl>
               <FormMessage />
             </FormItem>

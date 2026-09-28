@@ -1,29 +1,54 @@
+import { Cloud, FileCheck2, FileText, History, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { useConfirm } from "@/shared/ui/confirm-dialog";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { PageHeader } from "@/shared/ui/page-header";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Textarea } from "@/shared/ui/textarea";
 import {
   useAdminReport,
+  useCompanyDetail,
+  useRecalculateReportScore,
   useRejectReport,
   useReportOpinions,
+  useReportScoreVerification,
   useReportVersions,
   useRequestReportCorrection,
   useValidateReport,
 } from "../api";
 
+/** Fiche de détail Admin d'un rapport — identité de l'entreprise toujours visible en tête (on
+ * arrive ici depuis plusieurs points de la plateforme : file d'affectation, file de décision,
+ * fiche entreprise ; sans ce bandeau, rien ne rappelle de quelle entreprise il s'agit une fois
+ * sur la page). Le reste (indicateurs, carbone, avis, versions, décision) reprend les mêmes
+ * données qu'avant, seulement réorganisé avec des repères visuels cohérents avec le reste de la
+ * plateforme (icônes de section, cartes). */
 export function AdminReportDetailPage() {
   const { rapportId } = useParams<{ rapportId: string }>();
   const { data: rapport, isLoading, isError } = useAdminReport(rapportId ?? "");
+  const { data: entreprise } = useCompanyDetail(rapport?.entreprise_id ?? "");
   const { data: avis } = useReportOpinions(rapportId ?? "");
   const { data: versions } = useReportVersions(rapportId ?? "");
 
-  if (isLoading) return <div className="p-8 text-brand-grey">Chargement...</div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-8 p-8">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
   if (isError || !rapport) {
     return (
       <div className="p-8">
@@ -36,36 +61,61 @@ export function AdminReportDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <Link to="/admin" className="text-sm text-brand-green underline underline-offset-2">
           ← Tableau de bord
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
-          Rapport {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
-        </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+      </div>
+
+      <PageHeader
+        eyebrow="Administration"
+        title={`Rapport ${rapport.type} — ${rapport.annee_reporting ?? "année inconnue"}`}
+        description="Indicateurs extraits, données carbone, avis d'audit et décision."
+        action={
+          <Button asChild variant="outline">
+            <a
+              href={`/api/v1/admin/rapports/${rapport.id}/fichier`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <FileText className="size-4" />
+              Voir le PDF original
+            </a>
+          </Button>
+        }
+      />
+
+      <Card className="shadow-none">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+          {entreprise ? (
+            <Link to={`/admin/entreprises/${entreprise.id}`} className="hover:opacity-80">
+              <CompanyIdentity
+                nom={entreprise.nom}
+                logo={entreprise.logo}
+                secteur={`${entreprise.secteur} — ${entreprise.pays}`}
+                avatarClassName="size-12"
+              />
+            </Link>
+          ) : (
+            <span className="text-sm text-brand-grey">Entreprise…</span>
+          )}
           <Badge variant={variantStatutRapport(rapport.statut)}>
             {libelleStatutRapport(rapport.statut)}
           </Badge>
-          <a
-            href={`/api/v1/admin/rapports/${rapport.id}/fichier`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-brand-green underline underline-offset-2"
-          >
-            Voir le PDF original
-          </a>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Avis d'audit</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+            <MessageSquare className="size-4" />
+            Avis d'audit
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {!avis || avis.length === 0 ? (
-            <p className="text-brand-grey">Aucun avis rendu pour l'instant.</p>
+            <EmptyState icon={MessageSquare} message="Aucun avis rendu pour l'instant." />
           ) : (
             <ul className="divide-y">
               {avis.map((item) => (
@@ -85,89 +135,107 @@ export function AdminReportDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Indicateurs ESG</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+            <FileText className="size-4" />
+            Indicateurs ESG
+          </CardTitle>
         </CardHeader>
         <CardContent>
+          {rapport.score_global_declare !== null ? (
+            <p className="mb-3 text-sm">
+              Score ESG global auto-déclaré par l'entreprise :{" "}
+              <strong className="text-brand-blue">{rapport.score_global_declare}/100</strong>
+              {rapport.score_global_declare_preuve ? (
+                <span className="text-brand-grey">
+                  {" "}
+                  — {rapport.score_global_declare_preuve.nom_document} — p.
+                  {rapport.score_global_declare_preuve.page_debut}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           {rapport.indicateurs.length === 0 ? (
-            <p className="text-brand-grey">Aucun indicateur extrait.</p>
+            <EmptyState icon={FileText} message="Aucun indicateur extrait." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-grey">
-                    <th className="py-2 pr-4 font-medium">Pilier</th>
-                    <th className="py-2 pr-4 font-medium">Code</th>
-                    <th className="py-2 pr-4 font-medium">Valeur</th>
-                    <th className="py-2 font-medium">Preuve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rapport.indicateurs.map((indicateur) => (
-                    <tr key={indicateur.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{indicateur.pilier}</td>
-                      <td className="py-2 pr-4">{indicateur.code}</td>
-                      <td className="py-2 pr-4">
-                        {indicateur.valeur} {indicateur.unite}
-                      </td>
-                      <td className="py-2 text-brand-grey">
-                        {indicateur.preuve.nom_document} — p.{indicateur.preuve.page_debut}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pilier</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Valeur</TableHead>
+                  <TableHead>Preuve</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rapport.indicateurs.map((indicateur) => (
+                  <TableRow key={indicateur.id}>
+                    <TableCell>{indicateur.pilier}</TableCell>
+                    <TableCell>{indicateur.code}</TableCell>
+                    <TableCell>
+                      {indicateur.valeur} {indicateur.unite}
+                    </TableCell>
+                    <TableCell className="text-brand-grey">
+                      {indicateur.preuve.nom_document} — p.{indicateur.preuve.page_debut}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Émissions carbone (Scope 1/2/3)</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+            <Cloud className="size-4" />
+            Émissions carbone (Scope 1/2/3)
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {rapport.donnees_carbone.length === 0 ? (
-            <p className="text-brand-grey">Aucune donnée carbone extraite.</p>
+            <EmptyState icon={Cloud} message="Aucune donnée carbone extraite." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-grey">
-                    <th className="py-2 pr-4 font-medium">Scope</th>
-                    <th className="py-2 pr-4 font-medium">Catégorie GES</th>
-                    <th className="py-2 pr-4 font-medium">Valeur (tCO2e)</th>
-                    <th className="py-2 pr-4 font-medium">Année</th>
-                    <th className="py-2 pr-4 font-medium">Qualité PCAF</th>
-                    <th className="py-2 font-medium">Preuve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rapport.donnees_carbone.map((donnee) => (
-                    <tr key={donnee.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">Scope {donnee.scope}</td>
-                      <td className="py-2 pr-4">{donnee.categorie_ges ?? "—"}</td>
-                      <td className="py-2 pr-4">{donnee.valeur_tonnes_co2e}</td>
-                      <td className="py-2 pr-4">{donnee.annee}</td>
-                      <td className="py-2 pr-4">{donnee.score_qualite_pcaf}/5</td>
-                      <td className="py-2 text-brand-grey">
-                        {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Catégorie GES</TableHead>
+                  <TableHead>Valeur (tCO2e)</TableHead>
+                  <TableHead>Année</TableHead>
+                  <TableHead>Qualité PCAF</TableHead>
+                  <TableHead>Preuve</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rapport.donnees_carbone.map((donnee) => (
+                  <TableRow key={donnee.id}>
+                    <TableCell>Scope {donnee.scope}</TableCell>
+                    <TableCell>{donnee.categorie_ges ?? "—"}</TableCell>
+                    <TableCell>{donnee.valeur_tonnes_co2e}</TableCell>
+                    <TableCell>{donnee.annee}</TableCell>
+                    <TableCell>{donnee.score_qualite_pcaf}/5</TableCell>
+                    <TableCell className="text-brand-grey">
+                      {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Historique des versions</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+            <History className="size-4" />
+            Historique des versions
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {!versions || versions.length <= 1 ? (
-            <p className="text-brand-grey">Aucune version antérieure ou ultérieure.</p>
+            <EmptyState icon={History} message="Aucune version antérieure ou ultérieure." />
           ) : (
             <ul className="divide-y">
               {versions.map((version) => (
@@ -183,12 +251,9 @@ export function AdminReportDetailPage() {
                     </p>
                   </div>
                   {version.id !== rapport.id ? (
-                    <Link
-                      to={`/admin/rapports/${version.id}`}
-                      className="text-sm text-brand-green underline underline-offset-2"
-                    >
-                      Ouvrir
-                    </Link>
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/admin/rapports/${version.id}`}>Ouvrir</Link>
+                    </Button>
                   ) : null}
                 </li>
               ))}
@@ -198,7 +263,58 @@ export function AdminReportDetailPage() {
       </Card>
 
       {rapport.statut === "EN_VALIDATION" ? <FormulaireDecision rapportId={rapport.id} /> : null}
+      {rapport.statut === "VALIDE" ? <RecalculerScoreSection rapportId={rapport.id} /> : null}
     </div>
+  );
+}
+
+/** État incohérent, normalement inatteignable via le parcours normal (valider_rapport calcule
+ * toujours un score dans la même transaction) mais qui peut survenir sur des données historiques
+ * — sans quoi la publication de l'entreprise resterait bloquée indéfiniment sans recours (voir
+ * app/admin/review_queue.py::recalculer_score, BUG-020). */
+function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
+  const recalculer = useRecalculateReportScore(rapportId);
+  const [error, setError] = useState<string | null>(null);
+
+  if (recalculer.isSuccess) {
+    return (
+      <Alert>
+        <AlertTitle>Score recalculé</AlertTitle>
+        <AlertDescription>
+          Valeur globale : {recalculer.data.valeur_globale}/100.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Card className="shadow-none">
+      <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+        <div>
+          <p className="text-sm font-medium text-brand-blue">Score manquant sur ce rapport validé ?</p>
+          <p className="text-sm text-brand-grey">
+            À utiliser uniquement si l'entreprise reste bloquée en publication faute de score.
+          </p>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+        <Button
+          variant="outline"
+          disabled={recalculer.isPending}
+          onClick={() => {
+            setError(null);
+            recalculer.mutate(undefined, {
+              onError: (err) => {
+                setError(
+                  err instanceof ApiError ? err.message : "Le score n'a pas pu être recalculé.",
+                );
+              },
+            });
+          }}
+        >
+          {recalculer.isPending ? "Recalcul..." : "Recalculer le score"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -206,6 +322,8 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
   const validate = useValidateReport(rapportId);
   const reject = useRejectReport(rapportId);
   const requestCorrection = useRequestReportCorrection(rapportId);
+  const { data: verificationScore } = useReportScoreVerification(rapportId, true);
+  const confirm = useConfirm();
   const [commentaire, setCommentaire] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -214,6 +332,19 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
 
   function surErreur(err: unknown) {
     setError(err instanceof ApiError ? err.message : "La décision n'a pas pu être enregistrée.");
+  }
+
+  async function rejeter() {
+    const confirme = await confirm({
+      title: "Rejeter ce rapport ?",
+      description:
+        "L'entreprise sera notifiée du rejet. Cette décision reste consultable dans l'historique du rapport.",
+      confirmLabel: "Rejeter",
+      destructive: true,
+    });
+    if (!confirme) return;
+    setError(null);
+    reject.mutate({ commentaire: commentaire || null }, { onError: surErreur });
   }
 
   if (succeeded) {
@@ -228,13 +359,25 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Décision</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <FileCheck2 className="size-4" />
+          Décision
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
           <Alert variant="destructive">
             <AlertTitle>Échec</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        {verificationScore?.calculable === false ? (
+          <Alert variant="destructive">
+            <AlertTitle>Score non calculable</AlertTitle>
+            <AlertDescription>
+              Le vocabulaire d'indicateurs de ce rapport ne recoupe aucun indicateur de la
+              méthodologie de référence — valider échouera tant que ce n'est pas résolu.
+            </AlertDescription>
           </Alert>
         ) : null}
         <Textarea
@@ -265,14 +408,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
           >
             Demander une correction
           </Button>
-          <Button
-            variant="destructive"
-            disabled={pending}
-            onClick={() => {
-              setError(null);
-              reject.mutate({ commentaire: commentaire || null }, { onError: surErreur });
-            }}
-          >
+          <Button variant="destructive" disabled={pending} onClick={rejeter}>
             Rejeter
           </Button>
         </div>

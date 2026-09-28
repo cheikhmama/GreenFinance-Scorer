@@ -38,8 +38,19 @@ export function CompanyDetailPage() {
         </CardContent>
       </Card>
 
-      <IndicatorsTable indicateurs={entreprise.indicateurs} />
-      <CarbonTable donneesCarbone={entreprise.donnees_carbone} />
+      <IndicatorsTable
+        indicateurs={entreprise.indicateurs}
+        couverture={entreprise.couverture}
+        construireUrlPreuve={(preuveId) =>
+          `/api/v1/researcher/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
+        }
+      />
+      <CarbonTable
+        donneesCarbone={entreprise.donnees_carbone}
+        construireUrlPreuve={(preuveId) =>
+          `/api/v1/researcher/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
+        }
+      />
     </div>
   );
 }

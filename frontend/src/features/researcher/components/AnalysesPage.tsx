@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
@@ -9,12 +10,14 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { Textarea } from "@/shared/ui/textarea";
-import { useCreateAnalysis, useMyAnalyses, useMyAssignedProjects, usePublishedCompaniesForResearcher } from "../api";
+import { useCreateAnalysis, useMyAnalyses, useMyAssignedProjects, useProjectScope } from "../api";
 import { type AnalyseForm, analyseFormSchema } from "../schemas";
 
 /** Mes analyses, tous projets confondus — la création se fait toujours dans le contexte d'un
@@ -55,16 +58,16 @@ export function AnalysesPage() {
         </DialogContent>
       </Dialog>
 
-      {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+      {isLoading ? <CardListSkeleton /> : null}
       {isError ? <p className="text-destructive">Impossible de charger les analyses.</p> : null}
       {!isLoading && !isError && analyses?.length === 0 ? (
-        <p className="text-brand-grey">Aucune analyse pour l'instant.</p>
+        <EmptyState icon={FlaskConical} message="Aucune analyse pour l'instant." />
       ) : null}
 
-      <div className="space-y-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {analyses?.map((analyse) => (
           <Link key={analyse.id} to={`/researcher/analyses/${analyse.id}`}>
-            <Card className="transition hover:border-brand-green">
+            <Card className="h-full transition hover:border-brand-green hover:shadow-md">
               <CardContent className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-medium text-brand-blue">{analyse.titre}</p>
@@ -84,40 +87,58 @@ export function AnalysesPage() {
   );
 }
 
+/** Restreint le choix aux entreprises du périmètre du projet (ProjetEntreprise) — jamais toutes
+ * les entreprises publiées de la plateforme : une sélection hors périmètre serait de toute façon
+ * refusée côté serveur (code entreprise_hors_perimetre), un sélecteur pré-filtré évite de le
+ * découvrir tardivement via une erreur générique. */
 function CompaniesPicker({
+  projetId,
   selectedIds,
   onChange,
 }: {
+  projetId: string;
   selectedIds: string[];
   onChange: (ids: string[]) => void;
 }) {
   const [recherche, setRecherche] = useState("");
-  const { data } = usePublishedCompaniesForResearcher({ recherche });
-  const entreprises = data?.pages.flatMap((page) => page.items) ?? [];
+  const { data: perimetre, isLoading } = useProjectScope(projetId);
+  const entreprises = (perimetre ?? []).filter((entreprise) =>
+    entreprise.entreprise_nom.toLowerCase().includes(recherche.toLowerCase()),
+  );
 
   function toggle(id: string) {
     onChange(selectedIds.includes(id) ? selectedIds.filter((v) => v !== id) : [...selectedIds, id]);
   }
 
+  if (!isLoading && (perimetre ?? []).length === 0) {
+    return (
+      <p className="rounded-md border border-dashed p-3 text-xs text-brand-grey">
+        Aucune entreprise n'a encore été autorisée par l'institution pour ce projet.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <Input
-        placeholder="Rechercher une entreprise..."
+        placeholder="Rechercher une entreprise du périmètre..."
         value={recherche}
         onChange={(event) => setRecherche(event.target.value)}
       />
       <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
         {entreprises.map((entreprise) => (
-          <label key={entreprise.id} className="flex items-center gap-2 text-sm">
+          <label key={entreprise.entreprise_id} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={selectedIds.includes(entreprise.id)}
-              onChange={() => toggle(entreprise.id)}
+              checked={selectedIds.includes(entreprise.entreprise_id)}
+              onChange={() => toggle(entreprise.entreprise_id)}
             />
-            {entreprise.nom} — {entreprise.secteur}
+            {entreprise.entreprise_nom}
           </label>
         ))}
-        {entreprises.length === 0 ? <p className="text-xs text-brand-grey">Aucun résultat.</p> : null}
+        {!isLoading && entreprises.length === 0 ? (
+          <p className="text-xs text-brand-grey">Aucun résultat.</p>
+        ) : null}
       </div>
     </div>
   );
@@ -162,7 +183,16 @@ function FormulaireAnalyse({
           <label htmlFor="projet-analyse" className="font-medium">
             Projet
           </label>
-          <Select id="projet-analyse" value={projetId} onChange={(event) => setProjetId(event.target.value)}>
+          <Select
+            id="projet-analyse"
+            value={projetId}
+            onChange={(event) => {
+              // Le périmètre autorisé diffère par projet — on vide la sélection plutôt que de
+              // laisser une entreprise hors périmètre s'y attarder après le changement.
+              setProjetId(event.target.value);
+              form.setValue("entreprise_ids", []);
+            }}
+          >
             {projets.map((projet) => (
               <option key={projet.id} value={projet.id}>
                 {projet.nom}
@@ -203,7 +233,7 @@ function FormulaireAnalyse({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Entreprises comparées</FormLabel>
-              <CompaniesPicker selectedIds={field.value} onChange={field.onChange} />
+              <CompaniesPicker projetId={projetId} selectedIds={field.value} onChange={field.onChange} />
               <FormMessage />
             </FormItem>
           )}

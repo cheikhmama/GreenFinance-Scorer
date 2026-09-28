@@ -1,9 +1,12 @@
-import { Search } from "lucide-react";
+import { History, Search } from "lucide-react";
 import { useState } from "react";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { Input } from "@/shared/ui/input";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useJournalAudit } from "../api";
 
 /** Trace des événements de compte et de session (connexion, déconnexion, changement de mot de
@@ -55,42 +58,46 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
           </div>
         )}
 
-        {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : null}
         {isError ? <p className="text-destructive">Impossible de charger le journal.</p> : null}
         {!isLoading && !isError && entrees.length === 0 ? (
-          <p className="text-brand-grey">Aucune entrée pour ce filtre.</p>
+          <EmptyState icon={History} message="Aucune entrée pour ce filtre." />
         ) : null}
         {entrees.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-brand-grey">
-                  <th className="py-2 pr-4 font-medium">Date</th>
-                  <th className="py-2 pr-4 font-medium">Action</th>
-                  <th className="py-2 pr-4 font-medium">Ressource</th>
-                  <th className="py-2 pr-4 font-medium">Résultat</th>
-                  <th className="py-2 font-medium">Détail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entrees.map((entree) => (
-                  <tr key={entree.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 whitespace-nowrap">
-                      {new Date(entree.date).toLocaleString("fr-FR")}
-                    </td>
-                    <td className="py-2 pr-4">{entree.action}</td>
-                    <td className="py-2 pr-4">{entree.type_ressource}</td>
-                    <td className="py-2 pr-4">{entree.resultat}</td>
-                    <td className="py-2 text-brand-grey">
-                      {entree.ancienne_valeur && entree.nouvelle_valeur
-                        ? `${entree.ancienne_valeur} → ${entree.nouvelle_valeur}`
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Ressource</TableHead>
+                <TableHead>Résultat</TableHead>
+                <TableHead>Détail</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entrees.map((entree) => (
+                <TableRow key={entree.id}>
+                  <TableCell className="whitespace-nowrap">
+                    {new Date(entree.date).toLocaleString("fr-FR")}
+                  </TableCell>
+                  <TableCell>{entree.action}</TableCell>
+                  <TableCell>{entree.type_ressource}</TableCell>
+                  <TableCell>{entree.resultat}</TableCell>
+                  <TableCell className="text-brand-grey">
+                    {entree.ancienne_valeur && entree.nouvelle_valeur
+                      ? `${entree.ancienne_valeur} → ${entree.nouvelle_valeur}`
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         ) : null}
         {entrees.length > 0 && hasNextPage ? (
           <div className="mt-3">

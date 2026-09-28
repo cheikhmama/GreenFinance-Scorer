@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
@@ -14,6 +14,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { Textarea } from "@/shared/ui/textarea";
 import {
   useAnalysisDetail,
+  useAnalysisHistory,
   useCorrectAnalysis,
   useSubmitAnalysis,
   useUpdateAnalysis,
@@ -40,6 +41,8 @@ export function AnalyseDetailPage() {
         description="Analyse comparative sur des entreprises publiées."
         action={<Badge variant={variantStatutAnalyse(analyse.statut)}>{libelleStatutAnalyse(analyse.statut)}</Badge>}
       />
+
+      <HistoriqueVersions analyseId={analyse.id} versionActuelle={analyse.version} />
 
       {analyse.commentaire_institution ? (
         <Alert>
@@ -76,6 +79,59 @@ export function AnalyseDetailPage() {
         </Button>
       ) : null}
     </div>
+  );
+}
+
+/** Reconstruit la chaîne complète v1 -> correction -> v2 -> ... -> validation finale (voir
+ * app/researcher/analyses.py::lister_versions) — n'affiche rien si l'analyse n'a qu'une seule
+ * version, l'historique n'apportant alors aucune information. */
+function HistoriqueVersions({
+  analyseId,
+  versionActuelle,
+}: {
+  analyseId: string;
+  versionActuelle: number;
+}) {
+  const { data: versions } = useAnalysisHistory(analyseId);
+
+  if (!versions || versions.length <= 1) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base text-brand-blue">Historique des versions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {versions.map((version) => (
+          <div
+            key={version.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
+          >
+            <div className="flex items-center gap-2">
+              <span className={version.version === versionActuelle ? "font-semibold text-brand-blue" : "text-brand-grey"}>
+                Version {version.version}
+              </span>
+              {version.version === versionActuelle ? (
+                <span className="text-xs text-brand-grey">(consultée)</span>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={variantStatutAnalyse(version.statut)}>
+                {libelleStatutAnalyse(version.statut)}
+              </Badge>
+              {version.id !== analyseId ? (
+                <Link
+                  to={`/researcher/analyses/${version.id}`}
+                  className="text-brand-green underline-offset-2 hover:underline"
+                >
+                  Consulter
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
