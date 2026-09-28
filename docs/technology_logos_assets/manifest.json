@@ -1,0 +1,510 @@
+[
+  {
+    "name": "React",
+    "group": "frontend",
+    "file": "react.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "TypeScript",
+    "group": "frontend",
+    "file": "typescript.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg"
+    ]
+  },
+  {
+    "name": "Vite",
+    "group": "frontend",
+    "file": "vite_symbol.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/vite/vite-original.svg"
+    ],
+    "source_url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/vite/vite-original.svg"
+  },
+  {
+    "name": "Tailwind CSS",
+    "group": "frontend",
+    "file": "tailwind_css_symbol.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/tailwindcss/tailwindcss-original.svg"
+    ],
+    "source_url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/tailwindcss/tailwindcss-original.svg"
+  },
+  {
+    "name": "shadcn ui",
+    "group": "frontend",
+    "file": "shadcn_ui.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/shadcnui.svg"
+    ]
+  },
+  {
+    "name": "Radix UI",
+    "group": "frontend",
+    "file": "radix_ui.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/radixui.svg"
+    ]
+  },
+  {
+    "name": "Lucide",
+    "group": "frontend",
+    "file": "lucide.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/lucide.svg"
+    ]
+  },
+  {
+    "name": "TanStack React Query",
+    "group": "frontend",
+    "file": "tanstack_react_query.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/react-query.svg"
+    ]
+  },
+  {
+    "name": "React Router",
+    "group": "frontend",
+    "file": "react_router.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/reactrouter/reactrouter-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "React Hook Form",
+    "group": "frontend",
+    "file": "react_hook_form.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/reacthookform.svg"
+    ]
+  },
+  {
+    "name": "Zod",
+    "group": "frontend",
+    "file": "zod.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/zod.svg"
+    ]
+  },
+  {
+    "name": "Orval",
+    "group": "frontend",
+    "file": "orval.svg",
+    "urls": [
+      "https://orval.dev/images/emblem.svg"
+    ]
+  },
+  {
+    "name": "tailwind-merge",
+    "group": "frontend",
+    "file": "tailwind_merge.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/dcastil/tailwind-merge/v3.6.0/assets/logo.svg"
+    ]
+  },
+  {
+    "name": "Google Fonts",
+    "group": "frontend",
+    "file": "google_fonts.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/googlefonts.svg"
+    ]
+  },
+  {
+    "name": "HTML",
+    "group": "frontend",
+    "file": "html.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/html5/html5-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "CSS",
+    "group": "frontend",
+    "file": "css.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/css.svg"
+    ]
+  },
+  {
+    "name": "SVG",
+    "group": "frontend",
+    "file": "svg.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/svg.svg"
+    ]
+  },
+  {
+    "name": "Python",
+    "group": "backend",
+    "file": "python.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "FastAPI",
+    "group": "backend",
+    "file": "fastapi.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/fastapi.svg"
+    ]
+  },
+  {
+    "name": "Uvicorn",
+    "group": "backend",
+    "file": "uvicorn.png",
+    "urls": [
+      "https://raw.githubusercontent.com/tomchristie/uvicorn/main/docs/uvicorn.png"
+    ]
+  },
+  {
+    "name": "Starlette",
+    "group": "backend",
+    "file": "starlette.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/Kludex/starlette/main/docs/img/starlette.svg"
+    ]
+  },
+  {
+    "name": "Pydantic",
+    "group": "backend",
+    "file": "pydantic.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/pydantic.svg"
+    ]
+  },
+  {
+    "name": "structlog",
+    "group": "backend",
+    "file": "structlog.svg",
+    "urls": [
+      "https://www.structlog.org/en/stable/_static/structlog_logo.svg"
+    ]
+  },
+  {
+    "name": "PostgreSQL",
+    "group": "backend",
+    "file": "postgresql.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/postgresql/postgresql-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "SQLModel",
+    "group": "backend",
+    "file": "sqlmodel.svg",
+    "urls": [
+      "https://sqlmodel.tiangolo.com/img/logo-margin/logo-margin-vector.svg"
+    ]
+  },
+  {
+    "name": "SQLAlchemy",
+    "group": "backend",
+    "file": "sqlalchemy.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/sqlalchemy/sqlalchemy-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "Psycopg",
+    "group": "backend",
+    "file": "psycopg.png",
+    "urls": [
+      "https://www.psycopg.org/img/logo.png"
+    ]
+  },
+  {
+    "name": "Redis",
+    "group": "backend",
+    "file": "redis.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/redis/redis-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "JWT",
+    "group": "backend",
+    "file": "jwt.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/jwt.svg"
+    ]
+  },
+  {
+    "name": "Docling",
+    "group": "ai",
+    "file": "docling.png",
+    "urls": [
+      "https://raw.githubusercontent.com/docling-project/docling/main/docs/assets/logo.png"
+    ]
+  },
+  {
+    "name": "RapidOCR",
+    "group": "ai",
+    "file": "rapidocr.png",
+    "urls": [
+      "https://github.com/RapidAI/RapidOCR/releases/download/v1.1.0/Logov2_white.png"
+    ]
+  },
+  {
+    "name": "PaddlePaddle",
+    "group": "ai",
+    "file": "paddlepaddle.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/paddlepaddle.svg"
+    ]
+  },
+  {
+    "name": "PyMuPDF",
+    "group": "ai",
+    "file": "pymupdf.png",
+    "urls": [
+      "https://pymupdf.pro/images/py-mupdf-github-icon.png"
+    ]
+  },
+  {
+    "name": "BGE FlagEmbedding",
+    "group": "ai",
+    "file": "bge_flagembedding.jpg",
+    "urls": [
+      "https://raw.githubusercontent.com/FlagOpen/FlagEmbedding/master/imgs/bge_logo.jpg"
+    ],
+    "exclude": "Promotional illustration rather than a standalone logo"
+  },
+  {
+    "name": "NumPy",
+    "group": "ai",
+    "file": "numpy.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/numpy/numpy-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "PyTorch",
+    "group": "ai",
+    "file": "pytorch.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/pytorch.svg"
+    ]
+  },
+  {
+    "name": "Transformers Hugging Face",
+    "group": "ai",
+    "file": "transformers_hugging_face.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/hugging-face.svg"
+    ]
+  },
+  {
+    "name": "Sentence Transformers",
+    "group": "ai",
+    "file": "sentence_transformers.png",
+    "urls": [
+      "https://raw.githubusercontent.com/huggingface/sentence-transformers/main/docs/img/logo.png"
+    ]
+  },
+  {
+    "name": "Gemini",
+    "group": "ai",
+    "file": "gemini.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/google-gemini.svg"
+    ]
+  },
+  {
+    "name": "YAML",
+    "group": "ai",
+    "file": "yaml.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/yaml.svg"
+    ]
+  },
+  {
+    "name": "Docker",
+    "group": "tools",
+    "file": "docker.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/docker.svg"
+    ]
+  },
+  {
+    "name": "Linux",
+    "group": "tools",
+    "file": "linux.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/linux/linux-original.svg"
+    ]
+  },
+  {
+    "name": "Ubuntu",
+    "group": "tools",
+    "file": "ubuntu.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/ubuntu/ubuntu-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "uv",
+    "group": "tools",
+    "file": "uv.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/uv.svg"
+    ]
+  },
+  {
+    "name": "Hatch",
+    "group": "tools",
+    "file": "hatch.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/pypa/hatch/master/docs/assets/images/logo.svg"
+    ]
+  },
+  {
+    "name": "Node js",
+    "group": "tools",
+    "file": "node_js.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/nodejs.svg"
+    ]
+  },
+  {
+    "name": "npm",
+    "group": "tools",
+    "file": "npm.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/npm.svg"
+    ]
+  },
+  {
+    "name": "Git",
+    "group": "tools",
+    "file": "git.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/git.svg"
+    ]
+  },
+  {
+    "name": "GitHub",
+    "group": "tools",
+    "file": "github.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/github/github-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "GitHub Actions",
+    "group": "tools",
+    "file": "github_actions.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/githubactions/githubactions-original.svg"
+    ]
+  },
+  {
+    "name": "Bash",
+    "group": "tools",
+    "file": "bash_symbol.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/bash-icon.svg"
+    ],
+    "source_url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/bash-icon.svg"
+  },
+  {
+    "name": "PowerShell",
+    "group": "tools",
+    "file": "powershell.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/powershell/powershell-original.svg"
+    ]
+  },
+  {
+    "name": "Ruff",
+    "group": "validation",
+    "file": "ruff.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/ruff.svg"
+    ]
+  },
+  {
+    "name": "mypy",
+    "group": "validation",
+    "file": "mypy.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/python/mypy/master/docs/source/mypy_light.svg"
+    ]
+  },
+  {
+    "name": "Biome",
+    "group": "validation",
+    "file": "biome.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/biomejs.svg"
+    ]
+  },
+  {
+    "name": "pytest",
+    "group": "validation",
+    "file": "pytest.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/devicons/devicon/master/icons/pytest/pytest-original-wordmark.svg"
+    ]
+  },
+  {
+    "name": "HTTPX",
+    "group": "validation",
+    "file": "httpx.png",
+    "urls": [
+      "https://raw.githubusercontent.com/encode/httpx/master/docs/img/butterfly.png"
+    ]
+  },
+  {
+    "name": "coverage py",
+    "group": "validation",
+    "file": "coverage_py.png",
+    "urls": [
+      "https://raw.githubusercontent.com/coveragepy/coveragepy/main/doc/media/sleepy-snake-circle-150.png"
+    ]
+  },
+  {
+    "name": "Vitest",
+    "group": "validation",
+    "file": "vitest.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/vitest.svg"
+    ]
+  },
+  {
+    "name": "Testing Library",
+    "group": "validation",
+    "file": "testing_library.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/testing-library.svg"
+    ]
+  },
+  {
+    "name": "Markdown",
+    "group": "validation",
+    "file": "markdown.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/markdown.svg"
+    ]
+  },
+  {
+    "name": "OpenAPI",
+    "group": "validation",
+    "file": "openapi.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/openapi.svg"
+    ]
+  },
+  {
+    "name": "diagrams net",
+    "group": "validation",
+    "file": "diagrams_net.svg",
+    "urls": [
+      "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/diagramsdotnet.svg"
+    ]
+  }
+]

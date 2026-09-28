@@ -20,6 +20,16 @@ une implémentation des services backend décrits comme « cible » dans ce docu
 
 ## 0. Vision produit et principes non négociables
 
+**Pages publiques au 2026-09-15.** `features/auth/` fournit `/login`,
+`/mot-de-passe-oublie` et `/reinitialiser-mot-de-passe?token=…` ; `features/contact/`
+fournit `/contact`. Ces routes utilisent le cadre visuel `shared/layout/AuthLayout`,
+le logo SVG existant et des
+formulaires React Hook Form/Zod. Les mutations passent par les clients Orval générés.
+Les espaces privés conservent leurs gardes de rôle. L’envoi des e-mails nécessite la
+configuration SMTP décrite dans `docs/PUBLIC-AUTH.md` ; le contact confirme uniquement
+les messages acceptés par le serveur SMTP. La page de réinitialisation ne transmet
+pas son URL dans l’en-tête Referer (`no-referrer`) et retire le jeton après succès.
+
 Le frontend est l'interface de décision d'une plateforme ESG et carbone. Sa qualité ne se mesure donc pas au
 nombre de graphiques, mais à la capacité de répondre rapidement à quatre questions :
 
@@ -122,6 +132,7 @@ frontend/
 | Module frontend | Responsabilité | Backend | Étape |
 |---|---|---|---|
 | `features/auth/` | connexion, session, déconnexion | `app/auth/` | 9 |
+| `features/contact/` | formulaire public de contact | `app/contact/` | Pages publiques |
 | `features/admin/` | administration et file de revue | `app/admin/` | 10 |
 | `features/company/` | dépôt de rapports et données extraites | `app/company/` | 10 |
 | `features/audit/` | affectations, avis et preuves | `app/audit/` | 11 |
