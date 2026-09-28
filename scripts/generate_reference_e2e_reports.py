@@ -19,26 +19,50 @@ RACINE = Path(__file__).resolve().parent.parent / "data_test" / "reference_e2e"
 
 LABELS_INDICATEURS = {
     "scope_1": "Émissions directes (Scope 1)",
+    "scope_2": "Émissions indirectes énergie, non différenciées (Scope 2)",
     "scope_2_market_based": "Émissions indirectes énergie - méthode market-based (Scope 2)",
     "scope_2_location_based": "Émissions indirectes énergie - méthode location-based (Scope 2)",
     "scope_3": "Autres émissions indirectes de la chaîne de valeur (Scope 3)",
     "intensite_scope_1_2_marketbased": "Intensité carbone Scope 1+2 (market-based)",
     "intensite_scope_1_2_3_hors_cat11": "Intensité carbone Scope 1+2+3 (hors catégorie 11)",
     "intensite_scope_1_2_3_total": "Intensité carbone Scope 1+2+3 (total)",
+    "part_renouvelable_pourcentage": "Part d'énergie renouvelable dans le mix",
+    "dechets_valorises_pourcentage": "Part des déchets valorisés ou recyclés",
     # Socle Social/Gouvernance harmonisé (Phase 5 §9) — voir config/weights/default.yaml.
     "femmes_management_pourcentage": "Part de femmes au sein du management",
     "deces_professionnels": "Décès professionnels sur l'exercice",
     "femmes_conseil_pourcentage": "Part de femmes au conseil d'administration",
+    # Second lot — transparence humaine (voir app/ingestion/extractor.py::INDICATEURS_CIBLES).
+    "taille_conseil": "Taille du conseil d'administration",
+    "administrateurs_independants_pourcentage": "Part d'administrateurs indépendants",
+    "effectif_total": "Effectif total",
+    "femmes_effectif_pourcentage": "Part de femmes dans l'effectif total",
+    "heures_formation_par_employe": "Heures de formation moyennes par salarié",
+    "taux_frequence_accidents": "Taux de fréquence des accidents avec arrêt",
+    "score_environnement_declare": "Score Environnement auto-déclaré",
+    "score_social_declare": "Score Social auto-déclaré",
+    "score_gouvernance_declare": "Score Gouvernance auto-déclaré",
+    "score_global_declare": "Score ESG global auto-déclaré",
 }
 
 _CODES_ENVIRONNEMENT = {
     "scope_1",
+    "scope_2",
     "scope_2_market_based",
     "scope_2_location_based",
     "scope_3",
     "intensite_scope_1_2_marketbased",
     "intensite_scope_1_2_3_hors_cat11",
     "intensite_scope_1_2_3_total",
+    "part_renouvelable_pourcentage",
+    "dechets_valorises_pourcentage",
+}
+
+_CODES_SCORES_DECLARES = {
+    "score_environnement_declare",
+    "score_social_declare",
+    "score_gouvernance_declare",
+    "score_global_declare",
 }
 
 
@@ -97,7 +121,11 @@ def _page_tableau_indicateurs(
         label = LABELS_INDICATEURS[indicateur["code"]]
         page.insert_textbox(pymupdf.Rect(72, y - 10, 420, y + 20), label, fontsize=9.5, fontname="helv")
         valeur = indicateur["valeur_attendue"]
-        valeur_str = f"{valeur:,.1f}".replace(",", " ")
+        # 3 décimales sous 10 (sinon un ratio comme 0.041 tCO2e/t minerai s'arrondirait à "0.0",
+        # indiscernable d'un zéro réel) ; 1 décimale au-delà, où l'échelle rend ce niveau de
+        # précision sans intérêt visuel (ex. 17 990 000.0 tCO2e).
+        decimales = 3 if abs(valeur) < 10 else 1
+        valeur_str = f"{valeur:,.{decimales}f}".replace(",", " ")
         page.insert_text((430, y), valeur_str, fontsize=9.5, fontname="helv")
         page.insert_text((500, y), indicateur["unite"], fontsize=9.5, fontname="helv")
         y += 34
@@ -149,7 +177,12 @@ def generer_pdf(dossier: Path, scenario: dict[str, Any]) -> None:
     annee = scenario["rapport"]["annee_reporting"]
     indicateurs = scenario["extraction_attendue"]["indicateurs"]
     indicateurs_climat = [i for i in indicateurs if i["code"] in _CODES_ENVIRONNEMENT]
-    indicateurs_social_gouvernance = [i for i in indicateurs if i["code"] not in _CODES_ENVIRONNEMENT]
+    indicateurs_scores = [i for i in indicateurs if i["code"] in _CODES_SCORES_DECLARES]
+    indicateurs_social_gouvernance = [
+        i
+        for i in indicateurs
+        if i["code"] not in _CODES_ENVIRONNEMENT and i["code"] not in _CODES_SCORES_DECLARES
+    ]
 
     doc = pymupdf.open()
     _page_couverture(doc, nom, annee)
@@ -166,6 +199,14 @@ def generer_pdf(dossier: Path, scenario: dict[str, Any]) -> None:
         "Socle harmonisé Social/Gouvernance (Phase 5 §9) - valeurs de l'exercice de reporting.",
         indicateurs_social_gouvernance,
     )
+    if indicateurs_scores:
+        _page_tableau_indicateurs(
+            doc,
+            "3bis. Scores ESG auto-déclarés",
+            "Scores publiés par l'entreprise elle-même dans sa propre synthèse — distincts du "
+            "score recalculé par le moteur de scoring de la plateforme.",
+            indicateurs_scores,
+        )
     _page_perspectives(doc, nom)
     _page_methodologie(doc)
 

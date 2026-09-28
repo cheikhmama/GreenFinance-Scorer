@@ -1,0 +1,45 @@
+{
+  "_a_propos": "Entreprise de référence synthétique — corpus E2E (distinct de data_test/ground_truth.yaml, corpus de rapports réels utilisé pour la précision d'extraction). Voir data_test/reference_e2e/README.md. Profil (Mauritanie, minerai de fer) et valeurs inspirés d'un scénario de test fourni par l'utilisateur pour un audit complet de la plateforme ; nom d'entreprise volontairement fictif, aucune entreprise réelle n'est engagée par ces valeurs. Couvre la quasi-totalité du vocabulaire actuel de app/ingestion/extractor.py::INDICATEURS_CIBLES (19 des 23 codes, y compris les 3 non trouvés volontairement pour tester ce chemin), contrairement aux 5 autres scénarios du corpus qui n'en couvrent que 10.",
+  "entreprise": {
+    "nom": "Ferrosahel Mining",
+    "secteur": "Mines et extraction de minerai de fer",
+    "pays": "Mauritanie"
+  },
+  "rapport": {
+    "fichier": "rapport.pdf",
+    "type": "RAPPORT_ESG",
+    "annee_reporting": 2026
+  },
+  "extraction_attendue": {
+    "indicateurs": [
+      { "code": "scope_1", "cible": "donnee_carbone", "valeur_attendue": 533655.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "scope_2", "cible": "donnee_carbone", "valeur_attendue": 7076.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "scope_3", "cible": "donnee_carbone", "valeur_attendue": 17990000.0, "unite": "tCO2e", "page_attendue": 3 },
+      { "code": "intensite_scope_1_2_marketbased", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 0.041, "unite": "tCO2e/t minerai", "page_attendue": 3 },
+      { "code": "intensite_scope_1_2_3_total", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 1.404, "unite": "tCO2e/t minerai", "page_attendue": 3 },
+      { "code": "part_renouvelable_pourcentage", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 18.5, "unite": "%", "page_attendue": 3 },
+      { "code": "dechets_valorises_pourcentage", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 62.0, "unite": "%", "page_attendue": 3 },
+      { "code": "effectif_total", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 6450.0, "unite": "personnes", "page_attendue": 4 },
+      { "code": "femmes_effectif_pourcentage", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 8.4, "unite": "%", "page_attendue": 4 },
+      { "code": "femmes_management_pourcentage", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 11.2, "unite": "%", "page_attendue": 4 },
+      { "code": "heures_formation_par_employe", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 26.0, "unite": "h/salarié", "page_attendue": 4 },
+      { "code": "taux_frequence_accidents", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 0.72, "unite": "pour 1M h", "page_attendue": 4 },
+      { "code": "deces_professionnels", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 0.0, "unite": "count", "page_attendue": 4 },
+      { "code": "administrateurs_independants_pourcentage", "cible": "indicateur_esg", "pilier": "GOUVERNANCE", "valeur_attendue": 33.0, "unite": "%", "page_attendue": 4 },
+      { "code": "femmes_conseil_pourcentage", "cible": "indicateur_esg", "pilier": "GOUVERNANCE", "valeur_attendue": 22.0, "unite": "%", "page_attendue": 4 },
+      { "code": "score_environnement_declare", "cible": "indicateur_esg", "pilier": "ENVIRONNEMENT", "valeur_attendue": 68.0, "unite": "/100", "page_attendue": 5 },
+      { "code": "score_social_declare", "cible": "indicateur_esg", "pilier": "SOCIAL", "valeur_attendue": 74.0, "unite": "/100", "page_attendue": 5 },
+      { "code": "score_gouvernance_declare", "cible": "indicateur_esg", "pilier": "GOUVERNANCE", "valeur_attendue": 81.0, "unite": "/100", "page_attendue": 5 },
+      { "code": "score_global_declare", "cible": "rapport_score_global", "valeur_attendue": 73.7, "unite": "/100", "page_attendue": 5 }
+    ],
+    "codes_absents_volontaires": ["scope_2_market_based", "scope_2_location_based", "intensite_scope_1_2_3_hors_cat11", "taille_conseil"]
+  },
+  "audit_attendu": {
+    "decision": "RECOMMANDE_VALIDATION",
+    "commentaire_contient": "conforme"
+  },
+  "decision_admin_attendue": {
+    "statut": "VALIDE"
+  },
+  "publication_attendue": true
+}
