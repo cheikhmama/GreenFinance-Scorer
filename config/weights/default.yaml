@@ -1,4 +1,4 @@
-# Méthodologie de référence GreenFinance Scorer — version 1 (Phase 5 §9).
+# Méthodologie de référence GreenFinance Scorer — version 2.
 #
 # Chaque chiffre ici est une décision méthodologique, pas un détail technique : le changer
 # produit une nouvelle version de la notation, pas juste un ajustement de code. Validée sur les
@@ -9,14 +9,50 @@
 # jet, pas des seuils benchmarkés sur un référentiel sectoriel externe — à réviser (nouvelle
 # version) une fois un vrai corpus d'entreprises comparables disponible.
 #
-# Poids des indicateurs Social/Gouvernance : socle minimal harmonisé retenu après analyse de
-# data_test/reference_esg_8_entreprises.json — seuls les indicateurs présents chez la quasi-
-# totalité des 8 entreprises de référence et directement comparables entre elles (voir le
-# diagnostic associé). Les taux d'accidents du travail et le % d'administrateurs indépendants en
-# sont délibérément exclus : trop hétérogènes (métriques et dénominateurs différents selon
-# l'entreprise) pour ne pas produire une comparaison silencieusement fausse.
+# Ce que le score calculé n'inclut jamais, par principe (pas une omission à corriger) :
+#   - le tonnage carbone brut Scope 1/2/3 (DonneeCarbone) : sans dénominateur (CA, effectif,
+#     production...), normaliser une valeur absolue pénaliserait mécaniquement une grande
+#     entreprise face à une petite. Les 3 indicateurs d'intensité carbone ci-dessous sont le
+#     proxy déjà normalisé et correct pour cette dimension — c'est volontairement leur rôle.
+#   - les scores auto-déclarés par l'entreprise (score_global_declare et les 3 codes
+#     score_{environnement,social,gouvernance}_declare) : les mélanger au score calculé par la
+#     plateforme contredirait le principe "jamais de boîte noire, jamais un chiffre qu'on ne
+#     peut pas défendre" — ils restent extraits et affichés séparément, jamais fondus ici.
+#
+# Poids et bornes des indicateurs Social/Gouvernance/Environnement (hors intensités carbone,
+# déjà validées à la v1) : socle harmonisé retenu après analyse de
+# data_test/reference_esg_8_entreprises.json — seuls les indicateurs directement comparables
+# entre entreprises (même métrique, même dénominateur implicite) y sont ajoutés. Sont
+# délibérément exclus, criblés avec le même critère à la v2 :
+#   - taux_frequence_accidents : 7 métriques différentes selon l'entreprise dans le corpus de
+#     référence (TRIFR/AIFR/TRIR/LTIFR/TRFR/"Fréquence"/"Taux accidents"), dénominateurs non
+#     harmonisés (par 200 000h, par million d'heures, non précisé) — comparer ferait mentir.
+#   - administrateurs_independants_pourcentage : hétérogénéité déjà constatée dans le corpus.
+#   - taille_conseil : pas de sens monotone défendable (ni "plus c'est mieux" ni l'inverse — la
+#     bonne pratique vise une fourchette, pas un extremum), et normaliser() ne modélise que des
+#     directions strictement monotones.
+#   - effectif_total : grandeur brute (effectif), pas un ratio — même raisonnement que
+#     l'exclusion du tonnage carbone brut ci-dessus : une grande entreprise n'est pas "moins
+#     bonne" qu'une petite, comparer les effectifs bruts n'a pas de sens en score ESG.
+#   - heures_formation_par_employe : candidat légitime mais écarté à la v2, faute de matérialité
+#     suffisante dans le corpus de référence (une seule entreprise sur 8 le rapporte).
+#
+# Indicateurs ajoutés à la v2, avec leur justification de borne :
+#   - femmes_effectif_pourcentage : même famille que femmes_management_pourcentage/
+#     femmes_conseil_pourcentage déjà en v1, borne 0/50 par la même convention "parité" (au-delà
+#     de 50% on change de sens de déséquilibre). Preuve : 5/8 entreprises du corpus de référence
+#     rapportent ce code exact (8.36% à 40.4%), borne 0/50 cohérente avec cette plage.
+#   - part_renouvelable_pourcentage : AUCUNE entreprise du corpus de référence ne rapporte ce
+#     code exact — seules des métriques voisines (energie_renouvelable_pourcentage,
+#     electricite_renouvelable_pourcentage) y apparaissent, observées entre 24% et 98.6%. Borne
+#     0/100 retenue par analogie de grandeur (un pourcentage de part renouvelable), PAS par une
+#     correspondance de code vérifiée — à réviser en priorité dès qu'un vrai rapport fournit ce
+#     code précis.
+#   - dechets_valorises_pourcentage : aucun point de données dans le corpus de référence, sous
+#     aucun nom de code. Borne 0/100 retenue par pur raisonnement (c'est un pourcentage) — la
+#     borne la plus provisoire de ce fichier, à réviser dès la première donnée réelle disponible.
 
-version: 1
+version: 2
 nom: "Méthodologie de référence GreenFinance Scorer"
 
 piliers:
@@ -24,34 +60,49 @@ piliers:
     poids: 0.5
     indicateurs:
       intensite_scope_1_2_marketbased:
-        poids: 0.34
+        poids: 0.24
         plus_haut_est_meilleur: false
         borne_min: 0
         borne_max: 100
       intensite_scope_1_2_3_hors_cat11:
-        poids: 0.33
+        poids: 0.23
         plus_haut_est_meilleur: false
         borne_min: 0
         borne_max: 200
       intensite_scope_1_2_3_total:
-        poids: 0.33
+        poids: 0.23
         plus_haut_est_meilleur: false
         borne_min: 0
         borne_max: 500
+      part_renouvelable_pourcentage:
+        poids: 0.15
+        plus_haut_est_meilleur: true
+        borne_min: 0
+        borne_max: 100
+      dechets_valorises_pourcentage:
+        poids: 0.15
+        plus_haut_est_meilleur: true
+        borne_min: 0
+        borne_max: 100
 
   SOCIAL:
     poids: 0.25
     indicateurs:
-      femmes_management_pourcentage:
-        poids: 0.6
-        plus_haut_est_meilleur: true
-        borne_min: 0
-        borne_max: 50
       deces_professionnels:
-        poids: 0.4
+        poids: 0.40
         plus_haut_est_meilleur: false
         borne_min: 0
         borne_max: 5
+      femmes_management_pourcentage:
+        poids: 0.35
+        plus_haut_est_meilleur: true
+        borne_min: 0
+        borne_max: 50
+      femmes_effectif_pourcentage:
+        poids: 0.25
+        plus_haut_est_meilleur: true
+        borne_min: 0
+        borne_max: 50
 
   GOUVERNANCE:
     poids: 0.25

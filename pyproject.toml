@@ -34,6 +34,13 @@ dependencies = [
     # raisonnement que le bloc ci-dessus, promu du groupe notebook où il ne servait jusqu'ici
     # qu'à lire data_test/ground_truth.yaml depuis les scripts de validation.
     "pyyaml>=6.0.2",
+    # Import automatique par URL (Phase 6, app/company/url_fetch.py) — l'API en a besoin au
+    # runtime pour aller chercher un PDF côté serveur, pas seulement les tests (TestClient).
+    "httpx",
+    # Rapport de synthèse PDF (Phase 6, app/ingestion/synthesis_report.py) — jusqu'ici utilisé
+    # uniquement par scripts/generate_technology_report.py hors périmètre applicatif ; l'API en a
+    # désormais besoin au runtime, même raisonnement de promotion que le reste de ce bloc.
+    "reportlab",
 ]
 
 [dependency-groups]
@@ -41,9 +48,9 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
-    "httpx",
     "types-passlib",
     "types-pyyaml",
+    "types-reportlab>=5.0.0.20260911",
 ]
 notebook = [
     "jupyter",
