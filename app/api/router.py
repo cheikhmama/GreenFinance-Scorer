@@ -19,6 +19,7 @@ from app.audit.router import router as audit_router
 from app.auth.csrf import CSRFMiddleware
 from app.auth.router import router as auth_router
 from app.company.router import router as company_router
+from app.contact.router import router as contact_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware
@@ -31,6 +32,7 @@ from app.researcher.router import router as researcher_router
 # d'apparaître groupé dans /api/v1/openapi.json et /api/v1/docs dès
 # maintenant, même sans route active à l'intérieur de son router.
 OPENAPI_TAGS = [
+    {"name": "contact", "description": "Contact public avec l'équipe de la plateforme."},
     {"name": "auth", "description": "Authentification et autorisation — Étape 9."},
     {
         "name": "admin",
@@ -80,6 +82,7 @@ api_app.add_middleware(
 api_app.add_middleware(CSRFMiddleware)
 
 api_app.include_router(auth_router)
+api_app.include_router(contact_router)
 api_app.include_router(core_router)
 api_app.include_router(admin_router)
 api_app.include_router(audit_router)
