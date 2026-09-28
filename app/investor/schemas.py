@@ -7,14 +7,30 @@ même garantie (jamais l'auditeur_id, voir RapportESGDetail).
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.company.schemas import EntreprisePublic
 from app.core.enums import DevisePosition, TypeDureeInvestissement
-from app.ingestion.schemas import DonneeCarboneDetail, IndicateurESGDetail
+from app.ingestion.schemas import (
+    CouvertureResume,
+    DonneeCarboneDetail,
+    IndicateurESGDetail,
+)
+
+
+def _vers_naif_utc(valeur: datetime) -> datetime:
+    """Normalise un datetime éventuellement "aware" (ex. suffixe Z produit par
+    Date.toISOString() côté frontend) vers un naïf en UTC — même convention que
+    app/core/database.py::utcnow() et les colonnes TIMESTAMP WITHOUT TIME ZONE. Sans cette
+    normalisation à la frontière, comparer ce champ à une valeur déjà stockée (toujours naïve)
+    lève TypeError: can't compare offset-naive and offset-aware datetimes, jamais rattrapé
+    comme une simple erreur de validation (voir app/investor/portfolio.py::fermer_position)."""
+    if valeur.tzinfo is not None:
+        return valeur.astimezone(UTC).replace(tzinfo=None)
+    return valeur
 
 
 class EtatPosition(str, Enum):
@@ -46,11 +62,14 @@ class DonneesCarboneAgregees(BaseModel):
 
 class EntreprisePublieePublic(EntreprisePublic):
     """Entreprise publiée, telle que consultable par l'Investisseur — étend EntreprisePublic
-    (déjà utilisé côté Entreprise/Admin) avec le score et les émissions Scope 1/2/3 de son
-    dernier rapport validé."""
+    (déjà utilisé côté Entreprise/Admin) avec le score, les émissions Scope 1/2/3 de son dernier
+    rapport validé, et son montant minimum d'investissement pré-converti dans les 3 devises (voir
+    app/investor/entreprises.py::montant_minimum_par_devise) — le frontend n'a qu'à lire la
+    valeur de la devise déjà choisie pour la position, jamais de conversion côté client."""
 
     score: ScoreEntreprisePublic
     carbone: DonneesCarboneAgregees
+    montant_minimum_par_devise: dict[DevisePosition, float] | None
 
 
 class EntrepriseDetailInvestisseur(EntreprisePublieePublic):
@@ -60,11 +79,11 @@ class EntrepriseDetailInvestisseur(EntreprisePublieePublic):
 
     indicateurs: list[IndicateurESGDetail]
     donnees_carbone: list[DonneeCarboneDetail]
+    couverture: CouvertureResume
 
 
 class CreerPortefeuilleRequest(BaseModel):
     nom: str
-    devise_reference: DevisePosition
 
 
 class RenommerPortefeuilleRequest(BaseModel):
@@ -73,11 +92,19 @@ class RenommerPortefeuilleRequest(BaseModel):
 
 class AjouterPositionRequest(BaseModel):
     entreprise_id: uuid.UUID
-    montant: float
+    # gt=0, jamais seulement le CheckConstraint SQL ("montant_investi > 0", voir
+    # app/investor/models.py) : sans cette validation ici, un montant négatif ou nul remonterait
+    # comme une IntegrityError Postgres non rattrapée (500) plutôt qu'un 422 propre.
+    montant: float = Field(gt=0)
     devise: DevisePosition
     type_duree: TypeDureeInvestissement
     date_debut: datetime
     date_fin: datetime | None = None
+
+    @field_validator("date_debut", "date_fin")
+    @classmethod
+    def _normaliser_dates(cls, valeur: datetime | None) -> datetime | None:
+        return _vers_naif_utc(valeur) if valeur is not None else None
 
 
 class ModifierPositionRequest(BaseModel):
@@ -85,15 +112,25 @@ class ModifierPositionRequest(BaseModel):
     app/investor/portfolio.py) — l'entreprise concernée n'est jamais modifiable après création,
     seule une fermeture puis une nouvelle position permet de changer de cible."""
 
-    montant: float
+    montant: float = Field(gt=0)
     devise: DevisePosition
     type_duree: TypeDureeInvestissement
     date_debut: datetime
     date_fin: datetime | None = None
 
+    @field_validator("date_debut", "date_fin")
+    @classmethod
+    def _normaliser_dates(cls, valeur: datetime | None) -> datetime | None:
+        return _vers_naif_utc(valeur) if valeur is not None else None
+
 
 class FermerPositionRequest(BaseModel):
     date_fin: datetime | None = None
+
+    @field_validator("date_fin")
+    @classmethod
+    def _normaliser_date_fin(cls, valeur: datetime | None) -> datetime | None:
+        return _vers_naif_utc(valeur) if valeur is not None else None
 
 
 class EntrepriseSommaire(BaseModel):
@@ -161,6 +198,5 @@ class TableauDeBordInvestisseur(BaseModel):
     taux_couverture_esg_plateforme: float
     nombre_nouvelles_publications_suivies: int
     repartition_secteur: list[RepartitionSecteur]
-    positions_principales: list[PositionDetail]
     publications_recentes: list[EntreprisePublieePublic]
     entreprises_suivies_suspendues: list[EntrepriseSommaire]

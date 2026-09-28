@@ -9,15 +9,22 @@ analyses}.py — ce router ne fait qu'appliquer le contrôle d'accès par rôle 
 import uuid
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution, Utilisateur
+from app.auth.models import Utilisateur
 from app.auth.permissions import require_role
+from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.institution.schemas import RattachementPublic
+from app.institution.router import entreprise_perimetre_public, rattachement_public
+from app.institution.schemas import (
+    DocumentProjetPublic,
+    EntreprisePerimetrePublic,
+    RattachementPublic,
+)
 from app.investor import entreprises
 from app.investor.schemas import EntrepriseDetailInvestisseur, EntreprisePublieePublic
 from app.researcher import analyses, projets, rattachements
@@ -48,8 +55,15 @@ def lister_entreprises_route(
     current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublieePublic]:
+    perimetre = projets.entreprises_perimetre_chercheur(session, current_user.id)
     items, total = entreprises.lister_entreprises_publiees(
-        session, secteur=secteur, pays=pays, recherche=recherche, page=page, page_size=page_size
+        session,
+        secteur=secteur,
+        pays=pays,
+        recherche=recherche,
+        page=page,
+        page_size=page_size,
+        perimetre_autorise=perimetre,
     )
     return Page[EntreprisePublieePublic](
         items=items, page=page, page_size=page_size, total=total, pages=-(-total // page_size) or 1
@@ -67,21 +81,43 @@ def consulter_entreprise_route(
     current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
     session: Session = Depends(get_session),
 ) -> EntrepriseDetailInvestisseur:
-    return entreprises.consulter_entreprise_publiee(session, entreprise_id)
+    perimetre = projets.entreprises_perimetre_chercheur(session, current_user.id)
+    return entreprises.consulter_entreprise_publiee(
+        session, entreprise_id, perimetre_autorise=perimetre
+    )
+
+
+@router.get(
+    "/researcher/entreprises/{entreprise_id}/preuves/{preuve_id}/fichier",
+    operation_id="getEvidenceFileForResearcher",
+    summary="Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone",
+)
+def consulter_preuve_route(
+    entreprise_id: uuid.UUID,
+    preuve_id: uuid.UUID,
+    current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    perimetre = projets.entreprises_perimetre_chercheur(session, current_user.id)
+    chemin = entreprises.fichier_preuve(
+        session, entreprise_id, preuve_id, perimetre_autorise=perimetre
+    )
+    return FileResponse(storage.resolve_path(chemin), media_type="application/pdf")
 
 
 @router.get(
     "/researcher/comparaison",
-    response_model=list[EntreprisePublieePublic],
+    response_model=list[EntrepriseDetailInvestisseur],
     operation_id="compareCompaniesForResearcher",
-    summary="Comparer plusieurs entreprises publiées (score, Scope 1/2/3)",
+    summary="Comparer jusqu'à 4 entreprises publiées (score, indicateurs, carbone détaillés)",
 )
 def comparer_entreprises_route(
     entreprise_ids: list[uuid.UUID] = Query(...),
     current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
     session: Session = Depends(get_session),
-) -> list[EntreprisePublieePublic]:
-    return entreprises.comparer_entreprises(session, entreprise_ids)
+) -> list[EntrepriseDetailInvestisseur]:
+    perimetre = projets.entreprises_perimetre_chercheur(session, current_user.id)
+    return entreprises.comparer_entreprises(session, entreprise_ids, perimetre_autorise=perimetre)
 
 
 @router.get(
@@ -93,8 +129,9 @@ def comparer_entreprises_route(
 def lister_mes_rattachements_route(
     current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
     session: Session = Depends(get_session),
-) -> list[ChercheurInstitution]:
-    return rattachements.lister_mes_rattachements(session, current_user.id)
+) -> list[RattachementPublic]:
+    mes_rattachements = rattachements.lister_mes_rattachements(session, current_user.id)
+    return [rattachement_public(session, r) for r in mes_rattachements]
 
 
 @router.post(
@@ -107,8 +144,9 @@ def accepter_rattachement_route(
     rattachement_id: uuid.UUID,
     current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
     session: Session = Depends(get_session),
-) -> ChercheurInstitution:
-    return rattachements.accepter_invitation(session, current_user.id, rattachement_id)
+) -> RattachementPublic:
+    rattachement = rattachements.accepter_invitation(session, current_user.id, rattachement_id)
+    return rattachement_public(session, rattachement)
 
 
 @router.post(
@@ -121,8 +159,9 @@ def refuser_rattachement_route(
     rattachement_id: uuid.UUID,
     current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
     session: Session = Depends(get_session),
-) -> ChercheurInstitution:
-    return rattachements.refuser_invitation(session, current_user.id, rattachement_id)
+) -> RattachementPublic:
+    rattachement = rattachements.refuser_invitation(session, current_user.id, rattachement_id)
+    return rattachement_public(session, rattachement)
 
 
 @router.get(
@@ -144,11 +183,55 @@ def lister_mes_projets_route(
                 id=projet.id,
                 nom=projet.nom,
                 description=projet.description,
+                objectif=projet.objectif,
+                date_debut=projet.date_debut,
+                date_fin_prevue=projet.date_fin_prevue,
+                date_limite=projet.date_limite,
                 statut=projet.statut,
                 institution_email=institution.email if institution else "",
             )
         )
     return resultat
+
+
+@router.get(
+    "/researcher/projets/{projet_id}/perimetre",
+    response_model=list[EntreprisePerimetrePublic],
+    operation_id="listProjectScopeForResearcher",
+    summary="Lister les entreprises autorisées dans le périmètre d'un projet affecté",
+)
+def lister_perimetre_route(
+    projet_id: uuid.UUID,
+    current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
+    session: Session = Depends(get_session),
+) -> list[EntreprisePerimetrePublic]:
+    liens = projets.lister_perimetre(session, current_user.id, projet_id)
+    return [entreprise_perimetre_public(session, lien) for lien in liens]
+
+
+@router.get(
+    "/researcher/projets/{projet_id}/documents",
+    response_model=list[DocumentProjetPublic],
+    operation_id="listProjectDocumentsForResearcher",
+    summary="Lister les documents mis à disposition sur un projet affecté",
+)
+def lister_documents_route(
+    projet_id: uuid.UUID,
+    current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
+    session: Session = Depends(get_session),
+) -> list[DocumentProjetPublic]:
+    documents = projets.lister_documents(session, current_user.id, projet_id)
+    return [
+        DocumentProjetPublic(
+            id=document.id,
+            rapport_id=document.rapport_id,
+            entreprise_id=document.rapport.entreprise_id,
+            entreprise_nom=document.rapport.entreprise.nom,
+            annee_reporting=document.rapport.annee_reporting,
+            date_ajout=document.date_ajout,
+        )
+        for document in documents
+    ]
 
 
 def _analyse_detail(session: Session, analyse: Analyse) -> AnalyseDetail:
@@ -264,3 +347,17 @@ def corriger_analyse_route(
         session, current_user.id, analyse_id, payload.titre, payload.contenu, payload.entreprise_ids
     )
     return _analyse_detail(session, nouvelle)
+
+
+@router.get(
+    "/researcher/analyses/{analyse_id}/historique",
+    response_model=list[AnalysePublic],
+    operation_id="getAnalysisHistory",
+    summary="Reconstruire la chaîne complète des versions d'une analyse (v1 -> correction -> v2 -> ...)",
+)
+def historique_analyse_route(
+    analyse_id: uuid.UUID,
+    current_user: Utilisateur = Depends(require_role(Role.CHERCHEUR)),
+    session: Session = Depends(get_session),
+) -> list[Analyse]:
+    return analyses.historique_analyse(session, current_user.id, analyse_id)

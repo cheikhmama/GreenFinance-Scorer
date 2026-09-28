@@ -13,6 +13,7 @@ from app.auth.models import ChercheurInstitution, Utilisateur
 from app.core.database import utcnow
 from app.core.enums import Role, StatutRattachement
 from app.core.exceptions import ValidationError
+from app.core.notifications import notifier
 
 
 def lister_chercheurs_disponibles(session: Session, institution_id: uuid.UUID) -> list[Utilisateur]:
@@ -33,8 +34,22 @@ def lister_chercheurs_disponibles(session: Session, institution_id: uuid.UUID) -
     )
 
 
+def _notifier_invitation(session: Session, institution_id: uuid.UUID, chercheur_id: uuid.UUID) -> None:
+    institution = session.get(Utilisateur, institution_id)
+    if institution is not None:
+        notifier(
+            session,
+            chercheur_id,
+            "RATTACHEMENT_INVITATION",
+            f"{institution.nom or institution.email} vous invite à rejoindre ses projets.",
+        )
+
+
 def inviter_chercheur(
-    session: Session, institution_id: uuid.UUID, chercheur_id: uuid.UUID
+    session: Session,
+    institution_id: uuid.UUID,
+    chercheur_id: uuid.UUID,
+    conditions_collaboration: str | None = None,
 ) -> ChercheurInstitution:
     chercheur = session.get(Utilisateur, chercheur_id)
     if chercheur is None or chercheur.role != Role.CHERCHEUR or not chercheur.actif:
@@ -55,13 +70,20 @@ def inviter_chercheur(
         existant.statut = StatutRattachement.EN_ATTENTE
         existant.date_invitation = utcnow()
         existant.date_reponse = None
+        existant.conditions_collaboration = conditions_collaboration
         session.add(existant)
+        _notifier_invitation(session, institution_id, chercheur_id)
         session.commit()
         session.refresh(existant)
         return existant
 
-    rattachement = ChercheurInstitution(institution_id=institution_id, chercheur_id=chercheur_id)
+    rattachement = ChercheurInstitution(
+        institution_id=institution_id,
+        chercheur_id=chercheur_id,
+        conditions_collaboration=conditions_collaboration,
+    )
     session.add(rattachement)
+    _notifier_invitation(session, institution_id, chercheur_id)
     session.commit()
     session.refresh(rattachement)
     return rattachement

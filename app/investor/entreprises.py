@@ -12,16 +12,46 @@ from sqlmodel import Session, col, func, or_, select
 
 from app.company.models import Entreprise
 from app.company.schemas import EntreprisePublic
-from app.core.enums import StatutRapport
-from app.core.exceptions import NotFoundError
-from app.ingestion.models import DonneeCarbone, IndicateurESG, RapportESG
+from app.core.config import get_settings
+from app.core.enums import DevisePosition, StatutCouvertureIndicateur, StatutRapport
+from app.core.exceptions import NotFoundError, ValidationError
+from app.ingestion.models import (
+    CouvertureIndicateur,
+    DonneeCarbone,
+    IndicateurESG,
+    PreuveDocumentaire,
+    RapportESG,
+)
+from app.ingestion.schemas import CouvertureResume
+from app.investor import fx
 from app.investor.schemas import (
     DonneesCarboneAgregees,
     EntrepriseDetailInvestisseur,
     EntreprisePublieePublic,
     ScoreEntreprisePublic,
 )
-from app.scoring.models import ConfigurationPonderation, ScoreESG
+
+_COUVERTURE_VIDE = CouvertureResume(total_cibles=0, trouves=0, codes_manquants=[])
+
+
+def couverture_publique(session: Session, rapport: RapportESG | None) -> CouvertureResume:
+    """Même donnée que RapportESGDetail.couverture (app/ingestion/schemas.py), reconstruite ici
+    car EntrepriseDetailInvestisseur s'assemble manuellement (jamais via from_attributes sur
+    l'ORM, voir consulter_entreprise_publiee) plutôt que par un computed_field."""
+    if rapport is None:
+        return _COUVERTURE_VIDE
+    couvertures = session.exec(
+        select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport.id)
+    ).all()
+    return CouvertureResume(
+        total_cibles=len(couvertures),
+        trouves=sum(1 for c in couvertures if c.statut == StatutCouvertureIndicateur.TROUVE),
+        codes_manquants=[
+            c.code for c in couvertures if c.statut != StatutCouvertureIndicateur.TROUVE
+        ],
+    )
+from app.scoring.engine import score_officiel
+from app.scoring.models import ConfigurationPonderation
 
 _SCORE_VIDE = ScoreEntreprisePublic(
     valeur_globale=None,
@@ -49,7 +79,7 @@ def dernier_rapport_valide(session: Session, entreprise_id: uuid.UUID) -> Rappor
 def score_public(session: Session, rapport: RapportESG | None) -> ScoreEntreprisePublic:
     if rapport is None:
         return _SCORE_VIDE
-    score = session.exec(select(ScoreESG).where(ScoreESG.rapport_id == rapport.id)).first()
+    score = score_officiel(session, rapport.id)
     if score is None:
         return _SCORE_VIDE
     configuration = session.get(ConfigurationPonderation, score.configuration_id)
@@ -75,12 +105,36 @@ def carbone_agrege(session: Session, rapport: RapportESG | None) -> DonneesCarbo
     )
 
 
+def montant_minimum_par_devise(
+    entreprise: Entreprise, chemin_taux: str
+) -> dict[DevisePosition, float] | None:
+    """None si l'entreprise n'impose aucun minimum — jamais une carte à 3 zéros qui laisserait
+    croire à un minimum réel de 0. Sinon, converti dans les 3 devises depuis
+    Entreprise.devise_montant_minimum (toujours renseignée de pair, voir
+    app/company/models.py) avec la même logique FX que app/investor/portfolio.py."""
+    if entreprise.montant_minimum_investissement is None:
+        return None
+    assert entreprise.devise_montant_minimum is not None
+    return {
+        devise: fx.convertir(
+            entreprise.montant_minimum_investissement,
+            entreprise.devise_montant_minimum,
+            devise,
+            chemin_taux,
+        )[0]
+        for devise in DevisePosition
+    }
+
+
 def entreprise_publiee_publique(session: Session, entreprise: Entreprise) -> EntreprisePublieePublic:
     rapport = dernier_rapport_valide(session, entreprise.id)
     return EntreprisePublieePublic(
         **EntreprisePublic.model_validate(entreprise).model_dump(),
         score=score_public(session, rapport),
         carbone=carbone_agrege(session, rapport),
+        montant_minimum_par_devise=montant_minimum_par_devise(
+            entreprise, get_settings().fx_rates_path
+        ),
     )
 
 
@@ -92,8 +146,15 @@ def lister_entreprises_publiees(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    perimetre_autorise: set[uuid.UUID] | None = None,
 ) -> tuple[list[EntreprisePublieePublic], int]:
+    """perimetre_autorise restreint le catalogue à un sous-ensemble d'ids (Chercheur/Institution,
+    voir app/researcher/router.py et app/institution/router.py) — None (par défaut, cas
+    Investisseur) laisse le catalogue complet inchangé. Un ensemble vide renvoie une page vide,
+    jamais tout le catalogue par accident."""
     filtres: list[ColumnElement[bool]] = [col(Entreprise.date_publication).is_not(None)]
+    if perimetre_autorise is not None:
+        filtres.append(col(Entreprise.id).in_(perimetre_autorise))
     if secteur:
         filtres.append(col(Entreprise.secteur) == secteur)
     if pays:
@@ -114,38 +175,114 @@ def lister_entreprises_publiees(
 
 
 def consulter_entreprise_publiee(
-    session: Session, entreprise_id: uuid.UUID
+    session: Session,
+    entreprise_id: uuid.UUID,
+    *,
+    perimetre_autorise: set[uuid.UUID] | None = None,
 ) -> EntrepriseDetailInvestisseur:
     entreprise = session.get(Entreprise, entreprise_id)
-    if entreprise is None or entreprise.date_publication is None:
-        # Même code que l'entreprise soit inconnue ou pas encore publiée — jamais de 403 qui
-        # confirmerait l'existence d'une fiche non publiée à un Investisseur.
+    if (
+        entreprise is None
+        or entreprise.date_publication is None
+        or (perimetre_autorise is not None and entreprise_id not in perimetre_autorise)
+    ):
+        # Même code dans les trois cas — entreprise inconnue, pas encore publiée, ou hors du
+        # périmètre autorisé (Chercheur/Institution) — jamais de 403 qui confirmerait l'existence
+        # d'une fiche à un acteur qui n'y a pas droit.
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
 
     rapport = dernier_rapport_valide(session, entreprise_id)
     indicateurs = []
     donnees_carbone = []
     if rapport is not None:
+        # Trié par pilier puis code : le frontend regroupe visuellement les lignes d'un même
+        # pilier (rowSpan sur la colonne Pilier) et a donc besoin qu'elles arrivent déjà
+        # contiguës, jamais dans un ordre d'insertion arbitraire (voir EvidenceTables.tsx).
         indicateurs = list(
-            session.exec(select(IndicateurESG).where(IndicateurESG.rapport_id == rapport.id)).all()
+            session.exec(
+                select(IndicateurESG)
+                .where(IndicateurESG.rapport_id == rapport.id)
+                .order_by(col(IndicateurESG.pilier), col(IndicateurESG.code))
+            ).all()
         )
         donnees_carbone = list(
-            session.exec(select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport.id)).all()
+            session.exec(
+                select(DonneeCarbone)
+                .where(DonneeCarbone.rapport_id == rapport.id)
+                .order_by(col(DonneeCarbone.scope), col(DonneeCarbone.categorie_ges))
+            ).all()
         )
 
     base = entreprise_publiee_publique(session, entreprise)
     return EntrepriseDetailInvestisseur(
-        **base.model_dump(), indicateurs=indicateurs, donnees_carbone=donnees_carbone
+        **base.model_dump(),
+        indicateurs=indicateurs,
+        donnees_carbone=donnees_carbone,
+        couverture=couverture_publique(session, rapport),
     )
 
 
+def fichier_preuve(
+    session: Session,
+    entreprise_id: uuid.UUID,
+    preuve_id: uuid.UUID,
+    *,
+    perimetre_autorise: set[uuid.UUID] | None = None,
+) -> str:
+    """Chemin de stockage du mini-PDF (une page) prouvant un indicateur ou une donnée carbone —
+    jamais un simple session.get(PreuveDocumentaire, preuve_id) : sans vérifier que cette preuve
+    appartient bien au rapport VALIDE actuellement publié de CETTE entreprise, un UUID de preuve
+    deviné donnerait accès à l'extrait d'un rapport non publié ou d'une autre entreprise."""
+    entreprise = session.get(Entreprise, entreprise_id)
+    if (
+        entreprise is None
+        or entreprise.date_publication is None
+        or (perimetre_autorise is not None and entreprise_id not in perimetre_autorise)
+    ):
+        raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
+
+    rapport = dernier_rapport_valide(session, entreprise_id)
+    appartient_au_rapport = rapport is not None and (
+        session.exec(
+            select(IndicateurESG.id).where(
+                IndicateurESG.preuve_id == preuve_id, IndicateurESG.rapport_id == rapport.id
+            )
+        ).first()
+        is not None
+        or session.exec(
+            select(DonneeCarbone.id).where(
+                DonneeCarbone.preuve_id == preuve_id, DonneeCarbone.rapport_id == rapport.id
+            )
+        ).first()
+        is not None
+    )
+    if not appartient_au_rapport:
+        raise NotFoundError("Preuve introuvable.", code="preuve_introuvable")
+
+    preuve = session.get(PreuveDocumentaire, preuve_id)
+    assert preuve is not None  # invariant : la requête ci-dessus vient de la trouver par FK
+    return preuve.pdf_extrait_genere
+
+
+_MAX_ENTREPRISES_COMPARAISON = 4
+
+
 def comparer_entreprises(
-    session: Session, entreprise_ids: list[uuid.UUID]
-) -> list[EntreprisePublieePublic]:
-    resultats = []
-    for entreprise_id in entreprise_ids:
-        entreprise = session.get(Entreprise, entreprise_id)
-        if entreprise is None or entreprise.date_publication is None:
-            raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-        resultats.append(entreprise_publiee_publique(session, entreprise))
-    return resultats
+    session: Session,
+    entreprise_ids: list[uuid.UUID],
+    *,
+    perimetre_autorise: set[uuid.UUID] | None = None,
+) -> list[EntrepriseDetailInvestisseur]:
+    """Même détail que la fiche entreprise (indicateurs + carbone, pas seulement le score
+    agrégé) : la comparaison a besoin de la valeur, l'unité et la période de chaque indicateur,
+    jamais seulement de sa moyenne pondérée — voir consulter_entreprise_publiee, réutilisée ici
+    plutôt que dupliquée (perimetre_autorise est simplement propagé)."""
+    if len(entreprise_ids) > _MAX_ENTREPRISES_COMPARAISON:
+        raise ValidationError(
+            f"La comparaison est limitée à {_MAX_ENTREPRISES_COMPARAISON} entreprises.",
+            code="comparaison_trop_large",
+        )
+    return [
+        consulter_entreprise_publiee(session, entreprise_id, perimetre_autorise=perimetre_autorise)
+        for entreprise_id in entreprise_ids
+    ]

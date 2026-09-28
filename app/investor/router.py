@@ -9,10 +9,12 @@ appeler cette logique (même convention que les autres espaces, voir ARCHITECTUR
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import FileResponse
 from sqlmodel import Session
 
 from app.auth.models import Utilisateur
 from app.auth.permissions import require_role
+from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import Role
 from app.core.exceptions import NotFoundError
@@ -74,16 +76,31 @@ def consulter_entreprise_route(
 
 
 @router.get(
+    "/investor/entreprises/{entreprise_id}/preuves/{preuve_id}/fichier",
+    operation_id="getEvidenceFile",
+    summary="Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone",
+)
+def consulter_preuve_route(
+    entreprise_id: uuid.UUID,
+    preuve_id: uuid.UUID,
+    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    chemin = entreprises.fichier_preuve(session, entreprise_id, preuve_id)
+    return FileResponse(storage.resolve_path(chemin), media_type="application/pdf")
+
+
+@router.get(
     "/investor/comparaison",
-    response_model=list[EntreprisePublieePublic],
+    response_model=list[EntrepriseDetailInvestisseur],
     operation_id="compareCompanies",
-    summary="Comparer plusieurs entreprises publiées (score, Scope 1/2/3)",
+    summary="Comparer jusqu'à 4 entreprises publiées (score, indicateurs, carbone détaillés)",
 )
 def comparer_entreprises_route(
     entreprise_ids: list[uuid.UUID] = Query(...),
     current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
     session: Session = Depends(get_session),
-) -> list[EntreprisePublieePublic]:
+) -> list[EntrepriseDetailInvestisseur]:
     return entreprises.comparer_entreprises(session, entreprise_ids)
 
 
@@ -112,9 +129,7 @@ def creer_portefeuille_route(
     current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
-    portefeuille_cree = portfolio.creer_portefeuille(
-        session, current_user.id, payload.nom, payload.devise_reference
-    )
+    portefeuille_cree = portfolio.creer_portefeuille(session, current_user.id, payload.nom)
     return portfolio.resume_portefeuille(session, portefeuille_cree)
 
 

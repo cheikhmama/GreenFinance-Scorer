@@ -60,6 +60,13 @@ class AnalyseEntreprise(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     analyse_id: uuid.UUID = Field(foreign_key="analyse.id")
     entreprise_id: uuid.UUID = Field(foreign_key="entreprise.id")
+    # Figés au moment de l'ajout (jamais fournis par le Chercheur, jamais mis à jour ensuite) :
+    # rapport_id fixe le rapport publié exact (indicateurs, Scope 1/2/3, preuves), score_esg_id le
+    # score E/S/G/global + méthodologie/version exacts (app/scoring/engine.py::score_officiel).
+    # Une réévaluation ou republication ultérieure de l'entreprise ne change jamais ces deux
+    # valeurs : l'analyse restitue toujours ce qui a réellement été utilisé à sa création.
+    rapport_id: uuid.UUID | None = Field(default=None, foreign_key="rapport_esg.id")
+    score_esg_id: uuid.UUID | None = Field(default=None, foreign_key="score_esg.id")
 
     analyse: Analyse = Relationship(back_populates="entreprises")
     entreprise: Optional["Entreprise"] = Relationship()

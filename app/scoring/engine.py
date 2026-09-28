@@ -31,6 +31,7 @@ from app.scoring.config_schema import (
 )
 from app.scoring.models import ConfigurationPonderation, ScoreESG
 from app.scoring.normalization import normaliser
+from app.scoring.schemas import ScoreESGPublic
 
 _NOM_CONFIGURATION_REFERENCE = "Méthodologie de référence GreenFinance Scorer"
 
@@ -133,3 +134,66 @@ def calculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
     )
     session.add(score_esg)
     return score_esg
+
+
+def score_calculable(session: Session, rapport_id: uuid.UUID) -> bool:
+    """Prévisualise si calculer_score réussirait pour ce rapport, sans rien persister — même
+    logique que _score_pilier (un pilier est calculable dès qu'au moins un de ses indicateurs
+    cibles y est présent), jamais dupliquée. Utilisé pour avertir l'Admin AVANT qu'il ne clique
+    Valider, plutôt que de le laisser découvrir score_incalculable après coup (voir
+    app/admin/review_queue.py::valider_rapport)."""
+    rapport = session.get(RapportESG, rapport_id)
+    if rapport is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+
+    codes_par_pilier: dict[Pilier, set[str]] = {pilier: set() for pilier in Pilier}
+    for pilier, code in session.exec(
+        select(IndicateurESG.pilier, IndicateurESG.code).where(
+            IndicateurESG.rapport_id == rapport_id
+        )
+    ).all():
+        codes_par_pilier[Pilier(pilier)].add(code)
+
+    configuration = obtenir_configuration_reference(session)
+    schema = _charger_configuration_reference_depuis_disque(configuration.fichier_yaml)
+    return any(
+        codes_par_pilier[pilier] & set(pilier_config.indicateurs)
+        for pilier, pilier_config in schema.piliers.items()
+    )
+
+
+def score_officiel(session: Session, rapport_id: uuid.UUID) -> ScoreESG | None:
+    """Le ScoreESG publié/officiel d'un rapport — jamais un simple `WHERE rapport_id = X` non
+    ordonné : un même rapport peut porter plusieurs scores (un par ConfigurationPonderation, voir
+    uq_score_esg_rapport_configuration), et seul celui calculé sous la configuration de référence
+    (jamais une pondération personnalisée) fait foi. Réutilisé pour le score public affiché à
+    l'Investisseur (app/investor/entreprises.py::score_public) et pour figer la version exacte
+    utilisée par une Analyse Chercheur (app/researcher/analyses.py)."""
+    configuration = obtenir_configuration_reference(session)
+    return session.exec(
+        select(ScoreESG).where(
+            col(ScoreESG.rapport_id) == rapport_id,
+            col(ScoreESG.configuration_id) == configuration.id,
+        )
+    ).first()
+
+
+def score_public(session: Session, rapport_id: uuid.UUID) -> ScoreESGPublic | None:
+    """Forme de présentation partagée du score officiel (app/scoring/schemas.py::ScoreESGPublic)
+    -- None si le rapport n'a pas encore de score officiel (avant validation Auditeur/Admin),
+    jamais un score fabriqué. Point de vérité unique pour tout module qui doit afficher le score
+    officiel à un utilisateur, pour ne jamais dupliquer la jointure vers ConfigurationPonderation
+    (voir app/investor/entreprises.py::score_public, forme historique antérieure et distincte,
+    conservée pour ne pas casser le contrat existant côté Investisseur)."""
+    score = score_officiel(session, rapport_id)
+    if score is None:
+        return None
+    configuration = session.get(ConfigurationPonderation, score.configuration_id)
+    assert configuration is not None  # FK NOT NULL -- une ligne orpheline serait un bug ailleurs
+    return ScoreESGPublic(
+        valeur_globale=score.valeur_globale,
+        score_environnement=score.score_environnement,
+        score_social=score.score_social,
+        score_gouvernance=score.score_gouvernance,
+        configuration_version=configuration.version,
+    )

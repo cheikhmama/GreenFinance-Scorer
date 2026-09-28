@@ -16,8 +16,9 @@ from typing import Any
 
 import pydantic
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, col, func, or_, select
 
+from app.auth.models import Utilisateur
 from app.company.models import Entreprise
 from app.core.config import get_settings
 from app.core.database import utcnow
@@ -88,9 +89,24 @@ def _construire_position(valeurs: dict[str, Any]) -> PositionPortefeuille:
         raise ValidationError(message, code="position_invalide") from exc
 
 
-def _verifier_montant_minimum(entreprise: Entreprise, montant_converti: float) -> None:
+def _verifier_montant_minimum(
+    entreprise: Entreprise,
+    montant_converti: float,
+    devise_portefeuille: DevisePosition,
+    chemin_taux: str,
+) -> None:
+    """montant_converti est déjà dans devise_portefeuille (voir ajouter_position/
+    modifier_position) — le minimum doit donc être converti depuis SA PROPRE devise
+    (Entreprise.devise_montant_minimum) vers devise_portefeuille avant comparaison, jamais
+    comparé brut : deux montants dans des devises différentes ne sont pas comparables."""
     minimum = entreprise.montant_minimum_investissement
-    if minimum is not None and montant_converti < minimum:
+    if minimum is None:
+        return
+    assert entreprise.devise_montant_minimum is not None
+    minimum_converti, _ = fx.convertir(
+        minimum, entreprise.devise_montant_minimum, devise_portefeuille, chemin_taux
+    )
+    if montant_converti < minimum_converti:
         raise ValidationError(
             "Le montant est inférieur au minimum requis par cette entreprise.",
             code="montant_insuffisant",
@@ -225,11 +241,12 @@ def detail_portefeuille(session: Session, portefeuille: Portefeuille) -> Portefe
     )
 
 
-def creer_portefeuille(
-    session: Session, investisseur_id: uuid.UUID, nom: str, devise_reference: DevisePosition
-) -> Portefeuille:
+def creer_portefeuille(session: Session, investisseur_id: uuid.UUID, nom: str) -> Portefeuille:
+    """USD, jamais une saisie de l'investisseur : devise pivot déjà utilisée partout ailleurs
+    (voir app/investor/fx.py) — un portefeuille n'a plus besoin d'une devise choisie à la
+    création, seulement d'un nom (Étape Dashboard/Portefeuille, simplification du formulaire)."""
     portefeuille = Portefeuille(
-        investisseur_id=investisseur_id, nom=nom, devise_reference=devise_reference
+        investisseur_id=investisseur_id, nom=nom, devise_reference=DevisePosition.USD
     )
     session.add(portefeuille)
     session.commit()
@@ -334,10 +351,11 @@ def ajouter_position(
             code="entreprise_suspendue",
         )
 
+    chemin_taux = get_settings().fx_rates_path
     montant_converti, taux = fx.convertir(
-        payload.montant, payload.devise, portefeuille.devise_reference, get_settings().fx_rates_path
+        payload.montant, payload.devise, portefeuille.devise_reference, chemin_taux
     )
-    _verifier_montant_minimum(entreprise, montant_converti)
+    _verifier_montant_minimum(entreprise, montant_converti, portefeuille.devise_reference, chemin_taux)
 
     # Sans context "entreprise" (voir _construire_position) : le model_validator
     # _valider_montant_minimum, qui compare au montant AVANT conversion, reste un no-op —
@@ -385,10 +403,11 @@ def modifier_position(
             code="position_non_modifiable",
         )
 
+    chemin_taux = get_settings().fx_rates_path
     montant_converti, taux = fx.convertir(
-        payload.montant, payload.devise, portefeuille.devise_reference, get_settings().fx_rates_path
+        payload.montant, payload.devise, portefeuille.devise_reference, chemin_taux
     )
-    _verifier_montant_minimum(entreprise, montant_converti)
+    _verifier_montant_minimum(entreprise, montant_converti, portefeuille.devise_reference, chemin_taux)
 
     # Validée AVANT toute suppression : une position invalide ne doit jamais laisser le
     # portefeuille avec une position en moins (voir _construire_position).
@@ -498,3 +517,72 @@ def exporter_positions_csv(session: Session, portefeuille: Portefeuille) -> str:
             ]
         )
     return buffer.getvalue()
+
+
+def statistiques_admin(session: Session) -> tuple[int, int, int]:
+    """(portefeuilles non archivés, positions déclarées, entreprises distinctes présentes dans au
+    moins un portefeuille) tous Investisseurs confondus — synthèse pour l'Aperçu Administrateur
+    (app/admin/apercu.py). investisseurs_actifs est déjà calculé ailleurs (voir
+    app/admin/dashboard.py), pas dupliqué ici."""
+    portefeuilles_non_archives = session.exec(
+        select(func.count()).select_from(Portefeuille).where(col(Portefeuille.archive).is_(False))
+    ).one()
+    positions_declarees = session.exec(select(func.count()).select_from(PositionPortefeuille)).one()
+    entreprises_distinctes = session.exec(
+        select(func.count(func.distinct(col(PositionPortefeuille.entreprise_id))))
+    ).one()
+    return portefeuilles_non_archives, positions_declarees, entreprises_distinctes
+
+
+def lister_portefeuilles_admin(
+    session: Session,
+    *,
+    recherche: str | None = None,
+    page: int = 1,
+    page_size: int = 3,
+) -> tuple[list[tuple[Portefeuille, Utilisateur, int, float]], int]:
+    """Vue de suivi Administrateur de tous les portefeuilles non archivés, avec titulaire et nombre
+    de positions — le détail derrière "Portefeuilles non archivés" de l'Aperçu (indicateur → liste
+    filtrée). montant_total est déjà dans la devise de référence du portefeuille
+    (PositionPortefeuille.montant_converti, jamais recalculé) — jamais additionné entre
+    portefeuilles de devises différentes."""
+    filtres: list[ColumnElement[bool]] = [col(Portefeuille.archive).is_(False)]
+    if recherche:
+        filtres.append(
+            or_(
+                col(Portefeuille.nom).ilike(f"%{recherche}%"),
+                col(Utilisateur.email).ilike(f"%{recherche}%"),
+            )
+        )
+
+    total = session.exec(
+        select(func.count())
+        .select_from(Portefeuille)
+        .join(Utilisateur, col(Portefeuille.investisseur_id) == col(Utilisateur.id))
+        .where(*filtres)
+    ).one()
+    portefeuilles = list(
+        session.exec(
+            select(Portefeuille)
+            .join(Utilisateur, col(Portefeuille.investisseur_id) == col(Utilisateur.id))
+            .where(*filtres)
+            .order_by(col(Portefeuille.date_creation).desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).all()
+    )
+
+    resultats: list[tuple[Portefeuille, Utilisateur, int, float]] = []
+    for portefeuille in portefeuilles:
+        investisseur = session.get(Utilisateur, portefeuille.investisseur_id)
+        assert investisseur is not None  # FK NOT NULL, ne peut pas être absent
+        positions = list(
+            session.exec(
+                select(PositionPortefeuille).where(
+                    PositionPortefeuille.portefeuille_id == portefeuille.id
+                )
+            ).all()
+        )
+        montant_total, *_reste = _agreger(session, positions)
+        resultats.append((portefeuille, investisseur, len(positions), montant_total))
+    return resultats, total

@@ -4,10 +4,11 @@ import uuid
 
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution
+from app.auth.models import ChercheurInstitution, Utilisateur
 from app.core.database import utcnow
 from app.core.enums import StatutRattachement
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.notifications import notifier
 
 
 def lister_mes_rattachements(session: Session, chercheur_id: uuid.UUID) -> list[ChercheurInstitution]:
@@ -41,6 +42,20 @@ def _repondre(
     rattachement.statut = statut
     rattachement.date_reponse = utcnow()
     session.add(rattachement)
+
+    chercheur = session.get(Utilisateur, chercheur_id)
+    if chercheur is not None:
+        type_notification = (
+            "RATTACHEMENT_ACCEPTE" if statut == StatutRattachement.ACCEPTE else "RATTACHEMENT_REFUSE"
+        )
+        libelle = "accepté" if statut == StatutRattachement.ACCEPTE else "refusé"
+        notifier(
+            session,
+            rattachement.institution_id,
+            type_notification,
+            f"{chercheur.nom or chercheur.email} a {libelle} votre invitation.",
+        )
+
     session.commit()
     session.refresh(rattachement)
     return rattachement

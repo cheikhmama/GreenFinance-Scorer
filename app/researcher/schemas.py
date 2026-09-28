@@ -48,5 +48,9 @@ class ProjetAffecte(BaseModel):
     id: uuid.UUID
     nom: str
     description: str | None
+    objectif: str | None
+    date_debut: datetime | None
+    date_fin_prevue: datetime | None
+    date_limite: datetime | None
     statut: StatutProjet
     institution_email: str

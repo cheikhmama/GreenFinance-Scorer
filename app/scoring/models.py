@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -51,6 +51,13 @@ class ScoreESG(SQLModel, table=True):
 
     __tablename__ = "score_esg"
     __table_args__ = (
+        # Un rapport peut légitimement avoir plusieurs scores (un par ConfigurationPonderation :
+        # la référence, plus une par pondération personnalisée d'un Investisseur/Chercheur/
+        # Institution — voir tests/integration/test_models_scoring.py) mais jamais deux fois sous
+        # la même configuration : c'est ce doublon-là qui rendrait score_officiel() ambigu.
+        UniqueConstraint(
+            "rapport_id", "configuration_id", name="uq_score_esg_rapport_configuration"
+        ),
         CheckConstraint(
             "valeur_globale BETWEEN 0 AND 100", name="ck_score_esg_valeur_globale_bornee"
         ),

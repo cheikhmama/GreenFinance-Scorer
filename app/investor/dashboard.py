@@ -15,7 +15,7 @@ from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import DevisePosition
 from app.investor import entreprises as entreprises_investisseur
-from app.investor import fx, portfolio
+from app.investor import fx
 from app.investor.models import Portefeuille, PositionPortefeuille
 from app.investor.schemas import (
     EntrepriseSommaire,
@@ -24,8 +24,9 @@ from app.investor.schemas import (
 )
 
 _FENETRE_NOUVELLES_PUBLICATIONS_JOURS = 30
-_TOP_POSITIONS = 5
-_PUBLICATIONS_RECENTES_LIMITE = 5
+# Volontairement limité à 2 : la section "Publications récentes" du Dashboard Investisseur ne
+# montre qu'un aperçu, pas une liste complète (voir /investor/entreprises pour la liste entière).
+_PUBLICATIONS_RECENTES_LIMITE = 2
 
 
 def construire_tableau_de_bord(
@@ -37,9 +38,6 @@ def construire_tableau_de_bord(
         session.exec(select(Portefeuille).where(Portefeuille.investisseur_id == investisseur_id)).all()
     )
     devise_par_portefeuille = {p.id: p.devise_reference for p in portefeuilles}
-    montant_total_par_portefeuille = {
-        p.id: portfolio.resume_portefeuille(session, p).montant_total for p in portefeuilles
-    }
 
     toutes_positions: list[PositionPortefeuille] = []
     for p in portefeuilles:
@@ -69,10 +67,9 @@ def construire_tableau_de_bord(
         nb_complets / len(entreprises_publiees) * 100 if entreprises_publiees else 0.0
     )
 
-    # Répartition par secteur et positions principales, converties en USD (devise pivot commune,
-    # nécessaire car chaque portefeuille peut avoir sa propre devise de référence).
+    # Répartition par secteur, convertie en USD (devise pivot commune, nécessaire car chaque
+    # portefeuille peut avoir sa propre devise de référence).
     repartition_usd: dict[str, float] = {}
-    positions_avec_usd: list[tuple[float, PositionPortefeuille]] = []
     entreprises_suivies_ids: set[uuid.UUID] = set()
     for position in toutes_positions:
         entreprises_suivies_ids.add(position.entreprise_id)
@@ -85,19 +82,10 @@ def construire_tableau_de_bord(
         repartition_usd[entreprise_de_la_position.secteur] = (
             repartition_usd.get(entreprise_de_la_position.secteur, 0.0) + montant_usd
         )
-        positions_avec_usd.append((montant_usd, position))
 
     repartition_secteur = [
         RepartitionSecteur(secteur=secteur, montant_usd=montant)
         for secteur, montant in sorted(repartition_usd.items(), key=lambda item: item[1], reverse=True)
-    ]
-
-    positions_avec_usd.sort(key=lambda item: item[0], reverse=True)
-    positions_principales = [
-        portfolio.position_detail(
-            session, position, montant_total_par_portefeuille[position.portefeuille_id]
-        )
-        for _montant_usd, position in positions_avec_usd[:_TOP_POSITIONS]
     ]
 
     seuil_nouvelles_publications = utcnow() - timedelta(days=_FENETRE_NOUVELLES_PUBLICATIONS_JOURS)
@@ -128,7 +116,6 @@ def construire_tableau_de_bord(
         taux_couverture_esg_plateforme=taux_couverture_esg_plateforme,
         nombre_nouvelles_publications_suivies=nombre_nouvelles_publications_suivies,
         repartition_secteur=repartition_secteur,
-        positions_principales=positions_principales,
         publications_recentes=publications_recentes,
         entreprises_suivies_suspendues=entreprises_suivies_suspendues,
     )
