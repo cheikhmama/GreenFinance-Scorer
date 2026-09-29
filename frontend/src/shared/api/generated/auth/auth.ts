@@ -8,6 +8,7 @@ import type {
   ActiverCompteRequest,
   BodyUploadMyAvatar,
   ChangerMotDePasseRequest,
+  ConfirmerChangementEmailRequest,
   DemanderReinitialisationRequest,
   LoginRequest,
   ModifierProfilRequest,
@@ -189,7 +190,10 @@ export const getUpdateMyProfileUrl = () => {
 }
 
 /**
- * @summary Modifier mon nom et mon e-mail
+ * Le nom change immédiatement. Un nouvel e-mail n'est qu'une DEMANDE (voir
+ * app/auth/email_change.py) : `email` reste l'ancienne adresse et `email_en_attente` indique où
+ * le lien de confirmation a été envoyé.
+ * @summary Modifier mon nom, et demander un changement d'e-mail
  */
 export const updateMyProfile = async (modifierProfilRequest: ModifierProfilRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
 
@@ -205,6 +209,35 @@ return apiFetch<UtilisateurPublic>(getUpdateMyProfileUrl(),
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(modifierProfilRequest)
+  }
+);}
+
+
+export const getConfirmEmailChangeUrl = () => {
+
+
+
+
+  return `/auth/confirmer-changement-email`
+}
+
+/**
+ * @summary Confirmer un changement d'e-mail à partir du lien reçu à la nouvelle adresse
+ */
+export const confirmEmailChange = async (confirmerChangementEmailRequest: ConfirmerChangementEmailRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<UtilisateurPublic>(getConfirmEmailChangeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmerChangementEmailRequest)
   }
 );}
 

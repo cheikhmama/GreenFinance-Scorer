@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 
 from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
@@ -41,10 +41,10 @@ from app.investor.models import Portefeuille, PositionPortefeuille
 from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 
-def _utilisateur(session, role: Role) -> Utilisateur:
-    utilisateur = Utilisateur(
+def _utilisateur(session, role: Role) -> User:
+    utilisateur = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
+        password_hash="hash",
         role=role,
     )
     session.add(utilisateur)
@@ -120,7 +120,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     assert donnee_carbone in preuve.donnees_carbone
 
     # --- ConfigurationPonderation de référence ET personnalisée (Chercheur)
-    chercheur = _utilisateur(session, Role.CHERCHEUR)
+    chercheur = _utilisateur(session, Role.RESEARCHER)
     config_reference = ConfigurationPonderation(
         nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
     )
@@ -136,7 +136,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     assert config_chercheur.utilisateur is not None
     assert config_chercheur.utilisateur.id == chercheur.id
-    assert config_chercheur in chercheur.configurations_ponderation
+    assert config_chercheur in chercheur.scoring_configs
 
     # --- ScoreESG (un par configuration, sur le même ESGReport) ----------
     score_reference = ScoreESG(
@@ -167,7 +167,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     assert score_chercheur in config_chercheur.scores
 
     # --- Portefeuille + positions (USD converti, FIXE, OUVERTE) -----------
-    investisseur = _utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _utilisateur(session, Role.INVESTOR)
     portefeuille = Portefeuille(
         investisseur_id=investisseur.id, nom="Portefeuille vert", devise_reference=DevisePosition.USD
     )
@@ -175,7 +175,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.flush()
 
     assert portefeuille.investisseur.id == investisseur.id
-    assert portefeuille in investisseur.portefeuilles
+    assert portefeuille in investisseur.portfolios
 
     debut_fixe = utcnow() + timedelta(days=1)
     position_usd = PositionPortefeuille.model_validate(
@@ -231,7 +231,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         assert position in entreprise.positions
 
     # --- AvisAudit ----------------------------------------------------
-    auditeur = _utilisateur(session, Role.AUDITEUR)
+    auditeur = _utilisateur(session, Role.AUDITOR)
     avis = AvisAudit(
         rapport_id=rapport.id,
         auditeur_id=auditeur.id,
@@ -244,7 +244,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     assert avis.rapport.id == rapport.id
     assert avis in rapport.audit_opinions
     assert avis.auditeur.id == auditeur.id
-    assert avis in auditeur.avis_rendus
+    assert avis in auditeur.audit_opinions
 
     # --- Notification (entité transverse, hors diagramme de classes) ------
     notification = Notification(
@@ -317,14 +317,14 @@ def test_suppression_en_base_applique_les_regles_on_delete(session) -> None:
     """DELETE SQL direct (jamais la cascade ORM) : ce sont bien les règles ON DELETE de la base
     qui s'appliquent (docs/RENAME_PLAN.md §2.5)."""
     entreprise, rapport, indicateur = _rapport_avec_indicateur(session)
-    auditeur = _utilisateur(session, Role.AUDITEUR)
+    auditeur = _utilisateur(session, Role.AUDITOR)
     rapport.auditor_id = auditeur.id
     session.add(rapport)
     session.flush()
     rapport_id, indicateur_id = rapport.id, indicateur.id
 
     # SET NULL : supprimer l'auditeur ne supprime jamais le rapport.
-    session.execute(delete(Utilisateur).where(col(Utilisateur.id) == auditeur.id))
+    session.execute(delete(User).where(col(User.id) == auditeur.id))
     session.expire_all()
     rapport_apres = session.get(ESGReport, rapport_id)
     assert rapport_apres is not None

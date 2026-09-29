@@ -10,7 +10,7 @@ import uuid
 
 from sqlmodel import Session, col, select
 
-from app.auth.models import InstitutionProfil, Utilisateur
+from app.auth.models import InstitutionProfil, User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import StatutAnalyse
@@ -167,7 +167,7 @@ def exporter_analyse_csv(
     analyse = analyse_de_institution(session, institution_id, analyse_id)
     _consommer_quota_export(session, institution_id)
 
-    chercheur = session.get(Utilisateur, analyse.chercheur_id)
+    chercheur = session.get(User, analyse.chercheur_id)
     entreprise_ids = [
         lien.entreprise_id
         for lien in session.exec(

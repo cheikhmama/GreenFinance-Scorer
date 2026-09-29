@@ -4,7 +4,7 @@ from datetime import timedelta
 from fastapi.testclient import TestClient
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core import storage
@@ -30,12 +30,12 @@ from app.scoring.models import ScoreESG
 client = TestClient(app, base_url="https://testserver")
 
 
-def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -144,7 +144,7 @@ def _entreprise_non_publiee(session) -> Company:
 def test_lister_entreprises_ne_montre_que_les_publiees_avec_leur_score(session) -> None:
     publiee = _entreprise_publiee(session, score_global=72.4)
     _entreprise_non_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     response = authed.get("/api/v1/investor/entreprises", params={"recherche": publiee.name})
@@ -158,7 +158,7 @@ def test_lister_entreprises_ne_montre_que_les_publiees_avec_leur_score(session) 
 
 def test_consulter_entreprise_publiee_retourne_indicateurs_et_carbone_avec_preuve(session) -> None:
     publiee = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     response = authed.get(f"/api/v1/investor/entreprises/{publiee.id}")
@@ -171,7 +171,7 @@ def test_consulter_entreprise_publiee_retourne_indicateurs_et_carbone_avec_preuv
 def test_consulter_preuve_retourne_le_pdf_et_404_si_non_liee_a_lentreprise(session) -> None:
     publiee = _entreprise_publiee(session)
     storage.save_bytes("preuves/test/page_1.pdf", b"%PDF-1.4 preuve de test")
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     detail = authed.get(f"/api/v1/investor/entreprises/{publiee.id}")
@@ -193,7 +193,7 @@ def test_consulter_preuve_retourne_le_pdf_et_404_si_non_liee_a_lentreprise(sessi
 
 def test_consulter_entreprise_non_publiee_est_introuvable(session) -> None:
     non_publiee = _entreprise_non_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     response = authed.get(f"/api/v1/investor/entreprises/{non_publiee.id}")
@@ -204,7 +204,7 @@ def test_consulter_entreprise_non_publiee_est_introuvable(session) -> None:
 def test_comparer_deux_entreprises_publiees(session) -> None:
     a = _entreprise_publiee(session, score_global=60.0)
     b = _entreprise_publiee(session, score_global=90.0)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     response = authed.get("/api/v1/investor/comparaison", params={"entreprise_ids": [str(a.id), str(b.id)]})
@@ -217,7 +217,7 @@ def test_comparer_deux_entreprises_publiees(session) -> None:
 
 def test_comparer_plus_de_quatre_entreprises_est_refuse(session) -> None:
     cibles = [_entreprise_publiee(session) for _ in range(5)]
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     response = authed.get(
@@ -228,7 +228,7 @@ def test_comparer_plus_de_quatre_entreprises_est_refuse(session) -> None:
 
 
 def test_creer_portefeuille_puis_le_retrouver_dans_mes_portefeuilles(session) -> None:
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     creation = authed.post(
@@ -254,7 +254,7 @@ def _creer_portefeuille(authed: TestClient) -> str:
 
 def test_ajouter_position_sur_entreprise_non_publiee_est_refuse(session) -> None:
     non_publiee = _entreprise_non_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -274,7 +274,7 @@ def test_ajouter_position_sur_entreprise_non_publiee_est_refuse(session) -> None
 
 def test_ajouter_position_sur_entreprise_suspendue_est_refuse(session) -> None:
     suspendue = _entreprise_publiee(session, actif=False)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -294,7 +294,7 @@ def test_ajouter_position_sur_entreprise_suspendue_est_refuse(session) -> None:
 
 def test_ajouter_position_sous_le_montant_minimum_est_refuse(session) -> None:
     cible = _entreprise_publiee(session, montant_minimum=5000.0)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -316,7 +316,7 @@ def test_ajouter_position_montant_negatif_ou_nul_est_refuse_proprement(session) 
     """Régression : sans validation Pydantic (Field(gt=0)), un montant <= 0 atteignait le
     CheckConstraint SQL et remontait en 500 (IntegrityError non rattrapée) au lieu d'un 422."""
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -339,7 +339,7 @@ def test_ajouter_position_fixe_sans_date_fin_est_refuse_proprement(session) -> N
     """Une pydantic.ValidationError levée par PositionPortefeuille ne doit jamais devenir un 500
     (voir app/investor/portfolio.py::_construire_position)."""
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -360,7 +360,7 @@ def test_ajouter_position_fixe_sans_date_fin_est_refuse_proprement(session) -> N
 def test_ajouter_position_puis_consulter_le_portefeuille_calcule_le_score_agrege(session) -> None:
     a = _entreprise_publiee(session, score_global=60.0, score_e=50.0, score_s=70.0, score_g=80.0)
     b = _entreprise_publiee(session, score_global=90.0, score_e=95.0, score_s=None, score_g=95.0)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -393,7 +393,7 @@ def test_ajouter_position_puis_consulter_le_portefeuille_calcule_le_score_agrege
 
 def test_ajouter_position_fermer_puis_lister_etats(session) -> None:
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -431,7 +431,7 @@ def test_fermer_position_avec_date_fin_tz_aware_ne_leve_pas_erreur_interne(sessi
     (voir app/investor/schemas.py::_vers_naif_utc), comparer les deux levait un TypeError Python
     jamais rattrapé, remontant en 500 au lieu d'un 200 ou d'une erreur métier propre."""
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -459,7 +459,7 @@ def test_fermer_position_avec_date_fin_tz_aware_ne_leve_pas_erreur_interne(sessi
 
 def test_position_planifiee_modifiable_et_supprimable(session) -> None:
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -501,7 +501,7 @@ def test_position_planifiee_modifiable_et_supprimable(session) -> None:
 
 def test_position_active_non_modifiable_ni_supprimable(session) -> None:
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -526,7 +526,7 @@ def test_position_active_non_modifiable_ni_supprimable(session) -> None:
 
 def test_portefeuille_avec_positions_ne_peut_pas_etre_supprime_seulement_archive(session) -> None:
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -555,7 +555,7 @@ def test_portefeuille_avec_positions_ne_peut_pas_etre_supprime_seulement_archive
 
 
 def test_portefeuille_vide_est_supprimable(session) -> None:
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -564,11 +564,11 @@ def test_portefeuille_vide_est_supprimable(session) -> None:
 
 
 def test_investisseur_ne_voit_pas_le_portefeuille_dun_autre(session) -> None:
-    autre_investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    autre_investisseur = _create_utilisateur(session, Role.INVESTOR)
     autre_authed = _login(autre_investisseur.email)
     portefeuille_id = _creer_portefeuille(autre_authed)
 
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
 
     response = authed.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}")
@@ -577,7 +577,7 @@ def test_investisseur_ne_voit_pas_le_portefeuille_dun_autre(session) -> None:
 
 def test_tableau_de_bord_compte_portefeuilles_et_entreprises_suivies_suspendues(session) -> None:
     suspendue = _entreprise_publiee(session, actif=True)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 
@@ -608,7 +608,7 @@ def test_tableau_de_bord_compte_portefeuilles_et_entreprises_suivies_suspendues(
 
 def test_export_portefeuille_csv(session) -> None:
     cible = _entreprise_publiee(session)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     authed = _login(investisseur.email)
     portefeuille_id = _creer_portefeuille(authed)
 

@@ -38,7 +38,7 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from sqlmodel import Session, col, select
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
@@ -837,8 +837,8 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 )
 
             admins = session.exec(
-                select(Utilisateur).where(
-                    col(Utilisateur.role) == Role.ADMINISTRATEUR, col(Utilisateur.actif).is_(True)
+                select(User).where(
+                    col(User.role) == Role.ADMIN, col(User.active).is_(True)
                 )
             ).all()
             for admin in admins:

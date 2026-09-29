@@ -9,7 +9,7 @@ from sqlmodel import select
 
 from app.audit.models import AvisAudit
 from app.auth.hashing import hash_password
-from app.auth.models import ActivationCompte, Utilisateur
+from app.auth.models import AccountActivationToken, User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core import storage
@@ -48,12 +48,12 @@ def _smtp_configure(monkeypatch):
     monkeypatch.setattr("app.auth.activation.send_email", Mock())
 
 
-def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass", actif: bool = True) -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass", actif: bool = True) -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=actif,
+        active=actif,
     )
     session.add(user)
     session.commit()
@@ -63,19 +63,19 @@ def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass", a
 
 def _create_utilisateur_avec_email(
     session, role: Role, email: str, *, password: str = "s3cret-pass"
-) -> Utilisateur:
-    user = Utilisateur(email=email, mot_de_passe_hache=hash_password(password), role=role, actif=True)
+) -> User:
+    user = User(email=email, password_hash=hash_password(password), role=role, active=True)
     session.add(user)
     session.commit()
     session.refresh(user)
     return user
 
 
-def _create_entreprise_avec_utilisateur(session) -> tuple[Company, Utilisateur]:
+def _create_entreprise_avec_utilisateur(session) -> tuple[Company, User]:
     entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
-    utilisateur = _create_utilisateur(session, Role.ENTREPRISE)
+    utilisateur = _create_utilisateur(session, Role.ENTERPRISE)
     entreprise.owner_user_id = utilisateur.id
     session.add(entreprise)
     session.commit()
@@ -181,20 +181,20 @@ def test_lister_utilisateurs_par_role_ne_montre_que_le_role_et_les_actifs(sessio
     # dizaines de comptes AUDITEUR au fil des sessions, qui dépasseraient une simple page_size
     # large et masqueraient les comptes créés ici.
     marqueur = f"marqueur-{uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur_actif = _create_utilisateur_avec_email(session, Role.AUDITEUR, f"{marqueur}-actif@example.com")
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur_actif = _create_utilisateur_avec_email(session, Role.AUDITOR, f"{marqueur}-actif@example.com")
     auditeur_inactif = _create_utilisateur_avec_email(
-        session, Role.AUDITEUR, f"{marqueur}-inactif@example.com"
+        session, Role.AUDITOR, f"{marqueur}-inactif@example.com"
     )
-    auditeur_inactif.actif = False
+    auditeur_inactif.active = False
     session.add(auditeur_inactif)
-    chercheur = _create_utilisateur_avec_email(session, Role.CHERCHEUR, f"{marqueur}-chercheur@example.com")
+    chercheur = _create_utilisateur_avec_email(session, Role.RESEARCHER, f"{marqueur}-chercheur@example.com")
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": marqueur, "page_size": 50},
+        params={"role": "AUDITOR", "recherche": marqueur, "page_size": 50},
     )
 
     assert response.status_code == 200
@@ -206,11 +206,11 @@ def test_lister_utilisateurs_par_role_ne_montre_que_le_role_et_les_actifs(sessio
 
 
 def test_lister_utilisateurs_pagine_par_defaut_a_trois_par_page(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     role_isole = f"pagination-{uuid.uuid4()}"
     crees = [
         _create_utilisateur_avec_email(
-            session, Role.AUDITEUR, f"{role_isole}-{i}@example.com"
+            session, Role.AUDITOR, f"{role_isole}-{i}@example.com"
         )
         for i in range(5)
     ]
@@ -218,11 +218,11 @@ def test_lister_utilisateurs_pagine_par_defaut_a_trois_par_page(session) -> None
     authed_client = _login(admin.email, "s3cret-pass")
     premiere_page = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": role_isole, "page": 1},
+        params={"role": "AUDITOR", "recherche": role_isole, "page": 1},
     ).json()
     deuxieme_page = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": role_isole, "page": 2},
+        params={"role": "AUDITOR", "recherche": role_isole, "page": 2},
     ).json()
 
     assert premiere_page["total"] == 5
@@ -241,14 +241,14 @@ def test_lister_utilisateurs_recherche_filtre_par_email(session) -> None:
     # même test laisse un compte "@audit-conseil.test" en base (pas d'isolation transactionnelle
     # inter-tests), donc un motif de recherche statique ramasserait aussi ce résidu.
     domaine_unique = f"audit-conseil-{uuid.uuid4().hex}.test"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    cible = _create_utilisateur_avec_email(session, Role.AUDITEUR, f"cible@{domaine_unique}")
-    _create_utilisateur_avec_email(session, Role.AUDITEUR, f"autre-{uuid.uuid4()}@example.com")
+    admin = _create_utilisateur(session, Role.ADMIN)
+    cible = _create_utilisateur_avec_email(session, Role.AUDITOR, f"cible@{domaine_unique}")
+    _create_utilisateur_avec_email(session, Role.AUDITOR, f"autre-{uuid.uuid4()}@example.com")
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": domaine_unique},
+        params={"role": "AUDITOR", "recherche": domaine_unique},
     )
 
     body = response.json()
@@ -257,29 +257,29 @@ def test_lister_utilisateurs_recherche_filtre_par_email(session) -> None:
 
 
 def test_lister_utilisateurs_avec_role_entreprise_est_rejete(session) -> None:
-    user = _create_utilisateur(session, Role.ENTREPRISE)
+    user = _create_utilisateur(session, Role.ENTERPRISE)
     authed_client = _login(user.email, "s3cret-pass")
 
-    response = authed_client.get("/api/v1/admin/utilisateurs", params={"role": "AUDITEUR"})
+    response = authed_client.get("/api/v1/admin/utilisateurs", params={"role": "AUDITOR"})
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "permission_denied"
 
 
 def test_creer_utilisateur_envoie_un_lien_dactivation(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
     email_cible = f"nouveau-{uuid.uuid4()}@example.com"
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": email_cible, "nom": "Nouvel Auditeur", "role": "AUDITEUR"},
+        json={"email": email_cible, "nom": "Nouvel Auditeur", "role": "AUDITOR"},
     )
 
     assert response.status_code == 201
     body = response.json()
     assert body["email"] == email_cible
-    assert body["role"] == "AUDITEUR"
+    assert body["role"] == "AUDITOR"
     assert body["actif"] is True
     assert "mot_de_passe_temporaire" not in body
 
@@ -291,21 +291,21 @@ def test_creer_utilisateur_envoie_un_lien_dactivation(session) -> None:
     assert login_response.status_code == 401
 
     activation = session.exec(
-        select(ActivationCompte).where(ActivationCompte.utilisateur_id == uuid.UUID(body["id"]))
+        select(AccountActivationToken).where(AccountActivationToken.user_id == uuid.UUID(body["id"]))
     ).first()
     assert activation is not None
-    assert activation.utilise_le is None
-    assert activation.date_expiration > utcnow()
+    assert activation.used_at is None
+    assert activation.expires_at > utcnow()
 
 
 def test_creer_utilisateur_sans_nom_le_deduit_de_lemail(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
     email_cible = f"jean.dupont-{uuid.uuid4()}@example.com"
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": email_cible, "role": "AUDITEUR"},
+        json={"email": email_cible, "role": "AUDITOR"},
     )
 
     assert response.status_code == 201
@@ -314,16 +314,16 @@ def test_creer_utilisateur_sans_nom_le_deduit_de_lemail(session) -> None:
 
 def test_lister_utilisateurs_recherche_filtre_aussi_par_nom(session) -> None:
     marqueur = f"marqueur-{uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    cible = _create_utilisateur_avec_email(session, Role.AUDITEUR, f"autre-email-{uuid.uuid4()}@example.com")
-    cible.nom = f"{marqueur} Dupont"
+    admin = _create_utilisateur(session, Role.ADMIN)
+    cible = _create_utilisateur_avec_email(session, Role.AUDITOR, f"autre-email-{uuid.uuid4()}@example.com")
+    cible.name = f"{marqueur} Dupont"
     session.add(cible)
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": marqueur},
+        params={"role": "AUDITOR", "recherche": marqueur},
     )
 
     assert response.status_code == 200
@@ -333,7 +333,7 @@ def test_lister_utilisateurs_recherche_filtre_aussi_par_nom(session) -> None:
 
 
 def test_creer_utilisateur_refuse_le_role_administrateur(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.post(
@@ -341,7 +341,7 @@ def test_creer_utilisateur_refuse_le_role_administrateur(session) -> None:
         json={
             "email": f"nouvel-admin-{uuid.uuid4()}@example.com",
             "nom": "Nouvel Admin",
-            "role": "ADMINISTRATEUR",
+            "role": "ADMIN",
         },
     )
 
@@ -350,13 +350,13 @@ def test_creer_utilisateur_refuse_le_role_administrateur(session) -> None:
 
 
 def test_creer_utilisateur_refuse_un_email_deja_utilise(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    existant = _create_utilisateur(session, Role.CHERCHEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    existant = _create_utilisateur(session, Role.RESEARCHER)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": existant.email, "nom": "Doublon", "role": "AUDITEUR"},
+        json={"email": existant.email, "nom": "Doublon", "role": "AUDITOR"},
     )
 
     assert response.status_code == 422
@@ -364,7 +364,7 @@ def test_creer_utilisateur_refuse_un_email_deja_utilise(session) -> None:
 
 
 def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
     email_cible = f"nouvelle-entreprise-{uuid.uuid4()}@example.com"
 
@@ -372,7 +372,7 @@ def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(sessio
         "/api/v1/admin/utilisateurs",
         json={
             "email": email_cible,
-            "role": "ENTREPRISE",
+            "role": "ENTERPRISE",
             "nom": "Contact Acme",
             "nom_entreprise": "Acme Corp",
             "secteur": "Industrie",
@@ -391,10 +391,10 @@ def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(sessio
     assert entreprise.country == "France"
 
     # Le compte peut déposer un rapport une fois activé — la relation n'est plus manquante.
-    compte = session.get(Utilisateur, utilisateur_id)
+    compte = session.get(User, utilisateur_id)
     assert compte is not None
-    compte.mot_de_passe_hache = hash_password("s3cret-pass")
-    compte.date_activation = utcnow()
+    compte.password_hash = hash_password("s3cret-pass")
+    compte.activated_at = utcnow()
     session.add(compte)
     session.commit()
     authed_entreprise = _login(email_cible, "s3cret-pass")
@@ -403,7 +403,7 @@ def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(sessio
 
 
 def test_creer_utilisateur_role_entreprise_sans_profil_est_rejete(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.post(
@@ -411,7 +411,7 @@ def test_creer_utilisateur_role_entreprise_sans_profil_est_rejete(session) -> No
         json={
             "email": f"sans-profil-{uuid.uuid4()}@example.com",
             "nom": "Compte Sans Profil",
-            "role": "ENTREPRISE",
+            "role": "ENTERPRISE",
         },
     )
 
@@ -422,21 +422,21 @@ def test_creer_utilisateur_role_entreprise_sans_profil_est_rejete(session) -> No
 
 
 def test_creer_utilisateur_avec_role_entreprise_est_rejete(session) -> None:
-    user = _create_utilisateur(session, Role.ENTREPRISE)
+    user = _create_utilisateur(session, Role.ENTERPRISE)
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": f"x-{uuid.uuid4()}@example.com", "nom": "X", "role": "AUDITEUR"},
+        json={"email": f"x-{uuid.uuid4()}@example.com", "nom": "X", "role": "AUDITOR"},
     )
 
     assert response.status_code == 403
 
 
 def test_desactiver_utilisateur_revoque_ses_sessions_en_cours(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     admin_client = _login(admin.email, "s3cret-pass")
-    cible = _create_utilisateur(session, Role.AUDITEUR)
+    cible = _create_utilisateur(session, Role.AUDITOR)
     cible_client = _login(cible.email, "s3cret-pass")
     assert cible_client.get("/api/v1/auth/me").status_code == 200
 
@@ -448,7 +448,7 @@ def test_desactiver_utilisateur_revoque_ses_sessions_en_cours(session) -> None:
 
 
 def test_desactiver_utilisateur_inconnu_est_404(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     admin_client = _login(admin.email, "s3cret-pass")
 
     response = admin_client.post(f"/api/v1/admin/utilisateurs/{uuid.uuid4()}/desactiver")
@@ -459,13 +459,13 @@ def test_desactiver_utilisateur_inconnu_est_404(session) -> None:
 def test_creation_et_desactivation_de_compte_sont_journalisees(session) -> None:
     """Phase 3 §3.5 — ces deux actions de cycle de vie de compte tracent l'acteur qui a agi
     (l'administrateur), pas le compte cible."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     admin_client = _login(admin.email, "s3cret-pass")
-    cible = _create_utilisateur(session, Role.CHERCHEUR)
+    cible = _create_utilisateur(session, Role.RESEARCHER)
 
     admin_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": f"journal-{uuid.uuid4()}@example.com", "nom": "Journal", "role": "AUDITEUR"},
+        json={"email": f"journal-{uuid.uuid4()}@example.com", "nom": "Journal", "role": "AUDITOR"},
     )
     admin_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/desactiver")
 
@@ -482,7 +482,7 @@ def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
     # partagée des tests peut déjà contenir d'autres rapports qualifiants issus d'autres tests ou
     # d'une vérification manuelle -- on vérifie une inclusion/exclusion relative, jamais une
     # égalité de liste absolue.
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     non_extrait = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED)
     en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
@@ -504,8 +504,8 @@ def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
 
 
 def test_affecter_happy_path(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(
         session,
@@ -529,8 +529,8 @@ def test_affecter_happy_path(session) -> None:
 
 
 def test_affecter_rapport_deja_affecte(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
 
@@ -544,8 +544,8 @@ def test_affecter_rapport_deja_affecte(session) -> None:
 
 
 def test_affecter_extraction_non_terminee(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
 
@@ -559,8 +559,8 @@ def test_affecter_extraction_non_terminee(session) -> None:
 
 
 def test_affecter_auditeur_invalide(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(
         session,
@@ -582,8 +582,8 @@ def test_lister_rapports_en_validation_respecte_lordre_des_avis(session) -> None
     # Requête globale par conception, même remarque que le test précédent : on vérifie l'ordre
     # RELATIF de nos deux rapports l'un par rapport à l'autre, jamais une liste exacte -- la base
     # partagée des tests peut contenir d'autres rapports EN_VALIDATION issus d'ailleurs.
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
 
     second = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
@@ -612,8 +612,8 @@ def test_lister_rapports_en_validation_respecte_lordre_des_avis(session) -> None
 
 
 def test_valider_happy_path(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, utilisateur_entreprise = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
 
@@ -636,8 +636,8 @@ def test_valider_happy_path(session) -> None:
 
 
 def test_rejeter_happy_path(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
 
@@ -649,8 +649,8 @@ def test_rejeter_happy_path(session) -> None:
 
 
 def test_demander_correction_happy_path(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
 
@@ -664,7 +664,7 @@ def test_demander_correction_happy_path(session) -> None:
 
 
 def test_decision_avec_statut_invalide_est_rejetee(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED)
 
@@ -679,8 +679,8 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
     """Distinct de test_decision_sans_avis_est_rejetee : ici l'avis existe, mais le rapport n'a
     aucun ESGMetric -- calculer_score (Phase 5 §9) refuse de fabriquer un score sans
     substance, et la transition VALIDE n'a pas lieu (transaction unique, voir valider_rapport)."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(
         session,
@@ -706,7 +706,7 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
 
 
 def test_decision_sans_avis_est_rejetee(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     # EN_VALIDATION semé directement, sans AvisAudit -- état normalement inatteignable via l'API.
     rapport = _create_rapport(session, entreprise.id, status=ReportStatus.PENDING_DECISION)
@@ -722,7 +722,7 @@ def test_lister_entreprises_publiables_exclut_deja_publiees_et_sans_rapport_vali
     # `recherche` scope la requête aux seules entreprises de ce test, même raison que
     # test_lister_utilisateurs_par_role_ne_montre_que_le_role_et_les_actifs ci-dessus.
     marqueur = f"Marqueur {uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
 
     publiable, _ = _create_entreprise_avec_utilisateur(session)
     publiable.name = f"{marqueur} publiable"
@@ -754,7 +754,7 @@ def test_lister_entreprises_publiables_exclut_deja_publiees_et_sans_rapport_vali
 
 
 def test_lister_entreprises_publiables_pagine_par_defaut_a_trois_par_page(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     prefixe = f"Pagination {uuid.uuid4()}"
     for i in range(4):
         entreprise = Company(name=f"{prefixe} {i}", sector="Technologies", country="France")
@@ -781,7 +781,7 @@ def test_lister_entreprises_publiables_recherche_filtre_par_nom(session) -> None
     # exécution précédente de ce test laisse une autre "Ferme Solaire ..." en base (même raison
     # que test_lister_utilisateurs_recherche_filtre_par_email ci-dessus).
     nom_cible = f"Ferme Solaire {uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     cible, _ = _create_entreprise_avec_utilisateur(session)
     cible.name = nom_cible
     session.add(cible)
@@ -806,7 +806,7 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
     # (utilisateur_id à None) -- c'est précisément ce qui manquait pour piloter les entreprises
     # de référence orphelines (voir la conversation qui a motivé cette route).
     marqueur = f"Marqueur {uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
 
     orpheline = Company(name=f"{marqueur} orpheline", sector="Mines", country="Mauritanie")
     session.add(orpheline)
@@ -817,7 +817,14 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
     avec_compte.name = f"{marqueur} avec-compte"
     session.add(avec_compte)
     session.commit()
-    _create_rapport(session, avec_compte.id, status=ReportStatus.REJECTED)
+    # Horodatage explicite : deux dépôts consécutifs peuvent recevoir le même utcnow() (résolution
+    # de l'horloge), ce qui rendait "le plus récent" aléatoire.
+    _create_rapport(
+        session,
+        avec_compte.id,
+        status=ReportStatus.REJECTED,
+        submitted_at=utcnow() - timedelta(minutes=1),
+    )
     plus_recent = _create_rapport(session, avec_compte.id, status=ReportStatus.VALIDATED)
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -843,7 +850,7 @@ _PNG_1X1 = base64.b64decode(
 
 
 def test_consulter_entreprise_admin_retourne_le_detail_complet(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, utilisateur = _create_entreprise_avec_utilisateur(session)
     entreprise.description = "Une description."
     entreprise.website = "https://exemple.test"
@@ -866,7 +873,7 @@ def test_consulter_entreprise_admin_retourne_le_detail_complet(session) -> None:
 
 
 def test_consulter_entreprise_admin_inconnue_est_404(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.get(f"/api/v1/admin/entreprises/{uuid.uuid4()}")
@@ -876,7 +883,7 @@ def test_consulter_entreprise_admin_inconnue_est_404(session) -> None:
 
 
 def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(admin.email, "s3cret-pass")
 
@@ -908,7 +915,7 @@ def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
 
 
 def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(admin.email, "s3cret-pass")
 
@@ -926,7 +933,7 @@ def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
 
 
 def test_modifier_entreprise_refuse_nom_vide(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(admin.email, "s3cret-pass")
 
@@ -939,7 +946,7 @@ def test_modifier_entreprise_refuse_nom_vide(session) -> None:
 
 
 def test_modifier_entreprise_inconnue_est_404(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.patch(
@@ -952,7 +959,7 @@ def test_modifier_entreprise_inconnue_est_404(session) -> None:
 
 
 def test_televerser_puis_supprimer_logo_entreprise(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(admin.email, "s3cret-pass")
 
@@ -969,7 +976,7 @@ def test_televerser_puis_supprimer_logo_entreprise(session) -> None:
 
 
 def test_televerser_logo_entreprise_non_image_est_refuse(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(admin.email, "s3cret-pass")
 
@@ -983,7 +990,7 @@ def test_televerser_logo_entreprise_non_image_est_refuse(session) -> None:
 
 
 def test_televerser_logo_entreprise_inconnue_est_404(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.post(
@@ -996,7 +1003,7 @@ def test_televerser_logo_entreprise_inconnue_est_404(session) -> None:
 
 
 def test_logo_entreprise_routes_avec_role_entreprise_sont_rejetees(session) -> None:
-    user = _create_utilisateur(session, Role.ENTREPRISE)
+    user = _create_utilisateur(session, Role.ENTERPRISE)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(user.email, "s3cret-pass")
 
@@ -1010,7 +1017,7 @@ def test_logo_entreprise_routes_avec_role_entreprise_sont_rejetees(session) -> N
 
 
 def test_publier_happy_path_et_idempotence(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, utilisateur_entreprise = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
     _create_score(session, rapport.id)
@@ -1030,7 +1037,7 @@ def test_publier_happy_path_et_idempotence(session) -> None:
 
 
 def test_publier_sans_rapport_valide_est_rejete(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1044,7 +1051,7 @@ def test_publier_sans_score_est_rejete(session) -> None:
     """Rapport VALIDE semé directement (sans passer par /valider, donc sans ScoreESG) -- état
     normalement inatteignable via l'API seule depuis que valider_rapport calcule toujours un
     score dans la même transaction (Phase 5 §9), gardé en défense dans publier_entreprise."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
 
@@ -1068,7 +1075,7 @@ def test_admin_routes_sans_authentification_sont_rejetees() -> None:
 
 
 def test_admin_routes_avec_role_entreprise_sont_rejetees(session) -> None:
-    user = _create_utilisateur(session, Role.ENTREPRISE)
+    user = _create_utilisateur(session, Role.ENTERPRISE)
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.get("/api/v1/admin/rapports/a-affecter")
@@ -1078,7 +1085,7 @@ def test_admin_routes_avec_role_entreprise_sont_rejetees(session) -> None:
 
 
 def test_consulter_fichier_retourne_le_pdf_et_404_si_absent(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     chemin_relatif = f"rapports/test/{uuid.uuid4()}.pdf"
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de test")
@@ -1096,7 +1103,7 @@ def test_consulter_fichier_retourne_le_pdf_et_404_si_absent(session) -> None:
 
 
 def test_lister_versions_reconstruit_la_chaine_dans_l_ordre(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     original = _create_rapport(session, entreprise.id, version=1)
     correction_1 = _create_rapport(
@@ -1117,8 +1124,8 @@ def test_lister_versions_reconstruit_la_chaine_dans_l_ordre(session) -> None:
 
 
 def test_reactiver_utilisateur_reactive_et_journalise(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    cible = _create_utilisateur(session, Role.AUDITEUR, actif=False)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    cible = _create_utilisateur(session, Role.AUDITOR, actif=False)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/reactiver")
@@ -1140,31 +1147,31 @@ def test_reactiver_utilisateur_reactive_et_journalise(session) -> None:
 
 def test_lister_utilisateurs_inclut_les_inactifs_seulement_si_demande(session) -> None:
     marqueur = f"marqueur-{uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    inactif = _create_utilisateur_avec_email(session, Role.AUDITEUR, f"{marqueur}-inactif@example.com")
-    inactif.actif = False
+    admin = _create_utilisateur(session, Role.ADMIN)
+    inactif = _create_utilisateur_avec_email(session, Role.AUDITOR, f"{marqueur}-inactif@example.com")
+    inactif.active = False
     session.add(inactif)
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
 
     sans_flag = authed_client.get(
-        "/api/v1/admin/utilisateurs", params={"role": "AUDITEUR", "recherche": marqueur}
+        "/api/v1/admin/utilisateurs", params={"role": "AUDITOR", "recherche": marqueur}
     )
     assert sans_flag.json()["total"] == 0
 
     avec_flag = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": marqueur, "inclure_inactifs": True},
+        params={"role": "AUDITOR", "recherche": marqueur, "inclure_inactifs": True},
     )
     assert avec_flag.json()["total"] == 1
     assert avec_flag.json()["items"][0]["id"] == str(inactif.id)
 
 
 def test_lister_journal_audit_concerne_id_couvre_acteur_et_cible(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    autre_admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    cible = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    autre_admin = _create_utilisateur(session, Role.ADMIN)
+    cible = _create_utilisateur(session, Role.AUDITOR)
 
     # cible agit elle-même (acteur_id=cible.id)
     auditer(session, cible.id, "connexion", "Utilisateur", cible.id, "succes")
@@ -1184,7 +1191,7 @@ def test_lister_journal_audit_concerne_id_couvre_acteur_et_cible(session) -> Non
 
 
 def test_suspendre_et_reactiver_entreprise(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     authed_client = _login(admin.email, "s3cret-pass")
 
@@ -1198,7 +1205,7 @@ def test_suspendre_et_reactiver_entreprise(session) -> None:
 
 
 def test_lister_rapports_entreprise_filtre_par_entreprise(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     autre_entreprise, _ = _create_entreprise_avec_utilisateur(session)
     mien = _create_rapport(session, entreprise.id)
@@ -1213,7 +1220,7 @@ def test_lister_rapports_entreprise_filtre_par_entreprise(session) -> None:
 
 
 def test_lister_journal_audit_pagine_et_filtre_par_action(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     marqueur_action = f"action-test-{uuid.uuid4()}"
     autre_action = f"autre-action-{uuid.uuid4()}"
     for _ in range(3):
@@ -1244,7 +1251,7 @@ def _dashboard(authed_client: TestClient) -> dict:
 def test_dashboard_agrege_les_compteurs(session) -> None:
     # Base de test partagée, jamais vide entre les runs — on mesure une DELTA avant/après plutôt
     # qu'une valeur absolue (même principe que les autres listes globales de ce module).
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
     avant = _dashboard(authed_client)
 
@@ -1260,7 +1267,7 @@ def test_dashboard_agrege_les_compteurs(session) -> None:
 
 
 def test_audits_en_retard_respecte_le_sla(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
     sla = get_settings().sla_audit_jours
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
@@ -1284,7 +1291,7 @@ def test_audits_en_retard_respecte_le_sla(session) -> None:
 
 
 def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     entreprise.published_at = utcnow() - timedelta(days=5)
@@ -1313,22 +1320,22 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
 
 def test_lister_utilisateurs_filtre_par_en_attente_activation(session) -> None:
     marqueur = f"marqueur-{uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     en_attente = _create_utilisateur_avec_email(
-        session, Role.AUDITEUR, f"{marqueur}-attente@example.com"
+        session, Role.AUDITOR, f"{marqueur}-attente@example.com"
     )
-    en_attente.date_activation = None
+    en_attente.activated_at = None
     deja_active = _create_utilisateur_avec_email(
-        session, Role.AUDITEUR, f"{marqueur}-ok@example.com"
+        session, Role.AUDITOR, f"{marqueur}-ok@example.com"
     )
-    deja_active.date_activation = utcnow()
+    deja_active.activated_at = utcnow()
     session.add_all([en_attente, deja_active])
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(
         "/api/v1/admin/utilisateurs",
-        params={"role": "AUDITEUR", "recherche": marqueur, "en_attente_activation": True},
+        params={"role": "AUDITOR", "recherche": marqueur, "en_attente_activation": True},
     )
 
     assert response.status_code == 200
@@ -1341,7 +1348,7 @@ def test_lister_rapports_echec_extraction_filtre_correctement(session) -> None:
     """Un échec d'extraction (extraction_erreur renseigné) doit être visible quelque part côté
     Admin — invisible de /admin/rapports/a-affecter, qui ne filtre que sur
     extraction_terminee_le (voir BUG-017)."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     echec = _create_rapport(
         session,
@@ -1372,7 +1379,7 @@ def test_lister_rapports_orphelins_en_validation(session) -> None:
     l'API seule (voir app/admin/review_queue.py::_rapport_en_validation) mais qui doit rester
     visible d'une file Admin s'il survient (données historiques) — jamais invisible de partout à
     la fois comme avant ce correctif (voir BUG-018)."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     orphelin = _create_rapport(
         session,
@@ -1380,7 +1387,7 @@ def test_lister_rapports_orphelins_en_validation(session) -> None:
         status=ReportStatus.PENDING_DECISION,
         extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
     )
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     avec_avis = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1401,8 +1408,8 @@ def test_verifier_score_calculable_route(session) -> None:
     """Aperçu avant décision (BUG-019) : un rapport dont les indicateurs ne recoupent aucun code
     de la configuration de référence doit être signalé non calculable AVANT que l'Admin ne
     clique Valider, jamais seulement après coup."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
 
     calculable = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
@@ -1453,7 +1460,7 @@ def test_recalculer_score_route(session) -> None:
     """Action de récupération (BUG-020) pour un rapport VALIDE historiquement sans ScoreESG —
     état inatteignable via le parcours normal mais qui doit avoir une issue explicite depuis
     l'UI plutôt que de bloquer publier_entreprise indéfiniment sans recours."""
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
 
     sans_score = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)

@@ -4,7 +4,7 @@ import uuid
 
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution, Utilisateur
+from app.auth.models import ChercheurInstitution, User
 from app.core.database import utcnow
 from app.core.enums import StatutRattachement
 from app.core.exceptions import NotFoundError, ValidationError
@@ -43,7 +43,7 @@ def _repondre(
     rattachement.date_reponse = utcnow()
     session.add(rattachement)
 
-    chercheur = session.get(Utilisateur, chercheur_id)
+    chercheur = session.get(User, chercheur_id)
     if chercheur is not None:
         type_notification = (
             "RATTACHEMENT_ACCEPTE" if statut == StatutRattachement.ACCEPTE else "RATTACHEMENT_REFUSE"
@@ -53,7 +53,7 @@ def _repondre(
             session,
             rattachement.institution_id,
             type_notification,
-            f"{chercheur.nom or chercheur.email} a {libelle} votre invitation.",
+            f"{chercheur.name or chercheur.email} a {libelle} votre invitation.",
         )
 
     session.commit()

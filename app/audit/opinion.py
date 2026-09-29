@@ -11,7 +11,7 @@ import structlog
 from sqlmodel import Session, col, select
 
 from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.core.enums import DecisionAudit, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
@@ -67,8 +67,8 @@ def soumettre_avis(
         )
 
     admins = session.exec(
-        select(Utilisateur).where(
-            col(Utilisateur.role) == Role.ADMINISTRATEUR, col(Utilisateur.actif).is_(True)
+        select(User).where(
+            col(User.role) == Role.ADMIN, col(User.active).is_(True)
         )
     ).all()
     for admin in admins:

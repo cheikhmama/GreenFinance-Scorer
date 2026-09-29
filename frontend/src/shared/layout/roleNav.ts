@@ -37,7 +37,7 @@ export interface RoleNavConfig {
 
 /** Navigation réelle par rôle. */
 export const roleNavConfig: Record<Role, RoleNavConfig> = {
-  [Role.ADMINISTRATEUR]: {
+  [Role.ADMIN]: {
     label: "Administrateur",
     profilTo: "/admin/profil",
     items: [
@@ -48,7 +48,7 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/admin/journal-audit", label: "Journal d'audit", icon: History },
     ],
   },
-  [Role.ENTREPRISE]: {
+  [Role.ENTERPRISE]: {
     label: "Entreprise",
     profilTo: "/company/profil",
     items: [
@@ -57,7 +57,7 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/company/deposer", label: "Déposer un rapport", icon: Upload },
     ],
   },
-  [Role.AUDITEUR]: {
+  [Role.AUDITOR]: {
     label: "Auditeur",
     profilTo: "/audit/profil",
     items: [
@@ -65,7 +65,7 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/audit/historique", label: "Historique", icon: BookOpenCheck },
     ],
   },
-  [Role.INVESTISSEUR]: {
+  [Role.INVESTOR]: {
     label: "Investisseur",
     profilTo: "/investor/profil",
     items: [
@@ -75,7 +75,7 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/investor/portefeuilles", label: "Portefeuilles", icon: Wallet },
     ],
   },
-  [Role.CHERCHEUR]: {
+  [Role.RESEARCHER]: {
     label: "Chercheur",
     profilTo: "/researcher/profil",
     items: [

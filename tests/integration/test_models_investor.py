@@ -5,18 +5,18 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import DevisePosition, Role, TypeDureeInvestissement
 from app.investor.models import Portefeuille, PositionPortefeuille
 
 
-def _investisseur(session) -> Utilisateur:
-    utilisateur = Utilisateur(
+def _investisseur(session) -> User:
+    utilisateur = User(
         email=f"investisseur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
-        role=Role.INVESTISSEUR,
+        password_hash="hash",
+        role=Role.INVESTOR,
     )
     session.add(utilisateur)
     session.flush()

@@ -5,7 +5,7 @@ oublié : aucun mot de passe n'est jamais généré ni transmis par l'Administra
 (app/admin/utilisateurs.py::creer_utilisateur) — un lien d'activation à usage unique, envoyé par
 SMTP, permet à la personne titulaire du compte de poser elle-même son mot de passe.
 
-Le jeton en clair n'est jamais persisté (voir app/auth/models.py::ActivationCompte) : seule son
+Le jeton en clair n'est jamais persisté (voir app/auth/models.py::AccountActivationToken) : seule son
 empreinte SHA-256 l'est, même raisonnement que password_reset.py (l'entropie du jeton rend une
 attaque par force brute sur l'empreinte impraticable).
 """
@@ -19,7 +19,7 @@ from fastapi import BackgroundTasks
 from sqlmodel import Session, col, select
 
 from app.auth.hashing import hash_password
-from app.auth.models import ActivationCompte, Utilisateur
+from app.auth.models import AccountActivationToken, User
 from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
@@ -62,7 +62,7 @@ def _envoyer_lien(email: str, jeton_clair: str) -> None:
 
 
 def envoyer_lien_activation(
-    session: Session, utilisateur: Utilisateur, background_tasks: BackgroundTasks
+    session: Session, utilisateur: User, background_tasks: BackgroundTasks
 ) -> None:
     """Émet un nouveau lien d'activation — appelée à la fois à la création du compte
     (app/admin/utilisateurs.py::creer_utilisateur) et pour un renvoi (renvoyer_lien_activation).
@@ -70,9 +70,9 @@ def envoyer_lien_activation(
     Un nouveau lien invalide les précédents, encore valides ou non — jamais plus d'un lien
     utilisable à la fois pour un même compte (même règle que password_reset.py)."""
     anciens = session.exec(
-        select(ActivationCompte).where(
-            col(ActivationCompte.utilisateur_id) == utilisateur.id,
-            col(ActivationCompte.utilise_le).is_(None),
+        select(AccountActivationToken).where(
+            col(AccountActivationToken.user_id) == utilisateur.id,
+            col(AccountActivationToken.used_at).is_(None),
         )
     ).all()
     for ancien in anciens:
@@ -80,10 +80,10 @@ def envoyer_lien_activation(
 
     jeton_clair = secrets.token_urlsafe(32)
     session.add(
-        ActivationCompte(
-            utilisateur_id=utilisateur.id,
-            jeton_hache=_hash_token(jeton_clair),
-            date_expiration=utcnow() + ACTIVATION_TOKEN_TTL,
+        AccountActivationToken(
+            user_id=utilisateur.id,
+            token_hash=_hash_token(jeton_clair),
+            expires_at=utcnow() + ACTIVATION_TOKEN_TTL,
         )
     )
     session.commit()
@@ -91,25 +91,25 @@ def envoyer_lien_activation(
     background_tasks.add_task(_envoyer_lien, utilisateur.email, jeton_clair)
 
 
-def activer_compte(session: Session, jeton_clair: str, nouveau_mot_de_passe: str) -> Utilisateur:
+def activer_compte(session: Session, jeton_clair: str, nouveau_mot_de_passe: str) -> User:
     """Consomme le jeton, pose le mot de passe choisi et active le compte — aucune session n'est
     ouverte ici (même choix que password_reset.py::reinitialiser_mot_de_passe), l'utilisateur se
     connecte ensuite normalement."""
     jeton_hache = _hash_token(jeton_clair)
     entree = session.exec(
-        select(ActivationCompte).where(col(ActivationCompte.jeton_hache) == jeton_hache)
+        select(AccountActivationToken).where(col(AccountActivationToken.token_hash) == jeton_hache)
     ).first()
 
-    if entree is None or entree.utilise_le is not None or entree.date_expiration < utcnow():
+    if entree is None or entree.used_at is not None or entree.expires_at < utcnow():
         raise ValidationError("Ce lien d'activation est invalide ou a expiré.", code="jeton_invalide")
 
-    user = session.get(Utilisateur, entree.utilisateur_id)
-    if user is None or not user.actif or user.date_activation is not None:
+    user = session.get(User, entree.user_id)
+    if user is None or not user.active or user.activated_at is not None:
         raise ValidationError("Ce lien d'activation est invalide ou a expiré.", code="jeton_invalide")
 
-    entree.utilise_le = utcnow()
-    user.mot_de_passe_hache = hash_password(nouveau_mot_de_passe)
-    user.date_activation = utcnow()
+    entree.used_at = utcnow()
+    user.password_hash = hash_password(nouveau_mot_de_passe)
+    user.activated_at = utcnow()
     session.add(entree)
     session.add(user)
     auditer(session, user.id, "activation_compte", "Utilisateur", user.id, "succes")

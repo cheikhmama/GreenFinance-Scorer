@@ -6,8 +6,9 @@ Jamais réutilisés comme modèles de persistance (voir ARCHITECTURE.md §2).
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from app.auth.schemas import EmailNormalise
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
     DevisePosition,
@@ -62,7 +63,7 @@ class DecisionAdminRequest(BaseModel):
 
 
 class CreerUtilisateurRequest(BaseModel):
-    email: EmailStr
+    email: EmailNormalise
     # Nom de la personne ou de l'institution titulaire du compte (Utilisateur.nom), distinct de
     # nom_entreprise ci-dessous (le nom de l'Entreprise elle-même, requis seulement quand
     # role == ENTREPRISE). Optionnel : l'Administrateur ne le saisit pas systématiquement, voir

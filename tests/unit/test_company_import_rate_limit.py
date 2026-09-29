@@ -22,6 +22,10 @@ class _FakeRedis:
     def expire(self, key: str, seconds: int) -> None:
         pass
 
+    def eval(self, _script: str, _numkeys: int, key: str, _window: int) -> int:
+        """Reproduit app/core/redis.py::incrementer_fenetre (INCR + EXPIRE atomiques)."""
+        return self.incr(key)
+
 
 class _BrokenRedis:
     def _boom(self, *_a: object, **_k: object) -> None:
@@ -29,6 +33,7 @@ class _BrokenRedis:
 
     incr = _boom
     expire = _boom
+    eval = _boom
 
 
 @pytest.fixture()

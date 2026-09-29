@@ -140,12 +140,43 @@ extraction is `QUEUED`/`NOT_STARTED`, otherwise to `EN_EXTRACTION`; `DRAFT` goes
 The application never hard-deletes a company or a report (suspension and versioning are the
 application-level operations); these rules define what an administrative purge removes.
 
-## 3. Later renames
+## 3. Task 1.2 — users and authentication ✅
+
+Landed in migration `7499c018ddb1` (upgrade/downgrade round-trip and `alembic check` verified).
+
+### 3.1 Tables and columns
+
+| Current | Target | Note |
+|---|---|---|
+| `utilisateur` (`Utilisateur`) | `users` (`User`) | e-mail stored lower-case (`ck_users_email_lowercase`), unique |
+| `nom`, `mot_de_passe_hache`, `date_creation`, `actif`, `date_activation` | `name`, `password_hash`, `created_at`, `active`, `activated_at` | `email`, `avatar`, `role` unchanged |
+| `activation_compte` (`ActivationCompte`) | `account_activation_tokens` (`AccountActivationToken`) | |
+| `reinitialisation_mot_de_passe` (`ReinitialisationMotDePasse`) | `password_reset_tokens` (`PasswordResetToken`) | |
+| token columns `utilisateur_id`, `jeton_hache`, `date_creation`, `date_expiration`, `utilise_le` | `user_id`, `token_hash`, `created_at`, `expires_at`, `used_at` | |
+| — | `email_change_requests` (`EmailChangeRequest`) | new: e-mail change confirmed by the new address |
+| rel. `institution_profil`, `entreprise`, `rapports_audites`, `configurations_ponderation`, `portefeuilles`, `avis_rendus`, `projets`, `affectations_projet` | `institution_profile`, `company`, `audited_reports`, `scoring_configs`, `portfolios`, `audit_opinions`, `projects`, `project_assignments` | `notifications`, `analyses` unchanged |
+| `Role` values `ADMINISTRATEUR`, `ENTREPRISE`, `AUDITEUR`, `INVESTISSEUR`, `CHERCHEUR` | `ADMIN`, `ENTERPRISE`, `AUDITOR`, `INVESTOR`, `RESEARCHER` | `INSTITUTION` unchanged (D1); values change in the API too (rule 3 exception) |
+
+The audit journal's resource-type label `"Utilisateur"` is stored data, not a class name: it
+stays until the journal is renamed (task 4.7).
+
+### 3.2 `ON DELETE` rules for foreign keys to `users`
+
+| Rule | Columns | Why |
+|---|---|---|
+| CASCADE | tokens, `email_change_requests`, `notification.utilisateur_id`, `institution_profil.utilisateur_id`, `chercheur_institution.*` | rows that only exist for the user |
+| SET NULL | `journal_audit.acteur_id`, `companies.owner_user_id`, `esg_reports.auditor_id`, `esg_metrics.overridden_by_id` | optional references; the row keeps its own meaning |
+| RESTRICT | `avis_audit.auditeur_id`, `analyse.chercheur_id`, `affectation_projet.chercheur_id`, `projet.institution_id`, `portefeuille.investisseur_id`, `configuration_ponderation.utilisateur_id` | accountability or business records: deleting the user must fail rather than erase them. `configuration_ponderation.utilisateur_id` NULL means the *reference* config, so SET NULL would be actively wrong. Revisit each with its module's task. |
+
+This is a deliberate exception to the "CASCADE or SET NULL" guideline: the application never
+deletes a user (it deactivates them), and silently deleting audit opinions or research analyses
+would destroy evidence.
+
+## 4. Later renames
 
 | Task | Tables | Classes |
 |---|---|---|
-| 1.2 | `utilisateur` → `users`; `activation_compte`, `reinitialisation_mot_de_passe` | `Utilisateur` → `User`; `Role` values → `ADMIN`, `ENTERPRISE`, `AUDITOR`, `INVESTOR`, `RESEARCHER`, `INSTITUTION` |
 | 2.1 | `portefeuille` → `portfolios`, `position_portefeuille` → `portfolio_positions` | `Portefeuille` → `Portfolio`, `PositionPortefeuille` → `PortfolioPosition` |
 | 2.3 | `donnee_carbone` → `carbon_emissions`, `preuve_documentaire` → `evidence`, `couverture_indicateur` → `metric_coverage`, `signalement_ecart` → `discrepancy_flags` | matching classes |
 | 3.1 | `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores` | `ConfigurationPonderation` → `ScoringConfig`, `ScoreESG` → `Score`; `Pilier` → `Pillar` |
-| 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names | remaining classes |
+| 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names; audit journal labels | remaining classes |

@@ -181,10 +181,10 @@ An import that only has weights needs a total portfolio value so that amounts ca
 | Session | `__Host-` httpOnly cookie, `Secure`, `SameSite=Lax`, JWT HS256, 12 h | ✅ in place |
 | CSRF | Signed double-submit (`X-CSRF-Token`) + Origin check on mutating requests | ✅ in place |
 | Revocation | Per-user generation counter in Redis, fail-closed | ✅ in place |
-| Email identity | Lower-cased at every entry point, unique on `lower(email)` | ❌ login/creation compare as typed, reset lower-cases |
-| Password policy | **12 characters minimum, 72 UTF-8 bytes maximum**, on every endpoint that sets a password (activation, reset, change) | ❌ 8 min; the change-password endpoint has no check at all |
-| Rate limiting | Login, verify-password, **change-password**, reset request, contact, URL import. Per account **and** per client IP (behind a trusted proxy). Atomic counters (`INCR` + `EXPIRE` in one pipeline / Lua) | ⚠️ per email only; change-password not limited; non-atomic counter |
-| Sensitive profile changes | Changing email requires the current password and confirmation via a link sent to the new address | ❌ no re-authentication |
+| Email identity | Lower-cased at every entry point, case-insensitive uniqueness | ✅ task 1.2: normalized at the HTTP boundary, stored lower-case (CHECK constraint) with a unique index |
+| Password policy | **12 characters minimum, 72 UTF-8 bytes maximum**, on every endpoint that sets a password (activation, reset, change) | ✅ task 1.2 (one shared validator; login unaffected, D4) |
+| Rate limiting | Login, verify-password, **change-password**, email change, reset request, contact, URL import. Per account **and** per client IP (behind a trusted proxy). Atomic counters (`INCR` + `EXPIRE` in one Lua call) | ✅ task 1.2 (`app/core/redis.py::incrementer_fenetre`; login also per IP) |
+| Sensitive profile changes | Changing email requires the current password and confirmation via a link sent to the new address | ✅ task 1.2 (`app/auth/email_change.py`; old address notified) |
 | SSRF (URL import) | Scheme allow-list, DNS check with `not ip.is_global`, manual redirect revalidation, size cap, **total** download deadline | ⚠️ uses a deny-list; timeout is per read |
 | Secrets | Production refuses placeholder values and `*` CORS | ✅ in place |
 | Tenant scoping | Every query on tenant data filters by owner / assignment inside the owning module | ✅ in place; kept as a rule |
@@ -252,7 +252,9 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
 - `pytest`/`pytest-cov` move to the `dev` dependency group.
 - The container entrypoint runs `alembic upgrade head` (or a one-shot `migrate` service).
 - Postgres and Redis aren't published on the host outside development; Redis requires a password.
-- Reverse proxy in front of the API sets `X-Forwarded-For` so the API can rate-limit by IP.
+- Reverse proxy in front of the API sets `X-Forwarded-For`, and uvicorn is started with
+  `FORWARDED_ALLOW_IPS=<proxy address>` so that `request.client.host` is the real client — the
+  per-IP login limit and the contact limit rely on it and never read the header themselves.
 
 ---
 

@@ -41,8 +41,8 @@ export function UsersSection() {
   const parametreRole = searchParams.get("role");
   const roleAffiche: Role = ROLES_CONSULTABLES.includes(parametreRole as Role)
     ? (parametreRole as Role)
-    : Role.AUDITEUR;
-  // Le formulaire de création n'accepte jamais ADMINISTRATEUR (voir ROLES_ATTRIBUABLES) — si on
+    : Role.AUDITOR;
+  // Le formulaire de création n'accepte jamais ADMIN (voir ROLES_ATTRIBUABLES) — si on
   // parcourt les comptes Administrateur au moment d'ouvrir la modale, retombe sur le premier rôle
   // réellement attribuable plutôt que de présélectionner un rôle que le formulaire refuserait.
   const roleCreationParDefaut = ROLES_ATTRIBUABLES.includes(roleAffiche as RoleAttribuable)
@@ -321,7 +321,7 @@ function FormulaireCreation({
           )}
         />
 
-        {roleSaisi === Role.ENTREPRISE ? (
+        {roleSaisi === Role.ENTERPRISE ? (
           <div className="grid gap-4 border-t pt-4 sm:grid-cols-3">
             <FormField
               control={form.control}

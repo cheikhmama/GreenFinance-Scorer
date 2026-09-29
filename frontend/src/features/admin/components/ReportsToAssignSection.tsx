@@ -15,7 +15,7 @@ import { Role } from "../schemas";
  * déjà enregistrés, jamais une saisie libre (règle déjà validée pour ce projet). */
 export function ReportsToAssignSection() {
   const { data: rapports, isLoading, isError } = useReportsToAssign();
-  const { data: auditeurs } = useUtilisateursSelectionnables(Role.AUDITEUR);
+  const { data: auditeurs } = useUtilisateursSelectionnables(Role.AUDITOR);
 
   return (
     <Card>

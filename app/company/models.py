@@ -22,7 +22,7 @@ from sqlmodel import Field, Relationship, SQLModel
 from app.core.enums import CompanyStatus, DevisePosition, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.ingestion.models import ESGReport, SignalementEcart
     from app.investor.models import PositionPortefeuille
 
@@ -41,7 +41,7 @@ class Company(SQLModel, table=True):
         default=CompanyStatus.ACTIVE, sa_column=sa_enum_column(CompanyStatus)
     )
     owner_user_id: uuid.UUID | None = Field(
-        default=None, foreign_key="utilisateur.id", ondelete="SET NULL", index=True
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
     )
     # Identifiants de marché (ISO 6166 / ISO 17442) — uniques quand renseignés, clé de
     # rapprochement des positions importées (tâche 2.2) et des jeux de données publics (tâche 3.3).
@@ -75,7 +75,7 @@ class Company(SQLModel, table=True):
     # délibérément séparés côté Administrateur.
     published_at: datetime | None = Field(default=None)
 
-    owner: Optional["Utilisateur"] = Relationship(back_populates="entreprise")
+    owner: Optional["User"] = Relationship(back_populates="company")
     reports: list["ESGReport"] = Relationship(back_populates="company")
     positions: list["PositionPortefeuille"] = Relationship(back_populates="entreprise")
     discrepancy_flags: list["SignalementEcart"] = Relationship(back_populates="entreprise")

@@ -9,14 +9,14 @@ import uuid
 
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution, Utilisateur
+from app.auth.models import ChercheurInstitution, User
 from app.core.database import utcnow
 from app.core.enums import Role, StatutRattachement
 from app.core.exceptions import ValidationError
 from app.core.notifications import notifier
 
 
-def lister_chercheurs_disponibles(session: Session, institution_id: uuid.UUID) -> list[Utilisateur]:
+def lister_chercheurs_disponibles(session: Session, institution_id: uuid.UUID) -> list[User]:
     """Comptes CHERCHEUR actifs jamais encore invités par cette institution — un rattachement
     REFUSE se réinvite via inviter_chercheur (qui remet le même enregistrement à EN_ATTENTE),
     pas via cette liste."""
@@ -25,23 +25,23 @@ def lister_chercheurs_disponibles(session: Session, institution_id: uuid.UUID) -
     )
     return list(
         session.exec(
-            select(Utilisateur).where(
-                col(Utilisateur.role) == Role.CHERCHEUR,
-                col(Utilisateur.actif).is_(True),
-                col(Utilisateur.id).not_in(deja_rattaches),
+            select(User).where(
+                col(User.role) == Role.RESEARCHER,
+                col(User.active).is_(True),
+                col(User.id).not_in(deja_rattaches),
             )
         ).all()
     )
 
 
 def _notifier_invitation(session: Session, institution_id: uuid.UUID, chercheur_id: uuid.UUID) -> None:
-    institution = session.get(Utilisateur, institution_id)
+    institution = session.get(User, institution_id)
     if institution is not None:
         notifier(
             session,
             chercheur_id,
             "RATTACHEMENT_INVITATION",
-            f"{institution.nom or institution.email} vous invite à rejoindre ses projets.",
+            f"{institution.name or institution.email} vous invite à rejoindre ses projets.",
         )
 
 
@@ -51,8 +51,8 @@ def inviter_chercheur(
     chercheur_id: uuid.UUID,
     conditions_collaboration: str | None = None,
 ) -> ChercheurInstitution:
-    chercheur = session.get(Utilisateur, chercheur_id)
-    if chercheur is None or chercheur.role != Role.CHERCHEUR or not chercheur.actif:
+    chercheur = session.get(User, chercheur_id)
+    if chercheur is None or chercheur.role != Role.RESEARCHER or not chercheur.active:
         raise ValidationError("Chercheur invalide.", code="chercheur_invalide")
 
     existant = session.exec(

@@ -33,7 +33,7 @@ function renderModal() {
 }
 
 async function selectCompanyRole(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(screen.getByLabelText("Rôle de l’utilisateur"), "ENTREPRISE");
+  await user.selectOptions(screen.getByLabelText("Rôle de l’utilisateur"), "ENTERPRISE");
 }
 
 describe("UserProvisioningModal", () => {
@@ -210,7 +210,7 @@ describe("UserProvisioningModal", () => {
     renderModal();
     const roleSelect = screen.getByLabelText("Rôle de l’utilisateur");
 
-    await user.selectOptions(roleSelect, "INVESTISSEUR");
+    await user.selectOptions(roleSelect, "INVESTOR");
     expect(screen.getByLabelText("Type d’investisseur")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Organisation ou entreprise d’appartenance (facultatif)"),
@@ -219,7 +219,7 @@ describe("UserProvisioningModal", () => {
       screen.getByLabelText("Préférences ou domaines d’investissement (facultatif)"),
     ).toBeInTheDocument();
 
-    await user.selectOptions(roleSelect, "AUDITEUR");
+    await user.selectOptions(roleSelect, "AUDITOR");
     expect(screen.getByLabelText("Cabinet ou organisation d’appartenance *")).toBeRequired();
     expect(screen.getByLabelText("Fonction ou poste")).toBeInTheDocument();
     expect(screen.getByLabelText("Références professionnelles")).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe("UserProvisioningModal", () => {
     expect(screen.getByLabelText("Pays *")).toBeRequired();
     expect(screen.getByLabelText("Site officiel *")).toBeRequired();
 
-    await user.selectOptions(roleSelect, "CHERCHEUR");
+    await user.selectOptions(roleSelect, "RESEARCHER");
     expect(screen.getByLabelText("Institution d’appartenance")).not.toBeRequired();
     expect(screen.getByLabelText("Domaine de recherche")).toBeInTheDocument();
     expect(screen.queryByLabelText("Site officiel *")).not.toBeInTheDocument();

@@ -189,7 +189,7 @@ export function AdminDashboardPage() {
                 value={data?.auditeurs_actifs ?? "—"}
                 hint="Comptes pouvant recevoir une affectation"
                 icon={<ClipboardCheck className="size-5" />}
-                to="/admin/utilisateurs?role=AUDITEUR"
+                to="/admin/utilisateurs?role=AUDITOR"
               />
               <StatCard
                 label="Dossiers affectés"
@@ -223,7 +223,7 @@ export function AdminDashboardPage() {
                 value={data?.investisseurs_actifs ?? "—"}
                 hint="Comptes consultant le catalogue publié"
                 icon={<Wallet className="size-5" />}
-                to="/admin/utilisateurs?role=INVESTISSEUR"
+                to="/admin/utilisateurs?role=INVESTOR"
               />
               <StatCard
                 label="Portefeuilles non archivés"
@@ -256,7 +256,7 @@ export function AdminDashboardPage() {
                 value={data?.chercheurs_actifs ?? "—"}
                 hint="Comptes rattachables à un projet"
                 icon={<FlaskConical className="size-5" />}
-                to="/admin/utilisateurs?role=CHERCHEUR"
+                to="/admin/utilisateurs?role=RESEARCHER"
               />
               <StatCard
                 label="Affectés à un projet ouvert"

@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -27,83 +27,110 @@ if TYPE_CHECKING:
     from app.scoring.models import ConfigurationPonderation
 
 
-class Utilisateur(SQLModel, table=True):
-    __tablename__ = "utilisateur"
+class User(SQLModel, table=True):
+    """Table `users` (docs/RENAME_PLAN.md §3, tâche 1.2).
+
+    L'e-mail est l'identifiant de connexion, stocké exclusivement en minuscules
+    (ck_users_email_lowercase) : l'unicité de `email` vaut donc unicité insensible à la casse, et
+    toute recherche par e-mail compare une valeur normalisée à la frontière HTTP
+    (app/auth/schemas.py::EmailNormalise)."""
+
+    __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="ck_users_email_lowercase"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
-    nom: str | None = None
+    name: str | None = None
     # Data URI complet (voir app/company/models.py::Company.logo, même convention) — jamais un
     # fichier séparé sur disque, une image d'avatar reste petite (voir
     # app/auth/avatar.py::TAILLE_MAX_OCTETS).
     avatar: str | None = None
-    # None tant que le compte n'a pas été activé (voir date_activation ci-dessous) : un compte
+    # None tant que le compte n'a pas été activé (voir activated_at ci-dessous) : un compte
     # provisionné par l'Administrateur n'a d'abord aucun mot de passe, la personne titulaire pose
     # le sien elle-même via le lien d'activation (app/auth/activation.py).
-    mot_de_passe_hache: str | None = None
+    password_hash: str | None = None
     role: Role = Field(sa_column=sa_enum_column(Role))
-    date_creation: datetime = Field(default_factory=utcnow)
-    actif: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    active: bool = Field(default=True)
     # None tant qu'un compte provisionné par l'Administrateur (Phase 3 §3.3) n'a pas encore été
     # activé via le lien reçu par e-mail (app/auth/activation.py::activer_compte, qui pose
-    # mot_de_passe_hache et cette date dans le même geste) — login (app/auth/router.py) refuse
-    # toute tentative tant que mot_de_passe_hache est None, jamais besoin de vérifier ce champ
+    # password_hash et cette date dans le même geste) — login (app/auth/router.py) refuse
+    # toute tentative tant que password_hash est None, jamais besoin de vérifier ce champ
     # séparément ailleurs.
-    date_activation: datetime | None = Field(default=None)
+    activated_at: datetime | None = Field(default=None)
 
-    institution_profil: Optional["InstitutionProfil"] = Relationship(
+    institution_profile: Optional["InstitutionProfil"] = Relationship(
         back_populates="utilisateur"
     )
-    entreprise: Optional["Company"] = Relationship(back_populates="owner")
-    rapports_audites: list["ESGReport"] = Relationship(back_populates="auditor")
-    configurations_ponderation: list["ConfigurationPonderation"] = Relationship(
+    company: Optional["Company"] = Relationship(back_populates="owner")
+    audited_reports: list["ESGReport"] = Relationship(back_populates="auditor")
+    scoring_configs: list["ConfigurationPonderation"] = Relationship(
         back_populates="utilisateur"
     )
-    portefeuilles: list["Portefeuille"] = Relationship(back_populates="investisseur")
-    avis_rendus: list["AvisAudit"] = Relationship(back_populates="auditeur")
+    portfolios: list["Portefeuille"] = Relationship(back_populates="investisseur")
+    audit_opinions: list["AvisAudit"] = Relationship(back_populates="auditeur")
     notifications: list["Notification"] = Relationship(back_populates="utilisateur")
-    projets: list["Projet"] = Relationship(back_populates="institution")
-    affectations_projet: list["AffectationProjet"] = Relationship(back_populates="chercheur")
+    projects: list["Projet"] = Relationship(back_populates="institution")
+    project_assignments: list["AffectationProjet"] = Relationship(back_populates="chercheur")
     analyses: list["Analyse"] = Relationship(back_populates="chercheur")
 
 
-class ReinitialisationMotDePasse(SQLModel, table=True):
-    """Jeton à usage unique pour le flux « mot de passe oublié » (app/auth/password_reset.py).
+class PasswordResetToken(SQLModel, table=True):
+    """Table `password_reset_tokens` — jeton à usage unique pour le flux « mot de passe oublié »
+    (app/auth/password_reset.py).
 
-    Le jeton en clair n'est jamais persisté : seul son empreinte SHA-256 (jeton_hache) l'est,
+    Le jeton en clair n'est jamais persisté : seule son empreinte SHA-256 (token_hash) l'est,
     même logique que ne jamais stocker un mot de passe en clair — un vidage de cette table ne
-    doit permettre de rejouer aucun lien déjà émis. Une ligne est à usage unique (utilise_le
-    posé à la consommation) et expire après app/auth/password_reset.py::TOKEN_TTL, qu'elle ait
-    servi ou non."""
+    doit permettre de rejouer aucun lien déjà émis. Une ligne est à usage unique (used_at posé à
+    la consommation) et expire après app/auth/password_reset.py::TOKEN_TTL, qu'elle ait servi ou
+    non."""
 
-    __tablename__ = "reinitialisation_mot_de_passe"
-
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id", index=True)
-    jeton_hache: str = Field(unique=True, index=True)
-    date_creation: datetime = Field(default_factory=utcnow)
-    date_expiration: datetime
-    utilise_le: datetime | None = Field(default=None)
-
-
-class ActivationCompte(SQLModel, table=True):
-    """Jeton à usage unique pour le flux d'activation d'un compte provisionné par
-    l'Administrateur (app/auth/activation.py) — pendant de ReinitialisationMotDePasse ci-dessus
-    pour la première connexion plutôt qu'un mot de passe oublié, table dédiée plutôt que
-    réutilisée pour ne mélanger ni le sens ni le cycle de vie des deux flux.
-
-    Le jeton en clair n'est jamais persisté : seule son empreinte SHA-256 (jeton_hache) l'est.
-    Une ligne est à usage unique (utilise_le posé à la consommation) et expire après
-    app/auth/activation.py::ACTIVATION_TOKEN_TTL, qu'elle ait servi ou non."""
-
-    __tablename__ = "activation_compte"
+    __tablename__ = "password_reset_tokens"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id", index=True)
-    jeton_hache: str = Field(unique=True, index=True)
-    date_creation: datetime = Field(default_factory=utcnow)
-    date_expiration: datetime
-    utilise_le: datetime | None = Field(default=None)
+    user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    token_hash: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime
+    used_at: datetime | None = Field(default=None)
+
+
+class AccountActivationToken(SQLModel, table=True):
+    """Table `account_activation_tokens` — jeton à usage unique pour le flux d'activation d'un
+    compte provisionné par l'Administrateur (app/auth/activation.py), pendant de
+    PasswordResetToken ci-dessus pour la première connexion plutôt qu'un mot de passe
+    oublié. Mêmes garanties : empreinte SHA-256 seulement, usage unique, expiration
+    (app/auth/activation.py::ACTIVATION_TOKEN_TTL)."""
+
+    __tablename__ = "account_activation_tokens"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    token_hash: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime
+    used_at: datetime | None = Field(default=None)
+
+
+class EmailChangeRequest(SQLModel, table=True):
+    """Changement d'e-mail en attente de confirmation (app/auth/email_change.py).
+
+    L'e-mail est l'identifiant de connexion : il ne change qu'une fois le lien envoyé à la
+    NOUVELLE adresse cliqué, jamais sur la seule foi d'une session (une session volée ne suffit
+    plus à détourner le compte via « mot de passe oublié »). Mêmes garanties que les jetons
+    ci-dessus : empreinte SHA-256 seulement, usage unique, expiration."""
+
+    __tablename__ = "email_change_requests"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    new_email: str
+    token_hash: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime
+    used_at: datetime | None = Field(default=None)
 
 
 class InstitutionProfil(SQLModel, table=True):
@@ -113,10 +140,10 @@ class InstitutionProfil(SQLModel, table=True):
     __tablename__ = "institution_profil"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id", unique=True)
+    utilisateur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", unique=True)
     quota_export: int
 
-    utilisateur: Utilisateur = Relationship(back_populates="institution_profil")
+    utilisateur: User = Relationship(back_populates="institution_profile")
 
 
 class ChercheurInstitution(SQLModel, table=True):
@@ -135,8 +162,8 @@ class ChercheurInstitution(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    chercheur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
-    institution_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    chercheur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
+    institution_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
     statut: StatutRattachement = Field(
         default=StatutRattachement.EN_ATTENTE, sa_column=sa_enum_column(StatutRattachement)
     )

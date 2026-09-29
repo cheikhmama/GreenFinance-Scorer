@@ -17,7 +17,7 @@ from app.admin.review_queue import (
 )
 from app.admin.schemas import TableauDeBordAdmin
 from app.admin.utilisateurs import lister_utilisateurs_en_attente
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.enums import ReportStatus, Role
 from app.ingestion.models import ESGReport
@@ -52,9 +52,9 @@ def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
     # afficher tous les deux côte à côte sèmerait la confusion plutôt que d'informer.
     comptes_par_role = dict(
         session.exec(
-            select(Utilisateur.role, func.count())
-            .where(col(Utilisateur.actif).is_(True))
-            .group_by(col(Utilisateur.role))
+            select(User.role, func.count())
+            .where(col(User.active).is_(True))
+            .group_by(col(User.role))
         ).all()
     )
 
@@ -71,9 +71,9 @@ def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
         utilisateurs_en_attente=len(lister_utilisateurs_en_attente(session)),
         rapports_echec_extraction=len(lister_rapports_echec_extraction(session)),
         rapports_orphelins=len(lister_rapports_orphelins_en_validation(session)),
-        administrateurs_actifs=comptes_par_role.get(Role.ADMINISTRATEUR, 0),
-        auditeurs_actifs=comptes_par_role.get(Role.AUDITEUR, 0),
-        investisseurs_actifs=comptes_par_role.get(Role.INVESTISSEUR, 0),
-        chercheurs_actifs=comptes_par_role.get(Role.CHERCHEUR, 0),
+        administrateurs_actifs=comptes_par_role.get(Role.ADMIN, 0),
+        auditeurs_actifs=comptes_par_role.get(Role.AUDITOR, 0),
+        investisseurs_actifs=comptes_par_role.get(Role.INVESTOR, 0),
+        chercheurs_actifs=comptes_par_role.get(Role.RESEARCHER, 0),
         institutions_actives=comptes_par_role.get(Role.INSTITUTION, 0),
     )

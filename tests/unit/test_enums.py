@@ -69,11 +69,11 @@ def test_decision_audit_values() -> None:
 
 def test_role_values() -> None:
     assert {r.value for r in Role} == {
-        "ADMINISTRATEUR",
-        "ENTREPRISE",
-        "AUDITEUR",
-        "INVESTISSEUR",
-        "CHERCHEUR",
+        "ADMIN",
+        "ENTERPRISE",
+        "AUDITOR",
+        "INVESTOR",
+        "RESEARCHER",
         "INSTITUTION",
     }
 

@@ -18,7 +18,7 @@ import pydantic
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
@@ -540,7 +540,7 @@ def lister_portefeuilles_admin(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Portefeuille, Utilisateur, int, float]], int]:
+) -> tuple[list[tuple[Portefeuille, User, int, float]], int]:
     """Vue de suivi Administrateur de tous les portefeuilles non archivés, avec titulaire et nombre
     de positions — le détail derrière "Portefeuilles non archivés" de l'Aperçu (indicateur → liste
     filtrée). montant_total est déjà dans la devise de référence du portefeuille
@@ -551,20 +551,20 @@ def lister_portefeuilles_admin(
         filtres.append(
             or_(
                 col(Portefeuille.nom).ilike(f"%{recherche}%"),
-                col(Utilisateur.email).ilike(f"%{recherche}%"),
+                col(User.email).ilike(f"%{recherche}%"),
             )
         )
 
     total = session.exec(
         select(func.count())
         .select_from(Portefeuille)
-        .join(Utilisateur, col(Portefeuille.investisseur_id) == col(Utilisateur.id))
+        .join(User, col(Portefeuille.investisseur_id) == col(User.id))
         .where(*filtres)
     ).one()
     portefeuilles = list(
         session.exec(
             select(Portefeuille)
-            .join(Utilisateur, col(Portefeuille.investisseur_id) == col(Utilisateur.id))
+            .join(User, col(Portefeuille.investisseur_id) == col(User.id))
             .where(*filtres)
             .order_by(col(Portefeuille.date_creation).desc())
             .offset((page - 1) * page_size)
@@ -572,9 +572,9 @@ def lister_portefeuilles_admin(
         ).all()
     )
 
-    resultats: list[tuple[Portefeuille, Utilisateur, int, float]] = []
+    resultats: list[tuple[Portefeuille, User, int, float]] = []
     for portefeuille in portefeuilles:
-        investisseur = session.get(Utilisateur, portefeuille.investisseur_id)
+        investisseur = session.get(User, portefeuille.investisseur_id)
         assert investisseur is not None  # FK NOT NULL, ne peut pas être absent
         positions = list(
             session.exec(

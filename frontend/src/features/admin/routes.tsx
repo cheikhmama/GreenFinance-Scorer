@@ -18,7 +18,7 @@ import { ProfilePage } from "./components/ProfilePage";
 export const adminRoutes: RouteObject[] = [
   {
     element: (
-      <RequireRole allowedRoles={["ADMINISTRATEUR"]}>
+      <RequireRole allowedRoles={["ADMIN"]}>
         <AppShell />
       </RequireRole>
     ),

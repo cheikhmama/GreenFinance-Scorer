@@ -17,7 +17,7 @@ from sqlmodel import Field, Relationship, SQLModel
 from app.core.database import utcnow
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.ingestion.models import ESGReport
 
 
@@ -33,10 +33,15 @@ class ConfigurationPonderation(SQLModel, table=True):
     # personnalisation par un Investisseur, Chercheur ou Institution — la
     # contrainte "une seule référence à la fois" est applicative, pas
     # imposée en base à ce stade (voir tests/integration/test_models_scoring.py).
-    utilisateur_id: uuid.UUID | None = Field(default=None, foreign_key="utilisateur.id")
+    # RESTRICT, jamais SET NULL : un utilisateur_id NULL désigne la configuration de RÉFÉRENCE —
+    # le mettre à NULL à la suppression du Chercheur la transformerait silencieusement en
+    # méthodologie officielle.
+    utilisateur_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", ondelete="RESTRICT", index=True
+    )
 
-    utilisateur: Optional["Utilisateur"] = Relationship(
-        back_populates="configurations_ponderation"
+    utilisateur: Optional["User"] = Relationship(
+        back_populates="scoring_configs"
     )
     scores: list["ScoreESG"] = Relationship(back_populates="configuration")
 

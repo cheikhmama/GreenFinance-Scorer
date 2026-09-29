@@ -27,7 +27,7 @@ from app.core.database import utcnow
 from app.core.enums import DevisePosition, TypeDureeInvestissement, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.company.models import Company
 
 
@@ -35,7 +35,7 @@ class Portefeuille(SQLModel, table=True):
     __tablename__ = "portefeuille"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    investisseur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    investisseur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
     nom: str
     devise_reference: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
     date_creation: datetime = Field(default_factory=utcnow)
@@ -44,7 +44,7 @@ class Portefeuille(SQLModel, table=True):
     # portefeuilles" par défaut sans perdre son historique.
     archive: bool = Field(default=False)
 
-    investisseur: "Utilisateur" = Relationship(back_populates="portefeuilles")
+    investisseur: "User" = Relationship(back_populates="portfolios")
     positions: list["PositionPortefeuille"] = Relationship(back_populates="portefeuille")
 
 

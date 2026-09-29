@@ -3,17 +3,17 @@ import uuid
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.enums import CanalDepot, Role, TypeRapport
 from app.ingestion.models import ESGReport
 from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 
-def _utilisateur(session, role: Role) -> Utilisateur:
-    utilisateur = Utilisateur(
+def _utilisateur(session, role: Role) -> User:
+    utilisateur = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
+        password_hash="hash",
         role=role,
     )
     session.add(utilisateur)
@@ -36,7 +36,7 @@ def _rapport(session) -> ESGReport:
     return rapport
 
 
-@pytest.mark.parametrize("role", [Role.INVESTISSEUR, Role.CHERCHEUR, Role.INSTITUTION])
+@pytest.mark.parametrize("role", [Role.INVESTOR, Role.RESEARCHER, Role.INSTITUTION])
 def test_configuration_personnalisee_par_role(session, role: Role) -> None:
     utilisateur = _utilisateur(session, role)
     configuration = ConfigurationPonderation(
@@ -58,7 +58,7 @@ def test_rapport_accepte_plusieurs_scores_un_par_configuration(session) -> None:
     config_reference = ConfigurationPonderation(
         nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
     )
-    utilisateur = _utilisateur(session, Role.INVESTISSEUR)
+    utilisateur = _utilisateur(session, Role.INVESTOR)
     config_perso = ConfigurationPonderation(
         nom="perso",
         version=1,

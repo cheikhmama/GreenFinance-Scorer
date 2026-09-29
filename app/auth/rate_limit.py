@@ -1,22 +1,21 @@
-"""Limitation du débit de tentatives de connexion, par e-mail.
+"""Limitation du débit des tentatives de connexion : par e-mail ET par adresse IP.
 
-Empêche un brute-force ciblé sur un compte donné (fenêtre fixe en Redis).
-Volontairement limité par e-mail, pas par IP : une limitation par IP fiable
-suppose un en-tête posé par un reverse-proxy de confiance (X-Forwarded-For),
-pas encore en place — à ajouter si le besoin se confirme après déploiement,
-sans changer le contrat des fonctions ci-dessous.
+- Par e-mail (MAX_ATTEMPTS) : empêche un brute-force ciblé sur un compte donné.
+- Par IP (MAX_ATTEMPTS_PAR_IP, seuil plus large) : empêche la pulvérisation d'un même mot de
+  passe courant sur de nombreux comptes, que la seule limite par e-mail ne voit pas.
 
-Échec fermé si Redis est indisponible : une 503 explicite plutôt qu'un login
-qui réussirait sans aucune limitation, ou qu'une 500 générique qui masquerait
-la vraie cause. Le message journalisé est fixe — jamais str(exc) — pour ne
-jamais risquer de journaliser un identifiant de connexion Redis, même si
-redis-py ne semble pas l'exposer aujourd'hui (voir
-tests/unit/test_rate_limit.py::test_service_unavailable_never_logs_a_secret,
-même discipline que
-tests/unit/test_logging.py::test_database_connection_error_never_leaks_the_password
-côté base de données).
+L'IP est celle que fournit le serveur ASGI (request.client.host), jamais un en-tête lu
+directement : derrière un reverse-proxy, uvicorn ne la réécrit depuis X-Forwarded-For que pour
+les proxys listés dans FORWARDED_ALLOW_IPS (voir docs/ARCHITECTURE.md §8). Même règle que
+app/contact/router.py.
+
+Échec fermé si Redis est indisponible : une 503 explicite plutôt qu'un login qui réussirait sans
+aucune limitation, ou qu'une 500 générique qui masquerait la vraie cause. Le message journalisé
+est fixe — jamais str(exc) — pour ne jamais risquer de journaliser un identifiant de connexion
+Redis (voir tests/unit/test_rate_limit.py::test_service_unavailable_never_logs_a_secret).
 """
 
+import hashlib
 from collections.abc import Callable
 from typing import TypeVar
 
@@ -24,11 +23,12 @@ import redis
 import structlog
 
 from app.core.exceptions import ServiceUnavailableError, TooManyRequestsError
-from app.core.redis import get_redis_client
+from app.core.redis import get_redis_client, incrementer_fenetre
 
 logger = structlog.get_logger(__name__)
 
 MAX_ATTEMPTS = 5
+MAX_ATTEMPTS_PAR_IP = 30
 WINDOW_SECONDS = 15 * 60
 
 T = TypeVar("T")
@@ -36,6 +36,11 @@ T = TypeVar("T")
 
 def _key(email: str) -> str:
     return f"login_attempts:{email.strip().lower()}"
+
+
+def _key_ip(adresse_ip: str) -> str:
+    # Empreinte plutôt que l'IP en clair dans Redis — même choix que app/contact/router.py.
+    return f"login_attempts_ip:{hashlib.sha256(adresse_ip.encode()).hexdigest()}"
 
 
 def _guarded(operation: str, call: Callable[[], T]) -> T:
@@ -50,28 +55,32 @@ def _guarded(operation: str, call: Callable[[], T]) -> T:
         ) from exc
 
 
-def enforce_login_rate_limit(email: str) -> None:
-    """À appeler avant toute vérification d'identifiants — lève avant même
-    de toucher la base si le seuil est déjà atteint."""
+def enforce_login_rate_limit(email: str, adresse_ip: str | None = None) -> None:
+    """À appeler avant toute vérification d'identifiants — lève avant même de toucher la base si
+    un des seuils est déjà atteint. `adresse_ip` est omise pour les vérifications d'un compte déjà
+    connecté (verifier/changer mot de passe), où seul le compte compte."""
     attempts = _guarded("get", lambda: get_redis_client().get(_key(email)))
     if attempts is not None and int(attempts) >= MAX_ATTEMPTS:
         raise TooManyRequestsError(
             "Trop de tentatives de connexion pour ce compte. Réessayez plus tard."
         )
+    if adresse_ip is not None:
+        par_ip = _guarded("get", lambda: get_redis_client().get(_key_ip(adresse_ip)))
+        if par_ip is not None and int(par_ip) >= MAX_ATTEMPTS_PAR_IP:
+            raise TooManyRequestsError(
+                "Trop de tentatives de connexion depuis cette adresse. Réessayez plus tard."
+            )
 
 
-def register_failed_login_attempt(email: str) -> None:
-    key = _key(email)
-
-    def _incr_and_expire() -> int:
-        client = get_redis_client()
-        attempts = client.incr(key)
-        if attempts == 1:
-            client.expire(key, WINDOW_SECONDS)
-        return attempts
-
-    _guarded("incr", _incr_and_expire)
+def register_failed_login_attempt(email: str, adresse_ip: str | None = None) -> None:
+    client = get_redis_client()
+    _guarded("incr", lambda: incrementer_fenetre(client, _key(email), WINDOW_SECONDS))
+    if adresse_ip is not None:
+        _guarded("incr", lambda: incrementer_fenetre(client, _key_ip(adresse_ip), WINDOW_SECONDS))
 
 
 def clear_login_attempts(email: str) -> None:
+    """Réinitialise seulement le compteur du compte : le compteur par IP continue de compter
+    jusqu'à la fin de sa fenêtre — un succès sur UN compte ne doit jamais blanchir une IP qui
+    pulvérise des mots de passe sur les autres."""
     _guarded("delete", lambda: get_redis_client().delete(_key(email)))

@@ -16,7 +16,7 @@ from app.core.database import utcnow
 from app.core.enums import DecisionAudit, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.ingestion.models import ESGReport
 
 
@@ -30,7 +30,7 @@ class AvisAudit(SQLModel, table=True):
     # par une route ou un schéma de réponse accessible à un compte
     # Entreprise — règle d'accès à faire respecter strictement à partir
     # de l'Étape 9.
-    auditeur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    auditeur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
     decision: DecisionAudit = Field(sa_column=sa_enum_column(DecisionAudit))
     # Porte notamment la confirmation ou l'infirmation des données
     # manquantes/anomalies déjà détectées par le pipeline automatique.
@@ -38,4 +38,4 @@ class AvisAudit(SQLModel, table=True):
     date_avis: datetime = Field(default_factory=utcnow)
 
     rapport: "ESGReport" = Relationship(back_populates="audit_opinions")
-    auditeur: "Utilisateur" = Relationship(back_populates="avis_rendus")
+    auditeur: "User" = Relationship(back_populates="audit_opinions")

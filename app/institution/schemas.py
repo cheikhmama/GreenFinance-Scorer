@@ -10,10 +10,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.auth.schemas import UserContractMixin
 from app.core.enums import StatutAnalyse, StatutProjet, StatutRattachement
 
 
-class ChercheurDisponible(BaseModel):
+class ChercheurDisponible(UserContractMixin):
     """Compte CHERCHEUR actif, sélectionnable pour une invitation — même règle "sélection parmi
     les acteurs existants" que partout ailleurs (jamais de saisie libre d'identité)."""
 

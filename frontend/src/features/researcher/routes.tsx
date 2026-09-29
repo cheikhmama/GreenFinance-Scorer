@@ -15,7 +15,7 @@ import { ResearcherDashboardPage } from "./components/ResearcherDashboardPage";
 export const researcherRoutes: RouteObject[] = [
   {
     element: (
-      <RequireRole allowedRoles={["CHERCHEUR"]}>
+      <RequireRole allowedRoles={["RESEARCHER"]}>
         <AppShell />
       </RequireRole>
     ),

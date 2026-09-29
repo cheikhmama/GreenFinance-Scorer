@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
-from app.auth.models import ChercheurInstitution, Utilisateur
+from app.auth.models import ChercheurInstitution, User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import StatutAnalyse, StatutProjet, StatutRattachement
@@ -336,7 +336,7 @@ def lister_projets_admin(
 
     resultats: list[tuple[Projet, str, int]] = []
     for projet in projets:
-        institution = session.get(Utilisateur, projet.institution_id)
+        institution = session.get(User, projet.institution_id)
         assert institution is not None  # FK NOT NULL, ne peut pas être absent
         nb_chercheurs = session.exec(
             select(func.count())

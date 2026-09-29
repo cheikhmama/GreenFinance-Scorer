@@ -486,7 +486,7 @@ export function CompanyPrototypePage({ section }: { section: string }) {
     updateReport,
     users,
   } = usePrototype();
-  const previewUser = users.find((user) => user.id === previewUserId && user.role === "ENTREPRISE");
+  const previewUser = users.find((user) => user.id === previewUserId && user.role === "ENTERPRISE");
   const company =
     companies.find((item) => item.id === previewCompanyId) ??
     companies.find((item) => item.id === previewUser?.entityId) ??

@@ -16,7 +16,7 @@ import uuid
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import StatutAnalyse, StatutProjet
@@ -331,8 +331,8 @@ def lister_analyses_admin(
     total = session.exec(select(func.count()).select_from(Analyse).where(*filtres)).one()
     lignes = list(
         session.exec(
-            select(Analyse, Utilisateur.email, Projet.nom)
-            .join(Utilisateur, col(Analyse.chercheur_id) == Utilisateur.id)
+            select(Analyse, User.email, Projet.nom)
+            .join(User, col(Analyse.chercheur_id) == User.id)
             .join(Projet, col(Analyse.projet_id) == Projet.id)
             .where(*filtres)
             .order_by(col(Analyse.date_creation).desc())

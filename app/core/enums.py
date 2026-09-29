@@ -101,11 +101,13 @@ class DecisionAudit(str, Enum):
 
 
 class Role(str, Enum):
-    ADMINISTRATEUR = "ADMINISTRATEUR"
-    ENTREPRISE = "ENTREPRISE"
-    AUDITEUR = "AUDITEUR"
-    INVESTISSEUR = "INVESTISSEUR"
-    CHERCHEUR = "CHERCHEUR"
+    """Rôles de la plateforme (docs/ARCHITECTURE.md §1) — INSTITUTION conservé (décision D1)."""
+
+    ADMIN = "ADMIN"
+    ENTERPRISE = "ENTERPRISE"
+    AUDITOR = "AUDITOR"
+    INVESTOR = "INVESTOR"
+    RESEARCHER = "RESEARCHER"
     INSTITUTION = "INSTITUTION"
 
 

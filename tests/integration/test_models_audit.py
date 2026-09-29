@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.enums import (
     CanalDepot,
@@ -23,10 +23,10 @@ from app.ingestion.models import (
 )
 
 
-def _utilisateur(session, role: Role) -> Utilisateur:
-    utilisateur = Utilisateur(
+def _utilisateur(session, role: Role) -> User:
+    utilisateur = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
+        password_hash="hash",
         role=role,
     )
     session.add(utilisateur)
@@ -72,7 +72,7 @@ def _rapport_avec_indicateur(session) -> tuple[ESGReport, ESGMetric]:
 
 def test_creation_avis_audit(session) -> None:
     rapport, _ = _rapport_avec_indicateur(session)
-    auditeur = _utilisateur(session, Role.AUDITEUR)
+    auditeur = _utilisateur(session, Role.AUDITOR)
 
     avis = AvisAudit(
         rapport_id=rapport.id,
@@ -87,7 +87,7 @@ def test_creation_avis_audit(session) -> None:
     assert avis.rapport.id == rapport.id
     assert avis.auditeur.id == auditeur.id
     assert avis in rapport.audit_opinions
-    assert avis in auditeur.avis_rendus
+    assert avis in auditeur.audit_opinions
 
 
 def test_creation_signalement_ecart_ciblant_un_indicateur(session) -> None:
@@ -126,7 +126,7 @@ def test_indicateur_id_doit_referencer_un_indicateur_pas_un_rapport(session) -> 
 
 
 def test_creation_notification(session) -> None:
-    utilisateur = _utilisateur(session, Role.ENTREPRISE)
+    utilisateur = _utilisateur(session, Role.ENTERPRISE)
 
     notification = Notification(
         utilisateur_id=utilisateur.id,

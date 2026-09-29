@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core import storage
@@ -44,7 +44,7 @@ def _minimal_pdf_bytes() -> bytes:
     return data
 
 
-def _create_entreprise_utilisateur(session, *, password: str, avec_entreprise: bool = True) -> Utilisateur:
+def _create_entreprise_utilisateur(session, *, password: str, avec_entreprise: bool = True) -> User:
     entreprise = None
     if avec_entreprise:
         entreprise = Company(name=f"Entreprise {uuid.uuid4()}", sector="Technologies", country="France")
@@ -52,11 +52,11 @@ def _create_entreprise_utilisateur(session, *, password: str, avec_entreprise: b
         session.commit()
         session.refresh(entreprise)
 
-    user = Utilisateur(
+    user = User(
         email=f"entreprise-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
-        role=Role.ENTREPRISE,
-        actif=True,
+        password_hash=hash_password(password),
+        role=Role.ENTERPRISE,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -150,11 +150,11 @@ def test_deposer_rapport_sans_authentification_est_rejete() -> None:
 
 
 def test_deposer_rapport_avec_role_investisseur_est_rejete(session) -> None:
-    user = Utilisateur(
+    user = User(
         email=f"investisseur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password("s3cret-pass"),
-        role=Role.INVESTISSEUR,
-        actif=True,
+        password_hash=hash_password("s3cret-pass"),
+        role=Role.INVESTOR,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -203,9 +203,9 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
 def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatch) -> None:
     monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    user.entreprise.status = CompanyStatus.SUSPENDED
-    session.add(user.entreprise)
+    assert user.company is not None
+    user.company.status = CompanyStatus.SUSPENDED
+    session.add(user.company)
     session.commit()
     authed_client = _login(user.email, "s3cret-pass")
 
@@ -222,16 +222,16 @@ def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatc
 def test_lister_rapports_ne_montre_que_ceux_de_lentreprise_courante(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
     autre = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
-    assert autre.entreprise is not None
+    assert proprietaire.company is not None
+    assert autre.company is not None
     mien = ESGReport(
-        company_id=proprietaire.entreprise.id,
+        company_id=proprietaire.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/mien.pdf",
     )
     dautrui = ESGReport(
-        company_id=autre.entreprise.id,
+        company_id=autre.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dautrui.pdf",
@@ -261,7 +261,7 @@ def test_deposer_rapport_genere_le_nom_de_stockage_cote_serveur(session, monkeyp
     stockage, même assaini — seuls des identifiants déjà connus côté serveur le déterminent."""
     monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.post(
@@ -273,7 +273,7 @@ def test_deposer_rapport_genere_le_nom_de_stockage_cote_serveur(session, monkeyp
     assert response.status_code == 201
     fichier_source = response.json()["fichier_source"]
     assert "passwd" not in fichier_source
-    assert fichier_source == f"rapports/{user.entreprise.id}/{response.json()['id']}.pdf"
+    assert fichier_source == f"rapports/{user.company.id}/{response.json()['id']}.pdf"
 
 
 def test_deposer_rapport_fichier_trop_volumineux_est_rejete(session, monkeypatch) -> None:
@@ -353,9 +353,9 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
 def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch) -> None:
     monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     original = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.REVISION_REQUESTED,
@@ -387,9 +387,9 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
 
 def test_creer_correction_sur_un_rapport_pas_en_attente_est_rejetee(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.PENDING_DECISION,
@@ -413,9 +413,9 @@ def test_creer_correction_sur_un_rapport_pas_en_attente_est_rejetee(session) -> 
 def test_creer_correction_sur_le_rapport_dune_autre_entreprise_est_404(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
     autre = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
+    assert proprietaire.company is not None
     rapport = ESGReport(
-        company_id=proprietaire.entreprise.id,
+        company_id=proprietaire.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.REVISION_REQUESTED,
@@ -439,9 +439,9 @@ def test_creer_correction_sur_le_rapport_dune_autre_entreprise_est_404(session) 
 def test_consulter_rapport_dune_autre_entreprise_est_404(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
     autre = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
+    assert proprietaire.company is not None
     rapport = ESGReport(
-        company_id=proprietaire.entreprise.id,
+        company_id=proprietaire.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
@@ -469,9 +469,9 @@ def test_consulter_rapport_inexistant_est_404(session) -> None:
 
 def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
@@ -824,12 +824,12 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     assert resume.codes_manquants == ["scope_3"]
 
 
-def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"admin-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
-        role=Role.ADMINISTRATEUR,
-        actif=True,
+        password_hash=hash_password(password),
+        role=Role.ADMIN,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -889,8 +889,8 @@ def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
     assert response.status_code == 201
     rapport = session.get(ESGReport, uuid.UUID(response.json()["id"]))
     assert rapport is not None
-    assert user.entreprise is not None
-    assert rapport.company_id == user.entreprise.id
+    assert user.company is not None
+    assert rapport.company_id == user.company.id
     assert rapport.company_id != autre.id
 
 
@@ -955,11 +955,11 @@ def test_importer_rapport_par_url_admin_happy_path(session, monkeypatch) -> None
 
 
 def test_importer_rapport_par_url_avec_role_investisseur_est_rejete(session) -> None:
-    user = Utilisateur(
+    user = User(
         email=f"investisseur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password("s3cret-pass"),
-        role=Role.INVESTISSEUR,
-        actif=True,
+        password_hash=hash_password("s3cret-pass"),
+        role=Role.INVESTOR,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -999,9 +999,9 @@ def test_importer_rapport_par_url_url_non_autorisee_propage_lerreur_de_validatio
 
 def test_consulter_rapport_sans_score_officiel_le_renvoie_a_null(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
@@ -1023,9 +1023,9 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
     from app.scoring.engine import calculer_score
 
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
@@ -1070,9 +1070,9 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
 
 def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
+    assert proprietaire.company is not None
     rapport = ESGReport(
-        company_id=proprietaire.entreprise.id,
+        company_id=proprietaire.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
@@ -1091,11 +1091,11 @@ def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> 
 
 def test_telecharger_rapport_original_propre_entreprise_retourne_le_pdf(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     chemin_relatif = f"rapports/test/{uuid.uuid4()}.pdf"
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de test original")
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file=chemin_relatif,
@@ -1112,9 +1112,9 @@ def test_telecharger_rapport_original_propre_entreprise_retourne_le_pdf(session)
 
 def test_telecharger_rapport_synthese_non_generee_est_404_dedie(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
@@ -1131,11 +1131,11 @@ def test_telecharger_rapport_synthese_non_generee_est_404_dedie(session) -> None
 
 def test_telecharger_rapport_synthese_generee_retourne_le_pdf(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     chemin_relatif = f"synthese/{uuid.uuid4()}.pdf"
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de synthese")
     rapport = ESGReport(
-        company_id=user.entreprise.id,
+        company_id=user.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",

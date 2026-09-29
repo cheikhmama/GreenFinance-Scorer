@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from app.auth.hashing import hash_password
-from app.auth.models import InstitutionProfil, Utilisateur
+from app.auth.models import InstitutionProfil, User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core.database import utcnow
@@ -21,12 +21,12 @@ client = TestClient(app, base_url="https://testserver")
 
 def _create_utilisateur(
     session, role: Role, *, password: str = "s3cret-pass"
-) -> Utilisateur:
-    user = Utilisateur(
+) -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -34,7 +34,7 @@ def _create_utilisateur(
     return user
 
 
-def _create_institution(session, *, quota_export: int = 10) -> Utilisateur:
+def _create_institution(session, *, quota_export: int = 10) -> User:
     institution = _create_utilisateur(session, Role.INSTITUTION)
     session.add(
         InstitutionProfil(utilisateur_id=institution.id, quota_export=quota_export)
@@ -107,7 +107,7 @@ def _login(email: str, password: str = "s3cret-pass") -> TestClient:
 
 def test_inviter_chercheur_puis_disponibles_ne_le_montre_plus(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
 
     disponibles_avant = institution_authed.get(
@@ -130,7 +130,7 @@ def test_inviter_chercheur_puis_disponibles_ne_le_montre_plus(session) -> None:
 
 def test_inviter_chercheur_puis_acceptation_notifient_les_deux_parties(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
 
     invitation = institution_authed.post(
@@ -162,7 +162,7 @@ def test_inviter_chercheur_puis_acceptation_notifient_les_deux_parties(session) 
 
 def test_chercheur_accepte_invitation(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
@@ -191,7 +191,7 @@ def test_chercheur_accepte_invitation(session) -> None:
 
 def test_chercheur_refuse_puis_institution_peut_reinviter(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
@@ -226,7 +226,7 @@ def _accepter_rattachement(
 
 def test_affecter_chercheur_non_accepte_est_refuse(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
     institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
@@ -247,7 +247,7 @@ def test_affecter_chercheur_non_accepte_est_refuse(session) -> None:
 
 def test_workflow_complet_analyse_validee(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -306,7 +306,7 @@ def test_workflow_complet_analyse_validee(session) -> None:
 
 def test_workflow_correction_cree_une_nouvelle_version(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -358,7 +358,7 @@ def test_workflow_correction_cree_une_nouvelle_version(session) -> None:
 
 def test_cloturer_projet_bloque_nouvelle_affectation(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
@@ -382,7 +382,7 @@ def test_cloturer_projet_bloque_nouvelle_affectation(session) -> None:
 
 def test_export_analyse_decremente_le_quota_et_bloque_a_zero(session) -> None:
     institution = _create_institution(session, quota_export=1)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -427,7 +427,7 @@ def test_export_analyse_decremente_le_quota_et_bloque_a_zero(session) -> None:
 
 def test_chercheur_ne_peut_pas_creer_analyse_sur_projet_non_affecte(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -450,7 +450,7 @@ def test_chercheur_ne_peut_pas_creer_analyse_sur_projet_non_affecte(session) -> 
 
 def test_creer_analyse_refuse_entreprise_hors_perimetre(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -565,7 +565,7 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
 
 def test_decisions_analyse_notifient_le_chercheur(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -669,7 +669,7 @@ def test_creer_projet_refuse_dates_incoherentes(session) -> None:
 
 def test_inviter_chercheur_persiste_les_conditions_de_collaboration(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
 
     invitation = institution_authed.post(
@@ -693,7 +693,7 @@ def test_inviter_chercheur_persiste_les_conditions_de_collaboration(session) -> 
 
 def test_affecter_chercheur_notifie_le_chercheur(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
@@ -718,7 +718,7 @@ def test_affecter_chercheur_notifie_le_chercheur(session) -> None:
 
 def test_soumettre_analyse_notifie_institution(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -755,7 +755,7 @@ def test_soumettre_analyse_notifie_institution(session) -> None:
 
 def test_lister_mes_analyses_toutes_projets_confondus(session) -> None:
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     entreprise = _entreprise_publiee(session)
     institution_authed = _login(institution.email)
     chercheur_authed = _login(chercheur.email)
@@ -823,7 +823,7 @@ def test_chercheur_ne_voit_que_les_entreprises_du_perimetre_de_ses_projets(sessi
     pour ses projets affectés — même si l'entreprise est publiée sur la plateforme (voir
     app/researcher/projets.py::entreprises_perimetre_chercheur)."""
     institution = _create_institution(session)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     dans_le_perimetre = _entreprise_publiee(session)
     hors_perimetre = _entreprise_publiee(session)
     institution_authed = _login(institution.email)

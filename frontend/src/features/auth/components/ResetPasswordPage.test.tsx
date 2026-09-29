@@ -68,7 +68,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it.each([
-    ["court", "court", "8 caractères minimum"],
+    ["court-11car", "court-11car", "12 caractères minimum"],
     ["nouveau-secret", "autre-secret", "Les deux mots de passe ne correspondent pas."],
     [
       "a".repeat(73),

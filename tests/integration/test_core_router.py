@@ -1,10 +1,12 @@
 import uuid
+from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
+from app.core.database import utcnow
 from app.core.enums import Role
 from app.core.models import Notification
 from app.main import app
@@ -12,12 +14,12 @@ from app.main import app
 client = TestClient(app, base_url="https://testserver")
 
 
-def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -25,9 +27,15 @@ def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -
     return user
 
 
-def _create_notification(session, utilisateur_id: uuid.UUID, *, lu: bool = False) -> Notification:
+def _create_notification(
+    session, utilisateur_id: uuid.UUID, *, lu: bool = False, date_envoi: datetime | None = None
+) -> Notification:
     notification = Notification(
-        utilisateur_id=utilisateur_id, type="TEST", message="Message de test.", lu=lu
+        utilisateur_id=utilisateur_id,
+        type="TEST",
+        message="Message de test.",
+        lu=lu,
+        date_envoi=date_envoi or utcnow(),
     )
     session.add(notification)
     session.commit()
@@ -44,8 +52,8 @@ def _login(email: str, password: str) -> TestClient:
 
 
 def test_lister_mes_notifications_ne_montre_que_les_miennes(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.ENTREPRISE)
-    autre = _create_utilisateur(session, Role.ENTREPRISE)
+    utilisateur = _create_utilisateur(session, Role.ENTERPRISE)
+    autre = _create_utilisateur(session, Role.ENTERPRISE)
     ma_notification = _create_notification(session, utilisateur.id)
     _create_notification(session, autre.id)
 
@@ -61,8 +69,12 @@ def test_lister_mes_notifications_ne_montre_que_les_miennes(session) -> None:
 
 
 def test_lister_mes_notifications_plus_recente_dabord(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.AUDITEUR)
-    premiere = _create_notification(session, utilisateur.id)
+    utilisateur = _create_utilisateur(session, Role.AUDITOR)
+    # Horodatages explicites : deux créations consécutives peuvent recevoir le même utcnow()
+    # (résolution de l'horloge), ce qui rendait l'ordre attendu aléatoire.
+    premiere = _create_notification(
+        session, utilisateur.id, date_envoi=utcnow() - timedelta(minutes=1)
+    )
     deuxieme = _create_notification(session, utilisateur.id)
 
     authed_client = _login(utilisateur.email, "s3cret-pass")
@@ -73,7 +85,7 @@ def test_lister_mes_notifications_plus_recente_dabord(session) -> None:
 
 
 def test_lister_mes_notifications_filtre_non_lues_seulement(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.AUDITEUR)
+    utilisateur = _create_utilisateur(session, Role.AUDITOR)
     non_lue = _create_notification(session, utilisateur.id, lu=False)
     _create_notification(session, utilisateur.id, lu=True)
 
@@ -85,7 +97,7 @@ def test_lister_mes_notifications_filtre_non_lues_seulement(session) -> None:
 
 
 def test_marquer_lue_change_le_statut(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.CHERCHEUR)
+    utilisateur = _create_utilisateur(session, Role.RESEARCHER)
     notification = _create_notification(session, utilisateur.id, lu=False)
 
     authed_client = _login(utilisateur.email, "s3cret-pass")
@@ -98,7 +110,7 @@ def test_marquer_lue_change_le_statut(session) -> None:
 
 
 def test_marquer_lue_est_idempotent(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.AUDITEUR)
+    utilisateur = _create_utilisateur(session, Role.AUDITOR)
     notification = _create_notification(session, utilisateur.id, lu=True)
     authed_client = _login(utilisateur.email, "s3cret-pass")
 
@@ -109,8 +121,8 @@ def test_marquer_lue_est_idempotent(session) -> None:
 
 
 def test_marquer_lue_dune_notification_dautrui_est_404(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.AUDITEUR)
-    autre = _create_utilisateur(session, Role.AUDITEUR)
+    utilisateur = _create_utilisateur(session, Role.AUDITOR)
+    autre = _create_utilisateur(session, Role.AUDITOR)
     notification_dautrui = _create_notification(session, autre.id)
 
     authed_client = _login(utilisateur.email, "s3cret-pass")
@@ -121,7 +133,7 @@ def test_marquer_lue_dune_notification_dautrui_est_404(session) -> None:
 
 
 def test_marquer_lue_notification_inexistante_est_404(session) -> None:
-    utilisateur = _create_utilisateur(session, Role.AUDITEUR)
+    utilisateur = _create_utilisateur(session, Role.AUDITOR)
     authed_client = _login(utilisateur.email, "s3cret-pass")
 
     response = authed_client.post(f"/api/v1/notifications/{uuid.uuid4()}/lu")

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Response
 from fastapi.responses import FileResponse
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution, InstitutionProfil, Utilisateur
+from app.auth.models import ChercheurInstitution, InstitutionProfil, User
 from app.auth.permissions import require_role
 from app.core import storage
 from app.core.dependencies import get_session
@@ -58,16 +58,16 @@ def rattachement_public(
     que chercheur_id/institution_id, jamais de jointure ORM directe vers Utilisateur (voir
     app/auth/models.py). Réutilisé par app/researcher/router.py pour la même relation vue côté
     Chercheur (qui a symétriquement besoin de savoir quelle institution l'a invité)."""
-    chercheur = session.get(Utilisateur, rattachement.chercheur_id)
-    institution = session.get(Utilisateur, rattachement.institution_id)
+    chercheur = session.get(User, rattachement.chercheur_id)
+    institution = session.get(User, rattachement.institution_id)
     return RattachementPublic(
         id=rattachement.id,
         chercheur_id=rattachement.chercheur_id,
         chercheur_email=chercheur.email if chercheur else "",
-        chercheur_nom=chercheur.nom if chercheur else None,
+        chercheur_nom=chercheur.name if chercheur else None,
         institution_id=rattachement.institution_id,
         institution_email=institution.email if institution else "",
-        institution_nom=institution.nom if institution else None,
+        institution_nom=institution.name if institution else None,
         statut=rattachement.statut,
         date_invitation=rattachement.date_invitation,
         date_reponse=rattachement.date_reponse,
@@ -97,7 +97,7 @@ def entreprise_perimetre_public(
     summary="Consulter mon quota d'export restant",
 )
 def consulter_mon_profil_route(
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> InstitutionProfil:
     return analyses.consulter_mon_profil(session, current_user.id)
@@ -110,9 +110,9 @@ def consulter_mon_profil_route(
     summary="Lister les comptes Chercheur disponibles à inviter",
 )
 def lister_chercheurs_disponibles_route(
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
-) -> list[Utilisateur]:
+) -> list[User]:
     return chercheurs.lister_chercheurs_disponibles(session, current_user.id)
 
 
@@ -125,7 +125,7 @@ def lister_chercheurs_disponibles_route(
 )
 def inviter_chercheur_route(
     payload: InviterChercheurRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> RattachementPublic:
     rattachement = chercheurs.inviter_chercheur(
@@ -142,7 +142,7 @@ def inviter_chercheur_route(
 )
 def lister_mes_chercheurs_route(
     statut: StatutRattachement | None = None,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[RattachementPublic]:
     rattachements = chercheurs.lister_mes_chercheurs(
@@ -163,7 +163,7 @@ def lister_entreprises_route(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublieePublic]:
     items, total = entreprises_publiees.lister_entreprises_publiees(
@@ -191,7 +191,7 @@ def lister_entreprises_route(
 )
 def consulter_entreprise_route(
     entreprise_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> EntrepriseDetailInvestisseur:
     perimetre = projets.entreprises_perimetre_institution(session, current_user.id)
@@ -208,7 +208,7 @@ def consulter_entreprise_route(
 def consulter_preuve_route(
     entreprise_id: uuid.UUID,
     preuve_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     perimetre = projets.entreprises_perimetre_institution(session, current_user.id)
@@ -227,7 +227,7 @@ def consulter_preuve_route(
 )
 def creer_projet_route(
     payload: CreerProjetRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> Projet:
     return projets.creer_projet(
@@ -249,7 +249,7 @@ def creer_projet_route(
     summary="Lister mes projets",
 )
 def lister_mes_projets_route(
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[Projet]:
     return projets.lister_mes_projets(session, current_user.id)
@@ -261,7 +261,7 @@ def _projet_detail(session: Session, projet: Projet) -> ProjetDetail:
     ).all()
     affectations_out = []
     for affectation in affectations_db:
-        chercheur = session.get(Utilisateur, affectation.chercheur_id)
+        chercheur = session.get(User, affectation.chercheur_id)
         affectations_out.append(
             AffectationPublic(
                 id=affectation.id,
@@ -326,7 +326,7 @@ def _projet_detail(session: Session, projet: Projet) -> ProjetDetail:
 )
 def consulter_projet_route(
     projet_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> ProjetDetail:
     projet = projets.consulter_projet(session, current_user.id, projet_id)
@@ -343,13 +343,13 @@ def consulter_projet_route(
 def affecter_chercheur_route(
     projet_id: uuid.UUID,
     payload: AffecterChercheurRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> AffectationPublic:
     affectation = projets.affecter_chercheur(
         session, current_user.id, projet_id, payload.chercheur_id
     )
-    chercheur = session.get(Utilisateur, payload.chercheur_id)
+    chercheur = session.get(User, payload.chercheur_id)
     return AffectationPublic(
         id=affectation.id,
         chercheur_id=affectation.chercheur_id,
@@ -366,7 +366,7 @@ def affecter_chercheur_route(
 )
 def cloturer_projet_route(
     projet_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> Projet:
     return projets.cloturer_projet(session, current_user.id, projet_id)
@@ -382,7 +382,7 @@ def cloturer_projet_route(
 def ajouter_entreprise_perimetre_route(
     projet_id: uuid.UUID,
     payload: AjouterEntreprisePerimetreRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> EntreprisePerimetrePublic:
     lien = projets.ajouter_entreprise_perimetre(
@@ -399,7 +399,7 @@ def ajouter_entreprise_perimetre_route(
 )
 def lister_perimetre_route(
     projet_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[EntreprisePerimetrePublic]:
     liens = projets.lister_perimetre(session, current_user.id, projet_id)
@@ -416,7 +416,7 @@ def lister_perimetre_route(
 def ajouter_document_route(
     projet_id: uuid.UUID,
     payload: AjouterDocumentRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> DocumentProjetPublic:
     document = projets.ajouter_document(
@@ -440,7 +440,7 @@ def ajouter_document_route(
 )
 def lister_documents_route(
     projet_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[DocumentProjetPublic]:
     documents = projets.lister_documents(session, current_user.id, projet_id)
@@ -465,7 +465,7 @@ def lister_documents_route(
 )
 def lister_mes_analyses_route(
     statut: StatutAnalyse | None = None,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[AnalyseInstitutionPublic]:
     mes_analyses = analyses.lister_mes_analyses(session, current_user.id, statut=statut)
@@ -496,7 +496,7 @@ def lister_mes_analyses_route(
 )
 def consulter_analyse_route(
     analyse_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> AnalyseDetail:
     analyse = analyses.analyse_de_institution(session, current_user.id, analyse_id)
@@ -515,7 +515,7 @@ def consulter_analyse_route(
 def valider_analyse_route(
     analyse_id: uuid.UUID,
     payload: DecisionAnalyseRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ):
     return analyses.valider_analyse(
@@ -532,7 +532,7 @@ def valider_analyse_route(
 def demander_correction_route(
     analyse_id: uuid.UUID,
     payload: DecisionAnalyseRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ):
     return analyses.demander_correction(
@@ -548,7 +548,7 @@ def demander_correction_route(
 )
 def historique_analyse_route(
     analyse_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[Analyse]:
     return analyses.historique_analyse(session, current_user.id, analyse_id)
@@ -561,7 +561,7 @@ def historique_analyse_route(
 )
 def exporter_analyse_route(
     analyse_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INSTITUTION)),
+    current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> Response:
     contenu_csv = analyses.exporter_analyse_csv(session, current_user.id, analyse_id)

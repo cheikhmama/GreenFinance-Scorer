@@ -31,7 +31,7 @@ from app.core.enums import (
 
 if TYPE_CHECKING:
     from app.audit.models import AvisAudit
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.company.models import Company
     from app.scoring.models import ScoreESG
 
@@ -78,7 +78,7 @@ class ESGReport(SQLModel, table=True):
     # Champ interne réservé à l'accountability (voir aussi AvisAudit.auditeur_id) : jamais exposé
     # à l'Entreprise.
     auditor_id: uuid.UUID | None = Field(
-        default=None, foreign_key="utilisateur.id", ondelete="SET NULL", index=True
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
     )
     # Posée par affecter_auditeur (app/audit/assignment.py) au moment de l'affectation —
     # nécessaire pour calculer un retard d'audit (app/core/config.py::sla_audit_jours).
@@ -117,7 +117,7 @@ class ESGReport(SQLModel, table=True):
     config_hash: str | None = Field(default=None, max_length=64)
 
     company: "Company" = Relationship(back_populates="reports")
-    auditor: Optional["Utilisateur"] = Relationship(back_populates="rapports_audites")
+    auditor: Optional["User"] = Relationship(back_populates="audited_reports")
     metrics: list["ESGMetric"] = Relationship(back_populates="report")
     carbon_data: list["DonneeCarbone"] = Relationship(back_populates="rapport")
     scores: list["ScoreESG"] = Relationship(back_populates="rapport")
@@ -178,7 +178,7 @@ class ESGMetric(SQLModel, table=True):
     override_value: float | None = Field(default=None)
     override_reason: str | None = Field(default=None)
     overridden_by_id: uuid.UUID | None = Field(
-        default=None, foreign_key="utilisateur.id", ondelete="SET NULL", index=True
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
     )
     overridden_at: datetime | None = Field(default=None)
 

@@ -4,7 +4,7 @@ import pytest
 from sqlmodel import col, func, select
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, Role, TypeRapport
 from app.core.exceptions import ValidationError
@@ -176,10 +176,10 @@ def test_score_officiel_ignore_un_score_personnalise_du_meme_rapport(session) ->
     session.add(score_reference)
     session.commit()
 
-    utilisateur = Utilisateur(
+    utilisateur = User(
         email=f"chercheur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password("s3cret-pass"),
-        role=Role.CHERCHEUR,
+        password_hash=hash_password("s3cret-pass"),
+        role=Role.RESEARCHER,
     )
     session.add(utilisateur)
     session.commit()

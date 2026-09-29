@@ -14,7 +14,9 @@ from alembic.config import Config
 from sqlmodel import Session
 
 from alembic import command
+from app.auth.rate_limit import _key_ip
 from app.core.database import engine
+from app.core.redis import get_redis_client
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,3 +31,13 @@ def session():
     with Session(engine) as session:
         yield session
         session.rollback()
+
+
+@pytest.fixture(autouse=True)
+def _reinitialiser_limite_connexion_par_ip() -> None:
+    """Toutes les requêtes TestClient viennent de la même adresse ("testclient") et la suite
+    partage le Redis de développement : sans cette remise à zéro, les échecs de connexion de
+    TOUTE la suite (et des exécutions précédentes dans la fenêtre) s'additionneraient sur le
+    compteur par IP (app/auth/rate_limit.py::MAX_ATTEMPTS_PAR_IP) et finiraient par bloquer des
+    tests sans rapport."""
+    get_redis_client().delete(_key_ip("testclient"))

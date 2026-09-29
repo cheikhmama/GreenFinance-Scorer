@@ -19,7 +19,7 @@ from sqlmodel import Session, select
 
 import app.main  # noqa: F401  -- enregistre tous les modèles pour SQLAlchemy avant toute requête
 from app.admin.utilisateurs import creer_utilisateur
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.company.models import Company
 from app.company.rapports import deposer_rapport
 from app.core.database import engine
@@ -84,7 +84,7 @@ async def main() -> None:
     with Session(engine) as session:
         for spec in NOUVELLES_ENTREPRISES:
             utilisateur = session.exec(
-                select(Utilisateur).where(Utilisateur.email == spec["email"])
+                select(User).where(User.email == spec["email"])
             ).first()
             if utilisateur is not None:
                 print(f"[{spec['acronyme']}] compte {spec['email']} déjà existant, réutilisation.")
@@ -95,7 +95,7 @@ async def main() -> None:
                         ACTEUR_ADMIN_ID,
                         spec["email"],
                         None,
-                        Role.ENTREPRISE,
+                        Role.ENTERPRISE,
                         nom_entreprise=spec["nom"],
                         secteur=spec["secteur"],
                         pays=spec["pays"],

@@ -9,7 +9,7 @@ from sqlmodel import Field, Relationship, SQLModel
 from app.core.database import utcnow
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
 
 
 class JournalAudit(SQLModel, table=True):
@@ -30,7 +30,9 @@ class JournalAudit(SQLModel, table=True):
     __tablename__ = "journal_audit"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    acteur_id: uuid.UUID | None = Field(default=None, foreign_key="utilisateur.id")
+    acteur_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
+    )
     action: str
     type_ressource: str
     id_ressource: uuid.UUID | None = None
@@ -46,7 +48,7 @@ class Notification(SQLModel, table=True):
     __tablename__ = "notification"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    utilisateur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
     message: str
     type: str
     # Cible de redirection au clic (ex. l'id d'un ESGReport) — jamais de FK stricte : le type de
@@ -56,4 +58,4 @@ class Notification(SQLModel, table=True):
     date_envoi: datetime = Field(default_factory=utcnow)
     lu: bool = Field(default=False)
 
-    utilisateur: "Utilisateur" = Relationship(back_populates="notifications")
+    utilisateur: "User" = Relationship(back_populates="notifications")

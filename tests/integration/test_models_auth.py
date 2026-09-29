@@ -3,14 +3,14 @@ import uuid
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.models import ChercheurInstitution, InstitutionProfil, Utilisateur
+from app.auth.models import ChercheurInstitution, InstitutionProfil, User
 from app.core.enums import Role
 
 
-def _utilisateur(role: Role, email: str | None = None) -> Utilisateur:
-    return Utilisateur(
+def _utilisateur(role: Role, email: str | None = None) -> User:
+    return User(
         email=email or f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
+        password_hash="hash",
         role=role,
     )
 
@@ -22,11 +22,11 @@ def test_creation_utilisateur_par_role(session, role: Role) -> None:
     session.flush()
 
     assert utilisateur.id is not None
-    assert utilisateur.actif is True
+    assert utilisateur.active is True
 
 
 def test_rattachement_chercheur_institution(session) -> None:
-    chercheur = _utilisateur(Role.CHERCHEUR)
+    chercheur = _utilisateur(Role.RESEARCHER)
     institution = _utilisateur(Role.INSTITUTION)
     session.add(chercheur)
     session.add(institution)
@@ -48,10 +48,10 @@ def test_rattachement_chercheur_institution(session) -> None:
 
 def test_email_unique_constraint(session) -> None:
     email = f"unique-{uuid.uuid4()}@example.com"
-    session.add(_utilisateur(Role.ENTREPRISE, email=email))
+    session.add(_utilisateur(Role.ENTERPRISE, email=email))
     session.flush()
 
-    session.add(_utilisateur(Role.ENTREPRISE, email=email))
+    session.add(_utilisateur(Role.ENTERPRISE, email=email))
     with pytest.raises(IntegrityError):
         session.flush()
     session.rollback()

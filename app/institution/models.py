@@ -17,7 +17,7 @@ from app.core.database import utcnow
 from app.core.enums import StatutProjet, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.company.models import Company
     from app.ingestion.models import ESGReport
     from app.researcher.models import Analyse
@@ -27,7 +27,7 @@ class Projet(SQLModel, table=True):
     __tablename__ = "projet"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    institution_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    institution_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
     nom: str
     description: str | None = None
     # Distinct de description (texte libre) : objectif porte la finalité de la mission, demandée
@@ -46,7 +46,7 @@ class Projet(SQLModel, table=True):
     # recalculée (même principe que Company.published_at).
     date_cloture: datetime | None = None
 
-    institution: "Utilisateur" = Relationship(back_populates="projets")
+    institution: "User" = Relationship(back_populates="projects")
     affectations: list["AffectationProjet"] = Relationship(back_populates="projet")
     analyses: list["Analyse"] = Relationship(back_populates="projet")
     perimetre: list["ProjetEntreprise"] = Relationship(back_populates="projet")
@@ -61,11 +61,11 @@ class AffectationProjet(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    chercheur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    chercheur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
     date_affectation: datetime = Field(default_factory=utcnow)
 
     projet: Projet = Relationship(back_populates="affectations")
-    chercheur: "Utilisateur" = Relationship(back_populates="affectations_projet")
+    chercheur: "User" = Relationship(back_populates="project_assignments")
 
 
 class ProjetEntreprise(SQLModel, table=True):

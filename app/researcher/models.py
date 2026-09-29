@@ -20,7 +20,7 @@ from app.core.database import utcnow
 from app.core.enums import StatutAnalyse, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
+    from app.auth.models import User
     from app.company.models import Company
     from app.institution.models import Projet
 
@@ -30,7 +30,7 @@ class Analyse(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    chercheur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
+    chercheur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
     titre: str
     contenu: str
     statut: StatutAnalyse = Field(
@@ -44,7 +44,7 @@ class Analyse(SQLModel, table=True):
     date_decision: datetime | None = None
 
     projet: "Projet" = Relationship(back_populates="analyses")
-    chercheur: "Utilisateur" = Relationship(back_populates="analyses")
+    chercheur: "User" = Relationship(back_populates="analyses")
     entreprises: list["AnalyseEntreprise"] = Relationship(back_populates="analyse")
 
 

@@ -13,7 +13,7 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import ExtractionStatus, ReportStatus, Role
@@ -38,8 +38,8 @@ def affecter_auditeur(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid
             "L'extraction de ce rapport n'est pas terminée.", code="extraction_non_terminee"
         )
 
-    auditeur = session.get(Utilisateur, auditeur_id)
-    if auditeur is None or auditeur.role != Role.AUDITEUR or not auditeur.actif:
+    auditeur = session.get(User, auditeur_id)
+    if auditeur is None or auditeur.role != Role.AUDITOR or not auditeur.active:
         raise ValidationError("Auditeur invalide.", code="auditeur_invalide")
 
     rapport.auditor_id = auditeur.id
@@ -93,31 +93,31 @@ def lister_charge_auditeurs(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Utilisateur, int, int, int]], int]:
+) -> tuple[list[tuple[User, int, int, int]], int]:
     """Charge de travail par Auditeur actif — dossiers actuellement affectés, dont ceux en retard
     (au-delà de settings.sla_audit_jours), et avis rendus au total : le détail derrière le chiffre
     "Dossiers affectés" de l'Aperçu Administrateur (indicateur → liste filtrée). Pagination par
     offset/limit, même principe que les autres listes Admin (voir app/admin/utilisateurs.py)."""
     filtres: list[ColumnElement[bool]] = [
-        col(Utilisateur.role) == Role.AUDITEUR,
-        col(Utilisateur.actif).is_(True),
+        col(User.role) == Role.AUDITOR,
+        col(User.active).is_(True),
     ]
     if recherche:
-        filtres.append(col(Utilisateur.email).ilike(f"%{recherche}%"))
+        filtres.append(col(User.email).ilike(f"%{recherche}%"))
 
-    total = session.exec(select(func.count()).select_from(Utilisateur).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(User).where(*filtres)).one()
     auditeurs = list(
         session.exec(
-            select(Utilisateur)
+            select(User)
             .where(*filtres)
-            .order_by(col(Utilisateur.email))
+            .order_by(col(User.email))
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
     )
 
     seuil_retard = utcnow() - timedelta(days=get_settings().sla_audit_jours)
-    resultats: list[tuple[Utilisateur, int, int, int]] = []
+    resultats: list[tuple[User, int, int, int]] = []
     for auditeur in auditeurs:
         dossiers_affectes = session.exec(
             select(func.count())

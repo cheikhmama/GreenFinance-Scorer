@@ -5,11 +5,11 @@ import type { Role } from "@/features/auth/schemas";
 /** Un seul espace par rôle (voir Utilisateur.role, table à discriminant unique —
  * app/auth/models.py côté backend) : la correspondance est donc directe, sans liste. */
 const ROLE_HOME: Record<Role, string> = {
-  ADMINISTRATEUR: "/admin",
-  ENTREPRISE: "/company",
-  AUDITEUR: "/audit",
-  INVESTISSEUR: "/investor",
-  CHERCHEUR: "/researcher",
+  ADMIN: "/admin",
+  ENTERPRISE: "/company",
+  AUDITOR: "/audit",
+  INVESTOR: "/investor",
+  RESEARCHER: "/researcher",
   INSTITUTION: "/institution",
 };
 

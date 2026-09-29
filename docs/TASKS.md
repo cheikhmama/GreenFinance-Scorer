@@ -26,14 +26,15 @@ Rules for every task:
   - [x] Auditor override fields on metrics (columns only; the auditor API is part of the audit workflow work).
   - [x] Explicit `ON DELETE` rules and indexes on every foreign key to or from the three tables (RENAME_PLAN §2.5).
   - Follow-ups: ISIN/LEI check-digit validation lands with registration input (1.3); `official_score`, `coverage_rate`, `config_hash` are filled by 1.6 and 3.1.
-- [ ] 1.2 Auth & Email Sanitization: Enforce lowercase email normalization and Pydantic password validation (12-72 bytes).
-  - [ ] Rename `utilisateur` → `users` per RENAME_PLAN §3.
-  - [ ] Password policy per D4: 12 characters minimum on activation, reset and change; existing hashes untouched.
-  - [ ] Lower-case email on login, admin creation, profile update and reset; unique index on `lower(email)`; data migration that reports existing case-duplicates before adding the index **[review]**.
-  - [ ] One shared password validator used by activation, reset **and** change-password (change-password has none today) **[review]**.
-  - [ ] Rate-limit `POST /auth/changer-mot-de-passe` like verify-password **[review]**.
-  - [ ] Require the current password and a confirmation link to change email **[review]**.
-  - [ ] Atomic `INCR` + `EXPIRE` in rate-limit counters; add a per-IP limit behind a trusted proxy **[review]**.
+- [x] 1.2 Auth & Email Sanitization: Enforce lowercase email normalization and Pydantic password validation (12-72 bytes). (migration `7499c018ddb1`)
+  - [x] Rename `utilisateur` → `users` (+ token tables, `Role` values) per RENAME_PLAN §3.
+  - [x] Password policy per D4: 12 characters minimum on activation, reset and change; existing hashes untouched.
+  - [x] Lower-case email on login, admin creation, profile update and reset; case-insensitive uniqueness (stored lower-case + CHECK + unique index); the migration refuses to run on existing case-duplicates **[review]**.
+  - [x] One shared password validator used by activation, reset **and** change-password **[review]**.
+  - [x] Rate-limit `POST /auth/changer-mot-de-passe` like verify-password **[review]**.
+  - [x] Require the current password and a confirmation link to change email **[review]**; frontend confirmation page `/confirmer-email`.
+  - [x] Atomic `INCR` + `EXPIRE` in rate-limit counters; add a per-IP limit behind a trusted proxy **[review]**.
+  - [x] Found while testing: the activation e-mail linked to `/activer-compte`, a frontend page that did not exist — added (shares the reset page).
 - [ ] 1.3 Company Registration API: Implement Self-Service registration (`POST /api/v1/companies/register`).
 - [ ] 1.4 Admin KYC API: Implement onboarding approval endpoint (`PATCH /api/v1/admin/companies/{id}/onboard`).
 - [ ] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`).
@@ -87,5 +88,5 @@ Rules for every task:
 - [ ] 4.5 Test coverage **[review]**
   - [ ] Backend: extraction pipeline (with a stubbed LLM), semantic search, completeness, explainability, activation, avatar, CSRF middleware in isolation.
   - [ ] Frontend: at least one flow test per user space (currently only auth, contact, prototype, `RequireRole`).
-- [ ] 4.7 Finish the English rename: remaining modules and the remaining French JSON field names (RENAME_PLAN §3), with the regenerated client and frontend.
+- [ ] 4.7 Finish the English rename: remaining modules and the remaining French JSON field names (RENAME_PLAN §4), with the regenerated client and frontend.
 - [ ] 4.6 Documentation: expand `README.md` (features, roles and permissions, architecture diagram, deployment, screenshots).

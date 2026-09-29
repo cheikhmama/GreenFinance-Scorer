@@ -16,7 +16,7 @@ from app.audit.models import AvisAudit
 from app.audit.opinion import soumettre_avis
 from app.audit.preuves import fichier_preuve
 from app.audit.schemas import AvisAuditAdmin, SoumettreAvisRequest
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.permissions import require_role
 from app.core import storage
 from app.core.dependencies import get_session
@@ -36,7 +36,7 @@ router = APIRouter(tags=["audit"])
     summary="Lister les dossiers affectés à l'auditeur, en attente d'avis",
 )
 def lister_mes_dossiers(
-    current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
+    current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
 ) -> list[ESGReport]:
     return list(
@@ -57,7 +57,7 @@ def lister_mes_dossiers(
 )
 def consulter_dossier(
     rapport_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
+    current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
 ) -> RapportESGDetail:
     rapport = session.get(ESGReport, rapport_id)
@@ -77,7 +77,7 @@ def consulter_dossier(
 def consulter_preuve_route(
     rapport_id: uuid.UUID,
     preuve_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
+    current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     chemin = fichier_preuve(session, rapport_id, preuve_id, current_user.id)
@@ -91,7 +91,7 @@ def consulter_preuve_route(
     summary="Lister l'historique des avis déjà rendus par l'auditeur",
 )
 def lister_historique_route(
-    current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
+    current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
 ) -> list[AvisAudit]:
     return list(
@@ -113,7 +113,7 @@ def lister_historique_route(
 def soumettre_avis_route(
     rapport_id: uuid.UUID,
     payload: SoumettreAvisRequest,
-    current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
+    current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
 ) -> AvisAudit:
     return soumettre_avis(

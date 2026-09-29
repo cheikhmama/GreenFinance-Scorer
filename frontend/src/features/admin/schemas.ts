@@ -5,20 +5,20 @@ export { Role };
 export { DevisePosition };
 export const DEVISES = Object.values(DevisePosition);
 
-/** Jamais ADMINISTRATEUR — même règle déjà validée côté prototype (docs/PROTOTYPE_FRONTEND.md) et
+/** Jamais ADMIN — même règle déjà validée côté prototype (docs/PROTOTYPE_FRONTEND.md) et
  * appliquée côté serveur (app/admin/utilisateurs.py::creer_utilisateur). */
 export const ROLES_ATTRIBUABLES = [
-  Role.ENTREPRISE,
-  Role.INVESTISSEUR,
-  Role.AUDITEUR,
+  Role.ENTERPRISE,
+  Role.INVESTOR,
+  Role.AUDITOR,
   Role.INSTITUTION,
-  Role.CHERCHEUR,
+  Role.RESEARCHER,
 ] as const;
 
 export type RoleAttribuable = (typeof ROLES_ATTRIBUABLES)[number];
 
 /** Rôles consultables dans la liste des comptes (UsersSection) — contrairement à
- * ROLES_ATTRIBUABLES (formulaire de création), inclut ADMINISTRATEUR : on ne peut pas en créer un
+ * ROLES_ATTRIBUABLES (formulaire de création), inclut ADMIN : on ne peut pas en créer un
  * depuis ce formulaire, mais consulter/désactiver/réactiver les comptes déjà existants reste une
  * opération légitime (ex. suivre l'effectif d'administrateurs actifs). */
 export const ROLES_CONSULTABLES = Object.values(Role);
@@ -36,7 +36,7 @@ export const creerUtilisateurSchema = z
     pays: z.string().optional(),
   })
   .superRefine((values, ctx) => {
-    if (values.role !== Role.ENTREPRISE) return;
+    if (values.role !== Role.ENTERPRISE) return;
     // Le profil Entreprise (nom_entreprise/secteur/pays) est requis dans le même geste que la
     // création du compte — voir app/admin/utilisateurs.py::creer_utilisateur, sans lui le compte
     // ne peut rien déposer (aucune Entreprise à laquelle le rattacher).

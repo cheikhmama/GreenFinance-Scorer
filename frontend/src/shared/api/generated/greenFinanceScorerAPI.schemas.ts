@@ -15,7 +15,7 @@ export interface ActiverCompteRequest {
      */
   token: string;
   /**
-     * @minLength 8
+     * @minLength 12
      * @maxLength 72
      */
   nouveau_mot_de_passe: string;
@@ -268,6 +268,10 @@ export const CanalDepot = {
 
 export interface ChangerMotDePasseRequest {
   mot_de_passe_actuel: string;
+  /**
+     * @minLength 12
+     * @maxLength 72
+     */
   nouveau_mot_de_passe: string;
 }
 
@@ -291,6 +295,18 @@ export interface ChercheurDisponible {
   id: string;
   email: string;
   nom: string | null;
+}
+
+/**
+ * POST /auth/confirmer-changement-email — jeton reçu à la nouvelle adresse
+ * (app/auth/email_change.py::TOKEN_TTL, usage unique).
+ */
+export interface ConfirmerChangementEmailRequest {
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  token: string;
 }
 
 export interface ContactMessageRequest {
@@ -366,15 +382,18 @@ export interface CreerProjetRequest {
   date_limite?: string | null;
 }
 
+/**
+ * Rôles de la plateforme (docs/ARCHITECTURE.md §1) — INSTITUTION conservé (décision D1).
+ */
 export type Role = typeof Role[keyof typeof Role];
 
 
 export const Role = {
-  ADMINISTRATEUR: 'ADMINISTRATEUR',
-  ENTREPRISE: 'ENTREPRISE',
-  AUDITEUR: 'AUDITEUR',
-  INVESTISSEUR: 'INVESTISSEUR',
-  CHERCHEUR: 'CHERCHEUR',
+  ADMIN: 'ADMIN',
+  ENTERPRISE: 'ENTERPRISE',
+  AUDITOR: 'AUDITOR',
+  INVESTOR: 'INVESTOR',
+  RESEARCHER: 'RESEARCHER',
   INSTITUTION: 'INSTITUTION',
 } as const;
 
@@ -770,13 +789,16 @@ export interface ModifierPositionRequest {
 /**
  * Auto-service, restreint à nom et email — jamais role : fixé une seule fois à la création
  * du compte (app/admin/utilisateurs.py::creer_utilisateur), jamais modifiable ensuite, ni par
- * l'Admin ni par l'intéressé. L'email reste l'identifiant de connexion :
- * app/auth/router.py::modifier_mon_profil vérifie son unicité avant d'accepter le changement,
- * comme creer_utilisateur le fait à la création.
+ * l'Admin ni par l'intéressé.
+ *
+ * L'email est l'identifiant de connexion : le changer exige mot_de_passe_actuel et ne prend effet
+ * qu'à la confirmation du lien envoyé à la nouvelle adresse (app/auth/email_change.py) — une
+ * session volée ne suffit jamais à détourner le compte.
  */
 export interface ModifierProfilRequest {
   nom: string;
   email: string;
+  mot_de_passe_actuel?: string | null;
 }
 
 export interface NotificationPublic {
@@ -964,6 +986,7 @@ export interface UtilisateurPublic {
   date_creation: string;
   actif: boolean;
   date_activation: string | null;
+  email_en_attente?: string | null;
 }
 
 export interface PageUtilisateurPublic {
@@ -1151,7 +1174,7 @@ export interface ReinitialiserMotDePasseRequest {
      */
   token: string;
   /**
-     * @minLength 8
+     * @minLength 12
      * @maxLength 72
      */
   nouveau_mot_de_passe: string;

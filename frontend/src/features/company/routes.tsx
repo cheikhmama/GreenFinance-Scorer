@@ -10,7 +10,7 @@ import { ProfilePage } from "./components/ProfilePage";
 export const companyRoutes: RouteObject[] = [
   {
     element: (
-      <RequireRole allowedRoles={["ENTREPRISE"]}>
+      <RequireRole allowedRoles={["ENTERPRISE"]}>
         <AppShell />
       </RequireRole>
     ),

@@ -323,7 +323,7 @@ function InstitutionResearchers({ institutionName }: { institutionName: string }
     const dejaRattaches = new Set(institutionAffiliations.map((a) => a.researcherEmail));
     const normalizedQuery = query.trim().toLocaleLowerCase("fr");
     return users.filter((user) => {
-      if (user.role !== "CHERCHEUR" || dejaRattaches.has(user.email)) return false;
+      if (user.role !== "RESEARCHER" || dejaRattaches.has(user.email)) return false;
       if (!normalizedQuery) return true;
       return `${user.name} ${user.email}`.toLocaleLowerCase("fr").includes(normalizedQuery);
     });

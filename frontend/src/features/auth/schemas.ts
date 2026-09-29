@@ -10,6 +10,12 @@ import { Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 export { Role };
 export type User = UtilisateurPublic;
 
+/** Règle de tout mot de passe nouvellement posé (activation, réinitialisation, changement) —
+ * même règle que le backend (app/auth/schemas.py::NouveauMotDePasse, décision D4). Jamais
+ * appliquée à la connexion : un mot de passe existant plus court reste valide. */
+export const MOT_DE_PASSE_LONGUEUR_MIN = 12;
+const MESSAGE_LONGUEUR_MIN = `${MOT_DE_PASSE_LONGUEUR_MIN} caractères minimum`;
+
 /** Corps de POST /auth/login, validé côté client avant tout appel réseau. */
 export const loginRequestSchema = z.object({
   email: z.string().min(1, "L'adresse e-mail est requise").email("Adresse e-mail invalide"),
@@ -29,7 +35,7 @@ export type ForgotPasswordForm = z.infer<typeof forgotPasswordFormSchema>;
 export const changerMotDePasseFormSchema = z
   .object({
     motDePasseActuel: z.string().min(1, "Le mot de passe actuel est requis"),
-    nouveauMotDePasse: z.string().min(8, "8 caractères minimum"),
+    nouveauMotDePasse: z.string().min(MOT_DE_PASSE_LONGUEUR_MIN, MESSAGE_LONGUEUR_MIN),
     confirmation: z.string().min(1, "La confirmation est requise"),
   })
   .refine((values) => values.nouveauMotDePasse === values.confirmation, {
@@ -39,11 +45,13 @@ export const changerMotDePasseFormSchema = z
 
 export type ChangerMotDePasseForm = z.infer<typeof changerMotDePasseFormSchema>;
 
-/** Formulaire de PATCH /auth/me — nom et email, jamais le rôle. L'unicité de l'email est
- * vérifiée côté backend (voir app/auth/router.py::modifier_mon_profil). */
+/** Formulaire de PATCH /auth/me — nom et email, jamais le rôle. Changer d'e-mail exige le mot
+ * de passe actuel et ne prend effet qu'après confirmation du lien envoyé à la nouvelle adresse
+ * (app/auth/email_change.py) : le composant n'exige motDePasseActuel que dans ce cas. */
 export const modifierProfilFormSchema = z.object({
   nom: z.string().min(1, "Le nom est requis."),
   email: z.string().min(1, "L'adresse e-mail est requise").email("Adresse e-mail invalide"),
+  motDePasseActuel: z.string().optional(),
 });
 
 export type ModifierProfilForm = z.infer<typeof modifierProfilFormSchema>;
@@ -60,7 +68,7 @@ export type VerifierMotDePasseForm = z.infer<typeof verifierMotDePasseFormSchema
  * quel au moment d'appeler POST /auth/changer-mot-de-passe. */
 export const nouveauMotDePasseFormSchema = z
   .object({
-    nouveauMotDePasse: z.string().min(8, "8 caractères minimum"),
+    nouveauMotDePasse: z.string().min(MOT_DE_PASSE_LONGUEUR_MIN, MESSAGE_LONGUEUR_MIN),
     confirmation: z.string().min(1, "La confirmation est requise"),
   })
   .refine((values) => values.nouveauMotDePasse === values.confirmation, {

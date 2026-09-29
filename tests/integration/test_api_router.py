@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.core.enums import Role
 from app.main import app
@@ -60,44 +60,44 @@ _ROUTES: list[tuple[str, str, Role | None, dict[str, object] | None]] = [
     ("POST", "/auth/changer-mot-de-passe", None, {"mot_de_passe_actuel": "x", "nouveau_mot_de_passe": "y"}),
     ("GET", "/notifications", None, None),
     ("POST", f"/notifications/{_ID}/lu", None, None),
-    ("GET", "/admin/utilisateurs?role=AUDITEUR", Role.ADMINISTRATEUR, None),
-    ("POST", "/admin/utilisateurs", Role.ADMINISTRATEUR, {"email": "x@example.com", "role": "AUDITEUR"}),
-    ("POST", f"/admin/utilisateurs/{_ID}/desactiver", Role.ADMINISTRATEUR, None),
-    ("GET", "/admin/rapports/a-affecter", Role.ADMINISTRATEUR, None),
-    ("POST", f"/admin/rapports/{_ID}/affecter", Role.ADMINISTRATEUR, {"auditeur_id": _ID}),
-    ("GET", "/admin/rapports/en-validation", Role.ADMINISTRATEUR, None),
-    ("GET", f"/admin/rapports/{_ID}", Role.ADMINISTRATEUR, None),
-    ("GET", f"/admin/rapports/{_ID}/avis", Role.ADMINISTRATEUR, None),
-    ("POST", f"/admin/rapports/{_ID}/valider", Role.ADMINISTRATEUR, {}),
-    ("POST", f"/admin/rapports/{_ID}/rejeter", Role.ADMINISTRATEUR, {}),
-    ("POST", f"/admin/rapports/{_ID}/demander-correction", Role.ADMINISTRATEUR, {}),
-    ("GET", "/admin/entreprises", Role.ADMINISTRATEUR, None),
-    ("GET", "/admin/entreprises/publiables", Role.ADMINISTRATEUR, None),
-    ("GET", f"/admin/entreprises/{_ID}", Role.ADMINISTRATEUR, None),
+    ("GET", "/admin/utilisateurs?role=AUDITOR", Role.ADMIN, None),
+    ("POST", "/admin/utilisateurs", Role.ADMIN, {"email": "x@example.com", "role": "AUDITOR"}),
+    ("POST", f"/admin/utilisateurs/{_ID}/desactiver", Role.ADMIN, None),
+    ("GET", "/admin/rapports/a-affecter", Role.ADMIN, None),
+    ("POST", f"/admin/rapports/{_ID}/affecter", Role.ADMIN, {"auditeur_id": _ID}),
+    ("GET", "/admin/rapports/en-validation", Role.ADMIN, None),
+    ("GET", f"/admin/rapports/{_ID}", Role.ADMIN, None),
+    ("GET", f"/admin/rapports/{_ID}/avis", Role.ADMIN, None),
+    ("POST", f"/admin/rapports/{_ID}/valider", Role.ADMIN, {}),
+    ("POST", f"/admin/rapports/{_ID}/rejeter", Role.ADMIN, {}),
+    ("POST", f"/admin/rapports/{_ID}/demander-correction", Role.ADMIN, {}),
+    ("GET", "/admin/entreprises", Role.ADMIN, None),
+    ("GET", "/admin/entreprises/publiables", Role.ADMIN, None),
+    ("GET", f"/admin/entreprises/{_ID}", Role.ADMIN, None),
     (
         "PATCH",
         f"/admin/entreprises/{_ID}",
-        Role.ADMINISTRATEUR,
+        Role.ADMIN,
         {"nom": "x", "secteur": "y", "pays": "z"},
     ),
-    ("POST", f"/admin/entreprises/{_ID}/publier", Role.ADMINISTRATEUR, None),
-    ("GET", "/audit/rapports", Role.AUDITEUR, None),
-    ("GET", f"/audit/rapports/{_ID}", Role.AUDITEUR, None),
-    ("POST", f"/audit/rapports/{_ID}/avis", Role.AUDITEUR, {"decision": "RECOMMANDE_VALIDATION"}),
-    ("GET", f"/company/rapports/{_ID}", Role.ENTREPRISE, None),
+    ("POST", f"/admin/entreprises/{_ID}/publier", Role.ADMIN, None),
+    ("GET", "/audit/rapports", Role.AUDITOR, None),
+    ("GET", f"/audit/rapports/{_ID}", Role.AUDITOR, None),
+    ("POST", f"/audit/rapports/{_ID}/avis", Role.AUDITOR, {"decision": "RECOMMANDE_VALIDATION"}),
+    ("GET", f"/company/rapports/{_ID}", Role.ENTERPRISE, None),
 ]
 
 # Aucune route ci-dessus n'exige CHERCHEUR — un choix de « mauvais rôle » systématique et sûr
 # pour chacune, y compris pour /company (qui exige ENTREPRISE).
-_MAUVAIS_ROLE = Role.CHERCHEUR
+_MAUVAIS_ROLE = Role.RESEARCHER
 
 
 def _creer_et_connecter(session, role: Role) -> TestClient:
-    utilisateur = Utilisateur(
+    utilisateur = User(
         email=f"rbac-{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password("s3cret-pass"),
+        password_hash=hash_password("s3cret-pass"),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(utilisateur)
     session.commit()

@@ -6,7 +6,7 @@ from sqlmodel import select
 
 from app.audit.models import AvisAudit
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core.database import utcnow
@@ -32,12 +32,12 @@ from app.main import app
 client = TestClient(app, base_url="https://testserver")
 
 
-def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -73,8 +73,8 @@ def _login(email: str, password: str) -> TestClient:
 
 
 def test_lister_mes_dossiers_ne_montre_que_mes_rapports_affectes(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    autre_auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    autre_auditeur = _create_utilisateur(session, Role.AUDITOR)
     mon_rapport = _create_rapport_affecte(session, auditeur.id)
     _create_rapport_affecte(session, autre_auditeur.id)
 
@@ -88,8 +88,8 @@ def test_lister_mes_dossiers_ne_montre_que_mes_rapports_affectes(session) -> Non
 
 
 def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    autre_auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    autre_auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, autre_auditeur.id)
 
     authed_client = _login(auditeur.email, "s3cret-pass")
@@ -100,7 +100,7 @@ def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
 
 
 def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
     preuve = PreuveDocumentaire(
         nom_document="rapport.pdf",
@@ -149,7 +149,7 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
 
 
 def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
 
     authed_client = _login(auditeur.email, "s3cret-pass")
@@ -170,10 +170,10 @@ def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
 
 
 def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_inactif = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_inactif.actif = False
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    admin_inactif = _create_utilisateur(session, Role.ADMIN)
+    admin_inactif.active = False
     session.add(admin_inactif)
     session.commit()
     rapport = _create_rapport_affecte(session, auditeur.id)
@@ -202,7 +202,7 @@ def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
 
 
 def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
     authed_client = _login(auditeur.email, "s3cret-pass")
 
@@ -225,7 +225,7 @@ def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
     "decision", ["RECOMMANDE_VALIDATION", "RECOMMANDE_REJET", "DEMANDE_CLARIFICATION"]
 )
 def test_soumettre_avis_accepte_les_trois_recommandations(session, decision: str) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
     authed_client = _login(auditeur.email, "s3cret-pass")
 
@@ -239,8 +239,8 @@ def test_soumettre_avis_accepte_les_trois_recommandations(session, decision: str
 
 
 def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    autre_auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    autre_auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport_a = _create_rapport_affecte(session, auditeur.id)
     rapport_b = _create_rapport_affecte(session, auditeur.id)
     rapport_dautrui = _create_rapport_affecte(session, autre_auditeur.id)
@@ -285,7 +285,7 @@ def test_soumettre_avis_sans_authentification_est_rejete() -> None:
 
 
 def test_lister_mes_dossiers_avec_role_entreprise_est_rejete(session) -> None:
-    user = _create_utilisateur(session, Role.ENTREPRISE)
+    user = _create_utilisateur(session, Role.ENTERPRISE)
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.get("/api/v1/audit/rapports")
