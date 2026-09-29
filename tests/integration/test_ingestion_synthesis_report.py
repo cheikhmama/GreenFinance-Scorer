@@ -2,7 +2,7 @@ import uuid
 
 from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, MethodeDonnee, Pilier, TypeRapport
+from app.core.enums import CanalDepot, MethodeDonnee, Pillar, TypeRapport
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import (
     CarbonEmission,
@@ -17,7 +17,7 @@ from app.ingestion.synthesis_report import (
     _section_score_officiel,
     generer_rapport_synthese,
 )
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 
 def _texte(elements: list) -> str:
@@ -63,13 +63,13 @@ def test_section_score_officiel_absent_affiche_en_attente() -> None:
 
 
 def test_section_score_officiel_present_affiche_les_valeurs() -> None:
-    score = ScoreESG(
-        rapport_id=uuid.uuid4(),
-        configuration_id=uuid.uuid4(),
-        valeur_globale=66.45,
-        score_environnement=49.91,
-        score_social=86.0,
-        score_gouvernance=80.0,
+    score = Score(
+        report_id=uuid.uuid4(),
+        config_id=uuid.uuid4(),
+        global_score=66.45,
+        environmental_score=49.91,
+        social_score=86.0,
+        governance_score=80.0,
     )
     elements = _section_score_officiel(score)
     table = elements[-1]
@@ -83,7 +83,7 @@ def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
     preuve = _preuve(session)
     reel = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.SOCIAL,
+        pillar=Pillar.SOCIAL,
         metric_code="femmes_effectif_pourcentage",
         value=30.0,
         unit="%",
@@ -93,7 +93,7 @@ def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
     reel.proof = preuve
     declare = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.SOCIAL,
+        pillar=Pillar.SOCIAL,
         metric_code="score_social_declare",
         value=70.0,
         unit="",
@@ -115,7 +115,7 @@ def test_section_declare_par_lentreprise_isole_les_codes_auto_declares(session) 
     preuve = _preuve(session)
     declare = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.SOCIAL,
+        pillar=Pillar.SOCIAL,
         metric_code="score_social_declare",
         value=70.0,
         unit="",
@@ -160,7 +160,7 @@ def test_generer_rapport_synthese_produit_un_pdf_valide(session) -> None:
     session.add(
         ESGMetric(
             report_id=rapport.id,
-            pillar=Pilier.GOUVERNANCE,
+            pillar=Pillar.GOUVERNANCE,
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",

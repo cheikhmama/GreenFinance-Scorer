@@ -52,7 +52,7 @@ def couverture_publique(session: Session, rapport: ESGReport | None) -> Couvertu
         ],
     )
 from app.scoring.engine import score_officiel
-from app.scoring.models import ConfigurationPonderation
+from app.scoring.models import ScoringConfig
 
 _SCORE_VIDE = ScoreEntreprisePublic(
     valeur_globale=None,
@@ -83,12 +83,13 @@ def score_public(session: Session, rapport: ESGReport | None) -> ScoreEntreprise
     score = score_officiel(session, rapport.id)
     if score is None:
         return _SCORE_VIDE
-    configuration = session.get(ConfigurationPonderation, score.configuration_id)
+    configuration = session.get(ScoringConfig, score.config_id)
     return ScoreEntreprisePublic(
-        valeur_globale=score.valeur_globale,
-        score_environnement=score.score_environnement,
-        score_social=score.score_social,
-        score_gouvernance=score.score_gouvernance,
+        valeur_globale=score.global_score,
+        score_environnement=score.environmental_score,
+        score_social=score.social_score,
+        score_gouvernance=score.governance_score,
+        taux_couverture=score.coverage_rate,
         configuration_version=configuration.version if configuration else None,
     )
 

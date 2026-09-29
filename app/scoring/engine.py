@@ -1,25 +1,28 @@
-"""Moteur de calcul du score ESG (Phase 5 §9).
+"""Moteur de calcul du score ESG (Phase 5 §9, tâche 3.1).
 
-Point d'entrée : calculer_score(session, rapport_id). Lit les ESGMetric déjà persistés pour
-ce rapport (jamais de saisie manuelle, jamais de valeur recalculée à partir d'une source hors
-plateforme — même garantie que app/ingestion/models.py), les regroupe par pilier, normalise
-chaque valeur selon la configuration de pondération de référence (app/scoring/config_schema.py,
-config/weights/default.yaml) et persiste un ScoreESG.
+Point d'entrée : calculer_score(session, rapport_id). Lit les ESGMetric déjà persistés pour ce
+rapport, les regroupe par pilier, normalise chaque valeur selon la configuration de référence et
+persiste un Score avec sa couverture.
 
-Donnée manquante (Phase 5 §9, décision explicite) : un indicateur absent pour ce rapport est
-retiré du calcul de son pilier, dont le poids se répartit sur les indicateurs réellement
-présents — jamais compté comme 0. Un pilier sans aucun indicateur présent reste NULL (voir
-app/scoring/models.py::ScoreESG) et est lui-même retiré du calcul du score global, sur le même
-principe. Si aucun pilier n'est calculable, calculer_score refuse de créer un score plutôt que
-d'en fabriquer un sans substance (code score_incalculable).
+Configuration verrouillée (tâche 3.1, docs/ARCHITECTURE.md §5.3) : le calcul relit toujours le
+YAML STOCKÉ sur la ligne scoring_configs (content_yaml), jamais le fichier sur disque. Le fichier
+(config/weights/default.yaml) ne sert qu'à enregistrer la référence courante, identifiée par
+l'empreinte de son contenu : le modifier — même sans changer son numéro de version — enregistre
+une nouvelle configuration au prochain calcul, et les scores anciens gardent la leur.
+
+Donnée manquante (Phase 5 §9) : un indicateur absent est retiré du calcul de son pilier, dont le
+poids se répartit sur les indicateurs présents — jamais compté comme 0. Un pilier sans indicateur
+présent reste NULL et sort du score global. La part pondérée de ce qui était présent est la
+couverture (coverage_rate), stockée et affichée avec le score ; sous le seuil min_coverage de la
+configuration, le score n'est pas publiable (couverture_insuffisante).
 
 Transactions (tâche 1.6) : aucune fonction de ce module n'appelle session.commit() — l'appelant
-(la validation, le recalcul) possède la limite de transaction. La configuration de référence
-n'est créée que sur un chemin d'écriture (obtenir_configuration_reference, flush + ON CONFLICT) ;
-les lectures (score_officiel, score_public, score_calculable) n'écrivent jamais rien.
+possède la limite de transaction. Les lectures (score_officiel, score_public, apercu_score)
+n'écrivent jamais rien.
 """
 
 import uuid
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -29,74 +32,98 @@ from sqlmodel import Session, col, select
 
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import Pilier
+from app.core.enums import Pillar
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGMetric, ESGReport
 from app.scoring.config_schema import (
     ConfigurationScoring,
     PilierConfig,
-    charger_configuration_depuis_fichier,
+    charger_configuration,
+    empreinte_configuration,
 )
-from app.scoring.models import ConfigurationPonderation, ScoreESG
+from app.scoring.models import Score, ScoringConfig
 from app.scoring.normalization import normaliser
 from app.scoring.schemas import ScoreESGPublic
 
-_NOM_CONFIGURATION_REFERENCE = "Méthodologie de référence GreenFinance Scorer"
-
 
 @lru_cache
-def _charger_configuration_reference_depuis_disque(chemin: str) -> ConfigurationScoring:
-    """Le fichier YAML change rarement pendant qu'un process tourne — mis en cache par chemin,
-    comme app/ingestion/extractor.py::_get_embed_model met en cache un modèle coûteux à charger."""
-    return charger_configuration_depuis_fichier(Path(chemin))
+def _schema_depuis_contenu(contenu_yaml: str) -> ConfigurationScoring:
+    """Un même contenu se parse toujours à l'identique — mis en cache par contenu, jamais par
+    chemin : c'est le contenu qui fait foi."""
+    return charger_configuration(contenu_yaml)
 
 
-def _schema_reference() -> tuple[str, ConfigurationScoring]:
-    chemin = get_settings().default_scoring_config
-    return chemin, _charger_configuration_reference_depuis_disque(chemin)
+def _contenu_reference() -> str:
+    return Path(get_settings().default_scoring_config).read_text(encoding="utf-8")
 
 
-def trouver_configuration_reference(session: Session) -> ConfigurationPonderation | None:
-    """Lecture seule : la ligne de référence (utilisateur_id NULL) de la version décrite par le
-    fichier YAML courant, ou None si aucun score n'a encore été calculé sous cette version —
-    jamais créée ici (une requête GET ne doit rien écrire)."""
-    _chemin, schema = _schema_reference()
-    return session.exec(
-        select(ConfigurationPonderation).where(
-            col(ConfigurationPonderation.utilisateur_id).is_(None),
-            col(ConfigurationPonderation.version) == schema.version,
+def schema_configuration(configuration: ScoringConfig) -> ConfigurationScoring:
+    if configuration.content_yaml is None:
+        raise ValidationError(
+            "Le contenu de cette configuration de pondération n'a pas été conservé (antérieure "
+            "à la tâche 3.1) : aucun calcul n'est possible sous elle.",
+            code="configuration_sans_contenu",
         )
+    return _schema_depuis_contenu(configuration.content_yaml)
+
+
+def _trouver_par_empreinte(
+    session: Session, empreinte: str, proprietaire_id: uuid.UUID | None
+) -> ScoringConfig | None:
+    proprietaire = (
+        col(ScoringConfig.owner_user_id).is_(None)
+        if proprietaire_id is None
+        else col(ScoringConfig.owner_user_id) == proprietaire_id
+    )
+    return session.exec(
+        select(ScoringConfig).where(col(ScoringConfig.content_hash) == empreinte, proprietaire)
     ).first()
 
 
-def obtenir_configuration_reference(session: Session) -> ConfigurationPonderation:
-    """Chemin d'écriture : renvoie la ligne de référence de la version courante, en la créant si
-    besoin. N'appelle jamais commit() — seulement un INSERT ... ON CONFLICT DO NOTHING (unicité
-    uq_configuration_ponderation_reference_version), qui reste dans la transaction de l'appelant
-    et ne crée jamais de doublon, même sous deux validations concurrentes. Point de vérité unique
-    côté fichier (get_settings().default_scoring_config) : la ligne n'est qu'un pointeur versionné
-    vers lui."""
-    existante = trouver_configuration_reference(session)
+def enregistrer_configuration(
+    session: Session, contenu_yaml: str, proprietaire_id: uuid.UUID | None = None
+) -> ScoringConfig:
+    """Chemin d'écriture : la ligne de cette méthodologie pour ce propriétaire (nul = référence),
+    créée si besoin. Valide le contenu d'abord (ValidationError `configuration_invalide`), ne
+    commite jamais — INSERT ... ON CONFLICT DO NOTHING sur l'index d'unicité partiel concerné,
+    sans doublon même sous deux validations concurrentes."""
+    try:
+        schema = _schema_depuis_contenu(contenu_yaml)
+    except ValueError as exc:
+        raise ValidationError(
+            f"Configuration de pondération invalide : {exc}", code="configuration_invalide"
+        ) from exc
+    empreinte = empreinte_configuration(contenu_yaml)
+    existante = _trouver_par_empreinte(session, empreinte, proprietaire_id)
     if existante is not None:
         return existante
 
-    chemin, schema = _schema_reference()
+    colonnes_conflit, filtre_conflit = (
+        (["content_hash"], text("owner_user_id IS NULL"))
+        if proprietaire_id is None
+        else (["owner_user_id", "content_hash"], text("owner_user_id IS NOT NULL"))
+    )
     session.execute(
-        insert(ConfigurationPonderation)
+        insert(ScoringConfig)
         .values(
             id=uuid.uuid4(),
-            nom=_NOM_CONFIGURATION_REFERENCE,
+            name=schema.nom,
             version=schema.version,
-            fichier_yaml=chemin,
-            date_creation=utcnow(),
+            content_yaml=contenu_yaml,
+            content_hash=empreinte,
+            created_at=utcnow(),
+            owner_user_id=proprietaire_id,
         )
-        .on_conflict_do_nothing(
-            index_elements=["version"], index_where=text("utilisateur_id IS NULL")
-        )
+        .on_conflict_do_nothing(index_elements=colonnes_conflit, index_where=filtre_conflit)
     )
-    configuration = trouver_configuration_reference(session)
+    configuration = _trouver_par_empreinte(session, empreinte, proprietaire_id)
     assert configuration is not None  # insérée ci-dessus, ou par une transaction concurrente
     return configuration
+
+
+def obtenir_configuration_reference(session: Session) -> ScoringConfig:
+    """La référence décrite par le fichier YAML courant, enregistrée si besoin (écriture)."""
+    return enregistrer_configuration(session, _contenu_reference())
 
 
 def _valeur_effective(indicateur: ESGMetric) -> float:
@@ -127,119 +154,152 @@ def _score_pilier(pilier_config: PilierConfig, valeurs_par_code: dict[str, float
     return sum(sous_note * poids for sous_note, poids in contributions) / poids_total
 
 
-def calculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
-    """N'appelle jamais session.commit() : appelé comme sous-étape de la transition VALIDATED
-    (app/admin/review_queue.py::valider_rapport), qui contrôle la limite de la transaction —
-    même convention que app/core/notifications.py::notifier."""
-    rapport = session.get(ESGReport, rapport_id)
-    if rapport is None:
+def couverture(schema: ConfigurationScoring, codes_par_pilier: dict[Pillar, set[str]]) -> float:
+    """Part pondérée des indicateurs de la configuration présents dans le rapport, entre 0 et 1 :
+    Σ poids du pilier × Σ poids des indicateurs présents dans ce pilier (les deux niveaux de poids
+    somment à 1, config_schema.py l'impose)."""
+    return sum(
+        pilier_config.poids
+        * sum(
+            config_indicateur.poids
+            for code, config_indicateur in pilier_config.indicateurs.items()
+            if code in codes_par_pilier[pilier]
+        )
+        for pilier, pilier_config in schema.piliers.items()
+    )
+
+
+@dataclass(frozen=True)
+class ResultatScore:
+    global_score: float
+    scores_par_pilier: dict[Pillar, float]
+    coverage_rate: float
+
+
+def _valeurs_du_rapport(session: Session, rapport_id: uuid.UUID) -> dict[Pillar, dict[str, float]]:
+    if session.get(ESGReport, rapport_id) is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    valeurs: dict[Pillar, dict[str, float]] = {pilier: {} for pilier in Pillar}
+    for indicateur in session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport_id)).all():
+        valeurs[indicateur.pillar][indicateur.metric_code] = _valeur_effective(indicateur)
+    return valeurs
 
-    indicateurs = session.exec(
-        select(ESGMetric).where(ESGMetric.report_id == rapport_id)
-    ).all()
-    valeurs_par_pilier: dict[Pilier, dict[str, float]] = {pilier: {} for pilier in Pilier}
-    for indicateur in indicateurs:
-        valeurs_par_pilier[indicateur.pillar][indicateur.metric_code] = _valeur_effective(indicateur)
 
-    _chemin, schema = _schema_reference()
-
-    scores_par_pilier: dict[Pilier, float] = {}
+def _calculer(
+    schema: ConfigurationScoring, valeurs_par_pilier: dict[Pillar, dict[str, float]]
+) -> ResultatScore | None:
+    """None si aucun pilier n'est calculable — jamais un score sans substance."""
+    scores_par_pilier: dict[Pillar, float] = {}
     for pilier, pilier_config in schema.piliers.items():
         score_pilier = _score_pilier(pilier_config, valeurs_par_pilier[pilier])
         if score_pilier is not None:
             scores_par_pilier[pilier] = score_pilier
-
     if not scores_par_pilier:
+        return None
+    poids_total = sum(schema.piliers[pilier].poids for pilier in scores_par_pilier)
+    return ResultatScore(
+        global_score=sum(
+            scores_par_pilier[pilier] * schema.piliers[pilier].poids for pilier in scores_par_pilier
+        )
+        / poids_total,
+        scores_par_pilier=scores_par_pilier,
+        coverage_rate=couverture(
+            schema, {pilier: set(valeurs) for pilier, valeurs in valeurs_par_pilier.items()}
+        ),
+    )
+
+
+def calculer_score(session: Session, rapport_id: uuid.UUID) -> Score:
+    """Score officiel d'un rapport, sous la configuration de référence courante. N'appelle jamais
+    session.commit() : sous-étape de la transition VALIDATED (app/admin/review_queue.py::
+    valider_rapport), qui contrôle la transaction. Dénormalise official_score, coverage_rate et
+    config_hash sur le rapport dans la même transaction (docs/ARCHITECTURE.md §3.2)."""
+    valeurs = _valeurs_du_rapport(session, rapport_id)
+    configuration = obtenir_configuration_reference(session)
+    schema = schema_configuration(configuration)
+    resultat = _calculer(schema, valeurs)
+    if resultat is None:
         raise ValidationError(
             "Aucun indicateur exploitable n'a été trouvé pour ce rapport : impossible de "
             "calculer un score.",
             code="score_incalculable",
         )
+    if schema.min_coverage is not None and resultat.coverage_rate < schema.min_coverage:
+        raise ValidationError(
+            f"Couverture des indicateurs de {resultat.coverage_rate:.0%}, sous le minimum de "
+            f"{schema.min_coverage:.0%} exigé par la méthodologie : score non publiable.",
+            code="couverture_insuffisante",
+        )
 
-    poids_total = sum(schema.piliers[pilier].poids for pilier in scores_par_pilier)
-    valeur_globale = (
-        sum(scores_par_pilier[pilier] * schema.piliers[pilier].poids for pilier in scores_par_pilier)
-        / poids_total
+    score = Score(
+        report_id=rapport_id,
+        config_id=configuration.id,
+        global_score=resultat.global_score,
+        environmental_score=resultat.scores_par_pilier.get(Pillar.ENVIRONNEMENT),
+        social_score=resultat.scores_par_pilier.get(Pillar.SOCIAL),
+        governance_score=resultat.scores_par_pilier.get(Pillar.GOUVERNANCE),
+        coverage_rate=resultat.coverage_rate,
     )
-
-    # Seulement une fois le score calculable : un échec ne tente même pas l'insertion.
-    configuration = obtenir_configuration_reference(session)
-    score_esg = ScoreESG(
-        rapport_id=rapport_id,
-        configuration_id=configuration.id,
-        valeur_globale=valeur_globale,
-        score_environnement=scores_par_pilier.get(Pilier.ENVIRONNEMENT),
-        score_social=scores_par_pilier.get(Pilier.SOCIAL),
-        score_gouvernance=scores_par_pilier.get(Pilier.GOUVERNANCE),
-    )
-    session.add(score_esg)
-    # Toujours calculé sous la configuration de référence : c'est le score officiel, dénormalisé
-    # sur le rapport dans la même transaction (docs/ARCHITECTURE.md §3.2).
-    rapport.official_score = valeur_globale
-    session.add(rapport)
-    return score_esg
-
-
-def score_calculable(session: Session, rapport_id: uuid.UUID) -> bool:
-    """Prévisualise si calculer_score réussirait pour ce rapport, sans rien persister — même
-    logique que _score_pilier (un pilier est calculable dès qu'au moins un de ses indicateurs
-    cibles y est présent), jamais dupliquée. Utilisé pour avertir l'Admin AVANT qu'il ne clique
-    Valider, plutôt que de le laisser découvrir score_incalculable après coup (voir
-    app/admin/review_queue.py::valider_rapport)."""
+    session.add(score)
     rapport = session.get(ESGReport, rapport_id)
-    if rapport is None:
-        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    assert rapport is not None  # vérifié par _valeurs_du_rapport
+    rapport.official_score = resultat.global_score
+    rapport.coverage_rate = resultat.coverage_rate
+    rapport.config_hash = configuration.content_hash
+    session.add(rapport)
+    return score
 
-    codes_par_pilier: dict[Pilier, set[str]] = {pilier: set() for pilier in Pilier}
-    for pilier, code in session.exec(
-        select(ESGMetric.pillar, ESGMetric.metric_code).where(
-            ESGMetric.report_id == rapport_id
-        )
-    ).all():
-        codes_par_pilier[Pilier(pilier)].add(code)
 
-    _chemin, schema = _schema_reference()
-    return any(
-        codes_par_pilier[pilier] & set(pilier_config.indicateurs)
-        for pilier, pilier_config in schema.piliers.items()
+@dataclass(frozen=True)
+class ApercuScore:
+    calculable: bool
+    coverage_rate: float | None
+    min_coverage: float | None
+
+
+def apercu_score(session: Session, rapport_id: uuid.UUID) -> ApercuScore:
+    """Prévisualise, sans rien écrire, si calculer_score réussirait — même calcul (_calculer),
+    jamais dupliqué. Sous la référence décrite par le fichier courant, même si elle n'est pas
+    encore enregistrée. Montré à l'Admin AVANT qu'il ne clique Valider."""
+    schema = _schema_depuis_contenu(_contenu_reference())
+    resultat = _calculer(schema, _valeurs_du_rapport(session, rapport_id))
+    if resultat is None:
+        return ApercuScore(calculable=False, coverage_rate=None, min_coverage=schema.min_coverage)
+    return ApercuScore(
+        calculable=schema.min_coverage is None or resultat.coverage_rate >= schema.min_coverage,
+        coverage_rate=resultat.coverage_rate,
+        min_coverage=schema.min_coverage,
     )
 
 
-def score_officiel(session: Session, rapport_id: uuid.UUID) -> ScoreESG | None:
-    """Le ScoreESG publié/officiel d'un rapport — jamais un simple `WHERE rapport_id = X` non
-    ordonné : un même rapport peut porter plusieurs scores (un par ConfigurationPonderation, voir
-    uq_score_esg_rapport_configuration), et seul celui calculé sous la configuration de référence
-    (jamais une pondération personnalisée) fait foi. Réutilisé pour le score public affiché à
-    l'Investisseur (app/investor/entreprises.py::score_public) et pour figer la version exacte
-    utilisée par une Analyse Chercheur (app/researcher/analyses.py)."""
-    configuration = trouver_configuration_reference(session)
-    if configuration is None:
-        return None
+def score_officiel(session: Session, rapport_id: uuid.UUID) -> Score | None:
+    """Le score officiel d'un rapport : le plus récent calculé sous une configuration de
+    RÉFÉRENCE (jamais une pondération personnalisée). Un changement de méthodologie ne fait donc
+    jamais disparaître le score déjà publié d'un rapport — il reste celui que la validation a
+    produit, avec la configuration qui l'a produit, tant qu'aucun recalcul délibéré ne le
+    remplace."""
     return session.exec(
-        select(ScoreESG).where(
-            col(ScoreESG.rapport_id) == rapport_id,
-            col(ScoreESG.configuration_id) == configuration.id,
-        )
+        select(Score)
+        .join(ScoringConfig, col(ScoringConfig.id) == col(Score.config_id))
+        .where(col(Score.report_id) == rapport_id, col(ScoringConfig.owner_user_id).is_(None))
+        .order_by(col(Score.computed_at).desc())
     ).first()
 
 
 def score_public(session: Session, rapport_id: uuid.UUID) -> ScoreESGPublic | None:
     """Forme de présentation partagée du score officiel (app/scoring/schemas.py::ScoreESGPublic)
-    -- None si le rapport n'a pas encore de score officiel (avant validation Auditeur/Admin),
-    jamais un score fabriqué. Point de vérité unique pour tout module qui doit afficher le score
-    officiel à un utilisateur, pour ne jamais dupliquer la jointure vers ConfigurationPonderation
-    (voir app/investor/entreprises.py::score_public, forme historique antérieure et distincte,
-    conservée pour ne pas casser le contrat existant côté Investisseur)."""
+    -- None si le rapport n'a pas encore de score officiel (avant validation), jamais un score
+    fabriqué."""
     score = score_officiel(session, rapport_id)
     if score is None:
         return None
-    configuration = session.get(ConfigurationPonderation, score.configuration_id)
-    assert configuration is not None  # FK NOT NULL -- une ligne orpheline serait un bug ailleurs
+    configuration = session.get(ScoringConfig, score.config_id)
+    assert configuration is not None  # FK NOT NULL
     return ScoreESGPublic(
-        valeur_globale=score.valeur_globale,
-        score_environnement=score.score_environnement,
-        score_social=score.score_social,
-        score_gouvernance=score.score_gouvernance,
+        valeur_globale=score.global_score,
+        score_environnement=score.environmental_score,
+        score_social=score.social_score,
+        score_gouvernance=score.governance_score,
+        taux_couverture=score.coverage_rate,
         configuration_version=configuration.version,
     )

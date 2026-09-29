@@ -11,7 +11,7 @@ from app.core.enums import (
     CanalDepot,
     DecisionAudit,
     MethodeDonnee,
-    Pilier,
+    Pillar,
     Role,
     TypeRapport,
 )
@@ -60,7 +60,7 @@ def _rapport_avec_indicateur(session) -> tuple[ESGReport, ESGMetric]:
     session.flush()
     indicateur = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.GOUVERNANCE,
+        pillar=Pillar.GOUVERNANCE,
         metric_code="GOV-01",
         value=1.0,
         unit="ratio",

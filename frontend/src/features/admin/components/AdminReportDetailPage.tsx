@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
+import { formatPourcentage } from "@/shared/format/etatPosition";
 import {
   libelleDateRapport,
   libelleStatutRapport,
@@ -381,10 +382,18 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
           <Alert variant="destructive">
             <AlertTitle>Score non calculable</AlertTitle>
             <AlertDescription>
-              Le vocabulaire d'indicateurs de ce rapport ne recoupe aucun indicateur de la
-              méthodologie de référence — valider échouera tant que ce n'est pas résolu.
+              {verificationScore.taux_couverture != null &&
+              verificationScore.couverture_minimale != null
+                ? `Couverture des indicateurs de ${formatPourcentage(verificationScore.taux_couverture * 100)}, sous le minimum de ${formatPourcentage(verificationScore.couverture_minimale * 100)} exigé par la méthodologie — valider échouera.`
+                : "Le vocabulaire d'indicateurs de ce rapport ne recoupe aucun indicateur de la méthodologie de référence — valider échouera tant que ce n'est pas résolu."}
             </AlertDescription>
           </Alert>
+        ) : null}
+        {verificationScore?.calculable && verificationScore.taux_couverture != null ? (
+          <p className="text-sm text-brand-grey">
+            Couverture des indicateurs de la méthodologie :{" "}
+            {formatPourcentage(verificationScore.taux_couverture * 100)}.
+          </p>
         ) : null}
         <Textarea
           placeholder="Commentaire (optionnel pour valider, recommandé pour rejeter ou demander une correction)"

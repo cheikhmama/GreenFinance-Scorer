@@ -57,6 +57,7 @@ class ScoreEntreprisePublic(BaseModel):
     score_environnement: float | None
     score_social: float | None
     score_gouvernance: float | None
+    taux_couverture: float | None = None  # 0-1, voir app/scoring/schemas.py::ScoreESGPublic
     configuration_version: int | None
 
 

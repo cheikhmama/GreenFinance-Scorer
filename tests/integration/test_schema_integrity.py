@@ -28,7 +28,7 @@ from app.core.enums import (
     DecisionAudit,
     DevisePosition,
     MethodeDonnee,
-    Pilier,
+    Pillar,
     Role,
     TypeDureeInvestissement,
     TypeRapport,
@@ -41,7 +41,7 @@ from app.ingestion.models import (
     Evidence,
 )
 from app.investor.models import Portfolio, PortfolioPosition
-from app.scoring.models import ConfigurationPonderation, ScoreESG
+from app.scoring.models import Score, ScoringConfig
 
 
 def _utilisateur(session, role: Role) -> User:
@@ -94,7 +94,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     indicateur = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.ENVIRONNEMENT,
+        pillar=Pillar.ENVIRONNEMENT,
         metric_code="GHG-SCOPE1",
         value=123.4,
         unit="tCO2e",
@@ -123,52 +123,51 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     assert donnee_carbone.proof.id == preuve.id
     assert donnee_carbone in preuve.carbon_emissions
 
-    # --- ConfigurationPonderation de référence ET personnalisée (Chercheur)
+    # --- ScoringConfig de référence ET personnalisée (Chercheur)
     chercheur = _utilisateur(session, Role.RESEARCHER)
     # Version tirée au hasard : une seule référence par version, base de test partagée.
-    config_reference = ConfigurationPonderation(
-        nom="reference", version=random.randint(10_000, 10_000_000), fichier_yaml="scoring/reference.yaml"
+    config_reference = ScoringConfig(
+        name="reference", version=random.randint(10_000, 10_000_000)
     )
-    config_chercheur = ConfigurationPonderation(
-        nom="config-chercheur",
+    config_chercheur = ScoringConfig(
+        name="config-chercheur",
         version=1,
-        fichier_yaml="scoring/chercheur.yaml",
-        utilisateur_id=chercheur.id,
+        owner_user_id=chercheur.id,
     )
     session.add(config_reference)
     session.add(config_chercheur)
     session.flush()
 
-    assert config_chercheur.utilisateur is not None
-    assert config_chercheur.utilisateur.id == chercheur.id
+    assert config_chercheur.owner is not None
+    assert config_chercheur.owner.id == chercheur.id
     assert config_chercheur in chercheur.scoring_configs
 
-    # --- ScoreESG (un par configuration, sur le même ESGReport) ----------
-    score_reference = ScoreESG(
-        rapport_id=rapport.id,
-        configuration_id=config_reference.id,
-        valeur_globale=72.0,
-        score_environnement=70.0,
-        score_social=75.0,
-        score_gouvernance=71.0,
+    # --- Score (un par configuration, sur le même ESGReport) ----------
+    score_reference = Score(
+        report_id=rapport.id,
+        config_id=config_reference.id,
+        global_score=72.0,
+        environmental_score=70.0,
+        social_score=75.0,
+        governance_score=71.0,
     )
-    score_chercheur = ScoreESG(
-        rapport_id=rapport.id,
-        configuration_id=config_chercheur.id,
-        valeur_globale=68.0,
-        score_environnement=65.0,
-        score_social=70.0,
-        score_gouvernance=69.0,
+    score_chercheur = Score(
+        report_id=rapport.id,
+        config_id=config_chercheur.id,
+        global_score=68.0,
+        environmental_score=65.0,
+        social_score=70.0,
+        governance_score=69.0,
     )
     session.add(score_reference)
     session.add(score_chercheur)
     session.flush()
 
     assert {s.id for s in rapport.scores} == {score_reference.id, score_chercheur.id}
-    assert score_reference.rapport.id == rapport.id
-    assert score_reference.configuration.id == config_reference.id
+    assert score_reference.report.id == rapport.id
+    assert score_reference.config.id == config_reference.id
     assert score_reference in config_reference.scores
-    assert score_chercheur.configuration.id == config_chercheur.id
+    assert score_chercheur.config.id == config_chercheur.id
     assert score_chercheur in config_chercheur.scores
 
     # --- Portefeuille + positions (USD converti, FIXE, OUVERTE) -----------
@@ -289,7 +288,7 @@ def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
     session.flush()
     indicateur = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.SOCIAL,
+        pillar=Pillar.SOCIAL,
         metric_code="effectif_total",
         value=1200.0,
         unit="",
@@ -306,7 +305,7 @@ def test_un_seul_indicateur_par_code_et_par_rapport(session) -> None:
     session.add(
         ESGMetric(
             report_id=rapport.id,
-            pillar=Pilier.SOCIAL,
+            pillar=Pillar.SOCIAL,
             metric_code=indicateur.metric_code,
             value=1300.0,
             unit="",

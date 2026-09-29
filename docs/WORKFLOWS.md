@@ -101,6 +101,14 @@ the middle of `valider_rapport`, which could persist `VALIDE` without a score. U
 queue exists (task 4.1), step 7 runs synchronously right after the commit, as a best-effort step
 that can never undo the validation.
 
+*Task 3.1:* step 2 registers the reference by the hash of the file's content and step 3 always
+parses the **stored** `content_yaml`; step 4 also stores `coverage_rate` and `config_hash`. If the
+config sets `min_coverage` and the report's coverage is below it, step 3 raises
+`couverture_insuffisante` and nothing is committed — the admin sees the coverage and the minimum
+before deciding (`GET /admin/rapports/{id}/score-verification`). A report's official score is its
+**latest** score under a reference config, so publishing a new methodology never hides the scores
+already published.
+
 ---
 
 ## 2. Portfolio and investment analytics

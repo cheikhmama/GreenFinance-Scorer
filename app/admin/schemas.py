@@ -161,10 +161,28 @@ class TableauDeBordAdmin(BaseModel):
 
 class ScoreVerificationAdmin(BaseModel):
     """Aperçu, sans rien persister, de si un rapport PENDING_DECISION pourrait être scoré —
-    affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::score_calculable),
-    plutôt que de le laisser découvrir l'échec après coup."""
+    affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::apercu_score),
+    plutôt que de le laisser découvrir l'échec après coup. `calculable` est faux aussi quand la
+    couverture est sous le minimum de la méthodologie (tâche 3.1)."""
 
     calculable: bool
+    taux_couverture: float | None = None
+    couverture_minimale: float | None = None
+
+
+class ScoreRecalculeAdmin(BaseModel):
+    """Réponse de POST /admin/rapports/{id}/recalculer-score : le contrat JSON historique (la
+    route renvoyait la ligne de table, docs/RENAME_PLAN.md §1 règle 3), plus la couverture."""
+
+    id: uuid.UUID
+    rapport_id: uuid.UUID
+    configuration_id: uuid.UUID
+    valeur_globale: float
+    score_environnement: float | None
+    score_social: float | None
+    score_gouvernance: float | None
+    taux_couverture: float | None
+    date_calcul: datetime
 
 
 class StatistiquesAuditeursAdmin(BaseModel):

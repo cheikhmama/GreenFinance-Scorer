@@ -183,6 +183,12 @@ An import that only has weights needs a total portfolio value so that amounts ca
 | | `content_yaml` (text), `content_hash` (char(64), unique per owner) | **the content is stored, not only the file path** |
 | `scores` | `report_id`, `config_id`, `global`, `e`, `s`, `g`, `coverage_rate`, `computed_at` | unique `(report_id, config_id)` |
 
+*Implemented in task 3.1.* Columns are `global_score`, `environmental_score`, `social_score`,
+`governance_score`. `content_hash` is SHA-256 of the canonical form (parsed YAML, re-serialised as
+sorted JSON); uniqueness is one partial index for references (owner NULL) and one per owner.
+`version` is informational. Configs migrated from before 3.1 whose original content could not be
+recovered keep NULL content and hash (a CHECK ties them) and cannot be used for a calculation.
+
 ---
 
 ## 4. Security standards

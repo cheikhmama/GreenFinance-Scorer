@@ -44,7 +44,7 @@ from app.core.database import utcnow
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import CarbonEmission, ESGMetric, ESGReport
 from app.scoring.engine import score_officiel
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 _STYLES = getSampleStyleSheet()
 _STYLE_TITRE = ParagraphStyle(
@@ -68,7 +68,7 @@ _EN_TETE_TABLE = TableStyle(
 )
 
 
-def _section_score_officiel(score: ScoreESG | None) -> list:
+def _section_score_officiel(score: Score | None) -> list:
     elements: list = [Paragraph("Score ESG officiel (calculé par la plateforme)", _STYLE_SECTION)]
     if score is None:
         elements.append(
@@ -82,10 +82,10 @@ def _section_score_officiel(score: ScoreESG | None) -> list:
 
     donnees = [
         ["Pilier", "Score (/100)"],
-        ["Environnement", f"{score.score_environnement:.1f}" if score.score_environnement is not None else "-"],
-        ["Social", f"{score.score_social:.1f}" if score.score_social is not None else "-"],
-        ["Gouvernance", f"{score.score_gouvernance:.1f}" if score.score_gouvernance is not None else "-"],
-        ["Score global", f"{score.valeur_globale:.1f}"],
+        ["Environnement", f"{score.environmental_score:.1f}" if score.environmental_score is not None else "-"],
+        ["Social", f"{score.social_score:.1f}" if score.social_score is not None else "-"],
+        ["Gouvernance", f"{score.governance_score:.1f}" if score.governance_score is not None else "-"],
+        ["Score global", f"{score.global_score:.1f}"],
     ]
     table = Table(donnees, colWidths=[8 * cm, 4 * cm])
     table.setStyle(_EN_TETE_TABLE)

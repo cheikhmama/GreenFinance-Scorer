@@ -68,7 +68,11 @@ class AnalyseEntreprise(SQLModel, table=True):
     rapport_id: uuid.UUID | None = Field(
         default=None, foreign_key="esg_reports.id", ondelete="SET NULL", index=True
     )
-    score_esg_id: uuid.UUID | None = Field(default=None, foreign_key="score_esg.id")
+    # SET NULL (tâche 3.1) : comme rapport_id, la suppression d'un rapport — et donc de ses scores
+    # — ne doit jamais être bloquée par une analyse qui l'a figé.
+    score_esg_id: uuid.UUID | None = Field(
+        default=None, foreign_key="scores.id", ondelete="SET NULL", index=True
+    )
 
     analyse: Analyse = Relationship(back_populates="entreprises")
     entreprise: Optional["Company"] = Relationship()

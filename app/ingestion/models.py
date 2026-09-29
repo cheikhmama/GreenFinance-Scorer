@@ -22,7 +22,7 @@ from app.core.enums import (
     ExtractionStatus,
     MethodeDonnee,
     NiveauConfiance,
-    Pilier,
+    Pillar,
     ReportStatus,
     StatutCouvertureIndicateur,
     TypeRapport,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from app.audit.models import AvisAudit
     from app.auth.models import User
     from app.company.models import Company
-    from app.scoring.models import ScoreESG
+    from app.scoring.models import Score
 
 
 class ESGReport(SQLModel, table=True):
@@ -119,7 +119,7 @@ class ESGReport(SQLModel, table=True):
     # Empreinte du contenu déposé (Phase 4 §4.2) — détecte un doublon avant tout traitement.
     checksum_sha256: str | None = Field(default=None, index=True)
     # Score ESG global auto-déclaré par l'entreprise dans sa propre synthèse — distinct du score
-    # officiel (ScoreESG / official_score), calculé indépendamment par la plateforme. Toujours
+    # officiel (Score / official_score), calculé indépendamment par la plateforme. Toujours
     # accompagné de sa preuve documentaire (garantie G1 "aucune valeur sans preuve").
     declared_global_score: float | None = Field(default=None)
     declared_global_score_proof_id: uuid.UUID | None = Field(
@@ -138,7 +138,7 @@ class ESGReport(SQLModel, table=True):
     auditor: Optional["User"] = Relationship(back_populates="audited_reports")
     metrics: list["ESGMetric"] = Relationship(back_populates="report")
     carbon_data: list["CarbonEmission"] = Relationship(back_populates="report")
-    scores: list["ScoreESG"] = Relationship(back_populates="rapport")
+    scores: list["Score"] = Relationship(back_populates="report")
     audit_opinions: list["AvisAudit"] = Relationship(back_populates="rapport")
     declared_global_score_proof: Optional["Evidence"] = Relationship()
     coverages: list["MetricCoverage"] = Relationship(back_populates="report")
@@ -174,7 +174,7 @@ class ESGMetric(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE")
-    pillar: Pilier = Field(sa_column=sa_enum_column(Pilier))
+    pillar: Pillar = Field(sa_column=sa_enum_column(Pillar))
     metric_code: str
     value: float
     unit: str

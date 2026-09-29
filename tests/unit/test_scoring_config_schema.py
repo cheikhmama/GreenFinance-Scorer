@@ -1,13 +1,16 @@
+import importlib.util
 from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
-from app.core.enums import Pilier
+from app.core.enums import Pillar
 from app.scoring.config_schema import (
     ConfigurationScoring,
     charger_configuration_depuis_fichier,
+    empreinte_configuration,
 )
 
 # dict[str, Any], pas un TypedDict : cette fixture n'existe que pour nourrir model_validate
@@ -55,7 +58,7 @@ _BASE: dict[str, Any] = {
 
 def test_configuration_valide_est_acceptee() -> None:
     configuration = ConfigurationScoring.model_validate(_BASE)
-    assert configuration.piliers[Pilier.ENVIRONNEMENT].poids == 0.5
+    assert configuration.piliers[Pillar.ENVIRONNEMENT].poids == 0.5
 
 
 def test_pilier_manquant_est_rejete() -> None:
@@ -126,18 +129,44 @@ def test_fichier_de_reference_reel_est_valide() -> None:
     une régression ici serait une erreur de méthodologie silencieuse, pas juste un test qui casse."""
     configuration = charger_configuration_depuis_fichier(Path("config/weights/default.yaml"))
     assert configuration.version == 2
-    assert configuration.piliers[Pilier.SOCIAL].indicateurs["femmes_management_pourcentage"].poids == 0.35
+    assert configuration.piliers[Pillar.SOCIAL].indicateurs["femmes_management_pourcentage"].poids == 0.35
     # v2 ajoute 3 indicateurs (un par pilier concerné hors Gouvernance) -- jamais le tonnage
     # carbone brut ni les scores auto-déclarés, exclus par principe (voir le commentaire du YAML).
-    assert "part_renouvelable_pourcentage" in configuration.piliers[Pilier.ENVIRONNEMENT].indicateurs
-    assert "dechets_valorises_pourcentage" in configuration.piliers[Pilier.ENVIRONNEMENT].indicateurs
-    assert "femmes_effectif_pourcentage" in configuration.piliers[Pilier.SOCIAL].indicateurs
+    assert "part_renouvelable_pourcentage" in configuration.piliers[Pillar.ENVIRONNEMENT].indicateurs
+    assert "dechets_valorises_pourcentage" in configuration.piliers[Pillar.ENVIRONNEMENT].indicateurs
+    assert "femmes_effectif_pourcentage" in configuration.piliers[Pillar.SOCIAL].indicateurs
     for pilier_codes in (
-        configuration.piliers[Pilier.ENVIRONNEMENT].indicateurs,
-        configuration.piliers[Pilier.SOCIAL].indicateurs,
-        configuration.piliers[Pilier.GOUVERNANCE].indicateurs,
+        configuration.piliers[Pillar.ENVIRONNEMENT].indicateurs,
+        configuration.piliers[Pillar.SOCIAL].indicateurs,
+        configuration.piliers[Pillar.GOUVERNANCE].indicateurs,
     ):
         assert "score_environnement_declare" not in pilier_codes
         assert "score_social_declare" not in pilier_codes
         assert "score_gouvernance_declare" not in pilier_codes
         assert not any(code.startswith("scope_") for code in pilier_codes)
+
+
+def test_empreinte_insensible_a_la_forme_sensible_au_fond() -> None:
+    contenu = Path("config/weights/default.yaml").read_text(encoding="utf-8")
+    donnees = yaml.safe_load(contenu)
+
+    reformate = yaml.safe_dump(donnees, sort_keys=False, indent=4)
+    donnees["piliers"]["SOCIAL"]["poids"] += 0.01
+    modifie = yaml.safe_dump(donnees)
+
+    assert empreinte_configuration(reformate) == empreinte_configuration(contenu)
+    assert empreinte_configuration(modifie) != empreinte_configuration(contenu)
+
+
+def test_empreinte_identique_a_celle_de_la_migration() -> None:
+    """La migration c1d4a8e2f935 a figé sa propre copie du calcul d'empreinte (une migration ne
+    doit pas dépendre du code applicatif) : les deux doivent rester identiques, sinon les
+    configurations reprises à la migration ne seraient plus jamais retrouvées par leur empreinte."""
+    chemin = next(Path("alembic/versions").glob("c1d4a8e2f935_*.py"))
+    spec = importlib.util.spec_from_file_location("migration_3_1", chemin)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    contenu = Path("config/weights/default.yaml").read_text(encoding="utf-8")
+
+    assert migration._empreinte(contenu) == empreinte_configuration(contenu)

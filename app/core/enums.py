@@ -65,7 +65,7 @@ class CanalDepot(str, Enum):
     ENTREPRISE = "ENTREPRISE"
 
 
-class Pilier(str, Enum):
+class Pillar(str, Enum):
     ENVIRONNEMENT = "ENVIRONNEMENT"
     SOCIAL = "SOCIAL"
     GOUVERNANCE = "GOUVERNANCE"

@@ -43,7 +43,7 @@ from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import ExtractionStatus, MethodeDonnee, Pilier, Role
+from app.core.enums import ExtractionStatus, MethodeDonnee, Pillar, Role
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
 from app.ingestion.completeness import calculer_couverture
@@ -160,7 +160,7 @@ class CibleIndicateur:
     cible: Literal["donnee_carbone", "indicateur_esg", "rapport_score_global"]
     scope: int | None = None
     categorie_ges: str | None = None
-    pilier: Pilier | None = None
+    pilier: Pillar | None = None
 
 
 # Les 7 codes carbone/environnement déjà validés sur le corpus pilote (voir
@@ -187,43 +187,43 @@ INDICATEURS_CIBLES: list[CibleIndicateur] = [
     ),
     CibleIndicateur("scope_3", "donnee_carbone", scope=3),
     CibleIndicateur(
-        "intensite_scope_1_2_marketbased", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "intensite_scope_1_2_marketbased", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     CibleIndicateur(
-        "intensite_scope_1_2_3_hors_cat11", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "intensite_scope_1_2_3_hors_cat11", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     CibleIndicateur(
-        "intensite_scope_1_2_3_total", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "intensite_scope_1_2_3_total", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
-    CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
     # Second lot — transparence humaine, repris du catalogue déjà pensé dans
     # data_test/reference_esg_8_entreprises.json (codes déjà nommés, jamais branchés jusqu'ici).
     # Liste non exhaustive : le pattern (un CibleIndicateur par fait numérique avec page-preuve)
     # se répète, d'autres codes pourront s'ajouter au fil des rapports rencontrés.
-    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
     CibleIndicateur(
-        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pilier.GOUVERNANCE
+        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE
     ),
-    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pillar.SOCIAL),
     CibleIndicateur(
-        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     CibleIndicateur(
-        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     # Scores auto-déclarés par l'entreprise dans sa propre synthèse ESG — par pilier uniquement
     # (pas de "global" : Pilier n'a que 3 valeurs, et la plateforme calcule déjà son propre score
-    # officiel via ScoreESG/config/weights/default.yaml ; ajouter un score global auto-déclaré à
+    # officiel via Score/config/weights/default.yaml ; ajouter un score global auto-déclaré à
     # côté créerait une confusion entre "ce que l'entreprise prétend" et "ce que la plateforme
     # calcule" — décision produit à part entière, pas un ajout silencieux ici).
-    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT),
-    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT),
+    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
     CibleIndicateur("score_global_declare", "rapport_score_global"),
 ]
 

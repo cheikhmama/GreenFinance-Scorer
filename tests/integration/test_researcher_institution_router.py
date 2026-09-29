@@ -14,7 +14,7 @@ from app.core.models import Notification
 from app.ingestion.models import ESGReport
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -44,7 +44,7 @@ def _create_institution(session, *, quota_export: int = 10) -> User:
 
 
 def _entreprise_publiee(session, *, score_global: float = 70.0, nom: str | None = None) -> Company:
-    """Publiée avec un rapport VALIDE et un ScoreESG officiel — invariant réel de
+    """Publiée avec un rapport VALIDE et un Score officiel — invariant réel de
     publier_entreprise (app/admin/review_queue.py), jamais une entreprise « publiée » sans
     évaluation, sans quoi _verifier_perimetre_et_recuperer_snapshots ne trouverait jamais de
     rapport/score à figer."""
@@ -70,13 +70,13 @@ def _entreprise_publiee(session, *, score_global: float = 70.0, nom: str | None 
 
     configuration = obtenir_configuration_reference(session)
     session.add(
-        ScoreESG(
-            rapport_id=rapport.id,
-            configuration_id=configuration.id,
-            valeur_globale=score_global,
-            score_environnement=65.0,
-            score_social=75.0,
-            score_gouvernance=80.0,
+        Score(
+            report_id=rapport.id,
+            config_id=configuration.id,
+            global_score=score_global,
+            environmental_score=65.0,
+            social_score=75.0,
+            governance_score=80.0,
         )
     )
     session.commit()
@@ -541,10 +541,10 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
     session.commit()
     configuration = obtenir_configuration_reference(session)
     session.add(
-        ScoreESG(
-            rapport_id=nouveau_rapport.id,
-            configuration_id=configuration.id,
-            valeur_globale=80.0,
+        Score(
+            report_id=nouveau_rapport.id,
+            config_id=configuration.id,
+            global_score=80.0,
         )
     )
     session.commit()

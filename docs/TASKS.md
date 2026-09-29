@@ -87,9 +87,12 @@ Rules for every task:
 
 ## Phase 3: Researcher Tooling & SHAP Explainability
 
-- [ ] 3.1 YAML Config Versioning: Hash and store YAML configuration files on every calculation. **[review]**
-  - [ ] Store `content_yaml` + `content_hash` on `scoring_configs`; recalculation always uses the stored content.
-  - [ ] Store `coverage_rate` with every score and show it next to the score; optional `min_coverage` per config **[review]**.
+- [x] 3.1 YAML Config Versioning: Hash and store YAML configuration files on every calculation. **[review]** (migration `c1d4a8e2f935`)
+  - [x] Store `content_yaml` + `content_hash` on `scoring_configs`; recalculation always uses the stored content. The hash is SHA-256 of the canonical form (parsed YAML as sorted JSON: comments and layout don't count, weights, bounds and version do); a config is identified by its hash per owner (partial unique indexes), no longer by its version number — editing the file without bumping the version registers a new config instead of silently changing the old one.
+  - [x] Store `coverage_rate` with every score and show it next to the score (shared score summary, admin pre-validation check); optional `min_coverage` per config blocks validation below it (`couverture_insuffisante`) **[review]**. The reference YAML sets no minimum yet — a methodology decision left open.
+  - [x] Official score = the latest score under a reference config, not "the score under the current file version": a methodology change no longer hides every published score, so `scripts/recalculer_scores_v2.py` (the workaround) is deleted. Validation also fills `esg_reports.coverage_rate` / `config_hash`.
+  - [x] Renamed `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores`, `Pilier` → `Pillar` (RENAME_PLAN §3d); `scores.config_id` RESTRICT + index; `analyse_entreprise.score_esg_id` gets `ON DELETE SET NULL` + index (deleting a scored report failed once an analysis had frozen it).
+  - [x] Migration keeps a config's content only when the file it pointed to still declares the same version; otherwise content stays unknown (never guessed) and that config can't be used for a calculation (`configuration_sans_contenu`).
 - [ ] 3.2 SHAP Explainability Module: Implement feature attribution endpoints for score decomposition.
   - [ ] Exact linear SHAP with a sector baseline; contributions must sum to `score − baseline` (property test).
   - [ ] Waterfall endpoint and frontend chart.

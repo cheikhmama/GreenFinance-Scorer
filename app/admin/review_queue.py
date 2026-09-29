@@ -28,7 +28,7 @@ from app.core.notifications import notifier
 from app.ingestion import synthesis_report
 from app.ingestion.models import ESGReport
 from app.scoring.engine import calculer_score, score_officiel
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 logger = structlog.get_logger(__name__)
 
@@ -337,7 +337,7 @@ def valider_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | 
     """Distinct de rejeter_rapport/demander_correction (restés sur _decider) : valider est la
     seule décision qui produit aussi un score (Phase 5 §9).
 
-    Transaction atomique (tâche 1.6, docs/WORKFLOWS.md §1.3) : statut VALIDATED, ScoreESG,
+    Transaction atomique (tâche 1.6, docs/WORKFLOWS.md §1.3) : statut VALIDATED, Score,
     official_score et notification commitent ensemble, ou rien du tout. Un score incalculable
     (score_incalculable) annule donc toute la décision — jamais un rapport VALIDATED sans le score
     que le cahier des charges exige avant publication. Aucune étape de cette transaction ne
@@ -388,8 +388,8 @@ def _regenerer_synthese(session: Session, rapport: ESGReport) -> None:
         )
 
 
-def recalculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
-    """Action de récupération pour un rapport VALIDATED sans ScoreESG — état incohérent qui bloque
+def recalculer_score(session: Session, rapport_id: uuid.UUID) -> Score:
+    """Action de récupération pour un rapport VALIDATED sans Score — état incohérent qui bloque
     sinon indéfiniment publier_entreprise (code score_manquant) sans aucun moyen de s'en sortir
     depuis l'UI. Inatteignable via le parcours normal (valider_rapport calcule toujours le score
     dans la même transaction que la transition VALIDATED), mais peut survenir sur des données
@@ -564,7 +564,7 @@ def publier_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
     # _rapport_en_validation ci-dessus : jamais de publication sans preuve de score (cahier des
     # charges §9), quelle que soit la façon dont un rapport a pu atteindre VALIDATED.
     a_un_score = session.exec(
-        select(ScoreESG.id).where(ScoreESG.rapport_id == rapport_valide_id)
+        select(Score.id).where(Score.report_id == rapport_valide_id)
     ).first()
     if a_un_score is None:
         raise ValidationError(

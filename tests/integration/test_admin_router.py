@@ -24,7 +24,7 @@ from app.core.enums import (
     DecisionAudit,
     ExtractionStatus,
     MethodeDonnee,
-    Pilier,
+    Pillar,
     ReportStatus,
     Role,
     TypeRapport,
@@ -33,7 +33,7 @@ from app.core.models import JournalAudit, Notification
 from app.ingestion.models import ESGMetric, ESGReport, Evidence
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
-from app.scoring.models import ConfigurationPonderation, ScoreESG
+from app.scoring.models import Score, ScoringConfig
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -136,7 +136,7 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
     session.add(
         ESGMetric(
             report_id=rapport.id,
-            pillar=Pilier.GOUVERNANCE,
+            pillar=Pillar.GOUVERNANCE,
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",
@@ -148,21 +148,21 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
     return rapport
 
 
-def _create_score(session, rapport_id: uuid.UUID) -> ScoreESG:
-    """Sème un ScoreESG directement (sans passer par app/scoring/engine.py::calculer_score) --
+def _create_score(session, rapport_id: uuid.UUID) -> Score:
+    """Sème un Score directement (sans passer par app/scoring/engine.py::calculer_score) --
     utile pour les tests qui seedent un rapport VALIDE directement via _create_rapport plutôt
     que via le vrai parcours /valider (donc sans score réellement calculé). Réutilise la vraie
     configuration de référence (obtenir_configuration_reference) plutôt que d'en créer une
-    seconde : une ConfigurationPonderation ad hoc avec utilisateur_id=None aurait exactement la
+    seconde : une ScoringConfig ad hoc avec utilisateur_id=None aurait exactement la
     forme d'une configuration de référence et fausserait tout test d'idempotence sur celle-ci."""
     configuration = obtenir_configuration_reference(session)
-    score = ScoreESG(
-        rapport_id=rapport_id,
-        configuration_id=configuration.id,
-        valeur_globale=70.0,
-        score_environnement=70.0,
-        score_social=70.0,
-        score_gouvernance=70.0,
+    score = Score(
+        report_id=rapport_id,
+        config_id=configuration.id,
+        global_score=70.0,
+        environmental_score=70.0,
+        social_score=70.0,
+        governance_score=70.0,
     )
     session.add(score)
     session.commit()
@@ -632,11 +632,11 @@ def test_valider_happy_path(session) -> None:
         select(Notification).where(Notification.utilisateur_id == utilisateur_entreprise.id)
     ).all()
     assert any(n.type == "RAPPORT_VALIDE" for n in notifications)
-    score = session.exec(select(ScoreESG).where(ScoreESG.rapport_id == rapport.id)).first()
+    score = session.exec(select(Score).where(Score.report_id == rapport.id)).first()
     assert score is not None
-    assert score.score_gouvernance == 80.0  # femmes_conseil_pourcentage=40 -> 40/50 borne -> 80
-    assert score.score_environnement is None  # aucun indicateur ENVIRONNEMENT semé pour ce test
-    assert score.score_social is None
+    assert score.governance_score == 80.0  # femmes_conseil_pourcentage=40 -> 40/50 borne -> 80
+    assert score.environmental_score is None  # aucun indicateur ENVIRONNEMENT semé pour ce test
+    assert score.social_score is None
 
 
 def test_rejeter_happy_path(session) -> None:
@@ -1052,7 +1052,7 @@ def test_publier_sans_rapport_valide_est_rejete(session) -> None:
 
 
 def test_publier_sans_score_est_rejete(session) -> None:
-    """Rapport VALIDE semé directement (sans passer par /valider, donc sans ScoreESG) -- état
+    """Rapport VALIDE semé directement (sans passer par /valider, donc sans Score) -- état
     normalement inatteignable via l'API seule depuis que valider_rapport calcule toujours un
     score dans la même transaction (Phase 5 §9), gardé en défense dans publier_entreprise."""
     admin = _create_utilisateur(session, Role.ADMIN)
@@ -1437,7 +1437,7 @@ def test_verifier_score_calculable_route(session) -> None:
     session.add(
         ESGMetric(
             report_id=non_calculable.id,
-            pillar=Pilier.SOCIAL,
+            pillar=Pillar.SOCIAL,
             metric_code="effectif_total",
             value=1200.0,
             unit="personnes",
@@ -1461,7 +1461,7 @@ def test_verifier_score_calculable_route(session) -> None:
 
 
 def test_recalculer_score_route(session) -> None:
-    """Action de récupération (BUG-020) pour un rapport VALIDE historiquement sans ScoreESG —
+    """Action de récupération (BUG-020) pour un rapport VALIDE historiquement sans Score —
     état inatteignable via le parcours normal mais qui doit avoir une issue explicite depuis
     l'UI plutôt que de bloquer publier_entreprise indéfiniment sans recours."""
     admin = _create_utilisateur(session, Role.ADMIN)
@@ -1481,7 +1481,7 @@ def test_recalculer_score_route(session) -> None:
     session.add(
         ESGMetric(
             report_id=sans_score.id,
-            pillar=Pilier.GOUVERNANCE,
+            pillar=Pillar.GOUVERNANCE,
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",
@@ -1520,13 +1520,13 @@ def version_de_reference_inedite(monkeypatch, tmp_path) -> int:
     return version
 
 
-def _references_de_version(session, version: int) -> list[ConfigurationPonderation]:
+def _references_de_version(session, version: int) -> list[ScoringConfig]:
     session.expire_all()
     return list(
         session.exec(
-            select(ConfigurationPonderation).where(
-                col(ConfigurationPonderation.utilisateur_id).is_(None),
-                col(ConfigurationPonderation.version) == version,
+            select(ScoringConfig).where(
+                col(ScoringConfig.owner_user_id).is_(None),
+                col(ScoringConfig.version) == version,
             )
         ).all()
     )
@@ -1566,7 +1566,7 @@ def test_premiere_validation_incalculable_sous_une_nouvelle_version_ne_valide_ri
     assert rapport_apres is not None
     assert rapport_apres.status == ReportStatus.PENDING_DECISION
     assert rapport_apres.official_score is None
-    assert session.exec(select(ScoreESG).where(ScoreESG.rapport_id == rapport.id)).first() is None
+    assert session.exec(select(Score).where(Score.report_id == rapport.id)).first() is None
     assert _references_de_version(session, version_de_reference_inedite) == []
 
 
@@ -1585,11 +1585,14 @@ def test_premiere_validation_sous_une_nouvelle_version_cree_une_seule_reference(
     assert response.status_code == 200
     references = _references_de_version(session, version_de_reference_inedite)
     assert len(references) == 1
-    score = session.exec(select(ScoreESG).where(ScoreESG.rapport_id == rapport.id)).one()
-    assert score.configuration_id == references[0].id
+    score = session.exec(select(Score).where(Score.report_id == rapport.id)).one()
+    assert score.config_id == references[0].id
     rapport_apres = session.get(ESGReport, rapport.id)
     assert rapport_apres is not None
-    assert rapport_apres.official_score == score.valeur_globale
+    assert rapport_apres.official_score == score.global_score
+    # Tâche 3.1 : la validation fige aussi la couverture et l'empreinte de la méthodologie.
+    assert rapport_apres.coverage_rate == score.coverage_rate is not None
+    assert rapport_apres.config_hash == references[0].content_hash is not None
 
 
 def test_consulter_un_rapport_ou_son_score_ne_cree_aucune_configuration(

@@ -16,7 +16,7 @@ from app.core.enums import (
     ExtractionStatus,
     MethodeDonnee,
     NiveauConfiance,
-    Pilier,
+    Pillar,
     ReportStatus,
     Role,
     StatutCouvertureIndicateur,
@@ -1059,7 +1059,7 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
     session.add(
         ESGMetric(
             report_id=rapport.id,
-            pillar=Pilier.GOUVERNANCE,
+            pillar=Pillar.GOUVERNANCE,
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",

@@ -24,7 +24,7 @@ from app.core.enums import (
     ExtractionStatus,
     MethodeDonnee,
     NiveauConfiance,
-    Pilier,
+    Pillar,
     ReportStatus,
     StatutCouvertureIndicateur,
     TypeRapport,
@@ -206,7 +206,7 @@ class IndicateurESGDetail(BaseModel):
         }
 
     id: uuid.UUID
-    pilier: Pilier
+    pilier: Pillar
     code: str
     valeur: float
     unite: str
@@ -303,7 +303,7 @@ class RapportESGDetail(RapportESGPublic):
 
     indicateurs: list[IndicateurESGDetail]
     donnees_carbone: list[DonneeCarboneDetail]
-    # Score global auto-déclaré par l'entreprise (distinct du score officiel ScoreESG, calculé
+    # Score global auto-déclaré par l'entreprise (distinct du score officiel Score, calculé
     # indépendamment par la plateforme) — voir app/ingestion/models.py::ESGReport pour la
     # justification de ce champ direct plutôt qu'un ESGMetric.
     score_global_declare: float | None

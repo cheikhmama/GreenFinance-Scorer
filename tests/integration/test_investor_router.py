@@ -25,7 +25,7 @@ from app.ingestion.models import (
 )
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -120,13 +120,13 @@ def _entreprise_publiee(
 
     configuration = obtenir_configuration_reference(session)
     session.add(
-        ScoreESG(
-            rapport_id=rapport.id,
-            configuration_id=configuration.id,
-            valeur_globale=score_global,
-            score_environnement=score_e,
-            score_social=score_s,
-            score_gouvernance=score_g,
+        Score(
+            report_id=rapport.id,
+            config_id=configuration.id,
+            global_score=score_global,
+            environmental_score=score_e,
+            social_score=score_s,
+            governance_score=score_g,
         )
     )
     session.commit()

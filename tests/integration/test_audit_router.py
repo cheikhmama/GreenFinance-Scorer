@@ -15,7 +15,7 @@ from app.core.enums import (
     DecisionAudit,
     ExtractionStatus,
     MethodeDonnee,
-    Pilier,
+    Pillar,
     ReportStatus,
     Role,
     TypeRapport,
@@ -116,7 +116,7 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
     session.add(
         ESGMetric(
             report_id=rapport.id,
-            pillar=Pilier.ENVIRONNEMENT,
+            pillar=Pillar.ENVIRONNEMENT,
             metric_code="intensite_scope_1_2_marketbased",
             value=42.0,
             unit="gCO2e/kWh",

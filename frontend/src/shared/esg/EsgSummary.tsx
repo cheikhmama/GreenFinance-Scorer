@@ -2,7 +2,7 @@ import type {
   DonneesCarboneAgregees,
   ScoreEntreprisePublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { formatScore } from "@/shared/format/etatPosition";
+import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
 
 const TEINTES_PILIER: Record<"global" | "E" | "S" | "G", string> = {
   global: "bg-brand-green",
@@ -36,6 +36,13 @@ export function ScoreSummary({ score }: { score: ScoreEntreprisePublic }) {
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">Score global</dt>
         <dd className="mt-0.5 font-semibold text-brand-blue">{formatScore(score.valeur_globale)}</dd>
         <BarreScore valeur={score.valeur_globale} teinte={TEINTES_PILIER.global} />
+        {/* Un score ne se lit jamais sans sa couverture (tâche 3.1) : part pondérée des
+            indicateurs de la méthodologie effectivement publiés par l'entreprise. */}
+        {score.taux_couverture != null ? (
+          <dd className="mt-1 text-xs text-brand-grey">
+            Couverture {formatPourcentage(score.taux_couverture * 100)}
+          </dd>
+        ) : null}
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">E</dt>

@@ -76,6 +76,7 @@ from app.admin.schemas import (
     PerformanceESGAdmin,
     PortefeuilleAdmin,
     ProjetAdmin,
+    ScoreRecalculeAdmin,
     ScoreVerificationAdmin,
     StatistiquesAuditeursAdmin,
     StatistiquesChercheursAdmin,
@@ -114,8 +115,7 @@ from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.institution.projets import lister_projets_admin
 from app.investor.portfolio import lister_portefeuilles_admin
 from app.researcher.analyses import lister_analyses_admin
-from app.scoring.engine import score_calculable, score_public
-from app.scoring.models import ScoreESG
+from app.scoring.engine import apercu_score, score_public
 
 router = APIRouter(tags=["admin"])
 
@@ -443,12 +443,17 @@ def verifier_score_calculable_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ScoreVerificationAdmin:
-    return ScoreVerificationAdmin(calculable=score_calculable(session, rapport_id))
+    apercu = apercu_score(session, rapport_id)
+    return ScoreVerificationAdmin(
+        calculable=apercu.calculable,
+        taux_couverture=apercu.coverage_rate,
+        couverture_minimale=apercu.min_coverage,
+    )
 
 
 @router.post(
     "/admin/rapports/{rapport_id}/recalculer-score",
-    response_model=ScoreESG,
+    response_model=ScoreRecalculeAdmin,
     operation_id="recalculateReportScore",
     summary="Recalculer le score d'un rapport validé qui en est dépourvu (état incohérent)",
 )
@@ -456,8 +461,19 @@ def recalculer_score_route(
     rapport_id: uuid.UUID,
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> ScoreESG:
-    return recalculer_score(session, rapport_id)
+) -> ScoreRecalculeAdmin:
+    score = recalculer_score(session, rapport_id)
+    return ScoreRecalculeAdmin(
+        id=score.id,
+        rapport_id=score.report_id,
+        configuration_id=score.config_id,
+        valeur_globale=score.global_score,
+        score_environnement=score.environmental_score,
+        score_social=score.social_score,
+        score_gouvernance=score.governance_score,
+        taux_couverture=score.coverage_rate,
+        date_calcul=score.computed_at,
+    )
 
 
 @router.get(
@@ -674,10 +690,10 @@ def lister_entreprises_avec_score_route(
                 nom=entreprise.name,
                 secteur=entreprise.sector,
                 pays=entreprise.country,
-                score_global=score.valeur_globale if score else None,
-                score_environnement=score.score_environnement if score else None,
-                score_social=score.score_social if score else None,
-                score_gouvernance=score.score_gouvernance if score else None,
+                score_global=score.global_score if score else None,
+                score_environnement=score.environmental_score if score else None,
+                score_social=score.social_score if score else None,
+                score_gouvernance=score.governance_score if score else None,
             )
             for entreprise, score in items
         ],

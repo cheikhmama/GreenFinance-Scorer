@@ -44,7 +44,7 @@ import type {
   PerformanceESGAdmin,
   RapportESGDetail,
   RapportESGPublic,
-  ScoreESG,
+  ScoreRecalculeAdmin,
   ScoreVerificationAdmin,
   TableauDeBordAdmin,
   UtilisateurCree,
@@ -492,9 +492,9 @@ export const getRecalculateReportScoreUrl = (rapportId: string,) => {
 /**
  * @summary Recalculer le score d'un rapport validé qui en est dépourvu (état incohérent)
  */
-export const recalculateReportScore = async (rapportId: string, options?: RequestInit): Promise<ScoreESG> => {
+export const recalculateReportScore = async (rapportId: string, options?: RequestInit): Promise<ScoreRecalculeAdmin> => {
 
-  return apiFetch<ScoreESG>(getRecalculateReportScoreUrl(rapportId),
+  return apiFetch<ScoreRecalculeAdmin>(getRecalculateReportScoreUrl(rapportId),
   {
     ...options,
     method: 'POST'

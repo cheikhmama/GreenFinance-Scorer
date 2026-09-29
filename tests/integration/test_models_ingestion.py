@@ -10,7 +10,7 @@ from app.core.enums import (
     CanalDepot,
     ExtractionStatus,
     MethodeDonnee,
-    Pilier,
+    Pillar,
     ReportStatus,
     TypeRapport,
 )
@@ -114,7 +114,7 @@ def test_indicateur_et_donnee_carbone_lies_au_meme_rapport(session) -> None:
 
     indicateur = ESGMetric(
         report_id=rapport.id,
-        pillar=Pilier.ENVIRONNEMENT,
+        pillar=Pillar.ENVIRONNEMENT,
         metric_code="GHG-SCOPE1",
         value=123.4,
         unit="tCO2e",
@@ -282,7 +282,7 @@ def test_suppression_rapport_reference_echoue_proprement(session) -> None:
     session.add(
         ESGMetric(
             report_id=rapport.id,
-            pillar=Pilier.SOCIAL,
+            pillar=Pillar.SOCIAL,
             metric_code="EMP-01",
             value=1.0,
             unit="ratio",

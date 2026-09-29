@@ -24,7 +24,7 @@ from app.investor.entreprises import dernier_rapport_valide
 from app.investor.portfolio import statistiques_admin as statistiques_investisseurs
 from app.researcher.analyses import statistiques_admin as statistiques_chercheurs
 from app.scoring.engine import score_officiel
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 
 @dataclass
@@ -104,7 +104,7 @@ def calculer_performance_esg(session: Session, entreprises: list[Company]) -> Pe
     l'Investisseur, pas une nouvelle règle inventée ici. Une entreprise sans rapport validé ou
     sans score sous la référence est exclue du calcul, jamais comptée comme 0 — voir
     entreprises_avec_score/entreprises_perimetre pour la couverture réelle."""
-    scores: list[ScoreESG] = []
+    scores: list[Score] = []
     for entreprise in entreprises:
         rapport = dernier_rapport_valide(session, entreprise.id)
         if rapport is None:
@@ -118,19 +118,19 @@ def calculer_performance_esg(session: Session, entreprises: list[Company]) -> Pe
         TrancheScore(
             borne_min=lo,
             borne_max=min(hi, 100),
-            nombre_entreprises=sum(1 for s in scores if lo <= s.valeur_globale < hi),
+            nombre_entreprises=sum(1 for s in scores if lo <= s.global_score < hi),
         )
         for lo, hi in bornes
     ]
 
     return PerformanceESG(
-        score_global_moyen=_moyenne([s.valeur_globale for s in scores]),
+        score_global_moyen=_moyenne([s.global_score for s in scores]),
         score_environnement_moyen=_moyenne(
-            [s.score_environnement for s in scores if s.score_environnement is not None]
+            [s.environmental_score for s in scores if s.environmental_score is not None]
         ),
-        score_social_moyen=_moyenne([s.score_social for s in scores if s.score_social is not None]),
+        score_social_moyen=_moyenne([s.social_score for s in scores if s.social_score is not None]),
         score_gouvernance_moyen=_moyenne(
-            [s.score_gouvernance for s in scores if s.score_gouvernance is not None]
+            [s.governance_score for s in scores if s.governance_score is not None]
         ),
         entreprises_avec_score=len(scores),
         entreprises_perimetre=len(entreprises),
@@ -145,7 +145,7 @@ def lister_entreprises_avec_score(
     pays: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Company, ScoreESG | None]], int]:
+) -> tuple[list[tuple[Company, Score | None]], int]:
     """Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque
     entreprise publiée avec son score admissible, None si absent plutôt que 0. Même périmètre que
     calculer_performance_esg (entreprises publiées), filtrable par secteur/pays."""
@@ -166,7 +166,7 @@ def lister_entreprises_avec_score(
         ).all()
     )
 
-    resultats: list[tuple[Company, ScoreESG | None]] = []
+    resultats: list[tuple[Company, Score | None]] = []
     for entreprise in entreprises:
         rapport = dernier_rapport_valide(session, entreprise.id)
         score = score_officiel(session, rapport.id) if rapport is not None else None

@@ -705,13 +705,14 @@ export interface ScoreEntreprisePublic {
   score_environnement: number | null;
   score_social: number | null;
   score_gouvernance: number | null;
+  taux_couverture?: number | null;
   configuration_version: number | null;
 }
 
-export type Pilier = typeof Pilier[keyof typeof Pilier];
+export type Pillar = typeof Pillar[keyof typeof Pillar];
 
 
-export const Pilier = {
+export const Pillar = {
   ENVIRONNEMENT: 'ENVIRONNEMENT',
   SOCIAL: 'SOCIAL',
   GOUVERNANCE: 'GOUVERNANCE',
@@ -719,7 +720,7 @@ export const Pilier = {
 
 export interface IndicateurESGDetail {
   id: string;
-  pilier: Pilier;
+  pilier: Pillar;
   code: string;
   valeur: number;
   unite: string;
@@ -1370,7 +1371,7 @@ export interface ProjetPublic {
 }
 
 /**
- * Le ScoreESG officiel d'un rapport (app/scoring/engine.py::score_officiel), jamais un score
+ * Le Score officiel d'un rapport (app/scoring/engine.py::score_officiel), jamais un score
  * personnalisé ni un score auto-déclaré par l'entreprise -- ces deux-là restent ailleurs (voir
  * app/ingestion/schemas.py::RapportESGDetail pour la distinction explicite).
  */
@@ -1379,6 +1380,7 @@ export interface ScoreESGPublic {
   score_environnement: number | null;
   score_social: number | null;
   score_gouvernance: number | null;
+  taux_couverture: number | null;
   configuration_version: number;
 }
 
@@ -1475,35 +1477,31 @@ export interface ReportCreateRequest {
 }
 
 /**
- * Les quatre scores sont bornés 0-100 à la fois côté Pydantic (Field) et côté PostgreSQL
- * (__table_args__, Phase 5 §6). valeur_globale est toujours renseignée (app/scoring/engine.py
- * refuse de créer un ScoreESG si aucun pilier n'est calculable) ; les trois scores de pilier
- * sont nullables — un pilier sans aucun indicateur trouvé dans le rapport reste NULL plutôt que
- * de recevoir une note fabriquée (0 se lirait comme « pire score possible », pas comme
- * « donnée absente ») ; valeur_globale se recalcule alors sur les seuls piliers présents.
+ * Réponse de POST /admin/rapports/{id}/recalculer-score : le contrat JSON historique (la
+ * route renvoyait la ligne de table, docs/RENAME_PLAN.md §1 règle 3), plus la couverture.
  */
-export interface ScoreESG {
-  id?: string;
+export interface ScoreRecalculeAdmin {
+  id: string;
   rapport_id: string;
   configuration_id: string;
-  /**
-     * @minimum 0
-     * @maximum 100
-     */
   valeur_globale: number;
-  score_environnement?: number | null;
-  score_social?: number | null;
-  score_gouvernance?: number | null;
-  date_calcul?: string;
+  score_environnement: number | null;
+  score_social: number | null;
+  score_gouvernance: number | null;
+  taux_couverture: number | null;
+  date_calcul: string;
 }
 
 /**
  * Aperçu, sans rien persister, de si un rapport PENDING_DECISION pourrait être scoré —
- * affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::score_calculable),
- * plutôt que de le laisser découvrir l'échec après coup.
+ * affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::apercu_score),
+ * plutôt que de le laisser découvrir l'échec après coup. `calculable` est faux aussi quand la
+ * couverture est sous le minimum de la méthodologie (tâche 3.1).
  */
 export interface ScoreVerificationAdmin {
   calculable: boolean;
+  taux_couverture?: number | null;
+  couverture_minimale?: number | null;
 }
 
 export interface SoumettreAvisRequest {

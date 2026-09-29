@@ -30,7 +30,7 @@ from app.investor.models import Portfolio
 from app.main import app
 from app.researcher.models import Analyse
 from app.scoring.engine import obtenir_configuration_reference
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -119,13 +119,13 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
     session.commit()
     configuration = obtenir_configuration_reference(session)
     session.add(
-        ScoreESG(
-            rapport_id=rapport.id,
-            configuration_id=configuration.id,
-            valeur_globale=72.0,
-            score_environnement=80.0,
-            score_social=None,
-            score_gouvernance=65.0,
+        Score(
+            report_id=rapport.id,
+            config_id=configuration.id,
+            global_score=72.0,
+            environmental_score=80.0,
+            social_score=None,
+            governance_score=65.0,
         )
     )
     session.commit()

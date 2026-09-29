@@ -78,7 +78,7 @@ import type {
   RapportESGDetail,
   RapportESGPublic,
   Role,
-  ScoreESG,
+  ScoreRecalculeAdmin,
   ReportStatus,
   ScoreVerificationAdmin,
   StatutAnalyse,
@@ -239,7 +239,7 @@ export function useReportScoreVerification(rapportId: string, enabled: boolean) 
  * indéfiniment la publication de l'entreprise, voir app/admin/review_queue.py::recalculer_score). */
 export function useRecalculateReportScore(rapportId: string) {
   const queryClient = useQueryClient();
-  return useMutation<ScoreESG, ApiError, void>({
+  return useMutation<ScoreRecalculeAdmin, ApiError, void>({
     mutationFn: () => recalculateReportScore(rapportId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rapportKey(rapportId) });

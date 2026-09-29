@@ -5,7 +5,7 @@ from app.core.enums import (
     DevisePosition,
     ExtractionStatus,
     MethodeDonnee,
-    Pilier,
+    Pillar,
     ReportStatus,
     Role,
     TypeDureeInvestissement,
@@ -52,7 +52,7 @@ def test_canal_depot_values() -> None:
 
 
 def test_pilier_values() -> None:
-    assert {p.value for p in Pilier} == {"ENVIRONNEMENT", "SOCIAL", "GOUVERNANCE"}
+    assert {p.value for p in Pillar} == {"ENVIRONNEMENT", "SOCIAL", "GOUVERNANCE"}
 
 
 def test_methode_donnee_values() -> None:

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from app.institution.models import AffectationProjet, Projet
     from app.investor.models import Portfolio
     from app.researcher.models import Analyse
-    from app.scoring.models import ConfigurationPonderation
+    from app.scoring.models import ScoringConfig
 
 
 class User(SQLModel, table=True):
@@ -69,8 +69,8 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[Company.owner_user_id]"},
     )
     audited_reports: list["ESGReport"] = Relationship(back_populates="auditor")
-    scoring_configs: list["ConfigurationPonderation"] = Relationship(
-        back_populates="utilisateur"
+    scoring_configs: list["ScoringConfig"] = Relationship(
+        back_populates="owner"
     )
     portfolios: list["Portfolio"] = Relationship(back_populates="user")
     audit_opinions: list["AvisAudit"] = Relationship(back_populates="auditeur")

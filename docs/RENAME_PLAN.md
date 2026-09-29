@@ -204,10 +204,24 @@ Relationships follow (`report`, `proof`, `metric`, `company`, `Evidence.metrics`
 only `score_qualite_pcaf` becomes nullable. `StatutCouvertureIndicateur` and `MethodeDonnee` keep
 their names (their values are in the API).
 
+## 3d. Task 3.1 — scoring tables (migration `c1d4a8e2f935`)
+
+| Old table (class) | New table (class) | Columns |
+|---|---|---|
+| `configuration_ponderation` (`ConfigurationPonderation`) | `scoring_configs` (`ScoringConfig`) | `nom` → `name`, `date_creation` → `created_at`, `utilisateur_id` → `owner_user_id`; `fichier_yaml` **dropped** (replaced by `content_yaml` + `content_hash`) |
+| `score_esg` (`ScoreESG`) | `scores` (`Score`) | `rapport_id` → `report_id`, `configuration_id` → `config_id` (RESTRICT + index), `valeur_globale` → `global_score`, `score_environnement` / `score_social` / `score_gouvernance` → `environmental_score` / `social_score` / `governance_score`, `date_calcul` → `computed_at`; + `coverage_rate` |
+
+Relationships: `ScoringConfig.owner`, `Score.report`, `Score.config`. `Pilier` → `Pillar` (enum
+class only, its values are in the API; the OpenAPI schema name changes accordingly). The JSON
+contract is unchanged: `ScoreESGPublic` / `ScoreEntreprisePublic` map explicitly and gain
+`taux_couverture`; `POST /admin/rapports/{id}/recalculer-score` returned the table model itself
+and now returns `ScoreRecalculeAdmin` with the same field names. `analyse_entreprise.score_esg_id`
+keeps its name until task 4.7.
+
 ## 4. Later renames
 
 | Task | Tables | Classes |
 |---|---|---|
 | ~~2.3~~ | done — see §3c | |
-| 3.1 | `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores` | `ConfigurationPonderation` → `ScoringConfig`, `ScoreESG` → `Score`; `Pilier` → `Pillar` |
+| ~~3.1~~ | done — see §3d | |
 | 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names; audit journal labels | remaining classes |

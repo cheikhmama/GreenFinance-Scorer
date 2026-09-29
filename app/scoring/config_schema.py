@@ -13,12 +13,15 @@ entier absent pour un rapport donné) — mais un fichier dont les poids déclar
 plutôt que de se traduire en un score silencieusement biaisé.
 """
 
+import hashlib
+import json
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from app.core.enums import Pilier
+from app.core.enums import Pillar
 
 _TOLERANCE_SOMME_POIDS = 1e-6
 
@@ -50,11 +53,15 @@ class PilierConfig(BaseModel):
 class ConfigurationScoring(BaseModel):
     version: int
     nom: str
-    piliers: dict[Pilier, PilierConfig]
+    piliers: dict[Pillar, PilierConfig]
+    # Seuil facultatif (tâche 3.1) : un rapport dont la couverture pondérée des indicateurs de
+    # cette configuration est inférieure ne peut pas être validé sous elle — un score calculé sur
+    # trop peu de données ne se publie pas.
+    min_coverage: float | None = Field(default=None, ge=0, le=1)
 
     @model_validator(mode="after")
     def _trois_piliers_et_sommes_correctes(self) -> "ConfigurationScoring":
-        manquants = set(Pilier) - set(self.piliers)
+        manquants = set(Pillar) - set(self.piliers)
         if manquants:
             raise ValueError(f"piliers manquants : {sorted(p.value for p in manquants)}")
 
@@ -72,6 +79,29 @@ class ConfigurationScoring(BaseModel):
         return self
 
 
+def _lire_yaml(contenu_yaml: str) -> Any:
+    try:
+        return yaml.safe_load(contenu_yaml)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"YAML illisible : {exc}") from exc
+
+
+def charger_configuration(contenu_yaml: str) -> ConfigurationScoring:
+    """ValueError (ou pydantic.ValidationError, sous-classe) si le contenu est illisible ou
+    invalide."""
+    return ConfigurationScoring.model_validate(_lire_yaml(contenu_yaml))
+
+
+def empreinte_configuration(contenu_yaml: str) -> str:
+    """SHA-256 de la forme canonique : le YAML parsé, resérialisé en JSON à clés triées. Un
+    commentaire, une indentation ou un ordre de clés différents ne changent donc pas l'empreinte ;
+    un poids, une borne ou un numéro de version, si. Figée : la migration c1d4a8e2f935 recalcule
+    la même empreinte à l'identique, la modifier invaliderait toutes les empreintes en base."""
+    canonique = json.dumps(
+        _lire_yaml(contenu_yaml), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonique.encode("utf-8")).hexdigest()
+
+
 def charger_configuration_depuis_fichier(chemin: Path) -> ConfigurationScoring:
-    contenu = yaml.safe_load(chemin.read_text(encoding="utf-8"))
-    return ConfigurationScoring.model_validate(contenu)
+    return charger_configuration(chemin.read_text(encoding="utf-8"))
