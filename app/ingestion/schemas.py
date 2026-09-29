@@ -92,6 +92,7 @@ def rapport_vers_contrat(rapport: ESGReport) -> dict[str, Any]:
         "entreprise_id": rapport.company_id,
         "type": rapport.type,
         "canal": rapport.channel,
+        "date_creation": rapport.created_at,
         "date_depot": rapport.submitted_at,
         "statut": rapport.status,
         "statut_extraction": rapport.extraction_status,
@@ -127,13 +128,16 @@ class RapportESGPublic(BaseModel):
     entreprise_id: uuid.UUID
     type: TypeRapport
     canal: CanalDepot
-    date_depot: datetime
+    date_creation: datetime
+    # Nuls pour un brouillon (DRAFT, tâche 1.5) : ni fichier ni dépôt tant que la déclaration
+    # n'est pas soumise.
+    date_depot: datetime | None
     statut: ReportStatus
     # Avancement de l'extraction, distinct du statut métier (ExtractionStatus) — ajouté au
     # contrat avec le découpage de l'ancien statut unique, pour que le frontend distingue un
     # rapport en file, en cours, extrait ou en échec sans le déduire des horodatages.
     statut_extraction: ExtractionStatus
-    fichier_source: str
+    fichier_source: str | None
     nom_fichier_origine: str | None
     annee_reporting: int | None
     extraction_terminee_le: datetime | None

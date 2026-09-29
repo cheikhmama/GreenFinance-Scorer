@@ -17,6 +17,7 @@ from app.company.upload_validation import (
     valider_pdf,
 )
 from app.company.url_fetch import telecharger_pdf_depuis_url
+from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     CompanyStatus,
@@ -51,7 +52,7 @@ def lister_mes_rapports(session: Session, entreprise_id: uuid.UUID) -> list[ESGR
         session.exec(
             select(ESGReport)
             .where(ESGReport.company_id == entreprise_id)
-            .order_by(col(ESGReport.submitted_at).desc())
+            .order_by(col(ESGReport.created_at).desc())
         ).all()
     )
 
@@ -81,20 +82,9 @@ def _enregistrer_fichier(entreprise_id: uuid.UUID, rapport_id: uuid.UUID, conten
     return chemin_relatif
 
 
-def _creer_rapport(
-    session: Session,
-    background_tasks: BackgroundTasks,
-    *,
-    entreprise_id: uuid.UUID,
-    type_rapport: TypeRapport,
-    annee_reporting: int,
-    contenu: bytes,
-    version: int,
-    rapport_precedent_id: uuid.UUID | None,
-    nom_fichier_origine: str | None,
-    canal: CanalDepot = CanalDepot.ENTREPRISE,
-) -> ESGReport:
-    entreprise = session.get(Company, entreprise_id)
+def verifier_entreprise_active(entreprise: Company | None) -> None:
+    """Seule une entreprise ACTIVE dépose ou ouvre une déclaration — une inscription en attente
+    (tâche 1.3) ou une entreprise suspendue ne le peut pas."""
     if entreprise is not None and entreprise.status == CompanyStatus.PENDING_ONBOARDING:
         raise ValidationError(
             "L'inscription de cette entreprise n'est pas encore validée.",
@@ -103,27 +93,33 @@ def _creer_rapport(
     if entreprise is not None and entreprise.status != CompanyStatus.ACTIVE:
         raise ValidationError("Cette entreprise est suspendue.", code="entreprise_suspendue")
 
+
+def deposer_fichier(
+    session: Session,
+    background_tasks: BackgroundTasks,
+    rapport: ESGReport,
+    contenu: bytes,
+    nom_fichier_origine: str | None,
+) -> ESGReport:
+    """Dépose le PDF d'un rapport — nouveau (dépôt en une étape) ou brouillon existant (tâche 1.5,
+    POST /reports/{id}/submit) — et le soumet à l'extraction : validation du PDF, détection de
+    doublon, stockage, statut SUBMITTED + extraction QUEUED, notification, un seul commit, puis
+    extraction en tâche de fond. Point unique : les deux chemins de dépôt appliquent exactement
+    les mêmes règles."""
+    entreprise = session.get(Company, rapport.company_id)
+    verifier_entreprise_active(entreprise)
+
     valider_pdf(contenu)
     checksum = calculer_checksum(contenu)
-    _verifier_doublon(session, entreprise_id, checksum)
+    _verifier_doublon(session, rapport.company_id, checksum)
 
-    rapport_id = uuid.uuid4()
-    chemin_relatif = _enregistrer_fichier(entreprise_id, rapport_id, contenu)
-
-    rapport = ESGReport(
-        id=rapport_id,
-        company_id=entreprise_id,
-        type=type_rapport,
-        channel=canal,
-        status=ReportStatus.SUBMITTED,
-        extraction_status=ExtractionStatus.QUEUED,
-        source_file=chemin_relatif,
-        original_filename=nettoyer_nom_fichier(nom_fichier_origine),
-        fiscal_year=annee_reporting,
-        checksum_sha256=checksum,
-        version=version,
-        previous_report_id=rapport_precedent_id,
-    )
+    chemin_relatif = _enregistrer_fichier(rapport.company_id, rapport.id, contenu)
+    rapport.source_file = chemin_relatif
+    rapport.original_filename = nettoyer_nom_fichier(nom_fichier_origine)
+    rapport.checksum_sha256 = checksum
+    rapport.status = ReportStatus.SUBMITTED
+    rapport.extraction_status = ExtractionStatus.QUEUED
+    rapport.submitted_at = utcnow()
     try:
         session.add(rapport)
         if entreprise is not None and entreprise.owner_user_id is not None:
@@ -131,9 +127,9 @@ def _creer_rapport(
                 session,
                 entreprise.owner_user_id,
                 "RAPPORT_DEPOSE",
-                f"Votre rapport {type_rapport.value} ({annee_reporting}) a bien été reçu et est "
-                "en cours d'extraction.",
-                id_ressource=rapport_id,
+                f"Votre rapport {rapport.type.value} ({rapport.fiscal_year}) a bien été reçu et "
+                "est en cours d'extraction.",
+                id_ressource=rapport.id,
             )
         session.commit()
     except Exception:
@@ -147,11 +143,39 @@ def _creer_rapport(
 
     # Le passage QUEUED -> RUNNING se fait DANS run_extraction_pipeline, pas ici : le statut
     # d'extraction doit refléter que l'extraction a réellement démarré, pas seulement été demandée.
-    background_tasks.add_task(run_extraction_pipeline, rapport_id, annee_reporting)
+    assert rapport.fiscal_year is not None  # toujours fourni au dépôt comme à l'ouverture
+    background_tasks.add_task(run_extraction_pipeline, rapport.id, rapport.fiscal_year)
     logger.info(
-        "rapport_depose", rapport_id=str(rapport_id), version=version, entreprise_id=str(entreprise_id)
+        "rapport_depose",
+        rapport_id=str(rapport.id),
+        version=rapport.version,
+        entreprise_id=str(rapport.company_id),
     )
     return rapport
+
+
+def _creer_rapport(
+    session: Session,
+    background_tasks: BackgroundTasks,
+    *,
+    entreprise_id: uuid.UUID,
+    type_rapport: TypeRapport,
+    annee_reporting: int,
+    contenu: bytes,
+    version: int,
+    rapport_precedent_id: uuid.UUID | None,
+    nom_fichier_origine: str | None,
+    canal: CanalDepot = CanalDepot.ENTREPRISE,
+) -> ESGReport:
+    rapport = ESGReport(
+        company_id=entreprise_id,
+        type=type_rapport,
+        channel=canal,
+        fiscal_year=annee_reporting,
+        version=version,
+        previous_report_id=rapport_precedent_id,
+    )
+    return deposer_fichier(session, background_tasks, rapport, contenu, nom_fichier_origine)
 
 
 def deposer_rapport(

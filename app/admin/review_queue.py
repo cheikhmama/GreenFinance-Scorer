@@ -200,7 +200,7 @@ def lister_tous_les_rapports(
         session.exec(
             select(ESGReport)
             .where(*filtres)
-            .order_by(col(ESGReport.submitted_at).desc())
+            .order_by(col(ESGReport.created_at).desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
@@ -511,7 +511,7 @@ def lister_toutes_les_entreprises(
         list(
             session.exec(
                 select(
-                    ESGReport.company_id, ESGReport.id, ESGReport.status, ESGReport.submitted_at
+                    ESGReport.company_id, ESGReport.id, ESGReport.status, ESGReport.created_at
                 ).where(col(ESGReport.company_id).in_(ids))
             ).all()
         )
@@ -521,6 +521,8 @@ def lister_toutes_les_entreprises(
 
     nb_par_entreprise: dict[uuid.UUID, int] = {}
     dernier_par_entreprise: dict[uuid.UUID, tuple[datetime, uuid.UUID, ReportStatus]] = {}
+    # created_at, jamais submitted_at : un brouillon (tâche 1.5) n'a pas encore de date de dépôt
+    # mais reste le rapport le plus récent de l'entreprise.
     for entreprise_id, rapport_id, statut, date_depot in rapports:
         nb_par_entreprise[entreprise_id] = nb_par_entreprise.get(entreprise_id, 0) + 1
         plus_recent = dernier_par_entreprise.get(entreprise_id)
@@ -654,7 +656,7 @@ def resume_rapports_entreprise(
     renvoient une EntrepriseAdmin après une action ponctuelle (détail, modification, logo), où
     une jointure batchée n'a pas de sens."""
     rapports = session.exec(
-        select(ESGReport.id, ESGReport.status, ESGReport.submitted_at).where(
+        select(ESGReport.id, ESGReport.status, ESGReport.created_at).where(
             ESGReport.company_id == entreprise_id
         )
     ).all()

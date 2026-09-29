@@ -82,6 +82,7 @@ def _entreprise_publiee(
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()

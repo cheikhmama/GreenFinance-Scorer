@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, Index, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -50,13 +50,30 @@ class ESGReport(SQLModel, table=True):
             "company_id", "checksum_sha256", name="uq_esg_reports_company_checksum"
         ),
         Index("ix_esg_reports_company_fiscal_year", "company_id", "fiscal_year"),
+        # Un seul brouillon ouvert par exercice et par type de rapport (tâche 1.5) : ouvrir deux
+        # sessions de déclaration pour la même période serait une erreur de saisie, jamais utile.
+        Index(
+            "uq_esg_reports_one_draft_per_period",
+            "company_id",
+            "fiscal_year",
+            "type",
+            unique=True,
+            postgresql_where=text("status = 'DRAFT'"),
+        ),
+        # Un brouillon n'a encore ni fichier ni date de dépôt ; tout autre statut en a toujours.
+        CheckConstraint(
+            "status = 'DRAFT' OR (source_file IS NOT NULL AND submitted_at IS NOT NULL)",
+            name="ck_esg_reports_file_unless_draft",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE")
     type: TypeRapport = Field(sa_column=sa_enum_column(TypeRapport))
     channel: CanalDepot = Field(sa_column=sa_enum_column(CanalDepot))
-    submitted_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    # Moment du dépôt du fichier : nul tant que le rapport est un brouillon (DRAFT, tâche 1.5).
+    submitted_at: datetime | None = Field(default=None)
     status: ReportStatus = Field(
         default=ReportStatus.SUBMITTED, sa_column=sa_enum_column(ReportStatus)
     )
@@ -66,7 +83,8 @@ class ESGReport(SQLModel, table=True):
     extraction_status: ExtractionStatus = Field(
         default=ExtractionStatus.QUEUED, sa_column=sa_enum_column(ExtractionStatus)
     )
-    source_file: str
+    # Chemin de stockage du PDF déposé — nul tant que le rapport est un brouillon.
+    source_file: str | None = Field(default=None)
     # Nom du fichier PDF tel que fourni par le client au dépôt, affiché tel quel dans les espaces
     # Entreprise/Admin/Auditeur à la place du type de rapport — jamais utilisé comme chemin de
     # stockage (voir _enregistrer_fichier, app/company/rapports.py). Nullable : les rapports

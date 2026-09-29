@@ -9,6 +9,7 @@ from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core import storage
+from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     CompanyStatus,
@@ -229,12 +230,14 @@ def test_lister_rapports_ne_montre_que_ceux_de_lentreprise_courante(session) -> 
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/mien.pdf",
+        submitted_at=utcnow(),
     )
     dautrui = ESGReport(
         company_id=autre.company.id,
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dautrui.pdf",
+        submitted_at=utcnow(),
     )
     session.add(mien)
     session.add(dautrui)
@@ -360,6 +363,7 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.REVISION_REQUESTED,
         source_file="rapports/test/original.pdf",
+        submitted_at=utcnow(),
     )
     session.add(original)
     session.commit()
@@ -394,6 +398,7 @@ def test_creer_correction_sur_un_rapport_pas_en_attente_est_rejetee(session) -> 
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.PENDING_DECISION,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -420,6 +425,7 @@ def test_creer_correction_sur_le_rapport_dune_autre_entreprise_est_404(session) 
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.REVISION_REQUESTED,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -445,6 +451,7 @@ def test_consulter_rapport_dune_autre_entreprise_est_404(session) -> None:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -475,6 +482,7 @@ def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -514,6 +522,7 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -597,6 +606,7 @@ def _rapport_a_extraire(session) -> ESGReport:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -792,6 +802,7 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1005,6 +1016,7 @@ def test_consulter_rapport_sans_score_officiel_le_renvoie_a_null(session) -> Non
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1030,6 +1042,7 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         declared_global_score=99.0,  # volontairement très différent du score officiel calculé
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1076,6 +1089,7 @@ def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> 
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1099,6 +1113,7 @@ def test_telecharger_rapport_original_propre_entreprise_retourne_le_pdf(session)
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file=chemin_relatif,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1118,6 +1133,7 @@ def test_telecharger_rapport_synthese_non_generee_est_404_dedie(session) -> None
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1140,6 +1156,7 @@ def test_telecharger_rapport_synthese_generee_retourne_le_pdf(session) -> None:
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         synthesis_report_path=chemin_relatif,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()

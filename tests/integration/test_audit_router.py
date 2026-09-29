@@ -57,6 +57,7 @@ def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> ESGReport
         source_file="rapports/test/dummy.pdf",
         extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
         auditor_id=auditeur_id,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()

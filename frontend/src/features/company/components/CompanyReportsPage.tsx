@@ -72,7 +72,9 @@ export function CompanyReportsPage() {
                       <td className="py-2 pr-4">{rapport.type}</td>
                       <td className="py-2 pr-4">{rapport.annee_reporting ?? "—"}</td>
                       <td className="py-2 pr-4">
-                        {new Date(rapport.date_depot).toLocaleDateString("fr-FR")}
+                        {rapport.date_depot
+                          ? new Date(rapport.date_depot).toLocaleDateString("fr-FR")
+                          : "Brouillon"}
                       </td>
                       <td className="py-2 pr-4">v{rapport.version}</td>
                       <td className="py-2">

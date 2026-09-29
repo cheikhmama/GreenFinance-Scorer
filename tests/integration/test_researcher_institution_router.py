@@ -63,6 +63,7 @@ def _entreprise_publiee(session, *, score_global: float = 70.0, nom: str | None 
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()

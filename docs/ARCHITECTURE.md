@@ -87,6 +87,9 @@ registration (task 1.3) validates ISO codes on input.
 ### 3.2 `esg_reports` — fiscal reporting (module `app/ingestion` → `app/reporting`)
 
 *Implemented in task 1.1* (`official_score`, `coverage_rate`, `config_hash` columns exist; filled by tasks 1.6 and 3.1).
+Task 1.5 adds `created_at`, makes `source_file` / `submitted_at` nullable for `DRAFT` (a CHECK
+constraint requires both for every other status) and creates `app/reporting/` for the `/reports`
+API with its role-based scope.
 
 | Column | Type | Notes |
 |---|---|---|

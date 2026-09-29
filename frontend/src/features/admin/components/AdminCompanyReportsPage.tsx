@@ -1,6 +1,10 @@
 import { FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleDateRapport,
+  libelleStatutRapport,
+  variantStatutRapport,
+} from "@/shared/format/statut";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -37,7 +41,7 @@ export function AdminCompanyReportsPage() {
                   {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
                 </p>
                 <p className="text-xs text-brand-grey">
-                  Déposé le {new Date(rapport.date_depot).toLocaleDateString("fr-FR")} — version{" "}
+                  {libelleDateRapport(rapport)} — version{" "}
                   {rapport.version}
                 </p>
               </div>

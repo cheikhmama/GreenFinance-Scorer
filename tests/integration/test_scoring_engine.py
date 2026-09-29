@@ -6,6 +6,7 @@ from sqlmodel import col, func, select
 from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.company.models import Company
+from app.core.database import utcnow
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, Role, TypeRapport
 from app.core.exceptions import ValidationError
 from app.ingestion.models import ESGMetric, ESGReport, PreuveDocumentaire
@@ -26,6 +27,7 @@ def _rapport(session) -> ESGReport:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()

@@ -485,6 +485,8 @@ def consulter_fichier_route(
     rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    if rapport.source_file is None:
+        raise NotFoundError("Ce rapport n'a pas encore de fichier.", code="fichier_absent")
     return FileResponse(storage.resolve_path(rapport.source_file))
 
 

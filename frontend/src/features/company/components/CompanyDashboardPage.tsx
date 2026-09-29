@@ -19,7 +19,8 @@ export function CompanyDashboardPage() {
   const { data: notifications, isLoading: chargementNotifications } = useMyNotifications(5);
 
   const rapportsTries = [...(rapports ?? [])].sort(
-    (a, b) => new Date(b.date_depot).getTime() - new Date(a.date_depot).getTime(),
+    // date_creation, jamais date_depot : un brouillon (sans dépôt) reste le rapport le plus récent.
+    (a, b) => new Date(b.date_creation).getTime() - new Date(a.date_creation).getTime(),
   );
   const dernierRapport = rapportsTries[0];
 

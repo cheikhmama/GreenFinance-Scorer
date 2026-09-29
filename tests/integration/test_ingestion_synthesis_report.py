@@ -1,6 +1,7 @@
 import uuid
 
 from app.company.models import Company
+from app.core.database import utcnow
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, TypeRapport
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import (
@@ -35,6 +36,7 @@ def _rapport(session) -> ESGReport:
         channel=CanalDepot.ENTREPRISE,
         source_file="rapports/test/synthese-dummy.pdf",
         fiscal_year=2025,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()

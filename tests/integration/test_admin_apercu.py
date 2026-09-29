@@ -113,6 +113,7 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
         channel=CanalDepot.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -156,6 +157,7 @@ def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
             source_file="rapports/test/dummy.pdf",
             auditor_id=auditeur.id,
             assigned_at=utcnow(),
+            submitted_at=utcnow(),
         )
     )
     session.commit()

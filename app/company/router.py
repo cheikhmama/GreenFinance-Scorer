@@ -218,6 +218,8 @@ def telecharger_rapport_original_route(
     session: Session = Depends(get_session),
 ) -> FileResponse:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
+    if rapport.source_file is None:
+        raise NotFoundError("Ce rapport n'a pas encore de fichier.", code="fichier_absent")
     return FileResponse(storage.resolve_path(rapport.source_file), media_type="application/pdf")
 
 

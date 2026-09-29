@@ -92,6 +92,7 @@ def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> ESGReport
         "type": TypeRapport.RAPPORT_ESG,
         "channel": CanalDepot.ENTREPRISE,
         "status": ReportStatus.SUBMITTED,
+        "submitted_at": utcnow(),
         "source_file": "rapports/test/dummy.pdf",
     }
     valeurs.update(overrides)

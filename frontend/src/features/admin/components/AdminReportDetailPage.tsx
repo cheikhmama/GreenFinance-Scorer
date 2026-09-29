@@ -4,7 +4,11 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleDateRapport,
+  libelleStatutRapport,
+  variantStatutRapport,
+} from "@/shared/format/statut";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -246,8 +250,8 @@ export function AdminReportDetailPage() {
                       {version.id === rapport.id ? " (celle-ci)" : ""}
                     </p>
                     <p className="text-sm text-brand-grey">
-                      {libelleStatutRapport(version.statut, version.statut_extraction)} — déposé le{" "}
-                      {new Date(version.date_depot).toLocaleDateString("fr-FR")}
+                      {libelleStatutRapport(version.statut, version.statut_extraction)} —{" "}
+                      {libelleDateRapport(version).toLowerCase()}
                     </p>
                   </div>
                   {version.id !== rapport.id ? (

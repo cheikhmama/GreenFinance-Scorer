@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.auth.models import User
 from app.company.models import Company
+from app.core.database import utcnow
 from app.core.enums import CanalDepot, Role, TypeRapport
 from app.ingestion.models import ESGReport
 from app.scoring.models import ConfigurationPonderation, ScoreESG
@@ -31,6 +32,7 @@ def _rapport(session) -> ESGReport:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()

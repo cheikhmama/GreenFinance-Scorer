@@ -562,6 +562,12 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
         if rapport is None:
             logger.error("extraction_rapport_introuvable", rapport_id=str(rapport_id))
             return
+        if rapport.source_file is None:
+            # Un brouillon (tâche 1.5) n'a pas de fichier : rien à extraire. Jamais programmé
+            # par l'application, gardé en défense.
+            logger.error("extraction_sans_fichier", rapport_id=str(rapport_id))
+            return
+        fichier_source = rapport.source_file
 
         # Seul extraction_status avance ici, jamais le statut métier (ReportStatus) : rejouer
         # l'extraction (ex. après élargissement d'INDICATEURS_CIBLES) sur un rapport déjà affecté
@@ -580,9 +586,9 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
 
         etape = "erreur_inattendue"
         try:
-            source_path = storage.resolve_path(rapport.source_file)
+            source_path = storage.resolve_path(fichier_source)
             nom_entreprise = rapport.company.name
-            nom_document = Path(rapport.source_file).name
+            nom_document = Path(fichier_source).name
             demo = get_settings().gemini_api_key_is_placeholder
             if demo:
                 nom_document = f"[DEMO] {nom_document}"

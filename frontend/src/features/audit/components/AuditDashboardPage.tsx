@@ -50,7 +50,9 @@ export function AuditDashboardPage() {
                       <td className="py-2 pr-4">{dossier.type}</td>
                       <td className="py-2 pr-4">{dossier.annee_reporting ?? "—"}</td>
                       <td className="py-2 pr-4">
-                        {new Date(dossier.date_depot).toLocaleDateString("fr-FR")}
+                        {dossier.date_depot
+                          ? new Date(dossier.date_depot).toLocaleDateString("fr-FR")
+                          : "—"}
                       </td>
                       <td className="py-2">
                         <Link

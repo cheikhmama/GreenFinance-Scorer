@@ -26,6 +26,7 @@ from app.core.logging import CorrelationIdMiddleware
 from app.core.router import router as core_router
 from app.institution.router import router as institution_router
 from app.investor.router import router as investor_router
+from app.reporting.router import router as reporting_router
 from app.researcher.router import router as researcher_router
 
 # Catalogue explicite des tags : c'est ce qui permet à chaque module
@@ -61,6 +62,11 @@ OPENAPI_TAGS = [
             "(Phase 5 §10)."
         ),
     },
+    {
+        "name": "reports",
+        "description": "Déclarations : ouverture d'un exercice en brouillon, dépôt, périmètre par rôle "
+        "(tâche 1.5).",
+    },
     {"name": "investor", "description": "Espace Investisseur — Étape 16."},
     {"name": "researcher", "description": "Espace Chercheur — Étape 17."},
     {"name": "institution", "description": "Espace Institution — Étape 17."},
@@ -87,6 +93,7 @@ api_app.include_router(core_router)
 api_app.include_router(admin_router)
 api_app.include_router(audit_router)
 api_app.include_router(company_router)
+api_app.include_router(reporting_router)
 api_app.include_router(investor_router)
 api_app.include_router(researcher_router)
 api_app.include_router(institution_router)

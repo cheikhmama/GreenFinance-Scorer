@@ -250,6 +250,10 @@ export interface BodySubmitCompanyReportCorrection {
   annee_reporting: number;
 }
 
+export interface BodySubmitReport {
+  file: Blob;
+}
+
 export interface BodyUploadCompanyLogo {
   fichier: Blob;
 }
@@ -1036,10 +1040,11 @@ export interface RapportESGPublic {
   entreprise_id: string;
   type: TypeRapport;
   canal: CanalDepot;
-  date_depot: string;
+  date_creation: string;
+  date_depot: string | null;
   statut: ReportStatus;
   statut_extraction: ExtractionStatus;
-  fichier_source: string;
+  fichier_source: string | null;
   nom_fichier_origine: string | null;
   annee_reporting: number | null;
   extraction_terminee_le: string | null;
@@ -1051,6 +1056,29 @@ export interface RapportESGPublic {
 
 export interface PageRapportESGPublic {
   items: RapportESGPublic[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface ReportResponse {
+  id: string;
+  company_id: string;
+  report_type: TypeRapport;
+  fiscal_year: number | null;
+  status: ReportStatus;
+  extraction_status: ExtractionStatus;
+  version: number;
+  previous_report_id: string | null;
+  created_at: string;
+  submitted_at: string | null;
+  original_filename: string | null;
+  official_score: number | null;
+}
+
+export interface PageReportResponse {
+  items: ReportResponse[];
   page: number;
   page_size: number;
   total: number;
@@ -1201,10 +1229,11 @@ export interface RapportESGDetail {
   entreprise_id: string;
   type: TypeRapport;
   canal: CanalDepot;
-  date_depot: string;
+  date_creation: string;
+  date_depot: string | null;
   statut: ReportStatus;
   statut_extraction: ExtractionStatus;
-  fichier_source: string;
+  fichier_source: string | null;
   nom_fichier_origine: string | null;
   annee_reporting: number | null;
   extraction_terminee_le: string | null;
@@ -1267,6 +1296,19 @@ export interface RenommerPortefeuilleRequest {
 export interface RepartitionSecteur {
   secteur: string;
   montant_usd: number;
+}
+
+/**
+ * POST /reports — ouvre une déclaration (DRAFT) pour un exercice, avant tout fichier.
+ *
+ * `company_id` n'est lu que pour un Administrateur ; une Entreprise déclare toujours pour la
+ * sienne (même règle que l'import par URL, app/company/router.py).
+ */
+export interface ReportCreateRequest {
+  /** @minimum 2000 */
+  fiscal_year: number;
+  report_type: TypeRapport;
+  company_id?: string | null;
 }
 
 /**
@@ -1560,6 +1602,22 @@ page?: number;
 /**
  * @minimum 1
  * @maximum 50
+ */
+page_size?: number;
+};
+
+export type ListReportsParams = {
+fiscal_year?: number | null;
+status?: ReportStatus | null;
+report_type?: TypeRapport | null;
+company_id?: string | null;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
  */
 page_size?: number;
 };

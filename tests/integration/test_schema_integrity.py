@@ -71,6 +71,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()
@@ -271,6 +272,7 @@ def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()

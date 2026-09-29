@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from app.company.models import Company
+from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     ExtractionStatus,
@@ -36,6 +37,7 @@ def _rapport(entreprise_id: uuid.UUID, **kwargs) -> ESGReport:
         "type": TypeRapport.RAPPORT_ESG,
         "channel": CanalDepot.AUTOMATIQUE,
         "source_file": "s3://bucket/rapport.pdf",
+        "submitted_at": utcnow(),
     }
     defaults.update(kwargs)
     # SQLModel ignore silencieusement un kwarg inconnu : jamais un champ de test perdu en route.
@@ -63,6 +65,7 @@ def test_entreprise_id_obligatoire(session) -> None:
         type=TypeRapport.RAPPORT_ESG,
         channel=CanalDepot.AUTOMATIQUE,
         source_file="x",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     with pytest.raises(IntegrityError):

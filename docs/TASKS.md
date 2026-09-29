@@ -47,7 +47,12 @@ Rules for every task:
   - [x] Decision: no ISIN/LEI or financial data required to approve (unlisted companies); revisit with PCAF (2.3).
   - [x] `envoyer_lien_activation` no longer commits: callers commit the token with the rest of their change.
   - [x] Frontend: approve / reject panel on a pending company's admin page; end-to-end test register → approve → activate → log in.
-- [ ] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`).
+- [x] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`). (migration `fa4f8e80e840`)
+  - [x] `POST /reports` opens a `DRAFT` (no file); one draft per company, fiscal year and report type; ADMIN may open for a designated company.
+  - [x] `GET /reports`, `GET /reports/{id}` scoped by role in one place (`app/reporting/sessions.py::perimetre`): enterprise → its company, auditor → assigned reports, admin → all; out of scope → 404.
+  - [x] `POST /reports/{id}/submit` (same deposit logic as the one-step upload, bounded read) and `DELETE /reports/{id}` (discard a draft).
+  - [x] Schema: `created_at` added; `source_file` / `submitted_at` nullable for drafts, CHECK for every other status. Existing lists and file downloads handle drafts.
+  - [ ] Frontend screens to open / submit / discard a draft (the existing one-step deposit keeps working; drafts already show as "Brouillon").
 - [x] 1.6 Audit Queue & Atomic Validation: Refactor `valider_rapport` to run score calculation and status transition inside a single atomic BDD transaction. **[review]** (migration `834bf70ae1b9`)
   - [x] Remove `session.commit()` from `obtenir_configuration_reference`; `INSERT ... ON CONFLICT` on a new partial unique index (one reference row per version); existing duplicate rows merged by the migration.
   - [x] Stop GET endpoints (`score_officiel`, `score_public`, `score_calculable`) from creating rows (`trouver_configuration_reference` is read-only).
