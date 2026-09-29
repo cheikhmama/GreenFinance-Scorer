@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -23,6 +23,17 @@ if TYPE_CHECKING:
 
 class ConfigurationPonderation(SQLModel, table=True):
     __tablename__ = "configuration_ponderation"
+    __table_args__ = (
+        # Une seule ligne de référence par version (tâche 1.6) : cible de l'INSERT ... ON CONFLICT
+        # de app/scoring/engine.py::obtenir_configuration_reference. Sans elle, chaque changement
+        # de version du fichier YAML (ou deux validations concurrentes) créait une ligne de plus.
+        Index(
+            "uq_configuration_ponderation_reference_version",
+            "version",
+            unique=True,
+            postgresql_where=text("utilisateur_id IS NULL"),
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     nom: str
@@ -30,9 +41,8 @@ class ConfigurationPonderation(SQLModel, table=True):
     fichier_yaml: str
     date_creation: datetime = Field(default_factory=utcnow)
     # Nul = configuration de référence (Administrateur). Renseigné =
-    # personnalisation par un Investisseur, Chercheur ou Institution — la
-    # contrainte "une seule référence à la fois" est applicative, pas
-    # imposée en base à ce stade (voir tests/integration/test_models_scoring.py).
+    # personnalisation par un Investisseur, Chercheur ou Institution. Une seule
+    # référence par version (uq_configuration_ponderation_reference_version).
     # RESTRICT, jamais SET NULL : un utilisateur_id NULL désigne la configuration de RÉFÉRENCE —
     # le mettre à NULL à la suppression du Chercheur la transformerait silencieusement en
     # méthodologie officielle.

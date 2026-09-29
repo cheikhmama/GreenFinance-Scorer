@@ -94,8 +94,10 @@ the report stays in `PENDING_DECISION`.
 6. `COMMIT`.
 7. After commit: enqueue `generate_synthesis_pdf` and the notification email.
 
-*Current bug this fixes:* `obtenir_configuration_reference` commits in the middle of
-`valider_rapport`, which can persist `VALIDE` without a score (see `docs/TASKS.md` 1.6).
+*Implemented in task 1.6.* It fixed a bug where `obtenir_configuration_reference` committed in
+the middle of `valider_rapport`, which could persist `VALIDE` without a score. Until the job
+queue exists (task 4.1), step 7 runs synchronously right after the commit, as a best-effort step
+that can never undo the validation.
 
 ---
 

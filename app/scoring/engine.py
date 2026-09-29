@@ -12,15 +12,23 @@ présents — jamais compté comme 0. Un pilier sans aucun indicateur présent r
 app/scoring/models.py::ScoreESG) et est lui-même retiré du calcul du score global, sur le même
 principe. Si aucun pilier n'est calculable, calculer_score refuse de créer un score plutôt que
 d'en fabriquer un sans substance (code score_incalculable).
+
+Transactions (tâche 1.6) : aucune fonction de ce module n'appelle session.commit() — l'appelant
+(la validation, le recalcul) possède la limite de transaction. La configuration de référence
+n'est créée que sur un chemin d'écriture (obtenir_configuration_reference, flush + ON CONFLICT) ;
+les lectures (score_officiel, score_public, score_calculable) n'écrivent jamais rien.
 """
 
 import uuid
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Session, col, select
 
 from app.core.config import get_settings
+from app.core.database import utcnow
 from app.core.enums import Pilier
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGMetric, ESGReport
@@ -43,28 +51,60 @@ def _charger_configuration_reference_depuis_disque(chemin: str) -> Configuration
     return charger_configuration_depuis_fichier(Path(chemin))
 
 
-def obtenir_configuration_reference(session: Session) -> ConfigurationPonderation:
-    """Renvoie la configuration de référence (utilisateur_id NULL) la plus récente, ou la crée
-    si aucune n'existe encore — point de vérité unique côté fichier (get_settings().default_
-    scoring_config), la ligne en base n'est qu'un pointeur versionné vers lui."""
+def _schema_reference() -> tuple[str, ConfigurationScoring]:
     chemin = get_settings().default_scoring_config
-    schema = _charger_configuration_reference_depuis_disque(chemin)
+    return chemin, _charger_configuration_reference_depuis_disque(chemin)
 
-    existante = session.exec(
-        select(ConfigurationPonderation)
-        .where(col(ConfigurationPonderation.utilisateur_id).is_(None))
-        .order_by(col(ConfigurationPonderation.version).desc())
+
+def trouver_configuration_reference(session: Session) -> ConfigurationPonderation | None:
+    """Lecture seule : la ligne de référence (utilisateur_id NULL) de la version décrite par le
+    fichier YAML courant, ou None si aucun score n'a encore été calculé sous cette version —
+    jamais créée ici (une requête GET ne doit rien écrire)."""
+    _chemin, schema = _schema_reference()
+    return session.exec(
+        select(ConfigurationPonderation).where(
+            col(ConfigurationPonderation.utilisateur_id).is_(None),
+            col(ConfigurationPonderation.version) == schema.version,
+        )
     ).first()
-    if existante is not None and existante.version == schema.version:
+
+
+def obtenir_configuration_reference(session: Session) -> ConfigurationPonderation:
+    """Chemin d'écriture : renvoie la ligne de référence de la version courante, en la créant si
+    besoin. N'appelle jamais commit() — seulement un INSERT ... ON CONFLICT DO NOTHING (unicité
+    uq_configuration_ponderation_reference_version), qui reste dans la transaction de l'appelant
+    et ne crée jamais de doublon, même sous deux validations concurrentes. Point de vérité unique
+    côté fichier (get_settings().default_scoring_config) : la ligne n'est qu'un pointeur versionné
+    vers lui."""
+    existante = trouver_configuration_reference(session)
+    if existante is not None:
         return existante
 
-    configuration = ConfigurationPonderation(
-        nom=_NOM_CONFIGURATION_REFERENCE, version=schema.version, fichier_yaml=chemin
+    chemin, schema = _schema_reference()
+    session.execute(
+        insert(ConfigurationPonderation)
+        .values(
+            id=uuid.uuid4(),
+            nom=_NOM_CONFIGURATION_REFERENCE,
+            version=schema.version,
+            fichier_yaml=chemin,
+            date_creation=utcnow(),
+        )
+        .on_conflict_do_nothing(
+            index_elements=["version"], index_where=text("utilisateur_id IS NULL")
+        )
     )
-    session.add(configuration)
-    session.commit()
-    session.refresh(configuration)
+    configuration = trouver_configuration_reference(session)
+    assert configuration is not None  # insérée ci-dessus, ou par une transaction concurrente
     return configuration
+
+
+def _valeur_effective(indicateur: ESGMetric) -> float:
+    """La correction de l'Auditeur, quand il y en a une, remplace la valeur extraite — qui reste
+    intacte en base pour la traçabilité (docs/WORKFLOWS.md §1.3)."""
+    if indicateur.auditor_overridden and indicateur.override_value is not None:
+        return indicateur.override_value
+    return indicateur.value
 
 
 def _score_pilier(pilier_config: PilierConfig, valeurs_par_code: dict[str, float]) -> float | None:
@@ -100,10 +140,9 @@ def calculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
     ).all()
     valeurs_par_pilier: dict[Pilier, dict[str, float]] = {pilier: {} for pilier in Pilier}
     for indicateur in indicateurs:
-        valeurs_par_pilier[indicateur.pillar][indicateur.metric_code] = indicateur.value
+        valeurs_par_pilier[indicateur.pillar][indicateur.metric_code] = _valeur_effective(indicateur)
 
-    configuration = obtenir_configuration_reference(session)
-    schema = _charger_configuration_reference_depuis_disque(configuration.fichier_yaml)
+    _chemin, schema = _schema_reference()
 
     scores_par_pilier: dict[Pilier, float] = {}
     for pilier, pilier_config in schema.piliers.items():
@@ -124,6 +163,8 @@ def calculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
         / poids_total
     )
 
+    # Seulement une fois le score calculable : un échec ne tente même pas l'insertion.
+    configuration = obtenir_configuration_reference(session)
     score_esg = ScoreESG(
         rapport_id=rapport_id,
         configuration_id=configuration.id,
@@ -133,6 +174,10 @@ def calculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
         score_gouvernance=scores_par_pilier.get(Pilier.GOUVERNANCE),
     )
     session.add(score_esg)
+    # Toujours calculé sous la configuration de référence : c'est le score officiel, dénormalisé
+    # sur le rapport dans la même transaction (docs/ARCHITECTURE.md §3.2).
+    rapport.official_score = valeur_globale
+    session.add(rapport)
     return score_esg
 
 
@@ -154,8 +199,7 @@ def score_calculable(session: Session, rapport_id: uuid.UUID) -> bool:
     ).all():
         codes_par_pilier[Pilier(pilier)].add(code)
 
-    configuration = obtenir_configuration_reference(session)
-    schema = _charger_configuration_reference_depuis_disque(configuration.fichier_yaml)
+    _chemin, schema = _schema_reference()
     return any(
         codes_par_pilier[pilier] & set(pilier_config.indicateurs)
         for pilier, pilier_config in schema.piliers.items()
@@ -169,7 +213,9 @@ def score_officiel(session: Session, rapport_id: uuid.UUID) -> ScoreESG | None:
     (jamais une pondération personnalisée) fait foi. Réutilisé pour le score public affiché à
     l'Investisseur (app/investor/entreprises.py::score_public) et pour figer la version exacte
     utilisée par une Analyse Chercheur (app/researcher/analyses.py)."""
-    configuration = obtenir_configuration_reference(session)
+    configuration = trouver_configuration_reference(session)
+    if configuration is None:
+        return None
     return session.exec(
         select(ScoreESG).where(
             col(ScoreESG.rapport_id) == rapport_id,

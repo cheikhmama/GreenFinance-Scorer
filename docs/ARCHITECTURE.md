@@ -193,6 +193,9 @@ An import that only has weights needs a total portfolio value so that amounts ca
 
 ## 5. Transactions and traceability
 
+*Rules 1, 2 and 4 implemented for scoring and report decisions in task 1.6; rule 3 (locked
+configuration content) comes with task 3.1.*
+
 1. **One unit of work per HTTP request.** Domain functions never call `session.commit()`;
    the route (or the job) owns the transaction boundary. Helpers that "get or create" a row
    (e.g. the reference scoring config, today `obtenir_configuration_reference`) use

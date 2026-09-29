@@ -1,3 +1,4 @@
+import random
 import uuid
 
 import pytest
@@ -55,8 +56,9 @@ def test_configuration_personnalisee_par_role(session, role: Role) -> None:
 def test_rapport_accepte_plusieurs_scores_un_par_configuration(session) -> None:
     rapport = _rapport(session)
 
+    # Version tirée au hasard : une seule référence par version, base de test partagée.
     config_reference = ConfigurationPonderation(
-        nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
+        nom="reference", version=random.randint(10_000, 10_000_000), fichier_yaml="scoring/reference.yaml"
     )
     utilisateur = _utilisateur(session, Role.INVESTOR)
     config_perso = ConfigurationPonderation(
@@ -106,7 +108,7 @@ def test_score_hors_bornes_rejete_en_base(session, champ: str, valeur_invalide: 
     seule la contrainte CHECK côté PostgreSQL (Phase 5 §6) protège les 4 scores."""
     rapport = _rapport(session)
     configuration = ConfigurationPonderation(
-        nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
+        nom="reference", version=random.randint(10_000, 10_000_000), fichier_yaml="scoring/reference.yaml"
     )
     session.add(configuration)
     session.flush()
@@ -126,23 +128,27 @@ def test_score_hors_bornes_rejete_en_base(session, champ: str, valeur_invalide: 
     session.rollback()
 
 
-def test_utilisateur_id_nul_reserve_a_la_reference(session) -> None:
-    """utilisateur_id nul = configuration de référence. Au niveau du
-    schéma, rien n'empêche aujourd'hui de créer plusieurs configurations
-    avec utilisateur_id nul : « une seule référence à la fois » est une
-    règle applicative (couche service, à appliquer quand le moteur de
-    scoring sera implémenté à l'Étape 12), pas une contrainte de base de
-    données à ce stade — ce test documente explicitement cet état, il ne
-    doit pas être interprété comme une lacune non détectée."""
+def test_une_seule_reference_par_version(session) -> None:
+    """utilisateur_id nul = configuration de référence. Plusieurs versions de référence coexistent
+    (chacune porte les scores calculés sous elle), mais jamais deux lignes pour la même version
+    (uq_configuration_ponderation_reference_version, tâche 1.6). Versions tirées au hasard : la
+    base de test est partagée entre exécutions."""
+    version = random.randint(10_000, 10_000_000)
     reference_1 = ConfigurationPonderation(
-        nom="reference-v1", version=1, fichier_yaml="scoring/reference-v1.yaml"
+        nom="reference", version=version, fichier_yaml="scoring/reference.yaml"
     )
     reference_2 = ConfigurationPonderation(
-        nom="reference-v2", version=2, fichier_yaml="scoring/reference-v2.yaml"
+        nom="reference", version=version + 1, fichier_yaml="scoring/reference.yaml"
     )
     session.add(reference_1)
     session.add(reference_2)
     session.flush()
-
     assert reference_1.utilisateur_id is None
     assert reference_2.utilisateur_id is None
+
+    session.add(
+        ConfigurationPonderation(nom="doublon", version=version, fichier_yaml="scoring/x.yaml")
+    )
+    with pytest.raises(IntegrityError, match="uq_configuration_ponderation_reference_version"):
+        session.flush()
+    session.rollback()

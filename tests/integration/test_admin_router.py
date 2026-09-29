@@ -1,11 +1,14 @@
 import base64
+import random
+import re
 import uuid
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.audit.models import AvisAudit
 from app.auth.hashing import hash_password
@@ -30,7 +33,7 @@ from app.core.models import JournalAudit, Notification
 from app.ingestion.models import ESGMetric, ESGReport, PreuveDocumentaire
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
-from app.scoring.models import ScoreESG
+from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -1501,3 +1504,109 @@ def test_recalculer_score_route(session) -> None:
     reponse_invalide = authed_client.post(f"/api/v1/admin/rapports/{non_valide.id}/recalculer-score")
     assert reponse_invalide.status_code == 422
     assert reponse_invalide.json()["error"]["code"] == "transition_invalide"
+
+
+@pytest.fixture()
+def version_de_reference_inedite(monkeypatch, tmp_path) -> int:
+    """Pointe la configuration de référence vers une copie de config/weights/default.yaml portant
+    une version jamais vue en base : reproduit « première validation sous une nouvelle version »
+    (table sans ligne de référence pour cette version) sans vider la base de test partagée."""
+    version = random.randint(10_000, 10_000_000)
+    source = Path(get_settings().default_scoring_config).read_text(encoding="utf-8")
+    copie = tmp_path / "reference.yaml"
+    copie.write_text(re.sub(r"(?m)^version: \d+$", f"version: {version}", source), encoding="utf-8")
+    monkeypatch.setattr(get_settings(), "default_scoring_config", str(copie))
+    return version
+
+
+def _references_de_version(session, version: int) -> list[ConfigurationPonderation]:
+    session.expire_all()
+    return list(
+        session.exec(
+            select(ConfigurationPonderation).where(
+                col(ConfigurationPonderation.utilisateur_id).is_(None),
+                col(ConfigurationPonderation.version) == version,
+            )
+        ).all()
+    )
+
+
+def test_premiere_validation_incalculable_sous_une_nouvelle_version_ne_valide_rien(
+    session, version_de_reference_inedite
+) -> None:
+    """Régression tâche 1.6 : l'ancien obtenir_configuration_reference commitait AU MILIEU de
+    valider_rapport quand la ligne de référence manquait — le statut VALIDATED était alors déjà
+    persisté quand score_incalculable annulait la suite, laissant un rapport validé sans score."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport(
+        session,
+        entreprise.id,
+        status=ReportStatus.PENDING_DECISION,
+        extraction_status=ExtractionStatus.DONE,
+        auditor_id=auditeur.id,
+    )
+    session.add(
+        AvisAudit(
+            rapport_id=rapport.id, auditeur_id=auditeur.id, decision=DecisionAudit.RECOMMANDE_VALIDATION
+        )
+    )
+    session.commit()
+
+    response = _login(admin.email, "s3cret-pass").post(
+        f"/api/v1/admin/rapports/{rapport.id}/valider", json={}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "score_incalculable"
+    session.expire_all()
+    rapport_apres = session.get(ESGReport, rapport.id)
+    assert rapport_apres is not None
+    assert rapport_apres.status == ReportStatus.PENDING_DECISION
+    assert rapport_apres.official_score is None
+    assert session.exec(select(ScoreESG).where(ScoreESG.rapport_id == rapport.id)).first() is None
+    assert _references_de_version(session, version_de_reference_inedite) == []
+
+
+def test_premiere_validation_sous_une_nouvelle_version_cree_une_seule_reference(
+    session, version_de_reference_inedite
+) -> None:
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
+
+    response = _login(admin.email, "s3cret-pass").post(
+        f"/api/v1/admin/rapports/{rapport.id}/valider", json={}
+    )
+
+    assert response.status_code == 200
+    references = _references_de_version(session, version_de_reference_inedite)
+    assert len(references) == 1
+    score = session.exec(select(ScoreESG).where(ScoreESG.rapport_id == rapport.id)).one()
+    assert score.configuration_id == references[0].id
+    rapport_apres = session.get(ESGReport, rapport.id)
+    assert rapport_apres is not None
+    assert rapport_apres.official_score == score.valeur_globale
+
+
+def test_consulter_un_rapport_ou_son_score_ne_cree_aucune_configuration(
+    session, version_de_reference_inedite
+) -> None:
+    """Une lecture (GET) n'écrit jamais : ni le détail d'un rapport (score_public), ni l'aperçu
+    « le score serait-il calculable ? » ne créent la ligne de référence manquante."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    detail = authed_client.get(f"/api/v1/admin/rapports/{rapport.id}")
+    verification = authed_client.get(f"/api/v1/admin/rapports/{rapport.id}/score-verification")
+
+    assert detail.status_code == 200
+    assert detail.json()["score_officiel"] is None
+    assert verification.status_code == 200
+    assert verification.json()["calculable"] is True
+    assert _references_de_version(session, version_de_reference_inedite) == []

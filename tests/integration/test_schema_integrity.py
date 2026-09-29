@@ -1,3 +1,5 @@
+import random
+
 """Prompt 3.9 — scénario de bout en bout sur le schéma complet (Étape 3).
 
 Construit un graphe couvrant les 14 entités du diagramme de classes plus les
@@ -121,8 +123,9 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     # --- ConfigurationPonderation de référence ET personnalisée (Chercheur)
     chercheur = _utilisateur(session, Role.RESEARCHER)
+    # Version tirée au hasard : une seule référence par version, base de test partagée.
     config_reference = ConfigurationPonderation(
-        nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
+        nom="reference", version=random.randint(10_000, 10_000_000), fichier_yaml="scoring/reference.yaml"
     )
     config_chercheur = ConfigurationPonderation(
         nom="config-chercheur",

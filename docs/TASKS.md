@@ -38,11 +38,12 @@ Rules for every task:
 - [ ] 1.3 Company Registration API: Implement Self-Service registration (`POST /api/v1/companies/register`).
 - [ ] 1.4 Admin KYC API: Implement onboarding approval endpoint (`PATCH /api/v1/admin/companies/{id}/onboard`).
 - [ ] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`).
-- [ ] 1.6 Audit Queue & Atomic Validation: Refactor `valider_rapport` to run score calculation and status transition inside a single atomic BDD transaction. **[review]**
-  - [ ] Remove `session.commit()` from `obtenir_configuration_reference` (`app/scoring/engine.py:64`); use `flush()` + `ON CONFLICT`.
-  - [ ] Stop GET endpoints (`score_officiel`, `score_public`) from creating rows.
-  - [ ] Lock the report row during validation.
-  - [ ] Regression test: first validation on an empty `configuration_ponderation` table with an uncomputable score must leave the report un-validated.
+- [x] 1.6 Audit Queue & Atomic Validation: Refactor `valider_rapport` to run score calculation and status transition inside a single atomic BDD transaction. **[review]** (migration `834bf70ae1b9`)
+  - [x] Remove `session.commit()` from `obtenir_configuration_reference`; `INSERT ... ON CONFLICT` on a new partial unique index (one reference row per version); existing duplicate rows merged by the migration.
+  - [x] Stop GET endpoints (`score_officiel`, `score_public`, `score_calculable`) from creating rows (`trouver_configuration_reference` is read-only).
+  - [x] Lock the report row (`SELECT ... FOR UPDATE`) during every decision and during score recalculation.
+  - [x] Regression test: first validation under a reference version with no row yet and an uncomputable score leaves the report un-validated (verified to fail on the old code).
+  - [x] `official_score` set in the validation transaction (backfilled for validated reports); the score uses the auditor override when one exists; the synthesis PDF is generated only after the commit.
 
 ## Phase 2: Investment Portfolios & Carbon Module (PCAF)
 

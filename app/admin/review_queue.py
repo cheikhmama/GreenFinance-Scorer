@@ -282,7 +282,11 @@ def lister_versions(session: Session, rapport_id: uuid.UUID) -> list[ESGReport]:
 
 
 def _rapport_en_validation(session: Session, rapport_id: uuid.UUID) -> ESGReport:
-    rapport = session.get(ESGReport, rapport_id)
+    """Charge le rapport VERROUILLÉ (SELECT ... FOR UPDATE) jusqu'à la fin de la transaction de
+    décision : deux décisions concurrentes sur le même rapport (double clic, deux
+    Administrateurs) se sérialisent, et la seconde relit un statut qui n'est plus
+    PENDING_DECISION — jamais deux transitions ni deux scores (tâche 1.6)."""
+    rapport = session.get(ESGReport, rapport_id, with_for_update=True)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     if rapport.status != ReportStatus.PENDING_DECISION:
@@ -328,32 +332,18 @@ def _decider(
 
 def valider_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | None) -> ESGReport:
     """Distinct de rejeter_rapport/demander_correction (restés sur _decider) : valider est la
-    seule décision qui produit aussi un score (Phase 5 §9) — jamais un rapport REJECTED ou
-    REVISION_REQUESTED. La transition de statut et le calcul du score commitent ensemble : un
-    score incalculable (calculer_score lève score_incalculable) annule toute la décision plutôt
-    que de laisser un rapport VALIDATED sans le score que le cahier des charges exige avant
-    publication (voir publier_entreprise)."""
+    seule décision qui produit aussi un score (Phase 5 §9).
+
+    Transaction atomique (tâche 1.6, docs/WORKFLOWS.md §1.3) : statut VALIDATED, ScoreESG,
+    official_score et notification commitent ensemble, ou rien du tout. Un score incalculable
+    (score_incalculable) annule donc toute la décision — jamais un rapport VALIDATED sans le score
+    que le cahier des charges exige avant publication. Aucune étape de cette transaction ne
+    commite de son côté (voir app/scoring/engine.py). Le PDF de synthèse, effet de bord hors
+    base, n'est produit qu'APRÈS le commit (_regenerer_synthese)."""
     rapport = _rapport_en_validation(session, rapport_id)
     rapport.status = ReportStatus.VALIDATED
     session.add(rapport)
     calculer_score(session, rapport_id)
-
-    # Second déclencheur de génération du PDF de synthèse (app/ingestion/synthesis_report.py) :
-    # le premier, à la fin de l'extraction, ne pouvait afficher qu'un score "en attente" -- ici le
-    # score officiel vient d'être calculé, on régénère le même fichier (chemin de stockage
-    # inchangé) pour qu'il le reflète. Best-effort comme au premier déclencheur : un échec ici ne
-    # doit jamais empêcher la validation elle-même.
-    try:
-        contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
-        storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
-        rapport.synthesis_report_path = f"synthese/{rapport_id}.pdf"
-        session.add(rapport)
-    except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
-        logger.error(
-            "synthese_pdf_regeneration_echouee",
-            rapport_id=str(rapport_id),
-            error_type=type(exc_synthese).__name__,
-        )
 
     if rapport.company.owner_user_id is not None:
         notifier(
@@ -365,9 +355,34 @@ def valider_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | 
             id_ressource=rapport_id,
         )
     session.commit()
-    session.refresh(rapport)
     logger.info("rapport_decision", rapport_id=str(rapport_id), statut=ReportStatus.VALIDATED.value)
+
+    _regenerer_synthese(session, rapport)
+    session.refresh(rapport)
     return rapport
+
+
+def _regenerer_synthese(session: Session, rapport: ESGReport) -> None:
+    """Second déclencheur de génération du PDF de synthèse (app/ingestion/synthesis_report.py) :
+    le premier, à la fin de l'extraction, ne pouvait afficher qu'un score "en attente" — ici le
+    score officiel vient d'être commité, on régénère le même fichier pour qu'il le reflète.
+    Best-effort et hors de la transaction de décision : un échec ici n'annule jamais une
+    validation déjà commitée, et une validation annulée ne laisse jamais de PDF affichant un
+    score qui n'existe pas (le fichier n'est écrit qu'après le commit). À déplacer dans un job
+    ARQ avec la tâche 4.1."""
+    chemin = f"synthese/{rapport.id}.pdf"
+    try:
+        storage.save_bytes(chemin, synthesis_report.generer_rapport_synthese(session, rapport))
+        rapport.synthesis_report_path = chemin
+        session.add(rapport)
+        session.commit()
+    except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+        session.rollback()
+        logger.error(
+            "synthese_pdf_regeneration_echouee",
+            rapport_id=str(rapport.id),
+            error_type=type(exc_synthese).__name__,
+        )
 
 
 def recalculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
@@ -379,7 +394,8 @@ def recalculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
     propagée telle quelle par calculer_score) si le vocabulaire d'indicateurs du rapport ne
     recoupe toujours aucun indicateur de la configuration de référence — jamais un score fabriqué
     sans substance, même ici."""
-    rapport = session.get(ESGReport, rapport_id)
+    # Verrouillé comme une décision : deux recalculs concurrents ne créent jamais deux scores.
+    rapport = session.get(ESGReport, rapport_id, with_for_update=True)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     if rapport.status != ReportStatus.VALIDATED:

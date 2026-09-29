@@ -223,7 +223,13 @@ def test_changement_de_version_cree_une_nouvelle_configuration_et_invalide_lanci
     )
     session.commit()
 
-    configuration_v1_simulee = ConfigurationPonderation(
+    # Une seule référence par version : réutilise la ligne v1 si la base partagée l'a déjà.
+    configuration_v1_simulee = session.exec(
+        select(ConfigurationPonderation).where(
+            col(ConfigurationPonderation.utilisateur_id).is_(None),
+            col(ConfigurationPonderation.version) == 1,
+        )
+    ).first() or ConfigurationPonderation(
         nom="Ancienne référence", version=1, fichier_yaml="config/weights/default.yaml"
     )
     session.add(configuration_v1_simulee)
