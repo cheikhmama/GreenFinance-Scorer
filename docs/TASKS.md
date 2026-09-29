@@ -67,7 +67,7 @@ Rules for every task:
   - [x] Extended with `identifier_type`, `identifier_raw`, `match_status`, `weight`; `company_id` nullable for lines kept unmatched (CHECK ties it to `match_status`); cached aggregates on `portfolios` (filled by 2.3).
   - [x] Aggregation counts unmatched lines in the total but never scores them (coverage drops, scores don't); sector breakdown skips them.
   - [x] `ON DELETE`: `portfolios.user_id` CASCADE, `portfolio_positions.portfolio_id` CASCADE + index.
-  - [x] Found while renaming: three attribute writes (archive, rename, close position) that mypy cannot see on SQLModel — fixed and covered by the existing tests; one more timing-flaky test made deterministic.
+  - [x] Found while renaming: three attribute writes (archive, rename, close position) that mypy cannot see on SQLModel — fixed; archive/close were already covered by tests, a rename test was added (verified to fail on the old code); one more timing-flaky test made deterministic.
 - [ ] 2.2 Portfolio API: CSV/JSON upload endpoint for portfolio positions mapped by ISIN/Ticker.
   - [ ] All-or-nothing import with a per-line error report; unmatched lines kept.
   - [ ] Weight-only imports require a total portfolio value (PCAF needs amounts).
