@@ -23,14 +23,35 @@ def sa_enum_column(enum_cls: type[Enum], *, nullable: bool = False) -> Column:
     return Column(SAEnum(enum_cls, native_enum=False, length=64), nullable=nullable)
 
 
-class StatutRapport(str, Enum):
-    ENVOYE = "ENVOYE"
-    EN_EXTRACTION = "EN_EXTRACTION"
-    AFFECTE_AUDITEUR = "AFFECTE_AUDITEUR"
-    EN_VALIDATION = "EN_VALIDATION"
-    VALIDE = "VALIDE"
-    REJETE = "REJETE"
-    DEMANDE_CORRECTION = "DEMANDE_CORRECTION"
+class ReportStatus(str, Enum):
+    """Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
+    d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne."""
+
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    PENDING_AUDIT = "PENDING_AUDIT"
+    # Avis de l'auditeur rendu, décision de l'Administrateur attendue (décision D2).
+    PENDING_DECISION = "PENDING_DECISION"
+    REVISION_REQUESTED = "REVISION_REQUESTED"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+
+
+class ExtractionStatus(str, Enum):
+    NOT_STARTED = "NOT_STARTED"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    DONE = "DONE"
+    FAILED = "FAILED"
+
+
+class CompanyStatus(str, Enum):
+    """Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
+    score (Company.published_at)."""
+
+    PENDING_ONBOARDING = "PENDING_ONBOARDING"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
 
 
 class TypeRapport(str, Enum):

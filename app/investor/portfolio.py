@@ -19,12 +19,12 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
 
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import DevisePosition, TypeDureeInvestissement
+from app.core.enums import CompanyStatus, DevisePosition, TypeDureeInvestissement
 from app.core.exceptions import NotFoundError, ValidationError
-from app.ingestion.models import IndicateurESG
+from app.ingestion.models import ESGMetric
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
 from app.investor.models import Portefeuille, PositionPortefeuille
@@ -90,21 +90,21 @@ def _construire_position(valeurs: dict[str, Any]) -> PositionPortefeuille:
 
 
 def _verifier_montant_minimum(
-    entreprise: Entreprise,
+    entreprise: Company,
     montant_converti: float,
     devise_portefeuille: DevisePosition,
     chemin_taux: str,
 ) -> None:
     """montant_converti est déjà dans devise_portefeuille (voir ajouter_position/
     modifier_position) — le minimum doit donc être converti depuis SA PROPRE devise
-    (Entreprise.devise_montant_minimum) vers devise_portefeuille avant comparaison, jamais
+    (Company.minimum_investment_currency) vers devise_portefeuille avant comparaison, jamais
     comparé brut : deux montants dans des devises différentes ne sont pas comparables."""
-    minimum = entreprise.montant_minimum_investissement
+    minimum = entreprise.minimum_investment_amount
     if minimum is None:
         return
-    assert entreprise.devise_montant_minimum is not None
+    assert entreprise.minimum_investment_currency is not None
     minimum_converti, _ = fx.convertir(
-        minimum, entreprise.devise_montant_minimum, devise_portefeuille, chemin_taux
+        minimum, entreprise.minimum_investment_currency, devise_portefeuille, chemin_taux
     )
     if montant_converti < minimum_converti:
         raise ValidationError(
@@ -157,13 +157,13 @@ def _agreger(
 def position_detail(
     session: Session, position: PositionPortefeuille, montant_total_portefeuille: float
 ) -> PositionDetail:
-    entreprise = session.get(Entreprise, position.entreprise_id)
+    entreprise = session.get(Company, position.entreprise_id)
     assert entreprise is not None  # invariant : FK entreprise_id garantie par la base
     rapport = entreprises_investisseur.dernier_rapport_valide(session, position.entreprise_id)
     score = entreprises_investisseur.score_public(session, rapport)
     preuves_disponibles = rapport is not None and (
         session.exec(
-            select(IndicateurESG.id).where(IndicateurESG.rapport_id == rapport.id)
+            select(ESGMetric.id).where(ESGMetric.report_id == rapport.id)
         ).first()
         is not None
     )
@@ -181,9 +181,9 @@ def position_detail(
         type_duree=position.type_duree,
         date_debut=position.date_debut,
         date_fin=position.date_fin,
-        etat=etat_position(position, entreprise.actif),
+        etat=etat_position(position, entreprise.status == CompanyStatus.ACTIVE),
         score=score,
-        date_publication_utilisee=entreprise.date_publication,
+        date_publication_utilisee=entreprise.published_at,
         preuves_disponibles=preuves_disponibles,
     )
 
@@ -342,10 +342,10 @@ def ajouter_position(
     payload: AjouterPositionRequest,
 ) -> PositionPortefeuille:
     portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
-    entreprise = session.get(Entreprise, payload.entreprise_id)
-    if entreprise is None or entreprise.date_publication is None:
+    entreprise = session.get(Company, payload.entreprise_id)
+    if entreprise is None or entreprise.published_at is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-    if not entreprise.actif:
+    if entreprise.status != CompanyStatus.ACTIVE:
         raise ValidationError(
             "Cette entreprise est suspendue — aucune nouvelle position ne peut y être ouverte.",
             code="entreprise_suspendue",
@@ -394,10 +394,10 @@ def modifier_position(
     en plus d'une existante déjà active)."""
     portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
-    entreprise = session.get(Entreprise, position.entreprise_id)
+    entreprise = session.get(Company, position.entreprise_id)
     assert entreprise is not None
 
-    if etat_position(position, entreprise.actif) != EtatPosition.PLANIFIEE:
+    if etat_position(position, entreprise.status == CompanyStatus.ACTIVE) != EtatPosition.PLANIFIEE:
         raise ValidationError(
             "Seule une position encore planifiée peut être modifiée.",
             code="position_non_modifiable",
@@ -470,9 +470,9 @@ def supprimer_position(
 ) -> None:
     _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
-    entreprise = session.get(Entreprise, position.entreprise_id)
+    entreprise = session.get(Company, position.entreprise_id)
     assert entreprise is not None
-    if etat_position(position, entreprise.actif) != EtatPosition.PLANIFIEE:
+    if etat_position(position, entreprise.status == CompanyStatus.ACTIVE) != EtatPosition.PLANIFIEE:
         raise ValidationError(
             "Seule une position encore planifiée peut être supprimée.",
             code="position_non_supprimable",

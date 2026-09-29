@@ -16,7 +16,7 @@ from sqlmodel import Session, col, func, or_, select
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import InstitutionProfil, Utilisateur
 from app.auth.revocation import revoke_all_sessions
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
 from app.core.enums import Role
@@ -161,8 +161,8 @@ def creer_utilisateur(
 
     if role == Role.ENTREPRISE:
         assert nom_entreprise is not None and secteur is not None and pays is not None  # validé ci-dessus
-        entreprise = Entreprise(
-            nom=nom_entreprise, secteur=secteur, pays=pays, utilisateur_id=utilisateur.id
+        entreprise = Company(
+            name=nom_entreprise, sector=secteur, country=pays, owner_user_id=utilisateur.id
         )
         session.add(entreprise)
     elif role == Role.INSTITUTION:

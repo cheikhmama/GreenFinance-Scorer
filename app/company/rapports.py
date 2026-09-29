@@ -10,51 +10,57 @@ import structlog
 from fastapi import BackgroundTasks
 from sqlmodel import Session, col, select
 
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.company.upload_validation import (
     calculer_checksum,
     nettoyer_nom_fichier,
     valider_pdf,
 )
 from app.company.url_fetch import telecharger_pdf_depuis_url
-from app.core.enums import CanalDepot, StatutRapport, TypeRapport
+from app.core.enums import (
+    CanalDepot,
+    CompanyStatus,
+    ExtractionStatus,
+    ReportStatus,
+    TypeRapport,
+)
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.storage import resolve_path, save_bytes
 from app.ingestion.extractor import run_extraction_pipeline
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 
 logger = structlog.get_logger(__name__)
 
 
 def rapport_de_lentreprise(
     session: Session, rapport_id: uuid.UUID, entreprise_id: uuid.UUID
-) -> RapportESG:
+) -> ESGReport:
     """Garde-fou de propriété partagé par toutes les routes de app/company/router.py qui lisent
     un rapport précis (détail, téléchargement du fichier original, téléchargement du PDF de
     synthèse) -- même 404 que le rapport n'existe pas ou appartienne à une autre entreprise,
     jamais de 403, pour ne pas confirmer l'existence d'un rapport_id d'autrui."""
-    rapport = session.get(RapportESG, rapport_id)
-    if rapport is None or rapport.entreprise_id != entreprise_id:
+    rapport = session.get(ESGReport, rapport_id)
+    if rapport is None or rapport.company_id != entreprise_id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     return rapport
 
 
-def lister_mes_rapports(session: Session, entreprise_id: uuid.UUID) -> list[RapportESG]:
+def lister_mes_rapports(session: Session, entreprise_id: uuid.UUID) -> list[ESGReport]:
     return list(
         session.exec(
-            select(RapportESG)
-            .where(RapportESG.entreprise_id == entreprise_id)
-            .order_by(col(RapportESG.date_depot).desc())
+            select(ESGReport)
+            .where(ESGReport.company_id == entreprise_id)
+            .order_by(col(ESGReport.submitted_at).desc())
         ).all()
     )
 
 
 def _verifier_doublon(session: Session, entreprise_id: uuid.UUID, checksum: str) -> None:
     existant = session.exec(
-        select(RapportESG.id).where(
-            RapportESG.entreprise_id == entreprise_id,
-            RapportESG.checksum_sha256 == checksum,
+        select(ESGReport.id).where(
+            ESGReport.company_id == entreprise_id,
+            ESGReport.checksum_sha256 == checksum,
         )
     ).first()
     if existant is not None:
@@ -87,9 +93,9 @@ def _creer_rapport(
     rapport_precedent_id: uuid.UUID | None,
     nom_fichier_origine: str | None,
     canal: CanalDepot = CanalDepot.ENTREPRISE,
-) -> RapportESG:
-    entreprise = session.get(Entreprise, entreprise_id)
-    if entreprise is not None and not entreprise.actif:
+) -> ESGReport:
+    entreprise = session.get(Company, entreprise_id)
+    if entreprise is not None and entreprise.status != CompanyStatus.ACTIVE:
         raise ValidationError("Cette entreprise est suspendue.", code="entreprise_suspendue")
 
     valider_pdf(contenu)
@@ -99,25 +105,26 @@ def _creer_rapport(
     rapport_id = uuid.uuid4()
     chemin_relatif = _enregistrer_fichier(entreprise_id, rapport_id, contenu)
 
-    rapport = RapportESG(
+    rapport = ESGReport(
         id=rapport_id,
-        entreprise_id=entreprise_id,
+        company_id=entreprise_id,
         type=type_rapport,
-        canal=canal,
-        statut=StatutRapport.ENVOYE,
-        fichier_source=chemin_relatif,
-        nom_fichier_origine=nettoyer_nom_fichier(nom_fichier_origine),
-        annee_reporting=annee_reporting,
+        channel=canal,
+        status=ReportStatus.SUBMITTED,
+        extraction_status=ExtractionStatus.QUEUED,
+        source_file=chemin_relatif,
+        original_filename=nettoyer_nom_fichier(nom_fichier_origine),
+        fiscal_year=annee_reporting,
         checksum_sha256=checksum,
         version=version,
-        rapport_precedent_id=rapport_precedent_id,
+        previous_report_id=rapport_precedent_id,
     )
     try:
         session.add(rapport)
-        if entreprise is not None and entreprise.utilisateur_id is not None:
+        if entreprise is not None and entreprise.owner_user_id is not None:
             notifier(
                 session,
-                entreprise.utilisateur_id,
+                entreprise.owner_user_id,
                 "RAPPORT_DEPOSE",
                 f"Votre rapport {type_rapport.value} ({annee_reporting}) a bien été reçu et est "
                 "en cours d'extraction.",
@@ -133,8 +140,8 @@ def _creer_rapport(
         raise
     session.refresh(rapport)
 
-    # La transition ENVOYE -> EN_EXTRACTION se fait DANS run_extraction_pipeline, pas ici : le
-    # statut doit refléter que l'extraction a réellement démarré, pas seulement été demandée.
+    # Le passage QUEUED -> RUNNING se fait DANS run_extraction_pipeline, pas ici : le statut
+    # d'extraction doit refléter que l'extraction a réellement démarré, pas seulement été demandée.
     background_tasks.add_task(run_extraction_pipeline, rapport_id, annee_reporting)
     logger.info(
         "rapport_depose", rapport_id=str(rapport_id), version=version, entreprise_id=str(entreprise_id)
@@ -150,7 +157,7 @@ def deposer_rapport(
     type_rapport: TypeRapport,
     annee_reporting: int,
     nom_fichier_origine: str | None,
-) -> RapportESG:
+) -> ESGReport:
     return _creer_rapport(
         session,
         background_tasks,
@@ -171,7 +178,7 @@ def importer_rapport_par_url(
     url: str,
     type_rapport: TypeRapport,
     annee_reporting: int,
-) -> RapportESG:
+) -> ESGReport:
     """Canal d'import automatique (CanalDepot.AUTOMATIQUE) : le PDF est récupéré côté serveur
     depuis une URL plutôt que reçu en multipart, mais rejoint ensuite exactement le même chemin
     que deposer_rapport (checksum, dédoublonnage, validation PDF, stockage, extraction en tâche
@@ -201,16 +208,16 @@ def creer_correction(
     contenu: bytes,
     annee_reporting: int,
     nom_fichier_origine: str | None,
-) -> RapportESG:
+) -> ESGReport:
     """Dépose une nouvelle version en réponse à une demande de correction. Le rapport précédent
-    n'est jamais modifié — il reste DEMANDE_CORRECTION indéfiniment, seule une nouvelle ligne
-    liée est créée (voir app/ingestion/models.py::RapportESG, principe déjà acté en Phase 0)."""
-    precedent = session.get(RapportESG, rapport_precedent_id)
-    if precedent is None or precedent.entreprise_id != entreprise_id:
+    n'est jamais modifié — il reste REVISION_REQUESTED indéfiniment, seule une nouvelle ligne
+    liée est créée (voir app/ingestion/models.py::ESGReport, principe déjà acté en Phase 0)."""
+    precedent = session.get(ESGReport, rapport_precedent_id)
+    if precedent is None or precedent.company_id != entreprise_id:
         # Même code que l'entreprise soit inconnue ou que le rapport appartienne à une autre —
         # jamais de 403 ici, pour ne pas confirmer l'existence d'un rapport_id d'autrui.
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
-    if precedent.statut != StatutRapport.DEMANDE_CORRECTION:
+    if precedent.status != ReportStatus.REVISION_REQUESTED:
         raise ValidationError(
             "Ce rapport n'est pas en attente de correction.", code="transition_invalide"
         )

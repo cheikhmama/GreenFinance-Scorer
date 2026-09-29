@@ -4,9 +4,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.enums import CanalDepot, Role, TypeRapport
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 
@@ -21,15 +21,15 @@ def _utilisateur(session, role: Role) -> Utilisateur:
     return utilisateur
 
 
-def _rapport(session) -> RapportESG:
-    entreprise = Entreprise(nom="Acme", secteur="Industrie", pays="MR")
+def _rapport(session) -> ESGReport:
+    entreprise = Company(name="Acme", sector="Industrie", country="MR")
     session.add(entreprise)
     session.flush()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.AUTOMATIQUE,
-        fichier_source="s3://bucket/rapport.pdf",
+        channel=CanalDepot.AUTOMATIQUE,
+        source_file="s3://bucket/rapport.pdf",
     )
     session.add(rapport)
     session.flush()

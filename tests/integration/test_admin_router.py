@@ -11,7 +11,7 @@ from app.audit.models import AvisAudit
 from app.auth.hashing import hash_password
 from app.auth.models import ActivationCompte, Utilisateur
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core import storage
 from app.core.audit import auditer
 from app.core.config import get_settings
@@ -19,14 +19,15 @@ from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     DecisionAudit,
+    ExtractionStatus,
     MethodeDonnee,
     Pilier,
+    ReportStatus,
     Role,
-    StatutRapport,
     TypeRapport,
 )
 from app.core.models import JournalAudit, Notification
-from app.ingestion.models import IndicateurESG, PreuveDocumentaire, RapportESG
+from app.ingestion.models import ESGMetric, ESGReport, PreuveDocumentaire
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
 from app.scoring.models import ScoreESG
@@ -70,41 +71,43 @@ def _create_utilisateur_avec_email(
     return user
 
 
-def _create_entreprise_avec_utilisateur(session) -> tuple[Entreprise, Utilisateur]:
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Technologies", pays="France")
+def _create_entreprise_avec_utilisateur(session) -> tuple[Company, Utilisateur]:
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
     utilisateur = _create_utilisateur(session, Role.ENTREPRISE)
-    entreprise.utilisateur_id = utilisateur.id
+    entreprise.owner_user_id = utilisateur.id
     session.add(entreprise)
     session.commit()
     session.refresh(entreprise)
     return entreprise, utilisateur
 
 
-def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> RapportESG:
+def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> ESGReport:
     valeurs = {
-        "entreprise_id": entreprise_id,
+        "company_id": entreprise_id,
         "type": TypeRapport.RAPPORT_ESG,
-        "canal": CanalDepot.ENTREPRISE,
-        "statut": StatutRapport.ENVOYE,
-        "fichier_source": "rapports/test/dummy.pdf",
+        "channel": CanalDepot.ENTREPRISE,
+        "status": ReportStatus.SUBMITTED,
+        "source_file": "rapports/test/dummy.pdf",
     }
     valeurs.update(overrides)
-    rapport = RapportESG(**valeurs)
+    # SQLModel ignore silencieusement un kwarg inconnu : jamais un champ de test perdu en route.
+    assert set(valeurs) <= set(ESGReport.model_fields), set(valeurs) - set(ESGReport.model_fields)
+    rapport = ESGReport(**valeurs)
     session.add(rapport)
     session.commit()
     session.refresh(rapport)
     return rapport
 
 
-def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id: uuid.UUID) -> RapportESG:
+def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id: uuid.UUID) -> ESGReport:
     rapport = _create_rapport(
         session,
         entreprise_id,
-        statut=StatutRapport.EN_VALIDATION,
-        extraction_terminee_le=utcnow(),
-        auditeur_id=auditeur_id,
+        status=ReportStatus.PENDING_DECISION,
+        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        auditor_id=auditeur_id,
     )
     session.add(
         AvisAudit(
@@ -113,7 +116,7 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
             decision=DecisionAudit.RECOMMANDE_VALIDATION,
         )
     )
-    # Au moins un IndicateurESG (Phase 5 §9) : valider_rapport calcule désormais un score dans la
+    # Au moins un ESGMetric (Phase 5 §9) : valider_rapport calcule désormais un score dans la
     # même transaction que la transition VALIDE (app/admin/review_queue.py) -- sans indicateur,
     # calculer_score lèverait score_incalculable et /valider échouerait pour ce fixture partagé.
     preuve = PreuveDocumentaire(
@@ -127,14 +130,14 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
     session.add(preuve)
     session.flush()
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.GOUVERNANCE,
-            code="femmes_conseil_pourcentage",
-            valeur=40.0,
-            unite="%",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pilier.GOUVERNANCE,
+            metric_code="femmes_conseil_pourcentage",
+            value=40.0,
+            unit="%",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.commit()
@@ -380,12 +383,12 @@ def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(sessio
     assert response.status_code == 201
     utilisateur_id = uuid.UUID(response.json()["id"])
     entreprise = session.exec(
-        select(Entreprise).where(Entreprise.utilisateur_id == utilisateur_id)
+        select(Company).where(Company.owner_user_id == utilisateur_id)
     ).first()
     assert entreprise is not None
-    assert entreprise.nom == "Acme Corp"
-    assert entreprise.secteur == "Industrie"
-    assert entreprise.pays == "France"
+    assert entreprise.name == "Acme Corp"
+    assert entreprise.sector == "Industrie"
+    assert entreprise.country == "France"
 
     # Le compte peut déposer un rapport une fois activé — la relation n'est plus manquante.
     compte = session.get(Utilisateur, utilisateur_id)
@@ -481,13 +484,13 @@ def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
     # égalité de liste absolue.
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    non_extrait = _create_rapport(session, entreprise.id, statut=StatutRapport.ENVOYE)
-    en_cours = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_EXTRACTION)
+    non_extrait = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED)
+    en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
     qualifiant = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_EXTRACTION,
-        extraction_terminee_le=utcnow(),
+        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
     )
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -507,8 +510,8 @@ def test_affecter_happy_path(session) -> None:
     rapport = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_EXTRACTION,
-        extraction_terminee_le=utcnow(),
+        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
     )
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -517,7 +520,7 @@ def test_affecter_happy_path(session) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["statut"] == StatutRapport.AFFECTE_AUDITEUR.value
+    assert response.json()["statut"] == ReportStatus.PENDING_AUDIT.value
 
     notifications = session.exec(
         select(Notification).where(Notification.utilisateur_id == auditeur.id)
@@ -529,7 +532,7 @@ def test_affecter_rapport_deja_affecte(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     auditeur = _create_utilisateur(session, Role.AUDITEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
@@ -544,7 +547,7 @@ def test_affecter_extraction_non_terminee(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     auditeur = _create_utilisateur(session, Role.AUDITEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_EXTRACTION)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
@@ -562,8 +565,8 @@ def test_affecter_auditeur_invalide(session) -> None:
     rapport = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_EXTRACTION,
-        extraction_terminee_le=utcnow(),
+        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
     )
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -620,7 +623,7 @@ def test_valider_happy_path(session) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["statut"] == StatutRapport.VALIDE.value
+    assert response.json()["statut"] == ReportStatus.VALIDATED.value
     notifications = session.exec(
         select(Notification).where(Notification.utilisateur_id == utilisateur_entreprise.id)
     ).all()
@@ -642,7 +645,7 @@ def test_rejeter_happy_path(session) -> None:
     response = authed_client.post(f"/api/v1/admin/rapports/{rapport.id}/rejeter", json={})
 
     assert response.status_code == 200
-    assert response.json()["statut"] == StatutRapport.REJETE.value
+    assert response.json()["statut"] == ReportStatus.REJECTED.value
 
 
 def test_demander_correction_happy_path(session) -> None:
@@ -657,13 +660,13 @@ def test_demander_correction_happy_path(session) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["statut"] == StatutRapport.DEMANDE_CORRECTION.value
+    assert response.json()["statut"] == ReportStatus.REVISION_REQUESTED.value
 
 
 def test_decision_avec_statut_invalide_est_rejetee(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.ENVOYE)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(f"/api/v1/admin/rapports/{rapport.id}/valider", json={})
@@ -674,7 +677,7 @@ def test_decision_avec_statut_invalide_est_rejetee(session) -> None:
 
 def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
     """Distinct de test_decision_sans_avis_est_rejetee : ici l'avis existe, mais le rapport n'a
-    aucun IndicateurESG -- calculer_score (Phase 5 §9) refuse de fabriquer un score sans
+    aucun ESGMetric -- calculer_score (Phase 5 §9) refuse de fabriquer un score sans
     substance, et la transition VALIDE n'a pas lieu (transaction unique, voir valider_rapport)."""
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     auditeur = _create_utilisateur(session, Role.AUDITEUR)
@@ -682,9 +685,9 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
     rapport = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_VALIDATION,
-        extraction_terminee_le=utcnow(),
-        auditeur_id=auditeur.id,
+        status=ReportStatus.PENDING_DECISION,
+        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        auditor_id=auditeur.id,
     )
     session.add(
         AvisAudit(
@@ -699,14 +702,14 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "score_incalculable"
     session.refresh(rapport)
-    assert rapport.statut == StatutRapport.EN_VALIDATION  # transition annulée, pas de VALIDE partiel
+    assert rapport.status == ReportStatus.PENDING_DECISION  # transition annulée, pas de VALIDE partiel
 
 
 def test_decision_sans_avis_est_rejetee(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     # EN_VALIDATION semé directement, sans AvisAudit -- état normalement inatteignable via l'API.
-    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_VALIDATION)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.PENDING_DECISION)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(f"/api/v1/admin/rapports/{rapport.id}/valider", json={})
@@ -722,21 +725,21 @@ def test_lister_entreprises_publiables_exclut_deja_publiees_et_sans_rapport_vali
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
 
     publiable, _ = _create_entreprise_avec_utilisateur(session)
-    publiable.nom = f"{marqueur} publiable"
+    publiable.name = f"{marqueur} publiable"
     session.add(publiable)
     session.commit()
-    _create_rapport(session, publiable.id, statut=StatutRapport.VALIDE)
+    _create_rapport(session, publiable.id, status=ReportStatus.VALIDATED)
 
     deja_publiee, _ = _create_entreprise_avec_utilisateur(session)
-    deja_publiee.nom = f"{marqueur} deja-publiee"
-    _create_rapport(session, deja_publiee.id, statut=StatutRapport.VALIDE)
-    deja_publiee.date_publication = utcnow()
+    deja_publiee.name = f"{marqueur} deja-publiee"
+    _create_rapport(session, deja_publiee.id, status=ReportStatus.VALIDATED)
+    deja_publiee.published_at = utcnow()
     session.add(deja_publiee)
 
     sans_rapport_valide, _ = _create_entreprise_avec_utilisateur(session)
-    sans_rapport_valide.nom = f"{marqueur} sans-rapport-valide"
+    sans_rapport_valide.name = f"{marqueur} sans-rapport-valide"
     session.add(sans_rapport_valide)
-    _create_rapport(session, sans_rapport_valide.id, statut=StatutRapport.REJETE)
+    _create_rapport(session, sans_rapport_valide.id, status=ReportStatus.REJECTED)
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -754,10 +757,10 @@ def test_lister_entreprises_publiables_pagine_par_defaut_a_trois_par_page(sessio
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     prefixe = f"Pagination {uuid.uuid4()}"
     for i in range(4):
-        entreprise = Entreprise(nom=f"{prefixe} {i}", secteur="Technologies", pays="France")
+        entreprise = Company(name=f"{prefixe} {i}", sector="Technologies", country="France")
         session.add(entreprise)
         session.commit()
-        _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
+        _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     premiere_page = authed_client.get(
@@ -780,13 +783,13 @@ def test_lister_entreprises_publiables_recherche_filtre_par_nom(session) -> None
     nom_cible = f"Ferme Solaire {uuid.uuid4()}"
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     cible, _ = _create_entreprise_avec_utilisateur(session)
-    cible.nom = nom_cible
+    cible.name = nom_cible
     session.add(cible)
     session.commit()
-    _create_rapport(session, cible.id, statut=StatutRapport.VALIDE)
+    _create_rapport(session, cible.id, status=ReportStatus.VALIDATED)
 
     autre, _ = _create_entreprise_avec_utilisateur(session)
-    _create_rapport(session, autre.id, statut=StatutRapport.VALIDE)
+    _create_rapport(session, autre.id, status=ReportStatus.VALIDATED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(
@@ -805,17 +808,17 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
     marqueur = f"Marqueur {uuid.uuid4()}"
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
 
-    orpheline = Entreprise(nom=f"{marqueur} orpheline", secteur="Mines", pays="Mauritanie")
+    orpheline = Company(name=f"{marqueur} orpheline", sector="Mines", country="Mauritanie")
     session.add(orpheline)
     session.commit()
     session.refresh(orpheline)
 
     avec_compte, utilisateur = _create_entreprise_avec_utilisateur(session)
-    avec_compte.nom = f"{marqueur} avec-compte"
+    avec_compte.name = f"{marqueur} avec-compte"
     session.add(avec_compte)
     session.commit()
-    _create_rapport(session, avec_compte.id, statut=StatutRapport.REJETE)
-    plus_recent = _create_rapport(session, avec_compte.id, statut=StatutRapport.VALIDE)
+    _create_rapport(session, avec_compte.id, status=ReportStatus.REJECTED)
+    plus_recent = _create_rapport(session, avec_compte.id, status=ReportStatus.VALIDATED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get("/api/v1/admin/entreprises", params={"recherche": marqueur})
@@ -830,7 +833,7 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
     assert items[str(avec_compte.id)]["utilisateur_id"] == str(utilisateur.id)
     assert items[str(avec_compte.id)]["nombre_rapports"] == 2
     # Le plus récent des deux rapports (par date_depot), pas le premier créé.
-    assert items[str(avec_compte.id)]["dernier_statut_rapport"] == plus_recent.statut.value
+    assert items[str(avec_compte.id)]["dernier_statut_rapport"] == plus_recent.status.value
     assert items[str(avec_compte.id)]["dernier_rapport_id"] == str(plus_recent.id)
 
 
@@ -843,22 +846,22 @@ def test_consulter_entreprise_admin_retourne_le_detail_complet(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, utilisateur = _create_entreprise_avec_utilisateur(session)
     entreprise.description = "Une description."
-    entreprise.site_officiel = "https://exemple.test"
+    entreprise.website = "https://exemple.test"
     session.add(entreprise)
     session.commit()
-    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.REJETE)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.REJECTED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(f"/api/v1/admin/entreprises/{entreprise.id}")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"] == entreprise.nom
+    assert body["nom"] == entreprise.name
     assert body["description"] == "Une description."
     assert body["site_officiel"] == "https://exemple.test"
     assert body["utilisateur_id"] == str(utilisateur.id)
     assert body["nombre_rapports"] == 1
-    assert body["dernier_statut_rapport"] == StatutRapport.REJETE.value
+    assert body["dernier_statut_rapport"] == ReportStatus.REJECTED.value
     assert body["dernier_rapport_id"] == str(rapport.id)
 
 
@@ -912,9 +915,9 @@ def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
     response = authed_client.patch(
         f"/api/v1/admin/entreprises/{entreprise.id}",
         json={
-            "nom": entreprise.nom,
-            "secteur": entreprise.secteur,
-            "pays": entreprise.pays,
+            "nom": entreprise.name,
+            "secteur": entreprise.sector,
+            "pays": entreprise.country,
             "montant_minimum_investissement": 1000.0,
         },
     )
@@ -929,7 +932,7 @@ def test_modifier_entreprise_refuse_nom_vide(session) -> None:
 
     response = authed_client.patch(
         f"/api/v1/admin/entreprises/{entreprise.id}",
-        json={"nom": "   ", "secteur": entreprise.secteur, "pays": entreprise.pays},
+        json={"nom": "   ", "secteur": entreprise.sector, "pays": entreprise.country},
     )
 
     assert response.status_code == 422
@@ -1009,7 +1012,7 @@ def test_logo_entreprise_routes_avec_role_entreprise_sont_rejetees(session) -> N
 def test_publier_happy_path_et_idempotence(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, utilisateur_entreprise = _create_entreprise_avec_utilisateur(session)
-    rapport = _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
     _create_score(session, rapport.id)
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1043,7 +1046,7 @@ def test_publier_sans_score_est_rejete(session) -> None:
     score dans la même transaction (Phase 5 §9), gardé en défense dans publier_entreprise."""
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
+    _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(f"/api/v1/admin/entreprises/{entreprise.id}/publier")
@@ -1079,7 +1082,7 @@ def test_consulter_fichier_retourne_le_pdf_et_404_si_absent(session) -> None:
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     chemin_relatif = f"rapports/test/{uuid.uuid4()}.pdf"
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de test")
-    rapport = _create_rapport(session, entreprise.id, fichier_source=chemin_relatif)
+    rapport = _create_rapport(session, entreprise.id, source_file=chemin_relatif)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.get(f"/api/v1/admin/rapports/{rapport.id}/fichier")
@@ -1097,10 +1100,10 @@ def test_lister_versions_reconstruit_la_chaine_dans_l_ordre(session) -> None:
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     original = _create_rapport(session, entreprise.id, version=1)
     correction_1 = _create_rapport(
-        session, entreprise.id, version=2, rapport_precedent_id=original.id
+        session, entreprise.id, version=2, previous_report_id=original.id
     )
     correction_2 = _create_rapport(
-        session, entreprise.id, version=3, rapport_precedent_id=correction_1.id
+        session, entreprise.id, version=3, previous_report_id=correction_1.id
     )
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1246,8 +1249,8 @@ def test_dashboard_agrege_les_compteurs(session) -> None:
     avant = _dashboard(authed_client)
 
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
-    _create_rapport(session, entreprise.id, statut=StatutRapport.REJETE)
+    _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
+    _create_rapport(session, entreprise.id, status=ReportStatus.REJECTED)
 
     apres = _dashboard(authed_client)
     assert apres["entreprises_inscrites"] - avant["entreprises_inscrites"] == 1
@@ -1266,14 +1269,14 @@ def test_audits_en_retard_respecte_le_sla(session) -> None:
     _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.AFFECTE_AUDITEUR,
-        date_affectation=utcnow() - timedelta(days=sla + 1),
+        status=ReportStatus.PENDING_AUDIT,
+        assigned_at=utcnow() - timedelta(days=sla + 1),
     )
     _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.AFFECTE_AUDITEUR,
-        date_affectation=utcnow() - timedelta(days=sla - 1),
+        status=ReportStatus.PENDING_AUDIT,
+        assigned_at=utcnow() - timedelta(days=sla - 1),
     )
     apres = _dashboard(authed_client)
 
@@ -1284,7 +1287,7 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     authed_client = _login(admin.email, "s3cret-pass")
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    entreprise.date_publication = utcnow() - timedelta(days=5)
+    entreprise.published_at = utcnow() - timedelta(days=5)
     session.add(entreprise)
     session.commit()
 
@@ -1292,8 +1295,8 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
     _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.VALIDE,
-        date_depot=utcnow() - timedelta(days=10),
+        status=ReportStatus.VALIDATED,
+        submitted_at=utcnow() - timedelta(days=10),
     )
     apres_anterieur = _dashboard(authed_client)
     assert apres_anterieur["demandes_republication"] - avant["demandes_republication"] == 0
@@ -1301,8 +1304,8 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
     _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.VALIDE,
-        date_depot=utcnow() - timedelta(days=1),
+        status=ReportStatus.VALIDATED,
+        submitted_at=utcnow() - timedelta(days=1),
     )
     apres_posterieur = _dashboard(authed_client)
     assert apres_posterieur["demandes_republication"] - avant["demandes_republication"] == 1
@@ -1343,15 +1346,15 @@ def test_lister_rapports_echec_extraction_filtre_correctement(session) -> None:
     echec = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_EXTRACTION,
-        extraction_erreur="appel_claude_echoue",
+        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.FAILED,
+        extraction_error="appel_claude_echoue",
     )
-    en_cours = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_EXTRACTION)
+    en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
     qualifiant = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_EXTRACTION,
-        extraction_terminee_le=utcnow(),
+        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
     )
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1374,8 +1377,8 @@ def test_lister_rapports_orphelins_en_validation(session) -> None:
     orphelin = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_VALIDATION,
-        extraction_terminee_le=utcnow(),
+        status=ReportStatus.PENDING_DECISION,
+        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
     )
     auditeur = _create_utilisateur(session, Role.AUDITEUR)
     avec_avis = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
@@ -1407,8 +1410,8 @@ def test_verifier_score_calculable_route(session) -> None:
     non_calculable = _create_rapport(
         session,
         entreprise.id,
-        statut=StatutRapport.EN_VALIDATION,
-        extraction_terminee_le=utcnow(),
+        status=ReportStatus.PENDING_DECISION,
+        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
     )
     preuve = PreuveDocumentaire(
         nom_document="rapport-test.pdf",
@@ -1421,14 +1424,14 @@ def test_verifier_score_calculable_route(session) -> None:
     session.add(preuve)
     session.flush()
     session.add(
-        IndicateurESG(
-            rapport_id=non_calculable.id,
-            pilier=Pilier.SOCIAL,
-            code="effectif_total",
-            valeur=1200.0,
-            unite="personnes",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=non_calculable.id,
+            pillar=Pilier.SOCIAL,
+            metric_code="effectif_total",
+            value=1200.0,
+            unit="personnes",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.commit()
@@ -1453,7 +1456,7 @@ def test_recalculer_score_route(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
 
-    sans_score = _create_rapport(session, entreprise.id, statut=StatutRapport.VALIDE)
+    sans_score = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
     preuve = PreuveDocumentaire(
         nom_document="rapport-test.pdf",
         annee=2025,
@@ -1465,14 +1468,14 @@ def test_recalculer_score_route(session) -> None:
     session.add(preuve)
     session.flush()
     session.add(
-        IndicateurESG(
-            rapport_id=sans_score.id,
-            pilier=Pilier.GOUVERNANCE,
-            code="femmes_conseil_pourcentage",
-            valeur=40.0,
-            unite="%",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=sans_score.id,
+            pillar=Pilier.GOUVERNANCE,
+            metric_code="femmes_conseil_pourcentage",
+            value=40.0,
+            unit="%",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.commit()
@@ -1487,7 +1490,7 @@ def test_recalculer_score_route(session) -> None:
     assert deja_calcule.status_code == 422
     assert deja_calcule.json()["error"]["code"] == "score_deja_calcule"
 
-    non_valide = _create_rapport(session, entreprise.id, statut=StatutRapport.EN_EXTRACTION)
+    non_valide = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
     reponse_invalide = authed_client.post(f"/api/v1/admin/rapports/{non_valide.id}/recalculer-score")
     assert reponse_invalide.status_code == 422
     assert reponse_invalide.json()["error"]["code"] == "transition_invalide"

@@ -1,13 +1,13 @@
 import uuid
 
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, TypeRapport
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import (
     DonneeCarbone,
-    IndicateurESG,
+    ESGMetric,
+    ESGReport,
     PreuveDocumentaire,
-    RapportESG,
 )
 from app.ingestion.synthesis_report import (
     _section_carbone,
@@ -25,16 +25,16 @@ def _texte(elements: list) -> str:
     return " ".join(getattr(e, "text", "") for e in elements)
 
 
-def _rapport(session) -> RapportESG:
-    entreprise = Entreprise(nom=f"Synthese {uuid.uuid4()}", secteur="Industrie", pays="France")
+def _rapport(session) -> ESGReport:
+    entreprise = Company(name=f"Synthese {uuid.uuid4()}", sector="Industrie", country="France")
     session.add(entreprise)
     session.flush()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/synthese-dummy.pdf",
-        annee_reporting=2025,
+        channel=CanalDepot.ENTREPRISE,
+        source_file="rapports/test/synthese-dummy.pdf",
+        fiscal_year=2025,
     )
     session.add(rapport)
     session.flush()
@@ -79,26 +79,26 @@ def test_section_score_officiel_present_affiche_les_valeurs() -> None:
 def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
     rapport = _rapport(session)
     preuve = _preuve(session)
-    reel = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.SOCIAL,
-        code="femmes_effectif_pourcentage",
-        valeur=30.0,
-        unite="%",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    reel = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.SOCIAL,
+        metric_code="femmes_effectif_pourcentage",
+        value=30.0,
+        unit="%",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
     )
-    reel.preuve = preuve
-    declare = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.SOCIAL,
-        code="score_social_declare",
-        valeur=70.0,
-        unite="",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    reel.proof = preuve
+    declare = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.SOCIAL,
+        metric_code="score_social_declare",
+        value=70.0,
+        unit="",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
     )
-    declare.preuve = preuve
+    declare.proof = preuve
 
     elements = _section_indicateurs([reel, declare])
     table = elements[-1]
@@ -109,16 +109,16 @@ def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
 
 def test_section_declare_par_lentreprise_isole_les_codes_auto_declares(session) -> None:
     rapport = _rapport(session)
-    rapport.score_global_declare = 66.0
+    rapport.declared_global_score = 66.0
     preuve = _preuve(session)
-    declare = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.SOCIAL,
-        code="score_social_declare",
-        valeur=70.0,
-        unite="",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    declare = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.SOCIAL,
+        metric_code="score_social_declare",
+        value=70.0,
+        unit="",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
     )
 
     elements = _section_declare_par_lentreprise(rapport, [declare])
@@ -156,14 +156,14 @@ def test_generer_rapport_synthese_produit_un_pdf_valide(session) -> None:
     rapport = _rapport(session)
     preuve = _preuve(session)
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.GOUVERNANCE,
-            code="femmes_conseil_pourcentage",
-            valeur=40.0,
-            unite="%",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pilier.GOUVERNANCE,
+            metric_code="femmes_conseil_pourcentage",
+            value=40.0,
+            unit="%",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.add(

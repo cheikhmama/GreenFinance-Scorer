@@ -2,7 +2,7 @@
 
 Une correction demandée par l'Institution ne réécrit jamais l'analyse existante — corriger_analyse
 crée une nouvelle ligne (version+1, analyse_precedente_id), même principe que
-app/company/rapports.py::creer_correction sur RapportESG.
+app/company/rapports.py::creer_correction sur ESGReport.
 
 Une entreprise ne peut être comparée dans une analyse que si elle appartient au périmètre du
 projet (ProjetEntreprise, défini par l'Institution) — jamais n'importe quelle entreprise publiée
@@ -17,7 +17,7 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import StatutAnalyse, StatutProjet
 from app.core.exceptions import NotFoundError, ValidationError
@@ -72,8 +72,8 @@ def _verifier_perimetre_et_recuperer_snapshots(
                 code="entreprise_hors_perimetre",
             )
 
-        entreprise = session.get(Entreprise, entreprise_id)
-        if entreprise is None or entreprise.date_publication is None:
+        entreprise = session.get(Company, entreprise_id)
+        if entreprise is None or entreprise.published_at is None:
             raise NotFoundError(
                 "Entreprise introuvable.", code="entreprise_introuvable"
             )

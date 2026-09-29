@@ -30,7 +30,7 @@ export function ReportsInValidationSection() {
               <li key={rapport.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="flex items-center gap-2">
                   <Badge variant={variantStatutRapport(rapport.statut)}>
-                    {libelleStatutRapport(rapport.statut)}
+                    {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
                   </Badge>
                   <span className="text-brand-blue">
                     {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}

@@ -8,23 +8,24 @@ from app.audit.models import AvisAudit
 from app.auth.hashing import hash_password
 from app.auth.models import Utilisateur
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     DecisionAudit,
+    ExtractionStatus,
     MethodeDonnee,
     Pilier,
+    ReportStatus,
     Role,
-    StatutRapport,
     TypeRapport,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
     DonneeCarbone,
-    IndicateurESG,
+    ESGMetric,
+    ESGReport,
     PreuveDocumentaire,
-    RapportESG,
 )
 from app.main import app
 
@@ -44,18 +45,18 @@ def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -
     return user
 
 
-def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> RapportESG:
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Technologies", pays="France")
+def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> ESGReport:
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.AFFECTE_AUDITEUR if auditeur_id else StatutRapport.EN_EXTRACTION,
-        fichier_source="rapports/test/dummy.pdf",
-        extraction_terminee_le=utcnow(),
-        auditeur_id=auditeur_id,
+        channel=CanalDepot.ENTREPRISE,
+        status=ReportStatus.PENDING_AUDIT if auditeur_id else ReportStatus.SUBMITTED,
+        source_file="rapports/test/dummy.pdf",
+        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        auditor_id=auditeur_id,
     )
     session.add(rapport)
     session.commit()
@@ -112,14 +113,14 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
     session.add(preuve)
     session.commit()
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.ENVIRONNEMENT,
-            code="intensite_scope_1_2_marketbased",
-            valeur=42.0,
-            unite="gCO2e/kWh",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pilier.ENVIRONNEMENT,
+            metric_code="intensite_scope_1_2_marketbased",
+            value=42.0,
+            unit="gCO2e/kWh",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.add(
@@ -162,7 +163,7 @@ def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
     assert response.json()["auditeur_id"] == str(auditeur.id)
 
     session.refresh(rapport)
-    assert rapport.statut == StatutRapport.EN_VALIDATION
+    assert rapport.status == ReportStatus.PENDING_DECISION
     avis = session.exec(select(AvisAudit).where(AvisAudit.rapport_id == rapport.id)).first()
     assert avis is not None
     assert avis.auditeur_id == auditeur.id

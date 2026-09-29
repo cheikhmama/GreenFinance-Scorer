@@ -1,6 +1,6 @@
 """Entités de persistance de l'espace Auditeur.
 
-AvisAudit porte la décision de l'auditeur sur un RapportESG — jamais une
+AvisAudit porte la décision de l'auditeur sur un ESGReport — jamais une
 saisie de valeur extraite (voir app/ingestion/models.py). La logique des
 routes, de l'affectation et de la synthèse des avis reste implémentée à
 l'Étape 11 (Espace Auditeur).
@@ -17,14 +17,14 @@ from app.core.enums import DecisionAudit, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import Utilisateur
-    from app.ingestion.models import RapportESG
+    from app.ingestion.models import ESGReport
 
 
 class AvisAudit(SQLModel, table=True):
     __tablename__ = "avis_audit"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    rapport_id: uuid.UUID = Field(foreign_key="rapport_esg.id")
+    rapport_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
     # Champ interne réservé à l'accountability et au suivi de performance
     # des auditeurs (Espace Administrateur). Ne doit JAMAIS être exposé
     # par une route ou un schéma de réponse accessible à un compte
@@ -37,5 +37,5 @@ class AvisAudit(SQLModel, table=True):
     commentaire: str | None = None
     date_avis: datetime = Field(default_factory=utcnow)
 
-    rapport: "RapportESG" = Relationship(back_populates="avis_audit")
+    rapport: "ESGReport" = Relationship(back_populates="audit_opinions")
     auditeur: "Utilisateur" = Relationship(back_populates="avis_rendus")

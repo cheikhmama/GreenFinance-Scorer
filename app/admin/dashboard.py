@@ -18,28 +18,28 @@ from app.admin.review_queue import (
 from app.admin.schemas import TableauDeBordAdmin
 from app.admin.utilisateurs import lister_utilisateurs_en_attente
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
-from app.core.enums import Role, StatutRapport
-from app.ingestion.models import RapportESG
+from app.company.models import Company
+from app.core.enums import ReportStatus, Role
+from app.ingestion.models import ESGReport
 
 
 def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
-    entreprises_inscrites = session.exec(select(func.count()).select_from(Entreprise)).one()
-    rapports_soumis = session.exec(select(func.count()).select_from(RapportESG)).one()
+    entreprises_inscrites = session.exec(select(func.count()).select_from(Company)).one()
+    rapports_soumis = session.exec(select(func.count()).select_from(ESGReport)).one()
     rapports_valides = session.exec(
         select(func.count())
-        .select_from(RapportESG)
-        .where(col(RapportESG.statut) == StatutRapport.VALIDE)
+        .select_from(ESGReport)
+        .where(col(ESGReport.status) == ReportStatus.VALIDATED)
     ).one()
     rapports_rejetes = session.exec(
         select(func.count())
-        .select_from(RapportESG)
-        .where(col(RapportESG.statut) == StatutRapport.REJETE)
+        .select_from(ESGReport)
+        .where(col(ESGReport.status) == ReportStatus.REJECTED)
     ).one()
     entreprises_publiees = session.exec(
         select(func.count())
-        .select_from(Entreprise)
-        .where(col(Entreprise.date_publication).is_not(None))
+        .select_from(Company)
+        .where(col(Company.published_at).is_not(None))
     ).one()
 
     _, total_a_republier = lister_entreprises_a_republier(session, page=1, page_size=1)

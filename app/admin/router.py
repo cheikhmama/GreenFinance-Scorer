@@ -91,16 +91,16 @@ from app.auth.activation import envoyer_lien_activation
 from app.auth.models import Utilisateur
 from app.auth.permissions import require_role
 from app.auth.schemas import UtilisateurPublic
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.company.rapports import lister_mes_rapports
 from app.company.schemas import EntreprisePublic
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role, StatutAnalyse, StatutProjet, StatutRapport
+from app.core.enums import ReportStatus, Role, StatutAnalyse, StatutProjet
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
 from app.ingestion.extractor import run_extraction_pipeline
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.institution.projets import lister_projets_admin
 from app.investor.portfolio import lister_portefeuilles_admin
@@ -111,7 +111,7 @@ from app.scoring.models import ScoreESG
 router = APIRouter(tags=["admin"])
 
 
-def _vers_entreprise_admin(session: Session, entreprise: Entreprise) -> EntrepriseAdmin:
+def _vers_entreprise_admin(session: Session, entreprise: Company) -> EntrepriseAdmin:
     """Vue EntrepriseAdmin d'une entreprise déjà chargée — utilisée par les routes qui agissent
     sur UNE entreprise (détail, modification, logo), contrairement à lister_toutes_les_entreprises_
     route ci-dessous qui batch cette même construction pour toute une page à la fois."""
@@ -120,7 +120,7 @@ def _vers_entreprise_admin(session: Session, entreprise: Entreprise) -> Entrepri
     )
     return EntrepriseAdmin(
         **EntreprisePublic.model_validate(entreprise).model_dump(),
-        utilisateur_id=entreprise.utilisateur_id,
+        utilisateur_id=entreprise.owner_user_id,
         nombre_rapports=nombre_rapports,
         dernier_statut_rapport=dernier_statut,
         dernier_rapport_id=dernier_rapport_id,
@@ -263,7 +263,7 @@ def reactiver_utilisateur_route(
     summary="Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut",
 )
 def lister_tous_les_rapports_route(
-    statut: StatutRapport | None = Query(None, description="Filtre sur le statut du rapport"),
+    statut: ReportStatus | None = Query(None, description="Filtre sur le statut du rapport"),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
@@ -288,7 +288,7 @@ def lister_tous_les_rapports_route(
 def lister_rapports_en_retard_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_en_retard(session)
 
 
@@ -301,7 +301,7 @@ def lister_rapports_en_retard_route(
 def lister_rapports_a_affecter_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_a_affecter(session)
 
 
@@ -314,7 +314,7 @@ def lister_rapports_a_affecter_route(
 def lister_rapports_echec_extraction_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_echec_extraction(session)
 
 
@@ -327,7 +327,7 @@ def lister_rapports_echec_extraction_route(
 def lister_rapports_extraction_bloquee_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_extraction_bloquee(session)
 
 
@@ -342,10 +342,10 @@ def relancer_extraction_route(
     background_tasks: BackgroundTasks,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     rapport = relancer_extraction(session, rapport_id)
-    assert rapport.annee_reporting is not None  # garanti par relancer_extraction ci-dessus
-    background_tasks.add_task(run_extraction_pipeline, rapport.id, rapport.annee_reporting)
+    assert rapport.fiscal_year is not None  # garanti par relancer_extraction ci-dessus
+    background_tasks.add_task(run_extraction_pipeline, rapport.id, rapport.fiscal_year)
     return rapport
 
 
@@ -360,7 +360,7 @@ def affecter_route(
     payload: AffecterAuditeurRequest,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     return affecter_auditeur(session, rapport_id, payload.auditeur_id)
 
 
@@ -405,7 +405,7 @@ def lister_charge_auditeurs_route(
 def lister_rapports_en_validation_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_en_validation(session)
 
 
@@ -418,7 +418,7 @@ def lister_rapports_en_validation_route(
 def lister_rapports_orphelins_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_orphelins_en_validation(session)
 
 
@@ -461,7 +461,7 @@ def consulter_rapport_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
 ) -> RapportESGDetail:
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
@@ -478,10 +478,10 @@ def consulter_fichier_route(
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
-    return FileResponse(storage.resolve_path(rapport.fichier_source))
+    return FileResponse(storage.resolve_path(rapport.source_file))
 
 
 @router.get(
@@ -494,7 +494,7 @@ def lister_versions_route(
     rapport_id: uuid.UUID,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_versions(session, rapport_id)
 
 
@@ -523,7 +523,7 @@ def valider_route(
     payload: DecisionAdminRequest,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     return valider_rapport(session, rapport_id, payload.commentaire)
 
 
@@ -538,7 +538,7 @@ def rejeter_route(
     payload: DecisionAdminRequest,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     return rejeter_rapport(session, rapport_id, payload.commentaire)
 
 
@@ -553,7 +553,7 @@ def demander_correction_route(
     payload: DecisionAdminRequest,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     return demander_correction(session, rapport_id, payload.commentaire)
 
 
@@ -577,7 +577,7 @@ def lister_toutes_les_entreprises_route(
         items=[
             EntrepriseAdmin(
                 **EntreprisePublic.model_validate(entreprise).model_dump(),
-                utilisateur_id=entreprise.utilisateur_id,
+                utilisateur_id=entreprise.owner_user_id,
                 nombre_rapports=nombre_rapports,
                 dernier_statut_rapport=dernier_statut,
                 dernier_rapport_id=dernier_rapport_id,
@@ -659,9 +659,9 @@ def lister_entreprises_avec_score_route(
         items=[
             EntrepriseAvecScoreAdmin(
                 id=entreprise.id,
-                nom=entreprise.nom,
-                secteur=entreprise.secteur,
-                pays=entreprise.pays,
+                nom=entreprise.name,
+                secteur=entreprise.sector,
+                pays=entreprise.country,
                 score_global=score.valeur_globale if score else None,
                 score_environnement=score.score_environnement if score else None,
                 score_social=score.score_social if score else None,
@@ -686,7 +686,7 @@ def publier_route(
     entreprise_id: uuid.UUID,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> Entreprise:
+) -> Company:
     return publier_entreprise(session, entreprise_id)
 
 
@@ -700,7 +700,7 @@ def suspendre_route(
     entreprise_id: uuid.UUID,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> Entreprise:
+) -> Company:
     return suspendre_entreprise(session, entreprise_id)
 
 
@@ -714,7 +714,7 @@ def reactiver_entreprise_route(
     entreprise_id: uuid.UUID,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> Entreprise:
+) -> Company:
     return reactiver_entreprise(session, entreprise_id)
 
 
@@ -801,7 +801,7 @@ def lister_rapports_entreprise_route(
     entreprise_id: uuid.UUID,
     _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_mes_rapports(session, entreprise_id)
 
 

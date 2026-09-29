@@ -18,7 +18,7 @@ from app.core.database import utcnow
 
 if TYPE_CHECKING:
     from app.auth.models import Utilisateur
-    from app.ingestion.models import RapportESG
+    from app.ingestion.models import ESGReport
 
 
 class ConfigurationPonderation(SQLModel, table=True):
@@ -71,7 +71,7 @@ class ScoreESG(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    rapport_id: uuid.UUID = Field(foreign_key="rapport_esg.id")
+    rapport_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE")
     configuration_id: uuid.UUID = Field(foreign_key="configuration_ponderation.id")
     valeur_globale: float = Field(ge=0, le=100)
     score_environnement: float | None = Field(default=None, ge=0, le=100)
@@ -79,5 +79,5 @@ class ScoreESG(SQLModel, table=True):
     score_gouvernance: float | None = Field(default=None, ge=0, le=100)
     date_calcul: datetime = Field(default_factory=utcnow)
 
-    rapport: "RapportESG" = Relationship(back_populates="scores")
+    rapport: "ESGReport" = Relationship(back_populates="scores")
     configuration: ConfigurationPonderation = Relationship(back_populates="scores")

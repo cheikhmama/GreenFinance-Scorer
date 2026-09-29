@@ -54,14 +54,15 @@ export function CompanyReportsPage() {
                       <td className="py-2 pr-4">
                         <div className="flex flex-col gap-1">
                           <Badge variant={variantStatutRapport(rapport.statut)}>
-                            {libelleStatutRapport(rapport.statut)}
+                            {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
                           </Badge>
-                          {/* extraction_erreur peut rester non-null sur une ligne ayant depuis
-                              atteint AFFECTE_AUDITEUR/EN_VALIDATION/VALIDE/REJETE (une relance
-                              d'extraction échouée après une extraction déjà réussie ne l'efface
-                              pas) — le message n'est actionnable que tant que le rapport est
-                              encore bloqué en EN_EXTRACTION, jamais après. */}
-                          {rapport.extraction_erreur && rapport.statut === "EN_EXTRACTION" ? (
+                          {/* Une relance d'extraction peut échouer sur un rapport déjà avancé
+                              dans le workflow (PENDING_AUDIT et au-delà) — le message n'est
+                              actionnable que tant que le rapport est encore SUBMITTED, jamais
+                              après. */}
+                          {rapport.extraction_erreur &&
+                          rapport.statut === "SUBMITTED" &&
+                          rapport.statut_extraction === "FAILED" ? (
                             <span className="text-xs text-destructive">
                               Échec d'extraction récupérable — nouvelle version possible.
                             </span>

@@ -11,12 +11,12 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.auth.models import ChercheurInstitution, Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import StatutAnalyse, StatutProjet, StatutRattachement
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.institution.models import (
     AffectationProjet,
     Projet,
@@ -196,8 +196,8 @@ def ajouter_entreprise_perimetre(
     if projet.statut != StatutProjet.OUVERT:
         raise ValidationError("Ce projet est clôturé.", code="projet_cloture")
 
-    entreprise = session.get(Entreprise, entreprise_id)
-    if entreprise is None or entreprise.date_publication is None:
+    entreprise = session.get(Company, entreprise_id)
+    if entreprise is None or entreprise.published_at is None:
         raise ValidationError(
             "Cette entreprise n'est pas publiée.", code="entreprise_non_publiee"
         )
@@ -239,22 +239,22 @@ def ajouter_document(
     rapport_id: uuid.UUID,
 ) -> ProjetDocument:
     """N'accepte que le rapport actuellement publié de l'entreprise (Étape 17bis) — jamais
-    seulement statut == VALIDE : validation et publication restent deux gestes distincts (voir
-    app/company/models.py::Entreprise.date_publication), et un ancien rapport VALIDE remplacé
+    seulement statut == VALIDATED : validation et publication restent deux gestes distincts (voir
+    app/company/models.py::Company.published_at), et un ancien rapport VALIDATED remplacé
     depuis ne redevient jamais accessible ainsi. L'entreprise doit d'abord appartenir au périmètre
     du projet — mettre un document à disposition ne peut jamais élargir le périmètre en silence."""
     projet = _projet_de_institution(session, institution_id, projet_id)
     if projet.statut != StatutProjet.OUVERT:
         raise ValidationError("Ce projet est clôturé.", code="projet_cloture")
 
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
     dans_perimetre = session.exec(
         select(ProjetEntreprise).where(
             ProjetEntreprise.projet_id == projet_id,
-            ProjetEntreprise.entreprise_id == rapport.entreprise_id,
+            ProjetEntreprise.entreprise_id == rapport.company_id,
         )
     ).first()
     if dans_perimetre is None:
@@ -263,7 +263,7 @@ def ajouter_document(
             code="entreprise_hors_perimetre",
         )
 
-    rapport_public = dernier_rapport_valide(session, rapport.entreprise_id)
+    rapport_public = dernier_rapport_valide(session, rapport.company_id)
     if rapport_public is None or rapport_public.id != rapport.id:
         raise ValidationError(
             "Seul le rapport actuellement publié de l'entreprise peut être mis à disposition.",

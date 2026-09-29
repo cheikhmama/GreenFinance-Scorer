@@ -20,9 +20,9 @@ from app.auth.models import Utilisateur
 from app.auth.permissions import require_role
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role, StatutRapport
+from app.core.enums import ReportStatus, Role
 from app.core.exceptions import NotFoundError
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.scoring.engine import score_public
 
@@ -38,12 +38,12 @@ router = APIRouter(tags=["audit"])
 def lister_mes_dossiers(
     current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return list(
         session.exec(
-            select(RapportESG).where(
-                RapportESG.auditeur_id == current_user.id,
-                RapportESG.statut == StatutRapport.AFFECTE_AUDITEUR,
+            select(ESGReport).where(
+                ESGReport.auditor_id == current_user.id,
+                ESGReport.status == ReportStatus.PENDING_AUDIT,
             )
         ).all()
     )
@@ -60,10 +60,10 @@ def consulter_dossier(
     current_user: Utilisateur = Depends(require_role(Role.AUDITEUR)),
     session: Session = Depends(get_session),
 ) -> RapportESGDetail:
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     # Pas de restriction de statut ici (contrairement à la liste ci-dessus) : un auditeur peut
     # rouvrir un dossier sur lequel il a déjà rendu un avis.
-    if rapport is None or rapport.auditeur_id != current_user.id:
+    if rapport is None or rapport.auditor_id != current_user.id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
     return detail.model_copy(update={"score_officiel": score_public(session, rapport_id)})

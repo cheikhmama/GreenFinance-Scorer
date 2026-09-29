@@ -11,9 +11,14 @@ modèles SQLModel, pas seulement que chaque table existe isolément.
 import uuid
 from datetime import timedelta
 
+import pytest
+from sqlalchemy import delete
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import col, select
+
 from app.audit.models import AvisAudit
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
@@ -28,9 +33,9 @@ from app.core.enums import (
 from app.core.models import Notification
 from app.ingestion.models import (
     DonneeCarbone,
-    IndicateurESG,
+    ESGMetric,
+    ESGReport,
     PreuveDocumentaire,
-    RapportESG,
 )
 from app.investor.models import Portefeuille, PositionPortefeuille
 from app.scoring.models import ConfigurationPonderation, ScoreESG
@@ -49,29 +54,29 @@ def _utilisateur(session, role: Role) -> Utilisateur:
 
 def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> None:
     # --- Entreprise avec montant minimum d'investissement renseigné -------
-    entreprise = Entreprise(
-        nom="Acme Verte",
-        secteur="Industrie",
-        pays="MR",
-        montant_minimum_investissement=500.0,
+    entreprise = Company(
+        name="Acme Verte",
+        sector="Industrie",
+        country="MR",
+        minimum_investment_amount=500.0,
     )
     session.add(entreprise)
     session.flush()
 
-    # --- RapportESG -------------------------------------------------------
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    # --- ESGReport -------------------------------------------------------
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.AUTOMATIQUE,
-        fichier_source="s3://bucket/rapport.pdf",
+        channel=CanalDepot.AUTOMATIQUE,
+        source_file="s3://bucket/rapport.pdf",
     )
     session.add(rapport)
     session.flush()
 
-    assert rapport in entreprise.rapports
-    assert rapport.entreprise.id == entreprise.id
+    assert rapport in entreprise.reports
+    assert rapport.company.id == entreprise.id
 
-    # --- PreuveDocumentaire + IndicateurESG + DonneeCarbone ---------------
+    # --- PreuveDocumentaire + ESGMetric + DonneeCarbone ---------------
     preuve = PreuveDocumentaire(
         nom_document="rapport-annuel-2025.pdf",
         annee=2025,
@@ -83,14 +88,14 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.add(preuve)
     session.flush()
 
-    indicateur = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.ENVIRONNEMENT,
-        code="GHG-SCOPE1",
-        valeur=123.4,
-        unite="tCO2e",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    indicateur = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.ENVIRONNEMENT,
+        metric_code="GHG-SCOPE1",
+        value=123.4,
+        unit="tCO2e",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
     )
     donnee_carbone = DonneeCarbone(
         rapport_id=rapport.id,
@@ -105,11 +110,11 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.add(donnee_carbone)
     session.flush()
 
-    assert indicateur.rapport.id == rapport.id
-    assert indicateur in rapport.indicateurs
+    assert indicateur.report.id == rapport.id
+    assert indicateur in rapport.metrics
     assert donnee_carbone.rapport.id == rapport.id
-    assert donnee_carbone in rapport.donnees_carbone
-    assert indicateur.preuve.id == preuve.id
+    assert donnee_carbone in rapport.carbon_data
+    assert indicateur.proof.id == preuve.id
     assert indicateur in preuve.indicateurs
     assert donnee_carbone.preuve.id == preuve.id
     assert donnee_carbone in preuve.donnees_carbone
@@ -133,7 +138,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     assert config_chercheur.utilisateur.id == chercheur.id
     assert config_chercheur in chercheur.configurations_ponderation
 
-    # --- ScoreESG (un par configuration, sur le même RapportESG) ----------
+    # --- ScoreESG (un par configuration, sur le même ESGReport) ----------
     score_reference = ScoreESG(
         rapport_id=rapport.id,
         configuration_id=config_reference.id,
@@ -237,7 +242,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.flush()
 
     assert avis.rapport.id == rapport.id
-    assert avis in rapport.avis_audit
+    assert avis in rapport.audit_opinions
     assert avis.auditeur.id == auditeur.id
     assert avis in auditeur.avis_rendus
 
@@ -252,3 +257,81 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     assert notification in investisseur.notifications
     assert notification.utilisateur.id == investisseur.id
+
+
+def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
+    entreprise = Company(name="Acme Verte", sector="Industrie", country="MR")
+    session.add(entreprise)
+    session.flush()
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=TypeRapport.RAPPORT_ESG,
+        channel=CanalDepot.AUTOMATIQUE,
+        source_file="s3://bucket/rapport.pdf",
+    )
+    session.add(rapport)
+    session.flush()
+    preuve = PreuveDocumentaire(
+        nom_document="rapport.pdf",
+        annee=2025,
+        nombre_pages_total=10,
+        page_debut=1,
+        page_fin=1,
+        pdf_extrait_genere="s3://bucket/extraits/1.pdf",
+    )
+    session.add(preuve)
+    session.flush()
+    indicateur = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.SOCIAL,
+        metric_code="effectif_total",
+        value=1200.0,
+        unit="",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
+    )
+    session.add(indicateur)
+    session.flush()
+    return entreprise, rapport, indicateur
+
+
+def test_un_seul_indicateur_par_code_et_par_rapport(session) -> None:
+    _entreprise, rapport, indicateur = _rapport_avec_indicateur(session)
+    session.add(
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pilier.SOCIAL,
+            metric_code=indicateur.metric_code,
+            value=1300.0,
+            unit="",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=indicateur.proof_id,
+        )
+    )
+    with pytest.raises(IntegrityError, match="uq_esg_metrics_report_metric_code"):
+        session.flush()
+    session.rollback()
+
+
+def test_suppression_en_base_applique_les_regles_on_delete(session) -> None:
+    """DELETE SQL direct (jamais la cascade ORM) : ce sont bien les règles ON DELETE de la base
+    qui s'appliquent (docs/RENAME_PLAN.md §2.5)."""
+    entreprise, rapport, indicateur = _rapport_avec_indicateur(session)
+    auditeur = _utilisateur(session, Role.AUDITEUR)
+    rapport.auditor_id = auditeur.id
+    session.add(rapport)
+    session.flush()
+    rapport_id, indicateur_id = rapport.id, indicateur.id
+
+    # SET NULL : supprimer l'auditeur ne supprime jamais le rapport.
+    session.execute(delete(Utilisateur).where(col(Utilisateur.id) == auditeur.id))
+    session.expire_all()
+    rapport_apres = session.get(ESGReport, rapport_id)
+    assert rapport_apres is not None
+    assert rapport_apres.auditor_id is None
+
+    # CASCADE : supprimer l'entreprise emporte ses rapports et leurs indicateurs.
+    session.execute(delete(Company).where(col(Company.id) == entreprise.id))
+    session.expire_all()
+    assert session.get(ESGReport, rapport_id) is None
+    assert session.exec(select(ESGMetric).where(ESGMetric.id == indicateur_id)).first() is None

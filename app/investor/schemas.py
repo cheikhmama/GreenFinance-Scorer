@@ -12,7 +12,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.company.schemas import EntreprisePublic
+from app.company.schemas import CompanyContractMixin, EntreprisePublic
 from app.core.enums import DevisePosition, TypeDureeInvestissement
 from app.ingestion.schemas import (
     CouvertureResume,
@@ -133,7 +133,7 @@ class FermerPositionRequest(BaseModel):
         return _vers_naif_utc(valeur) if valeur is not None else None
 
 
-class EntrepriseSommaire(BaseModel):
+class EntrepriseSommaire(CompanyContractMixin):
     """Vue minimale d'une entreprise, imbriquée dans une position — jamais le détail complet
     (indicateurs/preuves), qui se consulte séparément via GET /investor/entreprises/{id}."""
 

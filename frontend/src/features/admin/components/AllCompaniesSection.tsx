@@ -80,7 +80,7 @@ export function AllCompaniesSection() {
 /** Une carte par entreprise — logo + identité toujours visibles, actions (Voir le rapport /
  * Valider / Suspendre-Réactiver) regroupées et cohérentes plutôt que des liens texte épars.
  * « Valider » n'apparaît que si le dernier rapport est réellement en attente de décision
- * (EN_VALIDATION) : un raccourci vers la même action que le formulaire de décision du rapport
+ * (PENDING_DECISION) : un raccourci vers la même action que le formulaire de décision du rapport
  * (voir AdminReportDetailPage), jamais une validation à l'aveugle sans avoir pu consulter les
  * données — le bouton "Voir le rapport" reste toujours à côté pour ça. */
 function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
@@ -90,7 +90,7 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
   const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const enAttenteDeDecision = entreprise.dernier_statut_rapport === "EN_VALIDATION";
+  const enAttenteDeDecision = entreprise.dernier_statut_rapport === "PENDING_DECISION";
 
   async function suspendre() {
     const confirme = await confirm({

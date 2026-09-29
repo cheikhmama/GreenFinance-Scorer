@@ -69,10 +69,10 @@ import type {
   RapportESGPublic,
   Role,
   ScoreESG,
+  ReportStatus,
   ScoreVerificationAdmin,
   StatutAnalyse,
   StatutProjet,
-  StatutRapport,
   TableauDeBordAdmin,
   UtilisateurCree,
   UtilisateurPublic,
@@ -151,7 +151,7 @@ export function useFailedExtractionReports() {
   });
 }
 
-/** Rapports EN_VALIDATION sans aucun avis d'audit — état incohérent normalement inatteignable via
+/** Rapports PENDING_DECISION sans aucun avis d'audit — état incohérent normalement inatteignable via
  * l'API seule, gardé en visibilité de défense (voir lister_rapports_orphelins_en_validation). */
 export function useOrphanReportsInValidation() {
   return useQuery<RapportESGPublic[], ApiError>({
@@ -160,7 +160,7 @@ export function useOrphanReportsInValidation() {
   });
 }
 
-/** Rapports EN_EXTRACTION sans erreur classifiée ni fin, bloqués depuis plus longtemps que
+/** Rapports SUBMITTED dont l'extraction reste RUNNING, bloqués depuis plus longtemps que
  * settings.extraction_timeout_minutes — traitement probablement interrompu (voir
  * lister_rapports_extraction_bloquee), distinct d'un échec classifié (useFailedExtractionReports). */
 export function useStuckExtractionReports() {
@@ -196,7 +196,7 @@ export function useOverdueReports() {
 /** Vue globale de tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut
  * (voir app/admin/review_queue.py::lister_tous_les_rapports) — sert le suivi transverse depuis le
  * tableau de bord (ex. "rapports validés"), distinct des files scopées à une étape du workflow. */
-export function useAllReports(statut?: StatutRapport) {
+export function useAllReports(statut?: ReportStatus) {
   return useInfiniteQuery<PageRapportESGPublic, ApiError>({
     queryKey: [...TOUS_RAPPORTS_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>

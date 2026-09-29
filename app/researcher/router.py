@@ -225,9 +225,9 @@ def lister_documents_route(
         DocumentProjetPublic(
             id=document.id,
             rapport_id=document.rapport_id,
-            entreprise_id=document.rapport.entreprise_id,
-            entreprise_nom=document.rapport.entreprise.nom,
-            annee_reporting=document.rapport.annee_reporting,
+            entreprise_id=document.rapport.company_id,
+            entreprise_nom=document.rapport.company.name,
+            annee_reporting=document.rapport.fiscal_year,
             date_ajout=document.date_ajout,
         )
         for document in documents

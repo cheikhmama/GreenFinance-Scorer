@@ -48,7 +48,7 @@ export function AuditReportDetailPage() {
           Dossier {dossier.type} — {dossier.annee_reporting ?? "année inconnue"}
         </h1>
         <Badge className="mt-2" variant={variantStatutRapport(dossier.statut)}>
-          {libelleStatutRapport(dossier.statut)}
+          {libelleStatutRapport(dossier.statut, dossier.statut_extraction)}
         </Badge>
       </div>
 
@@ -85,7 +85,7 @@ export function AuditReportDetailPage() {
         construireUrlPreuve={(preuveId) => construireUrlPreuveAudit(dossier.id, preuveId)}
       />
 
-      {dossier.statut === "AFFECTE_AUDITEUR" ? (
+      {dossier.statut === "PENDING_AUDIT" ? (
         <FormulaireAvis rapportId={dossier.id} />
       ) : (
         <Alert>

@@ -1,26 +1,42 @@
 from app.core.enums import (
     CanalDepot,
+    CompanyStatus,
     DecisionAudit,
     DevisePosition,
+    ExtractionStatus,
     MethodeDonnee,
     Pilier,
+    ReportStatus,
     Role,
-    StatutRapport,
     TypeDureeInvestissement,
     TypeRapport,
 )
 
 
-def test_statut_rapport_values() -> None:
-    assert {s.value for s in StatutRapport} == {
-        "ENVOYE",
-        "EN_EXTRACTION",
-        "AFFECTE_AUDITEUR",
-        "EN_VALIDATION",
-        "VALIDE",
-        "REJETE",
-        "DEMANDE_CORRECTION",
+def test_report_status_values() -> None:
+    assert {s.value for s in ReportStatus} == {
+        "DRAFT",
+        "SUBMITTED",
+        "PENDING_AUDIT",
+        "PENDING_DECISION",
+        "REVISION_REQUESTED",
+        "VALIDATED",
+        "REJECTED",
     }
+
+
+def test_extraction_status_values() -> None:
+    assert {s.value for s in ExtractionStatus} == {
+        "NOT_STARTED",
+        "QUEUED",
+        "RUNNING",
+        "DONE",
+        "FAILED",
+    }
+
+
+def test_company_status_values() -> None:
+    assert {s.value for s in CompanyStatus} == {"PENDING_ONBOARDING", "ACTIVE", "SUSPENDED"}
 
 
 def test_type_rapport_values() -> None:

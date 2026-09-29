@@ -101,7 +101,7 @@ export function AdminReportDetailPage() {
             <span className="text-sm text-brand-grey">Entreprise…</span>
           )}
           <Badge variant={variantStatutRapport(rapport.statut)}>
-            {libelleStatutRapport(rapport.statut)}
+            {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
           </Badge>
         </CardContent>
       </Card>
@@ -246,7 +246,7 @@ export function AdminReportDetailPage() {
                       {version.id === rapport.id ? " (celle-ci)" : ""}
                     </p>
                     <p className="text-sm text-brand-grey">
-                      {libelleStatutRapport(version.statut)} — déposé le{" "}
+                      {libelleStatutRapport(version.statut, version.statut_extraction)} — déposé le{" "}
                       {new Date(version.date_depot).toLocaleDateString("fr-FR")}
                     </p>
                   </div>
@@ -262,8 +262,8 @@ export function AdminReportDetailPage() {
         </CardContent>
       </Card>
 
-      {rapport.statut === "EN_VALIDATION" ? <FormulaireDecision rapportId={rapport.id} /> : null}
-      {rapport.statut === "VALIDE" ? <RecalculerScoreSection rapportId={rapport.id} /> : null}
+      {rapport.statut === "PENDING_DECISION" ? <FormulaireDecision rapportId={rapport.id} /> : null}
+      {rapport.statut === "VALIDATED" ? <RecalculerScoreSection rapportId={rapport.id} /> : null}
     </div>
   );
 }

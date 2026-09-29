@@ -4,32 +4,43 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.company.models import Entreprise
-from app.core.enums import CanalDepot, MethodeDonnee, Pilier, StatutRapport, TypeRapport
+from app.company.models import Company
+from app.core.enums import (
+    CanalDepot,
+    ExtractionStatus,
+    MethodeDonnee,
+    Pilier,
+    ReportStatus,
+    TypeRapport,
+)
 from app.ingestion.models import (
     DonneeCarbone,
-    IndicateurESG,
+    ESGMetric,
+    ESGReport,
     PreuveDocumentaire,
-    RapportESG,
 )
 
 
-def _entreprise(session, **kwargs) -> Entreprise:
-    entreprise = Entreprise(nom="Acme", secteur="Industrie", pays="MR", **kwargs)
+def _entreprise(session, **kwargs) -> Company:
+    # SQLModel ignore silencieusement un kwarg inconnu : jamais un champ de test perdu en route.
+    assert set(kwargs) <= set(Company.model_fields), set(kwargs) - set(Company.model_fields)
+    entreprise = Company(name="Acme", sector="Industrie", country="MR", **kwargs)
     session.add(entreprise)
     session.flush()
     return entreprise
 
 
-def _rapport(entreprise_id: uuid.UUID, **kwargs) -> RapportESG:
+def _rapport(entreprise_id: uuid.UUID, **kwargs) -> ESGReport:
     defaults = {
-        "entreprise_id": entreprise_id,
+        "company_id": entreprise_id,
         "type": TypeRapport.RAPPORT_ESG,
-        "canal": CanalDepot.AUTOMATIQUE,
-        "fichier_source": "s3://bucket/rapport.pdf",
+        "channel": CanalDepot.AUTOMATIQUE,
+        "source_file": "s3://bucket/rapport.pdf",
     }
     defaults.update(kwargs)
-    return RapportESG(**defaults)
+    # SQLModel ignore silencieusement un kwarg inconnu : jamais un champ de test perdu en route.
+    assert set(defaults) <= set(ESGReport.model_fields), set(defaults) - set(ESGReport.model_fields)
+    return ESGReport(**defaults)
 
 
 def test_creation_rapport_lie_a_entreprise_statut_par_defaut(session) -> None:
@@ -39,18 +50,19 @@ def test_creation_rapport_lie_a_entreprise_statut_par_defaut(session) -> None:
     session.flush()
 
     assert rapport.id is not None
-    assert rapport.statut == StatutRapport.ENVOYE
-    assert rapport.auditeur_id is None
+    assert rapport.status == ReportStatus.SUBMITTED
+    assert rapport.extraction_status == ExtractionStatus.QUEUED
+    assert rapport.auditor_id is None
 
 
 def test_entreprise_id_obligatoire(session) -> None:
     # SQLModel (table=True) ne valide pas les champs requis à la
     # construction : la contrainte NOT NULL s'applique au flush, côté base.
-    rapport = RapportESG(
-        entreprise_id=None,  # type: ignore[arg-type]
+    rapport = ESGReport(
+        company_id=None,  # type: ignore[arg-type]
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.AUTOMATIQUE,
-        fichier_source="x",
+        channel=CanalDepot.AUTOMATIQUE,
+        source_file="x",
     )
     session.add(rapport)
     with pytest.raises(IntegrityError):
@@ -66,14 +78,14 @@ def test_entreprise_id_inexistant_rejete(session) -> None:
     session.rollback()
 
 
-@pytest.mark.parametrize("statut", list(StatutRapport))
-def test_sept_statuts_tous_atteignables(session, statut: StatutRapport) -> None:
+@pytest.mark.parametrize("statut", list(ReportStatus))
+def test_sept_statuts_tous_atteignables(session, statut: ReportStatus) -> None:
     entreprise = _entreprise(session)
-    rapport = _rapport(entreprise.id, statut=statut)
+    rapport = _rapport(entreprise.id, status=statut)
     session.add(rapport)
     session.flush()
 
-    assert rapport.statut == statut
+    assert rapport.status == statut
 
 
 def _preuve(session) -> PreuveDocumentaire:
@@ -97,14 +109,14 @@ def test_indicateur_et_donnee_carbone_lies_au_meme_rapport(session) -> None:
     session.flush()
     preuve = _preuve(session)
 
-    indicateur = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.ENVIRONNEMENT,
-        code="GHG-SCOPE1",
-        valeur=123.4,
-        unite="tCO2e",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    indicateur = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.ENVIRONNEMENT,
+        metric_code="GHG-SCOPE1",
+        value=123.4,
+        unit="tCO2e",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
     )
     donnee_carbone = DonneeCarbone(
         rapport_id=rapport.id,
@@ -119,11 +131,11 @@ def test_indicateur_et_donnee_carbone_lies_au_meme_rapport(session) -> None:
     session.add(donnee_carbone)
     session.flush()
 
-    assert indicateur.rapport_id == donnee_carbone.rapport_id == rapport.id
-    assert indicateur.rapport.id == rapport.id
+    assert indicateur.report_id == donnee_carbone.rapport_id == rapport.id
+    assert indicateur.report.id == rapport.id
     assert donnee_carbone.rapport.id == rapport.id
-    assert indicateur in rapport.indicateurs
-    assert donnee_carbone in rapport.donnees_carbone
+    assert indicateur in rapport.metrics
+    assert donnee_carbone in rapport.carbon_data
     assert indicateur in preuve.indicateurs
     assert donnee_carbone in preuve.donnees_carbone
 
@@ -255,8 +267,8 @@ def test_checksum_nul_plusieurs_fois_autorise_meme_entreprise(session) -> None:
 
 
 def test_suppression_rapport_reference_echoue_proprement(session) -> None:
-    """Comportement documenté : rapport_id (IndicateurESG, DonneeCarbone) ne
-    porte pas de cascade de suppression. Supprimer un RapportESG encore
+    """Comportement documenté : rapport_id (ESGMetric, DonneeCarbone) ne
+    porte pas de cascade de suppression. Supprimer un ESGReport encore
     référencé échoue avec une IntegrityError — jamais de suppression
     silencieuse des indicateurs/données carbone associés."""
     entreprise = _entreprise(session)
@@ -265,14 +277,14 @@ def test_suppression_rapport_reference_echoue_proprement(session) -> None:
     session.flush()
     preuve = _preuve(session)
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.SOCIAL,
-            code="EMP-01",
-            valeur=1.0,
-            unite="ratio",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pilier.SOCIAL,
+            metric_code="EMP-01",
+            value=1.0,
+            unit="ratio",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.flush()

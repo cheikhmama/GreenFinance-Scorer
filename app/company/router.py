@@ -17,7 +17,7 @@ from sqlmodel import Session
 from app.auth.models import Utilisateur
 from app.auth.permissions import require_role
 from app.company.import_rate_limit import enforce_url_import_rate_limit
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.company.rapports import (
     creer_correction,
     deposer_rapport,
@@ -30,7 +30,7 @@ from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import Role, TypeRapport
 from app.core.exceptions import NotFoundError, ValidationError
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.scoring.engine import score_public
 
@@ -53,7 +53,7 @@ def _entreprise_id(current_user: Utilisateur) -> uuid.UUID:
 )
 def consulter_mon_profil_route(
     current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
-) -> Entreprise:
+) -> Company:
     _entreprise_id(current_user)  # lève si aucune entreprise n'est rattachée
     assert current_user.entreprise is not None
     return current_user.entreprise
@@ -68,7 +68,7 @@ def consulter_mon_profil_route(
 def lister_rapports_route(
     current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_mes_rapports(session, _entreprise_id(current_user))
 
 
@@ -86,7 +86,7 @@ def deposer_rapport_route(
     annee_reporting: int = Form(...),
     current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     contenu = fichier.file.read()
     return deposer_rapport(
         session,
@@ -111,7 +111,7 @@ def importer_rapport_par_url_route(
     payload: ImporterRapportParURLRequest,
     current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE, Role.ADMINISTRATEUR)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     if current_user.role == Role.ENTREPRISE:
         # Un entreprise_id fourni par un appelant Entreprise est toujours ignoré -- jamais fait
         # confiance à un client pour désigner une entreprise autre que la sienne.
@@ -122,7 +122,7 @@ def importer_rapport_par_url_route(
                 "entreprise_id est requis pour un import déclenché par un administrateur.",
                 code="entreprise_id_requis",
             )
-        if session.get(Entreprise, payload.entreprise_id) is None:
+        if session.get(Company, payload.entreprise_id) is None:
             raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
         entreprise_id = payload.entreprise_id
 
@@ -151,7 +151,7 @@ def creer_correction_route(
     annee_reporting: int = Form(...),
     current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     contenu = fichier.file.read()
     return creer_correction(
         session,
@@ -191,7 +191,7 @@ def telecharger_rapport_original_route(
     session: Session = Depends(get_session),
 ) -> FileResponse:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
-    return FileResponse(storage.resolve_path(rapport.fichier_source), media_type="application/pdf")
+    return FileResponse(storage.resolve_path(rapport.source_file), media_type="application/pdf")
 
 
 @router.get(
@@ -205,7 +205,7 @@ def telecharger_rapport_synthese_route(
     session: Session = Depends(get_session),
 ) -> FileResponse:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
-    if rapport.rapport_synthese_genere is None:
+    if rapport.synthesis_report_path is None:
         # Code distinct de "rapport introuvable" -- sûr à distinguer ici, la propriété est déjà
         # établie par rapport_de_lentreprise ci-dessus, donc cela ne confirme rien à un tiers.
         raise NotFoundError(
@@ -213,5 +213,5 @@ def telecharger_rapport_synthese_route(
             code="synthese_non_generee",
         )
     return FileResponse(
-        storage.resolve_path(rapport.rapport_synthese_genere), media_type="application/pdf"
+        storage.resolve_path(rapport.synthesis_report_path), media_type="application/pdf"
     )

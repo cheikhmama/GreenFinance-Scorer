@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import DevisePosition, Role, TypeDureeInvestissement
 from app.investor.models import Portefeuille, PositionPortefeuille
@@ -23,8 +23,10 @@ def _investisseur(session) -> Utilisateur:
     return utilisateur
 
 
-def _entreprise(session, **kwargs) -> Entreprise:
-    entreprise = Entreprise(nom="Acme", secteur="Industrie", pays="MR", **kwargs)
+def _entreprise(session, **kwargs) -> Company:
+    # SQLModel ignore silencieusement un kwarg inconnu : jamais un champ de test perdu en route.
+    assert set(kwargs) <= set(Company.model_fields), set(kwargs) - set(Company.model_fields)
+    entreprise = Company(name="Acme", sector="Industrie", country="MR", **kwargs)
     session.add(entreprise)
     session.flush()
     return entreprise
@@ -55,7 +57,7 @@ def _base_position(portefeuille_id: uuid.UUID, entreprise_id: uuid.UUID, **kwarg
 
 def test_position_sous_le_minimum_requis_rejetee(session) -> None:
     investisseur = _investisseur(session)
-    entreprise = _entreprise(session, montant_minimum_investissement=5000.0)
+    entreprise = _entreprise(session, minimum_investment_amount=5000.0)
     portefeuille = _portefeuille(session, investisseur.id)
 
     data = _base_position(portefeuille.id, entreprise.id, montant_investi=100.0)

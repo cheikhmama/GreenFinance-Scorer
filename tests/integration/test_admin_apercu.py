@@ -13,18 +13,18 @@ from fastapi.testclient import TestClient
 from app.auth.hashing import hash_password
 from app.auth.models import Utilisateur
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
     DevisePosition,
+    ReportStatus,
     Role,
     StatutAnalyse,
     StatutProjet,
-    StatutRapport,
     TypeRapport,
 )
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.institution.models import Projet
 from app.investor.models import Portefeuille
 from app.main import app
@@ -93,26 +93,26 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
     marqueur = f"secteur-{uuid.uuid4()}"
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
 
-    entreprise_sans_score = Entreprise(
-        nom=f"Sans score {uuid.uuid4()}",
-        secteur=marqueur,
-        pays="France",
-        date_publication=utcnow(),
+    entreprise_sans_score = Company(
+        name=f"Sans score {uuid.uuid4()}",
+        sector=marqueur,
+        country="France",
+        published_at=utcnow(),
     )
     session.add(entreprise_sans_score)
 
-    entreprise_avec_score = Entreprise(
-        nom=f"Avec score {uuid.uuid4()}", secteur=marqueur, pays="France", date_publication=utcnow()
+    entreprise_avec_score = Company(
+        name=f"Avec score {uuid.uuid4()}", sector=marqueur, country="France", published_at=utcnow()
     )
     session.add(entreprise_avec_score)
     session.commit()
 
-    rapport = RapportESG(
-        entreprise_id=entreprise_avec_score.id,
+    rapport = ESGReport(
+        company_id=entreprise_avec_score.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.VALIDE,
-        fichier_source="rapports/test/dummy.pdf",
+        channel=CanalDepot.ENTREPRISE,
+        status=ReportStatus.VALIDATED,
+        source_file="rapports/test/dummy.pdf",
     )
     session.add(rapport)
     session.commit()
@@ -144,18 +144,18 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
 def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
     admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
     auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Technologies", pays="France")
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
     session.add(
-        RapportESG(
-            entreprise_id=entreprise.id,
+        ESGReport(
+            company_id=entreprise.id,
             type=TypeRapport.RAPPORT_ESG,
-            canal=CanalDepot.ENTREPRISE,
-            statut=StatutRapport.AFFECTE_AUDITEUR,
-            fichier_source="rapports/test/dummy.pdf",
-            auditeur_id=auditeur.id,
-            date_affectation=utcnow(),
+            channel=CanalDepot.ENTREPRISE,
+            status=ReportStatus.PENDING_AUDIT,
+            source_file="rapports/test/dummy.pdf",
+            auditor_id=auditeur.id,
+            assigned_at=utcnow(),
         )
     )
     session.commit()

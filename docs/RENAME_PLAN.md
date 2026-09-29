@@ -13,13 +13,17 @@ anything, add or check its row here; after a rename lands, tick it.
    until the scoring tables are renamed (task 3.1); only its `ON DELETE` rule and index are fixed
    when the referenced table is renamed. Relationship attributes on a not-yet-renamed class
    (e.g. `Utilisateur.entreprise`) likewise keep their name.
-3. **The HTTP contract changes only when its endpoints are redesigned.** Response schemas read the
-   English attributes through `validation_alias` and keep their French JSON field names, so the
-   OpenAPI client and the frontend don't change during a persistence rename. The English JSON
-   contract arrives with the redesigned endpoints (tasks 1.3–1.5, 2.2, 3.2) and, for the rest,
-   task 4.7.
-   - *Exception:* enum **values** that change meaning (report statuses in task 1.1) change in
-     the API too, because the frontend must handle the new states.
+3. **The HTTP contract changes only when its endpoints are redesigned.** Response schemas keep
+   their French JSON field names and translate the English model explicitly, in one function per
+   entity (`company_vers_contrat` / `CompanyContractMixin` in `app/company/schemas.py`,
+   `rapport_vers_contrat` and `IndicateurESGDetail` in `app/ingestion/schemas.py`), so the frontend
+   doesn't change during a persistence rename. Request schemas keep their French fields and the
+   service code maps them. The English JSON contract arrives with the redesigned endpoints
+   (tasks 1.3–1.5, 2.2, 3.2) and, for the rest, task 4.7.
+   - *Exceptions (task 1.1):* report status **values** change in the API (`statut` now carries
+     `ReportStatus`), and reports gain `statut_extraction` (`ExtractionStatus`) — the frontend
+     needs both to tell a queued report from one being extracted. Company `actif` stays a boolean
+     in the API (true only for `ACTIVE`).
 4. **One consolidated migration per task**, with a working `downgrade()` that restores the
    previous names, values and constraints. Data transformations (status mapping) are written in
    SQL inside that migration, in both directions.
@@ -30,7 +34,9 @@ anything, add or check its row here; after a rename lands, tick it.
    (`app/ingestion/schemas.py`) are the validated Gemini tool-calling schema; they are
    translated at the persistence boundary, not changed.
 
-## 2. Task 1.1 — Company, ESG report, ESG metric
+## 2. Task 1.1 — Company, ESG report, ESG metric ✅
+
+Landed in migration `21e17187789f` (upgrade/downgrade round-trip and `alembic check` verified).
 
 ### 2.1 `entreprise` → `companies` (`Entreprise` → `Company`)
 

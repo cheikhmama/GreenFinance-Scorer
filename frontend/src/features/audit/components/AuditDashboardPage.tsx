@@ -44,7 +44,7 @@ export function AuditDashboardPage() {
                     <tr key={dossier.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         <Badge variant={variantStatutRapport(dossier.statut)}>
-                          {libelleStatutRapport(dossier.statut)}
+                          {libelleStatutRapport(dossier.statut, dossier.statut_extraction)}
                         </Badge>
                       </td>
                       <td className="py-2 pr-4">{dossier.type}</td>

@@ -11,7 +11,7 @@ import uuid
 from sqlmodel import Session, col, select
 
 from app.auth.models import InstitutionProfil, Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import StatutAnalyse
 from app.core.exceptions import NotFoundError, ValidationError
@@ -175,9 +175,9 @@ def exporter_analyse_csv(
         ).all()
     ]
     noms_entreprises = [
-        entreprise.nom
+        entreprise.name
         for eid in entreprise_ids
-        if (entreprise := session.get(Entreprise, eid)) is not None
+        if (entreprise := session.get(Company, eid)) is not None
     ]
 
     buffer = io.StringIO()

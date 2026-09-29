@@ -11,10 +11,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_val
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
     DevisePosition,
+    ReportStatus,
     Role,
     StatutAnalyse,
     StatutProjet,
-    StatutRapport,
 )
 
 
@@ -99,7 +99,7 @@ class EntrepriseAdmin(EntreprisePublic):
 
     utilisateur_id: uuid.UUID | None
     nombre_rapports: int
-    dernier_statut_rapport: StatutRapport | None
+    dernier_statut_rapport: ReportStatus | None
     # Permet au frontend de lier "Voir le rapport"/"Valider" directement au rapport le plus
     # récent, sans détour par la liste des rapports — None si aucun rapport déposé.
     dernier_rapport_id: uuid.UUID | None
@@ -152,7 +152,7 @@ class TableauDeBordAdmin(BaseModel):
 
 
 class ScoreVerificationAdmin(BaseModel):
-    """Aperçu, sans rien persister, de si un rapport EN_VALIDATION pourrait être scoré —
+    """Aperçu, sans rien persister, de si un rapport PENDING_DECISION pourrait être scoré —
     affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::score_calculable),
     plutôt que de le laisser découvrir l'échec après coup."""
 

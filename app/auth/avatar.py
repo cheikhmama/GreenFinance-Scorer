@@ -2,7 +2,7 @@
 
 Même principe frontière que app/company/upload_validation.py : le Content-Type déclaré par le
 client est falsifiable, seule la signature binaire réelle du fichier fait foi. Stocké comme data
-URI complet directement sur Utilisateur.avatar (même convention que Entreprise.logo) — une image
+URI complet directement sur Utilisateur.avatar (même convention que Company.logo) — une image
 d'avatar reste petite, pas besoin d'un fichier séparé sur disque ni d'une route de téléchargement
 dédiée.
 """

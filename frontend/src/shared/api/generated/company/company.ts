@@ -8,6 +8,7 @@ import type {
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
   EntreprisePublic,
+  ImporterRapportParURLRequest,
   RapportESGDetail,
   RapportESGPublic
 } from '../greenFinanceScorerAPI.schemas';
@@ -87,6 +88,35 @@ formData.append(`annee_reporting`, bodySubmitCompanyReport.annee_reporting.toStr
 );}
 
 
+export const getImportCompanyReportFromURLUrl = () => {
+
+
+
+
+  return `/company/rapports/import-url`
+}
+
+/**
+ * @summary Importer un rapport ESG/climat depuis une URL (canal automatique)
+ */
+export const importCompanyReportFromURL = async (importerRapportParURLRequest: ImporterRapportParURLRequest, options?: RequestInit): Promise<RapportESGPublic> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<RapportESGPublic>(getImportCompanyReportFromURLUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importerRapportParURLRequest)
+  }
+);}
+
+
 export const getSubmitCompanyReportCorrectionUrl = (rapportId: string,) => {
 
 
@@ -128,6 +158,52 @@ export const getGetCompanyReportUrl = (rapportId: string,) => {
 export const getCompanyReport = async (rapportId: string, options?: RequestInit): Promise<RapportESGDetail> => {
 
   return apiFetch<RapportESGDetail>(getGetCompanyReportUrl(rapportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetCompanyReportOriginalFileUrl = (rapportId: string,) => {
+
+
+
+
+  return `/company/rapports/${rapportId}/fichier`
+}
+
+/**
+ * @summary Télécharger le PDF original tel que déposé (non le rapport de synthèse)
+ */
+export const getCompanyReportOriginalFile = async (rapportId: string, options?: RequestInit): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetCompanyReportOriginalFileUrl(rapportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetCompanyReportSynthesisFileUrl = (rapportId: string,) => {
+
+
+
+
+  return `/company/rapports/${rapportId}/synthese/fichier`
+}
+
+/**
+ * @summary Télécharger le rapport de synthèse généré par la plateforme
+ */
+export const getCompanyReportSynthesisFile = async (rapportId: string, options?: RequestInit): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetCompanyReportSynthesisFileUrl(rapportId),
   {
     ...options,
     method: 'GET'

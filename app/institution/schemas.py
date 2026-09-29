@@ -81,7 +81,7 @@ class EntreprisePerimetrePublic(BaseModel):
     # seul rapport_id qu'ajouter_document acceptera pour cette entreprise (voir
     # app/institution/projets.py::ajouter_document). Nul si l'entreprise n'a encore aucun rapport
     # validé, ce qui ne devrait pas arriver pour une entreprise publiée mais reste possible en
-    # théorie (voir Entreprise.date_publication, jamais garanti par une contrainte SQL).
+    # théorie (voir Company.published_at, jamais garanti par une contrainte SQL).
     dernier_rapport_id: uuid.UUID | None
     date_ajout: datetime
 

@@ -12,10 +12,10 @@ from sqlmodel import Session, col, select
 
 from app.audit.models import AvisAudit
 from app.auth.models import Utilisateur
-from app.core.enums import DecisionAudit, Role, StatutRapport
+from app.core.enums import DecisionAudit, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 
 logger = structlog.get_logger(__name__)
 
@@ -33,14 +33,14 @@ def soumettre_avis(
     decision: DecisionAudit,
     commentaire: str | None,
 ) -> AvisAudit:
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     # Même règle de non-divulgation que company/router.py::consulter_rapport : un rapport
     # inexistant et un rapport affecté à un autre auditeur rendent la même erreur, jamais un 403
     # qui confirmerait l'existence du rapport_id à quelqu'un à qui il n'est pas affecté.
-    if rapport is None or rapport.auditeur_id != auditeur_id:
+    if rapport is None or rapport.auditor_id != auditeur_id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
-    if rapport.statut != StatutRapport.AFFECTE_AUDITEUR:
+    if rapport.status != ReportStatus.PENDING_AUDIT:
         raise ValidationError(
             "Un avis a déjà été soumis pour ce rapport.", code="avis_deja_soumis"
         )
@@ -53,15 +53,15 @@ def soumettre_avis(
     )
     session.add(avis)
 
-    rapport.statut = StatutRapport.EN_VALIDATION
+    rapport.status = ReportStatus.PENDING_DECISION
     session.add(rapport)
 
-    if rapport.entreprise.utilisateur_id is not None:
+    if rapport.company.owner_user_id is not None:
         notifier(
             session,
-            rapport.entreprise.utilisateur_id,
+            rapport.company.owner_user_id,
             "RAPPORT_AVIS_RENDU_ENTREPRISE",
-            f"L'examen de votre rapport {rapport.type.value} ({rapport.annee_reporting}) est "
+            f"L'examen de votre rapport {rapport.type.value} ({rapport.fiscal_year}) est "
             "terminé, en attente de décision finale.",
             id_ressource=rapport_id,
         )
@@ -77,7 +77,7 @@ def soumettre_avis(
             admin.id,
             "RAPPORT_AVIS_RENDU_ADMIN",
             f"L'auditeur {_LIBELLES_DECISION[decision]} pour le rapport "
-            f"{rapport.type.value} ({rapport.annee_reporting}) de {rapport.entreprise.nom}.",
+            f"{rapport.type.value} ({rapport.fiscal_year}) de {rapport.company.name}.",
             id_ressource=rapport_id,
         )
 

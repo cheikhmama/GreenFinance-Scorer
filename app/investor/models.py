@@ -28,7 +28,7 @@ from app.core.enums import DevisePosition, TypeDureeInvestissement, sa_enum_colu
 
 if TYPE_CHECKING:
     from app.auth.models import Utilisateur
-    from app.company.models import Entreprise
+    from app.company.models import Company
 
 
 class Portefeuille(SQLModel, table=True):
@@ -57,7 +57,7 @@ class PositionPortefeuille(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     portefeuille_id: uuid.UUID = Field(foreign_key="portefeuille.id")
-    entreprise_id: uuid.UUID = Field(foreign_key="entreprise.id")
+    entreprise_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
     # Montant tel que saisi par l'investisseur, dans la devise ci-dessous.
     montant_investi: float
     devise: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
@@ -79,7 +79,7 @@ class PositionPortefeuille(SQLModel, table=True):
     date_fin: datetime | None = None
 
     portefeuille: Portefeuille = Relationship(back_populates="positions")
-    entreprise: "Entreprise" = Relationship(back_populates="positions")
+    entreprise: "Company" = Relationship(back_populates="positions")
 
     @model_validator(mode="after")
     def _valider_regles_duree(self) -> "PositionPortefeuille":
@@ -124,7 +124,7 @@ class PositionPortefeuille(SQLModel, table=True):
     def _valider_montant_minimum(self, info: ValidationInfo) -> "PositionPortefeuille":
         context = info.context or {}
         entreprise = context.get("entreprise")
-        minimum = entreprise.montant_minimum_investissement if entreprise else None
+        minimum = entreprise.minimum_investment_amount if entreprise else None
         if minimum is not None and self.montant_investi < minimum:
             raise ValueError(
                 "montant_investi est inférieur au minimum requis par l'entreprise"

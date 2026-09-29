@@ -4,9 +4,15 @@ Ce document décrit les conventions structurelles posées à l'Étape 2 et que l
 l'Étape 3. Il est versionné avec le code : toute évolution de ces conventions doit être répercutée ici dans le
 même commit, jamais dans un wiki externe.
 
-> Architecture cible (refonte v2, non encore implémentée) : voir `docs/ARCHITECTURE.md`,
-> `docs/WORKFLOWS.md` et le suivi `docs/TASKS.md`. Tant qu'une phase n'est pas livrée, ce
-> fichier-ci reste la seule référence qui fait foi.
+> Architecture cible (refonte v2, en cours) : voir `docs/ARCHITECTURE.md`, `docs/WORKFLOWS.md`
+> et le suivi `docs/TASKS.md`. Tant qu'une phase n'est pas livrée, ce fichier-ci reste la seule
+> référence qui fait foi.
+>
+> Renommage anglais du domaine (décision D3) en cours, module par module : les tables, colonnes
+> et classes déjà renommées sont listées dans `docs/RENAME_PLAN.md` (§2 : `Company`, `ESGReport`,
+> `ESGMetric`, `ReportStatus`/`ExtractionStatus`/`CompanyStatus`). Pendant la transition, les
+> schémas de réponse gardent leurs champs JSON français et traduisent explicitement les modèles
+> anglais (règle 3 du plan) — un nouveau code utilise toujours les noms anglais côté modèle.
 
 ## 1. Organisation des modules
 

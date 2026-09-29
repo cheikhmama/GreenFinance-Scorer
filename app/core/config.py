@@ -35,12 +35,12 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: float = Field(default=10, gt=0, le=60)
     mail_from: str = ""
     contact_to_email: str = ""
-    # Délai au-delà duquel un rapport affecté sans avis rendu (RapportESG.date_affectation) compte
+    # Délai au-delà duquel un rapport affecté sans avis rendu (ESGReport.assigned_at) compte
     # comme "en retard" au dashboard Administrateur — configurable par déploiement (SLA_AUDIT_JOURS
     # dans .env), pas via un écran admin (aucun n'existe pour cette pondération, cohérent avec
     # app/scoring/config_schema.py, pas plus exposé).
     sla_audit_jours: int = 10
-    # Délai au-delà duquel un rapport EN_EXTRACTION sans extraction_erreur ni extraction_terminee_le
+    # Délai au-delà duquel un rapport dont l'extraction reste RUNNING
     # compte comme "bloqué" (traitement probablement interrompu) plutôt que "encore en cours" —
     # même principe de configuration que sla_audit_jours. Docling seul a pris ~9 min sur un rapport
     # de 25 pages (mesuré Phase 5) ; généreux pour éviter un faux positif sur un long rapport.

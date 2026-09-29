@@ -1,5 +1,5 @@
 """Génération du rapport de synthèse PDF produit par la plateforme (distinct du rapport original
-déposé par l'Entreprise, fichier_source sur RapportESG, jamais touché ici).
+déposé par l'Entreprise, fichier_source sur ESGReport, jamais touché ici).
 
 Composé et régénéré à deux déclencheurs (jamais versionné séparément, le fichier précédent est
 simplement remplacé) :
@@ -16,13 +16,13 @@ Séparation stricte, jamais mélangée visuellement, cohérente avec config/weig
     comme non intégrées au score calculé (tonnage brut sans dénominateur, voir le commentaire de
     config/weights/default.yaml) ;
   - les scores auto-déclarés par l'entreprise (CODES_AUTO_DECLARES_PAR_PILIER +
-    RapportESG.score_global_declare) vivent dans leur propre section "déclaré par l'entreprise",
+    ESGReport.declared_global_score) vivent dans leur propre section "déclaré par l'entreprise",
     jamais confondus avec ce que la plateforme calcule elle-même -- même principe que le reste de
     la plateforme : jamais de boîte noire, jamais un chiffre dont on ne peut pas dire la source.
 
 Fonction pure : ne touche pas la session DB au-delà des lectures nécessaires à l'assemblage,
 l'appelant décide de la persistance (app.core.storage) et de l'affectation du chemin résultant à
-RapportESG.rapport_synthese_genere.
+ESGReport.synthesis_report_path.
 """
 
 import io
@@ -42,7 +42,7 @@ from sqlmodel import Session, col, select
 
 from app.core.database import utcnow
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
-from app.ingestion.models import DonneeCarbone, IndicateurESG, RapportESG
+from app.ingestion.models import DonneeCarbone, ESGMetric, ESGReport
 from app.scoring.engine import score_officiel
 from app.scoring.models import ScoreESG
 
@@ -93,8 +93,8 @@ def _section_score_officiel(score: ScoreESG | None) -> list:
     return elements
 
 
-def _section_indicateurs(indicateurs: list[IndicateurESG]) -> list:
-    reels = [i for i in indicateurs if i.code not in CODES_AUTO_DECLARES_PAR_PILIER]
+def _section_indicateurs(indicateurs: list[ESGMetric]) -> list:
+    reels = [i for i in indicateurs if i.metric_code not in CODES_AUTO_DECLARES_PAR_PILIER]
     elements: list = [Paragraph("Indicateurs ESG extraits", _STYLE_SECTION)]
     if not reels:
         elements.append(Paragraph("Aucun indicateur extrait pour ce rapport.", _STYLES["Normal"]))
@@ -104,12 +104,12 @@ def _section_indicateurs(indicateurs: list[IndicateurESG]) -> list:
     for indicateur in reels:
         donnees.append(
             [
-                indicateur.code,
-                indicateur.pilier.value,
-                f"{indicateur.valeur:g}",
-                indicateur.unite or "-",
-                str(indicateur.annee_valeur) if indicateur.annee_valeur else "-",
-                f"p. {indicateur.preuve.page_debut}",
+                indicateur.metric_code,
+                indicateur.pillar.value,
+                f"{indicateur.value:g}",
+                indicateur.unit or "-",
+                str(indicateur.value_year) if indicateur.value_year else "-",
+                f"p. {indicateur.proof.page_debut}",
             ]
         )
     table = Table(donnees, colWidths=[5 * cm, 2.7 * cm, 2 * cm, 2 * cm, 1.8 * cm, 2 * cm])
@@ -150,8 +150,8 @@ def _section_carbone(donnees_carbone: list[DonneeCarbone]) -> list:
     return elements
 
 
-def _section_declare_par_lentreprise(rapport: RapportESG, indicateurs: list[IndicateurESG]) -> list:
-    declares = [i for i in indicateurs if i.code in CODES_AUTO_DECLARES_PAR_PILIER]
+def _section_declare_par_lentreprise(rapport: ESGReport, indicateurs: list[ESGMetric]) -> list:
+    declares = [i for i in indicateurs if i.metric_code in CODES_AUTO_DECLARES_PAR_PILIER]
     elements: list = [Paragraph("Déclaré par l'entreprise (non vérifié indépendamment)", _STYLE_SECTION)]
     elements.append(
         Paragraph(
@@ -162,10 +162,10 @@ def _section_declare_par_lentreprise(rapport: RapportESG, indicateurs: list[Indi
         )
     )
     lignes = [["Élément", "Valeur déclarée"]]
-    if rapport.score_global_declare is not None:
-        lignes.append(["Score ESG global déclaré", f"{rapport.score_global_declare:g}"])
+    if rapport.declared_global_score is not None:
+        lignes.append(["Score ESG global déclaré", f"{rapport.declared_global_score:g}"])
     for indicateur in declares:
-        lignes.append([indicateur.code, f"{indicateur.valeur:g} {indicateur.unite or ''}".strip()])
+        lignes.append([indicateur.metric_code, f"{indicateur.value:g} {indicateur.unit or ''}".strip()])
     if len(lignes) == 1:
         elements.append(Paragraph("Aucun score auto-déclaré trouvé dans ce rapport.", _STYLES["Normal"]))
         return elements
@@ -176,9 +176,9 @@ def _section_declare_par_lentreprise(rapport: RapportESG, indicateurs: list[Indi
     return elements
 
 
-def generer_rapport_synthese(session: Session, rapport: RapportESG) -> bytes:
+def generer_rapport_synthese(session: Session, rapport: ESGReport) -> bytes:
     indicateurs = list(
-        session.exec(select(IndicateurESG).where(col(IndicateurESG.rapport_id) == rapport.id)).all()
+        session.exec(select(ESGMetric).where(col(ESGMetric.report_id) == rapport.id)).all()
     )
     donnees_carbone = list(
         session.exec(select(DonneeCarbone).where(col(DonneeCarbone.rapport_id) == rapport.id)).all()
@@ -196,10 +196,10 @@ def generer_rapport_synthese(session: Session, rapport: RapportESG) -> bytes:
     )
 
     elements: list = [
-        Paragraph(f"Rapport de synthèse ESG -- {rapport.entreprise.nom}", _STYLE_TITRE),
+        Paragraph(f"Rapport de synthèse ESG -- {rapport.company.name}", _STYLE_TITRE),
         Paragraph(
-            f"{rapport.entreprise.secteur} · {rapport.entreprise.pays} · Année de reporting "
-            f"{rapport.annee_reporting or '-'} · Généré le "
+            f"{rapport.company.sector} · {rapport.company.country} · Année de reporting "
+            f"{rapport.fiscal_year or '-'} · Généré le "
             f"{utcnow().strftime('%d/%m/%Y')}",
             _STYLES["Normal"],
         ),

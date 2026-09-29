@@ -18,13 +18,14 @@ Rules for every task:
 
 ## Phase 1: Enterprise Management & Onboarding
 
-- [ ] 1.1 DB Models: Refactor `Company`, `ESGReport`, and `ESGMetric` models according to domain spec.
-  - [ ] Rename `entreprise`/`rapport_esg`/`indicateur_esg` to `companies`/`esg_reports`/`esg_metrics` per [`RENAME_PLAN.md`](RENAME_PLAN.md) §2, in one consolidated migration.
-  - [ ] Add `isin`, `lei` (check-digit validated), `revenue`, `enterprise_value` (EVIC) with currencies and dates, `status` (replaces `actif`; `published_at` keeps the publication timestamp).
-  - [ ] Split report `status` from `extraction_status`; add `DRAFT`, `PENDING_DECISION` (D2), `official_score`, `coverage_rate`, `config_hash`.
-  - [ ] Unique `(report_id, metric_code)` on metrics **[review]** (the scoring engine silently keeps the last duplicate today).
-  - [ ] Auditor override fields on metrics.
-  - [ ] Explicit `ON DELETE` rules and indexes on every foreign key to or from the three tables (RENAME_PLAN §2.5).
+- [x] 1.1 DB Models: Refactor `Company`, `ESGReport`, and `ESGMetric` models according to domain spec. (migration `21e17187789f`)
+  - [x] Rename `entreprise`/`rapport_esg`/`indicateur_esg` to `companies`/`esg_reports`/`esg_metrics` per [`RENAME_PLAN.md`](RENAME_PLAN.md) §2, in one consolidated migration.
+  - [x] Add `isin`, `lei` (check-digit validated), `revenue`, `enterprise_value` (EVIC) with currencies and dates, `status` (replaces `actif`; `published_at` keeps the publication timestamp).
+  - [x] Split report `status` from `extraction_status`; add `DRAFT`, `PENDING_DECISION` (D2), `official_score`, `coverage_rate`, `config_hash`.
+  - [x] Unique `(report_id, metric_code)` on metrics **[review]**; the extractor keeps the first exploitable occurrence of a repeated code.
+  - [x] Auditor override fields on metrics (columns only; the auditor API is part of the audit workflow work).
+  - [x] Explicit `ON DELETE` rules and indexes on every foreign key to or from the three tables (RENAME_PLAN §2.5).
+  - Follow-ups: ISIN/LEI check-digit validation lands with registration input (1.3); `official_score`, `coverage_rate`, `config_hash` are filled by 1.6 and 3.1.
 - [ ] 1.2 Auth & Email Sanitization: Enforce lowercase email normalization and Pydantic password validation (12-72 bytes).
   - [ ] Rename `utilisateur` → `users` per RENAME_PLAN §3.
   - [ ] Password policy per D4: 12 characters minimum on activation, reset and change; existing hashes untouched.

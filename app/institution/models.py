@@ -18,8 +18,8 @@ from app.core.enums import StatutProjet, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import Utilisateur
-    from app.company.models import Entreprise
-    from app.ingestion.models import RapportESG
+    from app.company.models import Company
+    from app.ingestion.models import ESGReport
     from app.researcher.models import Analyse
 
 
@@ -43,7 +43,7 @@ class Projet(SQLModel, table=True):
     statut: StatutProjet = Field(default=StatutProjet.OUVERT, sa_column=sa_enum_column(StatutProjet))
     date_creation: datetime = Field(default_factory=utcnow)
     # Nulle tant que le projet est OUVERT — renseignée une seule fois à la clôture, jamais
-    # recalculée (même principe que Entreprise.date_publication).
+    # recalculée (même principe que Company.published_at).
     date_cloture: datetime | None = None
 
     institution: "Utilisateur" = Relationship(back_populates="projets")
@@ -70,7 +70,7 @@ class AffectationProjet(SQLModel, table=True):
 
 class ProjetEntreprise(SQLModel, table=True):
     """Le périmètre d'un projet : les entreprises que l'Institution autorise à comparer dans ce
-    projet précis (Étape 17bis). Une entreprise n'y entre que publiée (Entreprise.date_publication
+    projet précis (Étape 17bis). Une entreprise n'y entre que publiée (Company.published_at
     non nul, vérifié par app/institution/projets.py, pas ici) — un Chercheur affecté au projet ne
     peut construire une analyse qu'avec des entreprises présentes dans cette table, jamais
     n'importe quelle entreprise publiée de la plateforme."""
@@ -82,11 +82,11 @@ class ProjetEntreprise(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    entreprise_id: uuid.UUID = Field(foreign_key="entreprise.id")
+    entreprise_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
     date_ajout: datetime = Field(default_factory=utcnow)
 
     projet: Projet = Relationship(back_populates="perimetre")
-    entreprise: "Entreprise" = Relationship()
+    entreprise: "Company" = Relationship()
 
 
 class ProjetDocument(SQLModel, table=True):
@@ -94,7 +94,7 @@ class ProjetDocument(SQLModel, table=True):
     restrictif que le périmètre (ProjetEntreprise) : appartenir au périmètre ne rend pas
     automatiquement tous les rapports internes de l'entreprise accessibles, seul un rapport
     explicitement ajouté ici l'est. N'accepte que le rapport actuellement publié de l'entreprise
-    (voir app/institution/projets.py::ajouter_document, jamais seulement statut == VALIDE — un
+    (voir app/institution/projets.py::ajouter_document, jamais seulement statut == VALIDATED — un
     ancien rapport validé puis remplacé ne doit jamais redevenir accessible ainsi)."""
 
     __tablename__ = "projet_document"
@@ -102,8 +102,8 @@ class ProjetDocument(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    rapport_id: uuid.UUID = Field(foreign_key="rapport_esg.id")
+    rapport_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
     date_ajout: datetime = Field(default_factory=utcnow)
 
     projet: Projet = Relationship(back_populates="documents")
-    rapport: "RapportESG" = Relationship()
+    rapport: "ESGReport" = Relationship()

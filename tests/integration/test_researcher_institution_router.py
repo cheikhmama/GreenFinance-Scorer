@@ -7,11 +7,11 @@ from sqlmodel import select
 from app.auth.hashing import hash_password
 from app.auth.models import InstitutionProfil, Utilisateur
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, Role, StatutRapport, TypeRapport
+from app.core.enums import CanalDepot, ReportStatus, Role, TypeRapport
 from app.core.models import Notification
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
 from app.scoring.models import ScoreESG
@@ -43,26 +43,26 @@ def _create_institution(session, *, quota_export: int = 10) -> Utilisateur:
     return institution
 
 
-def _entreprise_publiee(session, *, score_global: float = 70.0, nom: str | None = None) -> Entreprise:
+def _entreprise_publiee(session, *, score_global: float = 70.0, nom: str | None = None) -> Company:
     """Publiée avec un rapport VALIDE et un ScoreESG officiel — invariant réel de
     publier_entreprise (app/admin/review_queue.py), jamais une entreprise « publiée » sans
     évaluation, sans quoi _verifier_perimetre_et_recuperer_snapshots ne trouverait jamais de
     rapport/score à figer."""
-    entreprise = Entreprise(
-        nom=nom or f"Cible {uuid.uuid4()}",
-        secteur="Industrie",
-        pays="France",
-        date_publication=utcnow(),
+    entreprise = Company(
+        name=nom or f"Cible {uuid.uuid4()}",
+        sector="Industrie",
+        country="France",
+        published_at=utcnow(),
     )
     session.add(entreprise)
     session.commit()
 
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.VALIDE,
-        fichier_source="rapports/test/dummy.pdf",
+        channel=CanalDepot.ENTREPRISE,
+        status=ReportStatus.VALIDATED,
+        source_file="rapports/test/dummy.pdf",
     )
     session.add(rapport)
     session.commit()
@@ -480,8 +480,8 @@ def test_creer_analyse_refuse_entreprise_hors_perimetre(session) -> None:
 def test_ajouter_entreprise_perimetre_refuse_entreprise_non_publiee(session) -> None:
     institution = _create_institution(session)
     institution_authed = _login(institution.email)
-    entreprise_non_publiee = Entreprise(
-        nom=f"Cible {uuid.uuid4()}", secteur="Industrie", pays="France"
+    entreprise_non_publiee = Company(
+        name=f"Cible {uuid.uuid4()}", sector="Industrie", country="France"
     )
     session.add(entreprise_non_publiee)
     session.commit()
@@ -506,7 +506,7 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
 
     ancien_rapport_id = (
         session.exec(
-            select(RapportESG).where(RapportESG.entreprise_id == entreprise.id)
+            select(ESGReport).where(ESGReport.company_id == entreprise.id)
         )
         .one()
         .id
@@ -526,15 +526,15 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
 
     _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
 
-    # Une nouvelle évaluation supplante l'ancienne (nouveau RapportESG VALIDE, plus récent) —
+    # Une nouvelle évaluation supplante l'ancienne (nouveau ESGReport VALIDE, plus récent) —
     # l'ancien rapport reste littéralement VALIDE en base mais n'est plus le rapport publié.
-    nouveau_rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    nouveau_rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.VALIDE,
-        fichier_source="rapports/test/dummy-v2.pdf",
-        date_depot=utcnow() + timedelta(days=1),
+        channel=CanalDepot.ENTREPRISE,
+        status=ReportStatus.VALIDATED,
+        source_file="rapports/test/dummy-v2.pdf",
+        submitted_at=utcnow() + timedelta(days=1),
     )
     session.add(nouveau_rapport)
     session.commit()

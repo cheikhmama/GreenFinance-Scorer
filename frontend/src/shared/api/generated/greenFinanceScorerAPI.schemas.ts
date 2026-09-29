@@ -313,15 +313,33 @@ export interface ContactMessageRequest {
   message: string;
 }
 
+/**
+ * Statut à 3 valeurs d'un code cible pour un rapport (Phase 6, remplace l'ancien booléen
+ * CouvertureIndicateur.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
+ * sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
+ * simple absence dans les pages examinées, qui reste NON_TROUVE.
+ */
+export type StatutCouvertureIndicateur = typeof StatutCouvertureIndicateur[keyof typeof StatutCouvertureIndicateur];
+
+
+export const StatutCouvertureIndicateur = {
+  TROUVE: 'TROUVE',
+  NON_TROUVE: 'NON_TROUVE',
+  ABSENT_CONFIRME: 'ABSENT_CONFIRME',
+} as const;
+
 export interface CouvertureIndicateurPublic {
   code: string;
-  trouve: boolean;
+  statut: StatutCouvertureIndicateur;
 }
 
 /**
  * Transparence sur ce qui manque (décision produit, voir app/ingestion/completeness.py) :
  * total_cibles/trouves permettent d'afficher "14/23 indicateurs communiqués" plutôt que de
- * laisser deviner une absence à partir d'un tiret muet ; codes_manquants liste précisément quoi.
+ * laisser deviner une absence à partir d'un tiret muet ; codes_manquants liste tout code dont le
+ * statut n'est pas TROUVE (NON_TROUVE et ABSENT_CONFIRME y comptent tous les deux comme
+ * "manquant" — la distinction entre les deux reste disponible via CouvertureIndicateurPublic.statut
+ * pour qui a besoin de savoir si l'absence a été confirmée ou seulement pas encore trouvée).
  */
 export interface CouvertureResume {
   total_cibles: number;
@@ -413,6 +431,15 @@ export interface PreuveDocumentairePublic {
   pdf_extrait_genere: string;
 }
 
+export type NiveauConfiance = typeof NiveauConfiance[keyof typeof NiveauConfiance];
+
+
+export const NiveauConfiance = {
+  ELEVE: 'ELEVE',
+  MOYEN: 'MOYEN',
+  FAIBLE: 'FAIBLE',
+} as const;
+
 export interface DonneeCarboneDetail {
   id: string;
   scope: number;
@@ -422,6 +449,11 @@ export interface DonneeCarboneDetail {
   methode: MethodeDonnee;
   score_qualite_pcaf: number;
   preuve: PreuveDocumentairePublic;
+  valeur_brute: string | null;
+  section: string | null;
+  citation_source: string | null;
+  annee_valeur: number | null;
+  confiance: NiveauConfiance | null;
 }
 
 export interface DonneesCarboneAgregees {
@@ -431,17 +463,21 @@ export interface DonneesCarboneAgregees {
   scope_3: number | null;
 }
 
-export type StatutRapport = typeof StatutRapport[keyof typeof StatutRapport];
+/**
+ * Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
+ * d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne.
+ */
+export type ReportStatus = typeof ReportStatus[keyof typeof ReportStatus];
 
 
-export const StatutRapport = {
-  ENVOYE: 'ENVOYE',
-  EN_EXTRACTION: 'EN_EXTRACTION',
-  AFFECTE_AUDITEUR: 'AFFECTE_AUDITEUR',
-  EN_VALIDATION: 'EN_VALIDATION',
-  VALIDE: 'VALIDE',
-  REJETE: 'REJETE',
-  DEMANDE_CORRECTION: 'DEMANDE_CORRECTION',
+export const ReportStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  PENDING_AUDIT: 'PENDING_AUDIT',
+  PENDING_DECISION: 'PENDING_DECISION',
+  REVISION_REQUESTED: 'REVISION_REQUESTED',
+  VALIDATED: 'VALIDATED',
+  REJECTED: 'REJECTED',
 } as const;
 
 /**
@@ -465,7 +501,7 @@ export interface EntrepriseAdmin {
   date_publication: string | null;
   utilisateur_id: string | null;
   nombre_rapports: number;
-  dernier_statut_rapport: StatutRapport | null;
+  dernier_statut_rapport: ReportStatus | null;
   dernier_rapport_id: string | null;
 }
 
@@ -515,6 +551,11 @@ export interface IndicateurESGDetail {
   unite: string;
   methode: MethodeDonnee;
   preuve: PreuveDocumentairePublic;
+  valeur_brute: string | null;
+  section: string | null;
+  citation_source: string | null;
+  annee_valeur: number | null;
+  confiance: NiveauConfiance | null;
 }
 
 /**
@@ -611,6 +652,17 @@ export const EtatPosition = {
   ENTREPRISE_SUSPENDUE: 'ENTREPRISE_SUSPENDUE',
 } as const;
 
+export type ExtractionStatus = typeof ExtractionStatus[keyof typeof ExtractionStatus];
+
+
+export const ExtractionStatus = {
+  NOT_STARTED: 'NOT_STARTED',
+  QUEUED: 'QUEUED',
+  RUNNING: 'RUNNING',
+  DONE: 'DONE',
+  FAILED: 'FAILED',
+} as const;
+
 export interface FermerPositionRequest {
   date_fin?: string | null;
 }
@@ -627,6 +679,18 @@ export interface ValidationError {
 
 export interface HTTPValidationError {
   detail?: ValidationError[];
+}
+
+/**
+ * Corps de POST /company/rapports/import-url (CanalDepot.AUTOMATIQUE). entreprise_id n'est
+ * lu que pour un appelant Administrateur -- un appelant Entreprise est toujours rattaché à sa
+ * propre entreprise (voir app/company/router.py), un entreprise_id fourni par lui est ignoré.
+ */
+export interface ImporterRapportParURLRequest {
+  url: string;
+  type: TypeRapport;
+  annee_reporting: number;
+  entreprise_id?: string | null;
 }
 
 /**
@@ -871,7 +935,8 @@ export interface RapportESGPublic {
   type: TypeRapport;
   canal: CanalDepot;
   date_depot: string;
-  statut: StatutRapport;
+  statut: ReportStatus;
+  statut_extraction: ExtractionStatus;
   fichier_source: string;
   nom_fichier_origine: string | null;
   annee_reporting: number | null;
@@ -1011,6 +1076,19 @@ export interface ProjetPublic {
 }
 
 /**
+ * Le ScoreESG officiel d'un rapport (app/scoring/engine.py::score_officiel), jamais un score
+ * personnalisé ni un score auto-déclaré par l'entreprise -- ces deux-là restent ailleurs (voir
+ * app/ingestion/schemas.py::RapportESGDetail pour la distinction explicite).
+ */
+export interface ScoreESGPublic {
+  valeur_globale: number;
+  score_environnement: number | null;
+  score_social: number | null;
+  score_gouvernance: number | null;
+  configuration_version: number;
+}
+
+/**
  * Étend RapportESGPublic avec les données extraites. Ne contient JAMAIS l'avis de l'auditeur
  * (app/audit/schemas.py::AvisAudit*) — l'auditeur_id ne doit jamais pouvoir fuiter vers une
  * réponse Entreprise par accident de composition de schéma, pas seulement par discipline.
@@ -1021,7 +1099,8 @@ export interface RapportESGDetail {
   type: TypeRapport;
   canal: CanalDepot;
   date_depot: string;
-  statut: StatutRapport;
+  statut: ReportStatus;
+  statut_extraction: ExtractionStatus;
   fichier_source: string;
   nom_fichier_origine: string | null;
   annee_reporting: number | null;
@@ -1034,6 +1113,7 @@ export interface RapportESGDetail {
   donnees_carbone: DonneeCarboneDetail[];
   score_global_declare: number | null;
   score_global_declare_preuve: PreuveDocumentairePublic | null;
+  score_officiel?: ScoreESGPublic | null;
   readonly couverture: CouvertureResume;
 }
 
@@ -1110,7 +1190,7 @@ export interface ScoreESG {
 }
 
 /**
- * Aperçu, sans rien persister, de si un rapport EN_VALIDATION pourrait être scoré —
+ * Aperçu, sans rien persister, de si un rapport PENDING_DECISION pourrait être scoré —
  * affiché avant que l'Admin ne clique Valider (voir app/scoring/engine.py::score_calculable),
  * plutôt que de le laisser découvrir l'échec après coup.
  */
@@ -1225,7 +1305,7 @@ export type ListAllReportsParams = {
 /**
  * Filtre sur le statut du rapport
  */
-statut?: StatutRapport | null;
+statut?: ReportStatus | null;
 /**
  * @minimum 1
  */

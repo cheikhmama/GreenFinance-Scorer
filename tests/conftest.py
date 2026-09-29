@@ -8,7 +8,7 @@ n'annule que ce qui n'a pas été commit, et les handlers de route commitent tou
 conception). Sans l'isolation stockage, les PDF envoyés via POST /company/rapports pendant les
 tests s'écrivent sous le vrai STORAGE_PATH (./storage) — même défaut, mêmes conséquences : ça a
 rempli storage/rapports/test/ et laissé 230+ dossiers UUID orphelins (jamais nettoyés par un
-DELETE puisque les lignes RapportESG correspondantes vivent dans la base de test, droppée à part).
+DELETE puisque les lignes ESGReport correspondantes vivent dans la base de test, droppée à part).
 
 Ce module doit s'exécuter avant TOUT import de app.* dans la session pytest — d'où sa position à
 la racine de tests/, chargée avant tests/integration/conftest.py (qui importe déjà

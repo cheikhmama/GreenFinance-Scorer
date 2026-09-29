@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class JournalAudit(SQLModel, table=True):
     """Trace immuable des actions sensibles (Phase 3 §3.5) — jamais modifiée ni supprimée après
-    création, sur le même principe que RapportESG et ce qui en dérive (voir
+    création, sur le même principe que ESGReport et ce qui en dérive (voir
     app/ingestion/models.py). Écrite par app/core/audit.py::auditer, jamais construite ailleurs.
 
     Portée de cette passe : événements de compte et de session (connexion, déconnexion,
@@ -49,7 +49,7 @@ class Notification(SQLModel, table=True):
     utilisateur_id: uuid.UUID = Field(foreign_key="utilisateur.id")
     message: str
     type: str
-    # Cible de redirection au clic (ex. l'id d'un RapportESG) — jamais de FK stricte : le type de
+    # Cible de redirection au clic (ex. l'id d'un ESGReport) — jamais de FK stricte : le type de
     # ressource varie selon `type` (rapport, entreprise, ...) et certains types n'en ont pas
     # (ex. une invitation de rattachement, qui renvoie vers une liste, pas un id précis).
     id_ressource: uuid.UUID | None = Field(default=None)

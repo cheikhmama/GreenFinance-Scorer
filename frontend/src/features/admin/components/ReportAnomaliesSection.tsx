@@ -39,7 +39,7 @@ function BoutonRelancer({ rapportId }: { rapportId: string }) {
 }
 
 /** États incohérents/orphelins qu'aucune file normale ne surface (BUG-017/018) — un rapport en
- * échec d'extraction ou un rapport EN_VALIDATION sans avis restent invisibles de la file
+ * échec d'extraction ou un rapport PENDING_DECISION sans avis restent invisibles de la file
  * d'affectation/de décision normale, jamais silencieusement ignorés pour autant. Affichée dans
  * l'onglet "Alertes" (AdminReportsPage), avec un état vide explicite plutôt que de disparaître —
  * l'onglet lui-même reste sélectionnable même sans rien à traiter, pour confirmer l'absence

@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.audit.models import AvisAudit
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.enums import (
     CanalDepot,
     DecisionAudit,
@@ -16,9 +16,9 @@ from app.core.enums import (
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    IndicateurESG,
+    ESGMetric,
+    ESGReport,
     PreuveDocumentaire,
-    RapportESG,
     SignalementEcart,
 )
 
@@ -34,15 +34,15 @@ def _utilisateur(session, role: Role) -> Utilisateur:
     return utilisateur
 
 
-def _rapport_avec_indicateur(session) -> tuple[RapportESG, IndicateurESG]:
-    entreprise = Entreprise(nom="Acme", secteur="Industrie", pays="MR")
+def _rapport_avec_indicateur(session) -> tuple[ESGReport, ESGMetric]:
+    entreprise = Company(name="Acme", sector="Industrie", country="MR")
     session.add(entreprise)
     session.flush()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.AUTOMATIQUE,
-        fichier_source="s3://bucket/rapport.pdf",
+        channel=CanalDepot.AUTOMATIQUE,
+        source_file="s3://bucket/rapport.pdf",
     )
     session.add(rapport)
     session.flush()
@@ -56,14 +56,14 @@ def _rapport_avec_indicateur(session) -> tuple[RapportESG, IndicateurESG]:
     )
     session.add(preuve)
     session.flush()
-    indicateur = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.GOUVERNANCE,
-        code="GOV-01",
-        valeur=1.0,
-        unite="ratio",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    indicateur = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pilier.GOUVERNANCE,
+        metric_code="GOV-01",
+        value=1.0,
+        unit="ratio",
+        method=MethodeDonnee.RAPPORTEE,
+        proof_id=preuve.id,
     )
     session.add(indicateur)
     session.flush()
@@ -86,7 +86,7 @@ def test_creation_avis_audit(session) -> None:
     assert avis.id is not None
     assert avis.rapport.id == rapport.id
     assert avis.auditeur.id == auditeur.id
-    assert avis in rapport.avis_audit
+    assert avis in rapport.audit_opinions
     assert avis in auditeur.avis_rendus
 
 
@@ -95,7 +95,7 @@ def test_creation_signalement_ecart_ciblant_un_indicateur(session) -> None:
 
     signalement = SignalementEcart(
         indicateur_id=indicateur.id,
-        entreprise_id=rapport.entreprise_id,
+        entreprise_id=rapport.company_id,
         nature_ecart="Valeur incohérente avec l'année précédente",
     )
     session.add(signalement)
@@ -105,8 +105,8 @@ def test_creation_signalement_ecart_ciblant_un_indicateur(session) -> None:
     assert signalement.statut == "OUVERT"
     assert signalement.indicateur_id == indicateur.id
     # La cible est bien l'indicateur, jamais uniquement le rapport entier.
-    assert signalement.indicateur.rapport_id == rapport.id
-    assert signalement in indicateur.signalements
+    assert signalement.indicateur.report_id == rapport.id
+    assert signalement in indicateur.discrepancy_flags
 
 
 def test_indicateur_id_doit_referencer_un_indicateur_pas_un_rapport(session) -> None:
@@ -116,7 +116,7 @@ def test_indicateur_id_doit_referencer_un_indicateur_pas_un_rapport(session) -> 
     # contrainte de clé étrangère rejette la confusion rapport/indicateur.
     signalement = SignalementEcart(
         indicateur_id=rapport.id,
-        entreprise_id=rapport.entreprise_id,
+        entreprise_id=rapport.company_id,
         nature_ecart="x",
     )
     session.add(signalement)

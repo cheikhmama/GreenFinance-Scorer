@@ -1,6 +1,6 @@
 """Moteur de calcul du score ESG (Phase 5 §9).
 
-Point d'entrée : calculer_score(session, rapport_id). Lit les IndicateurESG déjà persistés pour
+Point d'entrée : calculer_score(session, rapport_id). Lit les ESGMetric déjà persistés pour
 ce rapport (jamais de saisie manuelle, jamais de valeur recalculée à partir d'une source hors
 plateforme — même garantie que app/ingestion/models.py), les regroupe par pilier, normalise
 chaque valeur selon la configuration de pondération de référence (app/scoring/config_schema.py,
@@ -23,7 +23,7 @@ from sqlmodel import Session, col, select
 from app.core.config import get_settings
 from app.core.enums import Pilier
 from app.core.exceptions import NotFoundError, ValidationError
-from app.ingestion.models import IndicateurESG, RapportESG
+from app.ingestion.models import ESGMetric, ESGReport
 from app.scoring.config_schema import (
     ConfigurationScoring,
     PilierConfig,
@@ -88,19 +88,19 @@ def _score_pilier(pilier_config: PilierConfig, valeurs_par_code: dict[str, float
 
 
 def calculer_score(session: Session, rapport_id: uuid.UUID) -> ScoreESG:
-    """N'appelle jamais session.commit() : appelé comme sous-étape de la transition VALIDE
+    """N'appelle jamais session.commit() : appelé comme sous-étape de la transition VALIDATED
     (app/admin/review_queue.py::valider_rapport), qui contrôle la limite de la transaction —
     même convention que app/core/notifications.py::notifier."""
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
     indicateurs = session.exec(
-        select(IndicateurESG).where(IndicateurESG.rapport_id == rapport_id)
+        select(ESGMetric).where(ESGMetric.report_id == rapport_id)
     ).all()
     valeurs_par_pilier: dict[Pilier, dict[str, float]] = {pilier: {} for pilier in Pilier}
     for indicateur in indicateurs:
-        valeurs_par_pilier[indicateur.pilier][indicateur.code] = indicateur.valeur
+        valeurs_par_pilier[indicateur.pillar][indicateur.metric_code] = indicateur.value
 
     configuration = obtenir_configuration_reference(session)
     schema = _charger_configuration_reference_depuis_disque(configuration.fichier_yaml)
@@ -142,14 +142,14 @@ def score_calculable(session: Session, rapport_id: uuid.UUID) -> bool:
     cibles y est présent), jamais dupliquée. Utilisé pour avertir l'Admin AVANT qu'il ne clique
     Valider, plutôt que de le laisser découvrir score_incalculable après coup (voir
     app/admin/review_queue.py::valider_rapport)."""
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
     codes_par_pilier: dict[Pilier, set[str]] = {pilier: set() for pilier in Pilier}
     for pilier, code in session.exec(
-        select(IndicateurESG.pilier, IndicateurESG.code).where(
-            IndicateurESG.rapport_id == rapport_id
+        select(ESGMetric.pillar, ESGMetric.metric_code).where(
+            ESGMetric.report_id == rapport_id
         )
     ).all():
         codes_par_pilier[Pilier(pilier)].add(code)

@@ -64,6 +64,8 @@ companies 1───* esg_reports 1───* esg_metrics
 
 ### 3.1 `companies` — master data (module `app/company`)
 
+*Implemented in task 1.1* (ISIN/LEI check-digit validation: task 1.3).
+
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
@@ -83,6 +85,8 @@ LEI, revenue or EVIC — PCAF can't be computed without them. `country` stays fr
 registration (task 1.3) validates ISO codes on input.
 
 ### 3.2 `esg_reports` — fiscal reporting (module `app/ingestion` → `app/reporting`)
+
+*Implemented in task 1.1* (`official_score`, `coverage_rate`, `config_hash` columns exist; filled by tasks 1.6 and 3.1).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -114,6 +118,8 @@ registration (task 1.3) validates ISO codes on input.
 (annual, ESG, climate) for the same year, and each correction adds a version.
 
 ### 3.3 `esg_metrics` — data points
+
+*Implemented in task 1.1.*
 
 | Column | Type | Notes |
 |---|---|---|

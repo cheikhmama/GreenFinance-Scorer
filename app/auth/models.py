@@ -18,9 +18,9 @@ from app.core.enums import Role, StatutRattachement, sa_enum_column
 
 if TYPE_CHECKING:
     from app.audit.models import AvisAudit
-    from app.company.models import Entreprise
+    from app.company.models import Company
     from app.core.models import Notification
-    from app.ingestion.models import RapportESG
+    from app.ingestion.models import ESGReport
     from app.institution.models import AffectationProjet, Projet
     from app.investor.models import Portefeuille
     from app.researcher.models import Analyse
@@ -33,7 +33,7 @@ class Utilisateur(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
     nom: str | None = None
-    # Data URI complet (voir app/company/models.py::Entreprise.logo, même convention) — jamais un
+    # Data URI complet (voir app/company/models.py::Company.logo, même convention) — jamais un
     # fichier séparé sur disque, une image d'avatar reste petite (voir
     # app/auth/avatar.py::TAILLE_MAX_OCTETS).
     avatar: str | None = None
@@ -54,8 +54,8 @@ class Utilisateur(SQLModel, table=True):
     institution_profil: Optional["InstitutionProfil"] = Relationship(
         back_populates="utilisateur"
     )
-    entreprise: Optional["Entreprise"] = Relationship(back_populates="utilisateur")
-    rapports_audites: list["RapportESG"] = Relationship(back_populates="auditeur")
+    entreprise: Optional["Company"] = Relationship(back_populates="owner")
+    rapports_audites: list["ESGReport"] = Relationship(back_populates="auditor")
     configurations_ponderation: list["ConfigurationPonderation"] = Relationship(
         back_populates="utilisateur"
     )

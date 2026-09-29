@@ -1,6 +1,6 @@
 import { FileText } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { StatutRapport } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { ReportStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -10,14 +10,13 @@ import { Select } from "@/shared/ui/select";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAllReports } from "../api";
 
-const STATUTS: StatutRapport[] = [
-  "ENVOYE",
-  "EN_EXTRACTION",
-  "AFFECTE_AUDITEUR",
-  "EN_VALIDATION",
-  "VALIDE",
-  "REJETE",
-  "DEMANDE_CORRECTION",
+const STATUTS: ReportStatus[] = [
+  "SUBMITTED",
+  "PENDING_AUDIT",
+  "PENDING_DECISION",
+  "VALIDATED",
+  "REJECTED",
+  "REVISION_REQUESTED",
 ];
 
 /** Vue de suivi transverse de TOUS les rapports, tous statuts confondus — contrairement aux
@@ -28,11 +27,11 @@ const STATUTS: StatutRapport[] = [
  * bon filtre plutôt que sur une liste non filtrée à re-trier manuellement. */
 export function AllReportsSection() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const statut = (searchParams.get("statut") as StatutRapport | null) ?? "";
+  const statut = (searchParams.get("statut") as ReportStatus | null) ?? "";
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAllReports(statut || undefined);
 
-  function handleStatutChange(valeur: StatutRapport | "") {
+  function handleStatutChange(valeur: ReportStatus | "") {
     setSearchParams(
       (params) => {
         if (valeur) {
@@ -54,7 +53,7 @@ export function AllReportsSection() {
         <CardTitle>Tous les rapports</CardTitle>
         <Select
           value={statut}
-          onChange={(event) => handleStatutChange(event.target.value as StatutRapport | "")}
+          onChange={(event) => handleStatutChange(event.target.value as ReportStatus | "")}
           className="w-56"
         >
           <option value="">Tous les statuts</option>
@@ -77,7 +76,7 @@ export function AllReportsSection() {
               <li key={rapport.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="flex items-center gap-2">
                   <Badge variant={variantStatutRapport(rapport.statut)}>
-                    {libelleStatutRapport(rapport.statut)}
+                    {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
                   </Badge>
                   <span className="text-brand-blue">
                     {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}

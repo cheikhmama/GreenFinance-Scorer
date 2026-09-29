@@ -5,7 +5,7 @@ visible par un Auditeur ou un Investisseur) et l'entité PreuveDocumentaire corr
 
 Fonction pure : ne touche pas la session DB — l'appelant (app/ingestion/extractor.py) décide de
 l'ajout/flush, et est responsable de dédupliquer les appels par page (PreuveDocumentaire est
-many-to-one avec IndicateurESG/DonneeCarbone : plusieurs indicateurs trouvés sur la même page
+many-to-one avec ESGMetric/DonneeCarbone : plusieurs indicateurs trouvés sur la même page
 partagent une seule preuve, pas une par indicateur).
 """
 

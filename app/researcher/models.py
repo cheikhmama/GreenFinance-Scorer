@@ -4,7 +4,7 @@ Une Analyse est toujours rattachée à un Projet (app/institution/models.py) et 
 en donne le droit — jamais créée hors projet. Une correction demandée par l'Institution ne
 réécrit jamais l'analyse existante : elle reste CORRECTION_DEMANDEE, et une nouvelle ligne est
 créée avec version+1 et analyse_precedente_id pointant vers elle (même principe que
-app/ingestion/models.py::RapportESG). Statut + commentaire_institution suffisent ici, sans
+app/ingestion/models.py::ESGReport). Statut + commentaire_institution suffisent ici, sans
 entité "avis" séparée comme AvisAudit : un seul acteur (l'Institution) décide, il n'y a pas de
 recommandation intermédiaire d'un tiers à tracer séparément.
 """
@@ -21,7 +21,7 @@ from app.core.enums import StatutAnalyse, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import Utilisateur
-    from app.company.models import Entreprise
+    from app.company.models import Company
     from app.institution.models import Projet
 
 
@@ -59,14 +59,16 @@ class AnalyseEntreprise(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     analyse_id: uuid.UUID = Field(foreign_key="analyse.id")
-    entreprise_id: uuid.UUID = Field(foreign_key="entreprise.id")
+    entreprise_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
     # Figés au moment de l'ajout (jamais fournis par le Chercheur, jamais mis à jour ensuite) :
     # rapport_id fixe le rapport publié exact (indicateurs, Scope 1/2/3, preuves), score_esg_id le
     # score E/S/G/global + méthodologie/version exacts (app/scoring/engine.py::score_officiel).
     # Une réévaluation ou republication ultérieure de l'entreprise ne change jamais ces deux
     # valeurs : l'analyse restitue toujours ce qui a réellement été utilisé à sa création.
-    rapport_id: uuid.UUID | None = Field(default=None, foreign_key="rapport_esg.id")
+    rapport_id: uuid.UUID | None = Field(
+        default=None, foreign_key="esg_reports.id", ondelete="SET NULL", index=True
+    )
     score_esg_id: uuid.UUID | None = Field(default=None, foreign_key="score_esg.id")
 
     analyse: Analyse = Relationship(back_populates="entreprises")
-    entreprise: Optional["Entreprise"] = Relationship()
+    entreprise: Optional["Company"] = Relationship()

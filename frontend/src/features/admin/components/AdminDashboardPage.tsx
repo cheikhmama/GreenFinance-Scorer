@@ -161,7 +161,7 @@ export function AdminDashboardPage() {
                 value={data?.rapports_valides ?? "—"}
                 hint="Décision favorable rendue"
                 icon={<ThumbsUp className="size-5" />}
-                to="/admin/rapports?onglet=tous&statut=VALIDE"
+                to="/admin/rapports?onglet=tous&statut=VALIDATED"
               />
               <StatCard
                 label="Rapports rejetés"
@@ -169,7 +169,7 @@ export function AdminDashboardPage() {
                 hint="Décision défavorable rendue"
                 icon={<ThumbsDown className="size-5" />}
                 tone="violet"
-                to="/admin/rapports?onglet=tous&statut=REJETE"
+                to="/admin/rapports?onglet=tous&statut=REJECTED"
               />
               <StatCard
                 label="Demandes de republication"

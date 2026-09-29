@@ -43,24 +43,26 @@ export function CompanyReportDetailPage() {
         </h1>
         <div className="mt-2 flex items-center gap-2">
           <Badge variant={variantStatutRapport(rapport.statut)}>
-            {libelleStatutRapport(rapport.statut)}
+            {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
           </Badge>
           <span className="text-sm text-brand-grey">
             version {rapport.version}
             {rapport.rapport_precedent_id ? " (correction)" : ""}
           </span>
         </div>
-        {/* Même garde que CompanyReportsPage.tsx : extraction_erreur peut survivre à une
-            extraction depuis réussie (relance échouée sur un rapport déjà avancé dans le
-            workflow) -- n'afficher que tant que c'est encore actionnable. */}
-        {rapport.extraction_erreur && rapport.statut === "EN_EXTRACTION" ? (
+        {/* Même garde que CompanyReportsPage.tsx : une relance d'extraction peut échouer sur un
+            rapport déjà avancé dans le workflow -- n'afficher que tant que c'est encore
+            actionnable (rapport encore SUBMITTED). */}
+        {rapport.extraction_erreur &&
+        rapport.statut === "SUBMITTED" &&
+        rapport.statut_extraction === "FAILED" ? (
           <p className="mt-2 text-sm text-destructive">
             Échec d'extraction : {libelleCauseExtraction(rapport.extraction_erreur)}
           </p>
         ) : null}
       </div>
 
-      {rapport.statut === "DEMANDE_CORRECTION" ? (
+      {rapport.statut === "REVISION_REQUESTED" ? (
         <FormulaireCorrection rapportId={rapport.id} />
       ) : null}
 

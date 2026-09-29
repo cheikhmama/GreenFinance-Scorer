@@ -6,21 +6,22 @@ from fastapi.testclient import TestClient
 from app.auth.hashing import hash_password
 from app.auth.models import Utilisateur
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import (
     CanalDepot,
+    CompanyStatus,
     DevisePosition,
     MethodeDonnee,
+    ReportStatus,
     Role,
-    StatutRapport,
     TypeRapport,
 )
 from app.ingestion.models import (
     DonneeCarbone,
+    ESGReport,
     PreuveDocumentaire,
-    RapportESG,
 )
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
@@ -62,25 +63,25 @@ def _entreprise_publiee(
     score_s: float | None = 75.0,
     score_g: float | None = 80.0,
     scope_1: float = 100.0,
-) -> Entreprise:
-    entreprise = Entreprise(
-        nom=f"Cible {uuid.uuid4()}",
-        secteur=secteur,
-        pays=pays,
-        actif=actif,
-        montant_minimum_investissement=montant_minimum,
-        devise_montant_minimum=DevisePosition.USD if montant_minimum is not None else None,
-        date_publication=utcnow(),
+) -> Company:
+    entreprise = Company(
+        name=f"Cible {uuid.uuid4()}",
+        sector=secteur,
+        country=pays,
+        status=CompanyStatus.ACTIVE if actif else CompanyStatus.SUSPENDED,
+        minimum_investment_amount=montant_minimum,
+        minimum_investment_currency=DevisePosition.USD if montant_minimum is not None else None,
+        published_at=utcnow(),
     )
     session.add(entreprise)
     session.commit()
 
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.VALIDE,
-        fichier_source="rapports/test/dummy.pdf",
+        channel=CanalDepot.ENTREPRISE,
+        status=ReportStatus.VALIDATED,
+        source_file="rapports/test/dummy.pdf",
     )
     session.add(rapport)
     session.commit()
@@ -132,8 +133,8 @@ def _entreprise_publiee(
     return entreprise
 
 
-def _entreprise_non_publiee(session) -> Entreprise:
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Industrie", pays="France")
+def _entreprise_non_publiee(session) -> Company:
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Industrie", country="France")
     session.add(entreprise)
     session.commit()
     session.refresh(entreprise)
@@ -146,7 +147,7 @@ def test_lister_entreprises_ne_montre_que_les_publiees_avec_leur_score(session) 
     investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
     authed = _login(investisseur.email)
 
-    response = authed.get("/api/v1/investor/entreprises", params={"recherche": publiee.nom})
+    response = authed.get("/api/v1/investor/entreprises", params={"recherche": publiee.name})
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
@@ -592,7 +593,7 @@ def test_tableau_de_bord_compte_portefeuilles_et_entreprises_suivies_suspendues(
     )
 
     # Suspendue APRÈS la prise de position (voir "position conservée, nouvelle opération bloquée").
-    suspendue.actif = False
+    suspendue.status = CompanyStatus.SUSPENDED
     session.add(suspendue)
     session.commit()
 
@@ -625,4 +626,4 @@ def test_export_portefeuille_csv(session) -> None:
     export = authed.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}/export")
     assert export.status_code == 200
     assert export.headers["content-type"].startswith("text/csv")
-    assert cible.nom in export.text
+    assert cible.name in export.text

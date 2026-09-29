@@ -5,10 +5,10 @@ from sqlmodel import col, func, select
 
 from app.auth.hashing import hash_password
 from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, Role, TypeRapport
 from app.core.exceptions import ValidationError
-from app.ingestion.models import IndicateurESG, PreuveDocumentaire, RapportESG
+from app.ingestion.models import ESGMetric, ESGReport, PreuveDocumentaire
 from app.scoring.engine import (
     calculer_score,
     obtenir_configuration_reference,
@@ -17,15 +17,15 @@ from app.scoring.engine import (
 from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 
-def _rapport(session) -> RapportESG:
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Industrie", pays="France")
+def _rapport(session) -> ESGReport:
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Industrie", country="France")
     session.add(entreprise)
     session.flush()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
         type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+        channel=CanalDepot.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
     )
     session.add(rapport)
     session.flush()
@@ -48,14 +48,14 @@ def _preuve(session) -> PreuveDocumentaire:
 
 def _ajouter_indicateur(session, rapport_id: uuid.UUID, preuve_id: uuid.UUID, pilier: Pilier, code: str, valeur: float) -> None:
     session.add(
-        IndicateurESG(
-            rapport_id=rapport_id,
-            pilier=pilier,
-            code=code,
-            valeur=valeur,
-            unite="x",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve_id,
+        ESGMetric(
+            report_id=rapport_id,
+            pillar=pilier,
+            metric_code=code,
+            value=valeur,
+            unit="x",
+            method=MethodeDonnee.RAPPORTEE,
+            proof_id=preuve_id,
         )
     )
 

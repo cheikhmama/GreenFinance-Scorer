@@ -56,7 +56,7 @@ export function CompanyDashboardPage() {
                 <span className="text-brand-grey">…</span>
               ) : dernierRapport ? (
                 <Badge variant={variantStatutRapport(dernierRapport.statut)}>
-                  {libelleStatutRapport(dernierRapport.statut)}
+                  {libelleStatutRapport(dernierRapport.statut, dernierRapport.statut_extraction)}
                 </Badge>
               ) : (
                 <span className="text-sm text-brand-grey">Aucun rapport déposé</span>

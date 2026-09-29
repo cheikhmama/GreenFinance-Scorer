@@ -17,7 +17,7 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.audit.assignment import statistiques_charge_globale
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.enums import StatutAnalyse
 from app.institution.projets import statistiques_admin as statistiques_institutions
 from app.investor.entreprises import dernier_rapport_valide
@@ -87,17 +87,17 @@ def _moyenne(valeurs: list[float]) -> float | None:
     return sum(valeurs) / len(valeurs) if valeurs else None
 
 
-def entreprises_perimetre_esg(session: Session) -> list[Entreprise]:
+def entreprises_perimetre_esg(session: Session) -> list[Company]:
     """Périmètre de calcul de la performance ESG : les entreprises publiées — celles réellement
     montrées à l'Investisseur, cohérent avec ce que "couverture ESG" doit signifier ici (jamais
     une entreprise encore inconnue du catalogue public)."""
     return list(
-        session.exec(select(Entreprise).where(col(Entreprise.date_publication).is_not(None))).all()
+        session.exec(select(Company).where(col(Company.published_at).is_not(None))).all()
     )
 
 
-def calculer_performance_esg(session: Session, entreprises: list[Entreprise]) -> PerformanceESG:
-    """Score admissible par entreprise : celui du dernier RapportESG VALIDE
+def calculer_performance_esg(session: Session, entreprises: list[Company]) -> PerformanceESG:
+    """Score admissible par entreprise : celui du dernier ESGReport VALIDATED
     (dernier_rapport_valide, app/investor/entreprises.py), sous la configuration de référence
     (score_officiel, app/scoring/engine.py) — jamais une pondération personnalisée, jamais un
     rapport non validé ; même définition que celle déjà utilisée pour le score public affiché à
@@ -145,28 +145,28 @@ def lister_entreprises_avec_score(
     pays: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Entreprise, ScoreESG | None]], int]:
+) -> tuple[list[tuple[Company, ScoreESG | None]], int]:
     """Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque
     entreprise publiée avec son score admissible, None si absent plutôt que 0. Même périmètre que
     calculer_performance_esg (entreprises publiées), filtrable par secteur/pays."""
-    filtres: list[ColumnElement[bool]] = [col(Entreprise.date_publication).is_not(None)]
+    filtres: list[ColumnElement[bool]] = [col(Company.published_at).is_not(None)]
     if secteur:
-        filtres.append(col(Entreprise.secteur) == secteur)
+        filtres.append(col(Company.sector) == secteur)
     if pays:
-        filtres.append(col(Entreprise.pays) == pays)
+        filtres.append(col(Company.country) == pays)
 
-    total = session.exec(select(func.count()).select_from(Entreprise).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(Company).where(*filtres)).one()
     entreprises = list(
         session.exec(
-            select(Entreprise)
+            select(Company)
             .where(*filtres)
-            .order_by(col(Entreprise.nom))
+            .order_by(col(Company.name))
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
     )
 
-    resultats: list[tuple[Entreprise, ScoreESG | None]] = []
+    resultats: list[tuple[Company, ScoreESG | None]] = []
     for entreprise in entreprises:
         rapport = dernier_rapport_valide(session, entreprise.id)
         score = score_officiel(session, rapport.id) if rapport is not None else None

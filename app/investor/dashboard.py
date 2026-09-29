@@ -10,10 +10,10 @@ from datetime import timedelta
 
 from sqlmodel import Session, col, select
 
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import DevisePosition
+from app.core.enums import CompanyStatus, DevisePosition
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
 from app.investor.models import Portefeuille, PositionPortefeuille
@@ -48,7 +48,7 @@ def construire_tableau_de_bord(
         )
 
     entreprises_publiees = list(
-        session.exec(select(Entreprise).where(col(Entreprise.date_publication).is_not(None))).all()
+        session.exec(select(Company).where(col(Company.published_at).is_not(None))).all()
     )
 
     # Couverture ESG plateforme : part des entreprises publiées dont les 3 piliers sont calculés.
@@ -73,14 +73,14 @@ def construire_tableau_de_bord(
     entreprises_suivies_ids: set[uuid.UUID] = set()
     for position in toutes_positions:
         entreprises_suivies_ids.add(position.entreprise_id)
-        entreprise_de_la_position = session.get(Entreprise, position.entreprise_id)
+        entreprise_de_la_position = session.get(Company, position.entreprise_id)
         assert entreprise_de_la_position is not None
         devise_portefeuille = devise_par_portefeuille[position.portefeuille_id]
         montant_usd, _ = fx.convertir(
             position.montant_converti, devise_portefeuille, DevisePosition.USD, chemin_taux
         )
-        repartition_usd[entreprise_de_la_position.secteur] = (
-            repartition_usd.get(entreprise_de_la_position.secteur, 0.0) + montant_usd
+        repartition_usd[entreprise_de_la_position.sector] = (
+            repartition_usd.get(entreprise_de_la_position.sector, 0.0) + montant_usd
         )
 
     repartition_secteur = [
@@ -93,21 +93,21 @@ def construire_tableau_de_bord(
         1
         for entreprise in entreprises_publiees
         if entreprise.id in entreprises_suivies_ids
-        and entreprise.date_publication is not None
-        and entreprise.date_publication >= seuil_nouvelles_publications
+        and entreprise.published_at is not None
+        and entreprise.published_at >= seuil_nouvelles_publications
     )
 
     publications_recentes = [
         entreprises_investisseur.entreprise_publiee_publique(session, e)
         for e in sorted(
-            entreprises_publiees, key=lambda e: e.date_publication or utcnow(), reverse=True
+            entreprises_publiees, key=lambda e: e.published_at or utcnow(), reverse=True
         )[:_PUBLICATIONS_RECENTES_LIMITE]
     ]
 
     entreprises_suivies_suspendues = [
         EntrepriseSommaire.model_validate(e)
         for e in entreprises_publiees
-        if e.id in entreprises_suivies_ids and not e.actif
+        if e.id in entreprises_suivies_ids and e.status != CompanyStatus.ACTIVE
     ]
 
     return TableauDeBordInvestisseur(

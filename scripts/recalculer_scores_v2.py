@@ -1,4 +1,4 @@
-"""Script ponctuel -- recalcule le score officiel de tous les RapportESG déjà VALIDE après le
+"""Script ponctuel -- recalcule le score officiel de tous les ESGReport déjà VALIDE après le
 passage de config/weights/default.yaml en version 2 (Phase 5 §9, élargissement de la couverture
 du scoring, voir le commentaire du fichier YAML pour la justification méthodologique).
 
@@ -21,9 +21,9 @@ from sqlmodel import Session, col, select
 
 import app.main  # noqa: F401  -- enregistre tous les modèles pour SQLAlchemy avant toute requête
 from app.core.database import engine
-from app.core.enums import StatutRapport
+from app.core.enums import ReportStatus
 from app.core.exceptions import ValidationError
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.scoring.engine import (
     calculer_score,
     obtenir_configuration_reference,
@@ -37,7 +37,7 @@ def main() -> None:
         print(f"Configuration de référence courante : version {reference.version} (id={reference.id})")
 
         rapports = session.exec(
-            select(RapportESG).where(col(RapportESG.statut) == StatutRapport.VALIDE)
+            select(ESGReport).where(col(ESGReport.status) == ReportStatus.VALIDATED)
         ).all()
         print(f"{len(rapports)} rapport(s) VALIDE trouvé(s).")
 

@@ -242,7 +242,7 @@ export function AdminCompanyDetailPage() {
                 </Link>
               </Button>
             ) : null}
-            {entreprise.dernier_statut_rapport === "EN_VALIDATION" && entreprise.dernier_rapport_id ? (
+            {entreprise.dernier_statut_rapport === "PENDING_DECISION" && entreprise.dernier_rapport_id ? (
               <Button
                 size="sm"
                 disabled={validate.isPending}
