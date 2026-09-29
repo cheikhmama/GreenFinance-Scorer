@@ -1,5 +1,6 @@
 import base64
 import uuid
+from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -650,7 +651,9 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_expire_est_refuse(session) -> 
         PasswordResetToken(
             user_id=user.id,
             token_hash=_hash_token(jeton),
-            expires_at=utcnow(),
+            # Nettement dans le passé : expires_at=utcnow() pouvait tomber sur le même tic d'horloge
+            # que la vérification (expires_at < utcnow()) et passer pour encore valide.
+            expires_at=utcnow() - timedelta(minutes=1),
         )
     )
     session.commit()

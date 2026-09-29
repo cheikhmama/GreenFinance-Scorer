@@ -62,8 +62,12 @@ Rules for every task:
 
 ## Phase 2: Investment Portfolios & Carbon Module (PCAF)
 
-- [ ] 2.1 DB Models: Implement `Portfolio` and `PortfolioPosition` models.
-  - Note: both exist today (`Portefeuille`, `PositionPortefeuille`). This task **extends** them with `identifier_type`, `identifier_raw`, `weight`, `match_status` and cached aggregates, and renames them per 0.2.
+- [x] 2.1 DB Models: Implement `Portfolio` and `PortfolioPosition` models. (migration `be63d4541f22`)
+  - [x] Renamed to `portfolios` / `portfolio_positions` with English columns (RENAME_PLAN §3b).
+  - [x] Extended with `identifier_type`, `identifier_raw`, `match_status`, `weight`; `company_id` nullable for lines kept unmatched (CHECK ties it to `match_status`); cached aggregates on `portfolios` (filled by 2.3).
+  - [x] Aggregation counts unmatched lines in the total but never scores them (coverage drops, scores don't); sector breakdown skips them.
+  - [x] `ON DELETE`: `portfolios.user_id` CASCADE, `portfolio_positions.portfolio_id` CASCADE + index.
+  - [x] Found while renaming: three attribute writes (archive, rename, close position) that mypy cannot see on SQLModel — fixed and covered by the existing tests; one more timing-flaky test made deterministic.
 - [ ] 2.2 Portfolio API: CSV/JSON upload endpoint for portfolio positions mapped by ISIN/Ticker.
   - [ ] All-or-nothing import with a per-line error report; unmatched lines kept.
   - [ ] Weight-only imports require a total portfolio value (PCAF needs amounts).

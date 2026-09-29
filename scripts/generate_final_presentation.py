@@ -686,7 +686,7 @@ def slide_10(prs: Presentation) -> tuple[str, str, str]:
     add_text(slide, 3.15, 3.14, 8.8, 0.34, "FastAPI /api/v1 · Pydantic · authentification et permissions", size=13, color=WHITE, bold=True)
 
     add_arrow(slide, 6.43, 3.8, 0.48, 0.25, color="#9FCAB9")
-    domains = ["Auth", "Ingestion", "Audit", "Scoring", "Carbone", "Portefeuille"]
+    domains = ["Auth", "Ingestion", "Audit", "Scoring", "Carbone", "Portfolio"]
     x = 0.85
     for idx, domain in enumerate(domains):
         accent = GREEN if idx < 4 else AMBER

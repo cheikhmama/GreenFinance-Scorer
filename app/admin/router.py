@@ -968,12 +968,12 @@ def lister_portefeuilles_admin_route(
         items=[
             PortefeuilleAdmin(
                 id=portefeuille.id,
-                nom=portefeuille.nom,
+                nom=portefeuille.name,
                 investisseur_email=investisseur.email,
-                devise_reference=portefeuille.devise_reference,
+                devise_reference=portefeuille.reference_currency,
                 nombre_positions=nombre_positions,
                 montant_total=montant_total,
-                date_creation=portefeuille.date_creation,
+                date_creation=portefeuille.created_at,
             )
             for portefeuille, investisseur, nombre_positions, montant_total in items
         ],

@@ -20,7 +20,7 @@ from app.core.enums import Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
 from app.investor import dashboard, entreprises, portfolio
-from app.investor.models import Portefeuille, PositionPortefeuille
+from app.investor.models import Portfolio, PortfolioPosition
 from app.investor.schemas import (
     AjouterPositionRequest,
     CreerPortefeuilleRequest,
@@ -162,9 +162,9 @@ def lister_mes_portefeuilles_route(
     )
 
 
-def _portefeuille_ou_404(session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID) -> Portefeuille:
-    portefeuille = session.get(Portefeuille, portefeuille_id)
-    if portefeuille is None or portefeuille.investisseur_id != investisseur_id:
+def _portefeuille_ou_404(session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID) -> Portfolio:
+    portefeuille = session.get(Portfolio, portefeuille_id)
+    if portefeuille is None or portefeuille.user_id != investisseur_id:
         raise NotFoundError("Portefeuille introuvable.", code="portefeuille_introuvable")
     return portefeuille
 
@@ -266,9 +266,9 @@ def exporter_portefeuille_route(
 
 
 def _position_detail_apres_mutation(
-    session: Session, portefeuille_id: uuid.UUID, position: PositionPortefeuille
+    session: Session, portefeuille_id: uuid.UUID, position: PortfolioPosition
 ) -> PositionDetail:
-    portefeuille = session.get(Portefeuille, portefeuille_id)
+    portefeuille = session.get(Portfolio, portefeuille_id)
     assert portefeuille is not None
     resume = portfolio.resume_portefeuille(session, portefeuille)
     return portfolio.position_detail(session, position, resume.montant_total)

@@ -24,7 +24,7 @@ from app.core.enums import CompanyStatus, DevisePosition, sa_enum_column
 if TYPE_CHECKING:
     from app.auth.models import User
     from app.ingestion.models import ESGReport, SignalementEcart
-    from app.investor.models import PositionPortefeuille
+    from app.investor.models import PortfolioPosition
 
 
 class Company(SQLModel, table=True):
@@ -88,5 +88,5 @@ class Company(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[Company.owner_user_id]"},
     )
     reports: list["ESGReport"] = Relationship(back_populates="company")
-    positions: list["PositionPortefeuille"] = Relationship(back_populates="entreprise")
+    positions: list["PortfolioPosition"] = Relationship(back_populates="company")
     discrepancy_flags: list["SignalementEcart"] = Relationship(back_populates="entreprise")

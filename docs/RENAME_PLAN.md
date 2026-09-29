@@ -168,17 +168,31 @@ stays until the journal is renamed (task 4.7).
 |---|---|---|
 | CASCADE | tokens, `email_change_requests`, `notification.utilisateur_id`, `institution_profil.utilisateur_id`, `chercheur_institution.*` | rows that only exist for the user |
 | SET NULL | `journal_audit.acteur_id`, `companies.owner_user_id`, `esg_reports.auditor_id`, `esg_metrics.overridden_by_id` | optional references; the row keeps its own meaning |
-| RESTRICT | `avis_audit.auditeur_id`, `analyse.chercheur_id`, `affectation_projet.chercheur_id`, `projet.institution_id`, `portefeuille.investisseur_id`, `configuration_ponderation.utilisateur_id` | accountability or business records: deleting the user must fail rather than erase them. `configuration_ponderation.utilisateur_id` NULL means the *reference* config, so SET NULL would be actively wrong. Revisit each with its module's task. |
+| RESTRICT | `avis_audit.auditeur_id`, `analyse.chercheur_id`, `affectation_projet.chercheur_id`, `projet.institution_id`, `configuration_ponderation.utilisateur_id` | accountability or business records: deleting the user must fail rather than erase them. `configuration_ponderation.utilisateur_id` NULL means the *reference* config, so SET NULL would be actively wrong. Revisit each with its module's task. |
 
 This is a deliberate exception to the "CASCADE or SET NULL" guideline: the application never
 deletes a user (it deactivates them), and silently deleting audit opinions or research analyses
 would destroy evidence.
 
+## 3b. Task 2.1 — portfolios ✅
+
+Landed in migration `be63d4541f22` (upgrade/downgrade round-trip and `alembic check` verified).
+
+| Current | Target | Note |
+|---|---|---|
+| `portefeuille` (`Portefeuille`) | `portfolios` (`Portfolio`) | `user_id` → users **CASCADE** (was RESTRICT in §3.2: a portfolio only belongs to its investor) |
+| `investisseur_id`, `nom`, `devise_reference`, `date_creation`, `archive` | `user_id`, `name`, `reference_currency`, `created_at`, `archived` | + cached `total_esg_score`, `waci`, `financed_emissions_tco2e`, `computed_at`, `config_hash` (filled by 2.3) |
+| `position_portefeuille` (`PositionPortefeuille`) | `portfolio_positions` (`PortfolioPosition`) | `portfolio_id` CASCADE + index |
+| `portefeuille_id`, `entreprise_id`, `montant_investi`, `devise`, `taux_change_utilise`, `montant_converti`, `type_duree`, `date_debut`, `date_fin` | `portfolio_id`, `company_id` (**nullable**), `outstanding_amount`, `currency`, `fx_rate_used`, `converted_amount`, `duration_type`, `start_date`, `end_date` | + `identifier_type`, `identifier_raw`, `match_status` (`MatchStatus`), `weight` in ]0, 1] |
+| rel. `investisseur`, `portefeuille`, `entreprise` | `user`, `portfolio`, `company` | |
+
+`DevisePosition` and `TypeDureeInvestissement` keep their class names for now (their values are
+part of the API). Amounts stay `float` until task 2.3 (`Decimal` with the PCAF engine).
+
 ## 4. Later renames
 
 | Task | Tables | Classes |
 |---|---|---|
-| 2.1 | `portefeuille` → `portfolios`, `position_portefeuille` → `portfolio_positions` | `Portefeuille` → `Portfolio`, `PositionPortefeuille` → `PortfolioPosition` |
 | 2.3 | `donnee_carbone` → `carbon_emissions`, `preuve_documentaire` → `evidence`, `couverture_indicateur` → `metric_coverage`, `signalement_ecart` → `discrepancy_flags` | matching classes |
 | 3.1 | `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores` | `ConfigurationPonderation` → `ScoringConfig`, `ScoreESG` → `Score`; `Pilier` → `Pillar` |
 | 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names; audit journal labels | remaining classes |

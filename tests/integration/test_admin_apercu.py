@@ -26,7 +26,7 @@ from app.core.enums import (
 )
 from app.ingestion.models import ESGReport
 from app.institution.models import Projet
-from app.investor.models import Portefeuille
+from app.investor.models import Portfolio
 from app.main import app
 from app.researcher.models import Analyse
 from app.scoring.engine import obtenir_configuration_reference
@@ -179,8 +179,8 @@ def test_portefeuilles_admin_liste_un_portefeuille_non_archive(session) -> None:
     investisseur = _create_utilisateur(session, Role.INVESTOR)
     marqueur = f"portefeuille-{uuid.uuid4()}"
     session.add(
-        Portefeuille(
-            investisseur_id=investisseur.id, nom=marqueur, devise_reference=DevisePosition.EUR
+        Portfolio(
+            user_id=investisseur.id, name=marqueur, reference_currency=DevisePosition.EUR
         )
     )
     session.commit()

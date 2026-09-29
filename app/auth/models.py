@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from app.core.models import Notification
     from app.ingestion.models import ESGReport
     from app.institution.models import AffectationProjet, Projet
-    from app.investor.models import Portefeuille
+    from app.investor.models import Portfolio
     from app.researcher.models import Analyse
     from app.scoring.models import ConfigurationPonderation
 
@@ -72,7 +72,7 @@ class User(SQLModel, table=True):
     scoring_configs: list["ConfigurationPonderation"] = Relationship(
         back_populates="utilisateur"
     )
-    portfolios: list["Portefeuille"] = Relationship(back_populates="investisseur")
+    portfolios: list["Portfolio"] = Relationship(back_populates="user")
     audit_opinions: list["AvisAudit"] = Relationship(back_populates="auditeur")
     notifications: list["Notification"] = Relationship(back_populates="utilisateur")
     projects: list["Projet"] = Relationship(back_populates="institution")

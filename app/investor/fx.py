@@ -27,7 +27,7 @@ def convertir(
     """Retourne (montant_converti, taux_change_utilise).
 
     taux_change_utilise est None quand depuis == vers (aucune conversion nécessaire — voir
-    PositionPortefeuille.taux_change_utilise/montant_converti, nuls dans ce cas précis)."""
+    PortfolioPosition.fx_rate_used/converted_amount, nuls dans ce cas précis)."""
     if depuis == vers:
         return montant, None
 

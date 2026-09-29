@@ -16,7 +16,7 @@ from app.core.database import utcnow
 from app.core.enums import CompanyStatus, DevisePosition
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
-from app.investor.models import Portefeuille, PositionPortefeuille
+from app.investor.models import Portfolio, PortfolioPosition
 from app.investor.schemas import (
     EntrepriseSommaire,
     RepartitionSecteur,
@@ -35,15 +35,15 @@ def construire_tableau_de_bord(
     chemin_taux = get_settings().fx_rates_path
 
     portefeuilles = list(
-        session.exec(select(Portefeuille).where(Portefeuille.investisseur_id == investisseur_id)).all()
+        session.exec(select(Portfolio).where(Portfolio.user_id == investisseur_id)).all()
     )
-    devise_par_portefeuille = {p.id: p.devise_reference for p in portefeuilles}
+    devise_par_portefeuille = {p.id: p.reference_currency for p in portefeuilles}
 
-    toutes_positions: list[PositionPortefeuille] = []
+    toutes_positions: list[PortfolioPosition] = []
     for p in portefeuilles:
         toutes_positions.extend(
             session.exec(
-                select(PositionPortefeuille).where(PositionPortefeuille.portefeuille_id == p.id)
+                select(PortfolioPosition).where(PortfolioPosition.portfolio_id == p.id)
             ).all()
         )
 
@@ -72,12 +72,15 @@ def construire_tableau_de_bord(
     repartition_usd: dict[str, float] = {}
     entreprises_suivies_ids: set[uuid.UUID] = set()
     for position in toutes_positions:
-        entreprises_suivies_ids.add(position.entreprise_id)
-        entreprise_de_la_position = session.get(Company, position.entreprise_id)
+        if position.company_id is None:
+            # Ligne importée non rapprochée (tâche 2.2) : aucun secteur connu.
+            continue
+        entreprises_suivies_ids.add(position.company_id)
+        entreprise_de_la_position = session.get(Company, position.company_id)
         assert entreprise_de_la_position is not None
-        devise_portefeuille = devise_par_portefeuille[position.portefeuille_id]
+        devise_portefeuille = devise_par_portefeuille[position.portfolio_id]
         montant_usd, _ = fx.convertir(
-            position.montant_converti, devise_portefeuille, DevisePosition.USD, chemin_taux
+            position.converted_amount, devise_portefeuille, DevisePosition.USD, chemin_taux
         )
         repartition_usd[entreprise_de_la_position.sector] = (
             repartition_usd.get(entreprise_de_la_position.sector, 0.0) + montant_usd

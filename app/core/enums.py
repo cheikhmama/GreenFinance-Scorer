@@ -117,6 +117,22 @@ class DevisePosition(str, Enum):
     EUR = "EUR"
 
 
+class IdentifierType(str, Enum):
+    """Identifiant de marché d'une ligne de portefeuille importée (tâche 2.2)."""
+
+    ISIN = "ISIN"
+    TICKER = "TICKER"
+
+
+class MatchStatus(str, Enum):
+    """Rapprochement d'une ligne de portefeuille avec une entreprise de la plateforme."""
+
+    MATCHED = "MATCHED"
+    UNMATCHED = "UNMATCHED"
+    # Plusieurs entreprises possibles (ex. un ticker coté sur plusieurs places).
+    AMBIGUOUS = "AMBIGUOUS"
+
+
 class TypeDureeInvestissement(str, Enum):
     OUVERTE = "OUVERTE"
     FIXE = "FIXE"

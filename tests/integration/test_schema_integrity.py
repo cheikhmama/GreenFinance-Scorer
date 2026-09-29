@@ -39,7 +39,7 @@ from app.ingestion.models import (
     ESGReport,
     PreuveDocumentaire,
 )
-from app.investor.models import Portefeuille, PositionPortefeuille
+from app.investor.models import Portfolio, PortfolioPosition
 from app.scoring.models import ConfigurationPonderation, ScoreESG
 
 
@@ -172,49 +172,49 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     # --- Portefeuille + positions (USD converti, FIXE, OUVERTE) -----------
     investisseur = _utilisateur(session, Role.INVESTOR)
-    portefeuille = Portefeuille(
-        investisseur_id=investisseur.id, nom="Portefeuille vert", devise_reference=DevisePosition.USD
+    portefeuille = Portfolio(
+        user_id=investisseur.id, name="Portefeuille vert", reference_currency=DevisePosition.USD
     )
     session.add(portefeuille)
     session.flush()
 
-    assert portefeuille.investisseur.id == investisseur.id
+    assert portefeuille.user.id == investisseur.id
     assert portefeuille in investisseur.portfolios
 
     debut_fixe = utcnow() + timedelta(days=1)
-    position_usd = PositionPortefeuille.model_validate(
+    position_usd = PortfolioPosition.model_validate(
         {
-            "portefeuille_id": portefeuille.id,
-            "entreprise_id": entreprise.id,
-            "montant_investi": 1000.0,
-            "devise": DevisePosition.USD,
-            "taux_change_utilise": 0.92,
-            "montant_converti": 920.0,
-            "type_duree": TypeDureeInvestissement.OUVERTE,
-            "date_debut": utcnow(),
+            "portfolio_id": portefeuille.id,
+            "company_id": entreprise.id,
+            "outstanding_amount": 1000.0,
+            "currency": DevisePosition.USD,
+            "fx_rate_used": 0.92,
+            "converted_amount": 920.0,
+            "duration_type": TypeDureeInvestissement.OUVERTE,
+            "start_date": utcnow(),
         }
     )
-    position_fixe = PositionPortefeuille.model_validate(
+    position_fixe = PortfolioPosition.model_validate(
         {
-            "portefeuille_id": portefeuille.id,
-            "entreprise_id": entreprise.id,
-            "montant_investi": 2000.0,
-            "devise": DevisePosition.MRU,
-            "montant_converti": 52.0,
-            "type_duree": TypeDureeInvestissement.FIXE,
-            "date_debut": debut_fixe,
-            "date_fin": debut_fixe + timedelta(days=180),
+            "portfolio_id": portefeuille.id,
+            "company_id": entreprise.id,
+            "outstanding_amount": 2000.0,
+            "currency": DevisePosition.MRU,
+            "converted_amount": 52.0,
+            "duration_type": TypeDureeInvestissement.FIXE,
+            "start_date": debut_fixe,
+            "end_date": debut_fixe + timedelta(days=180),
         }
     )
-    position_ouverte = PositionPortefeuille.model_validate(
+    position_ouverte = PortfolioPosition.model_validate(
         {
-            "portefeuille_id": portefeuille.id,
-            "entreprise_id": entreprise.id,
-            "montant_investi": 750.0,
-            "devise": DevisePosition.EUR,
-            "montant_converti": 750.0,
-            "type_duree": TypeDureeInvestissement.OUVERTE,
-            "date_debut": utcnow(),
+            "portfolio_id": portefeuille.id,
+            "company_id": entreprise.id,
+            "outstanding_amount": 750.0,
+            "currency": DevisePosition.EUR,
+            "converted_amount": 750.0,
+            "duration_type": TypeDureeInvestissement.OUVERTE,
+            "start_date": utcnow(),
         }
     )
     session.add(position_usd)
@@ -222,16 +222,16 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.add(position_ouverte)
     session.flush()
 
-    assert position_usd.taux_change_utilise == 0.92
-    assert position_usd.montant_converti == 920.0
-    assert position_fixe.date_fin is not None
-    assert position_ouverte.date_fin is None
+    assert position_usd.fx_rate_used == 0.92
+    assert position_usd.converted_amount == 920.0
+    assert position_fixe.end_date is not None
+    assert position_ouverte.end_date is None
     assert {position_usd.id, position_fixe.id, position_ouverte.id} == {
         p.id for p in portefeuille.positions
     }
     for position in (position_usd, position_fixe, position_ouverte):
-        assert position.portefeuille.id == portefeuille.id
-        assert position.entreprise.id == entreprise.id
+        assert position.portfolio.id == portefeuille.id
+        assert position.company is not None and position.company.id == entreprise.id
         assert position in entreprise.positions
 
     # --- AvisAudit ----------------------------------------------------

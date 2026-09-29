@@ -564,6 +564,22 @@ def test_portefeuille_vide_est_supprimable(session) -> None:
     assert suppression.status_code == 204
 
 
+def test_renommer_un_portefeuille_est_persiste(session) -> None:
+    """Couvre l'écriture Portfolio.name (tâche 2.1) : un setattr sur un attribut SQLModel
+    renommé échappe à mypy, seul un aller-retour par l'API le prouve persisté."""
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
+    authed = _login(investisseur.email)
+    portefeuille_id = _creer_portefeuille(authed)
+
+    renommage = authed.patch(
+        f"/api/v1/investor/portefeuilles/{portefeuille_id}", json={"nom": "Actions vertes 2026"}
+    )
+    relu = authed.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}")
+
+    assert renommage.status_code == 200
+    assert relu.json()["nom"] == "Actions vertes 2026"
+
+
 def test_investisseur_ne_voit_pas_le_portefeuille_dun_autre(session) -> None:
     autre_investisseur = _create_utilisateur(session, Role.INVESTOR)
     autre_authed = _login(autre_investisseur.email)
