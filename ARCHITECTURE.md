@@ -4,6 +4,10 @@ Ce document décrit les conventions structurelles posées à l'Étape 2 et que l
 l'Étape 3. Il est versionné avec le code : toute évolution de ces conventions doit être répercutée ici dans le
 même commit, jamais dans un wiki externe.
 
+> Architecture cible (refonte v2, non encore implémentée) : voir `docs/ARCHITECTURE.md`,
+> `docs/WORKFLOWS.md` et le suivi `docs/TASKS.md`. Tant qu'une phase n'est pas livrée, ce
+> fichier-ci reste la seule référence qui fait foi.
+
 ## 1. Organisation des modules
 
 Un package sous `app/` par grande partie fonctionnelle du projet. La liste et le rôle de chacun :
