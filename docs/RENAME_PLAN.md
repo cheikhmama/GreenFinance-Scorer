@@ -1,0 +1,145 @@
+# English Domain Rename Plan (decision D3)
+
+The French domain model is renamed to English **module by module**, together with each phase's
+refactoring, never as one big-bang change. This file is the single glossary: before renaming
+anything, add or check its row here; after a rename lands, tick it.
+
+## 1. Boundary rules
+
+1. **Layers renamed together.** For a renamed entity, these change in the same commit: the table,
+   its columns, the SQLModel class and attributes, its relationships, its enums, the domain code
+   that uses them, the tests, and the scripts under `scripts/`.
+2. **Inbound foreign-key columns follow their own table.** `score_esg.rapport_id` keeps its name
+   until the scoring tables are renamed (task 3.1); only its `ON DELETE` rule and index are fixed
+   when the referenced table is renamed. Relationship attributes on a not-yet-renamed class
+   (e.g. `Utilisateur.entreprise`) likewise keep their name.
+3. **The HTTP contract changes only when its endpoints are redesigned.** Response schemas read the
+   English attributes through `validation_alias` and keep their French JSON field names, so the
+   OpenAPI client and the frontend don't change during a persistence rename. The English JSON
+   contract arrives with the redesigned endpoints (tasks 1.3–1.5, 2.2, 3.2) and, for the rest,
+   task 4.7.
+   - *Exception:* enum **values** that change meaning (report statuses in task 1.1) change in
+     the API too, because the frontend must handle the new states.
+4. **One consolidated migration per task**, with a working `downgrade()` that restores the
+   previous names, values and constraints. Data transformations (status mapping) are written in
+   SQL inside that migration, in both directions.
+5. **Every foreign key touched gets an explicit `ON DELETE`** (`CASCADE` for rows that only
+   exist as part of their parent, `SET NULL` for optional references) **and an index** on the
+   referencing column.
+6. **LLM contracts are not renamed.** `IndicateurExtrait` / `ExtractionEntreprise`
+   (`app/ingestion/schemas.py`) are the validated Gemini tool-calling schema; they are
+   translated at the persistence boundary, not changed.
+
+## 2. Task 1.1 — Company, ESG report, ESG metric
+
+### 2.1 `entreprise` → `companies` (`Entreprise` → `Company`)
+
+| Current | Target | Note |
+|---|---|---|
+| `nom` | `name` | |
+| `secteur` | `sector` | |
+| `pays` | `country` | free text until task 1.3 |
+| `logo`, `description` | unchanged | |
+| `site_officiel` | `website` | |
+| `actif` (bool) | `status` (`CompanyStatus`) | `false` → `SUSPENDED`, `true` → `ACTIVE` |
+| `utilisateur_id` | `owner_user_id` | `ON DELETE SET NULL` |
+| `montant_minimum_investissement` | `minimum_investment_amount` | |
+| `devise_montant_minimum` | `minimum_investment_currency` | |
+| `date_publication` | `published_at` | |
+| — | `isin`, `lei` | new, unique when present, check digits validated |
+| — | `revenue`, `revenue_currency` | new, `numeric(20,2)` |
+| — | `enterprise_value`, `enterprise_value_currency`, `enterprise_value_as_of` | new (EVIC for PCAF) |
+| rel. `utilisateur` / `rapports` / `signalements_ecart` | `owner` / `reports` / `discrepancy_flags` | `positions` unchanged |
+
+### 2.2 `rapport_esg` → `esg_reports` (`RapportESG` → `ESGReport`)
+
+| Current | Target | Note |
+|---|---|---|
+| `entreprise_id` | `company_id` | `ON DELETE CASCADE`; index `(company_id, fiscal_year)` |
+| `type` | unchanged | |
+| `canal` | `channel` | |
+| `date_depot` | `submitted_at` | |
+| `statut` (`StatutRapport`) | `status` (`ReportStatus`) | see §2.4 |
+| — | `extraction_status` (`ExtractionStatus`) | new, see §2.4 |
+| `fichier_source` | `source_file` | |
+| `nom_fichier_origine` | `original_filename` | |
+| `annee_reporting` | `fiscal_year` | |
+| `auditeur_id` | `auditor_id` | `ON DELETE SET NULL` |
+| `date_affectation` | `assigned_at` | |
+| `extraction_demarree_le` | `extraction_started_at` | |
+| `extraction_terminee_le` | `extraction_finished_at` | |
+| `extraction_erreur` | `extraction_error` | |
+| `tentatives_extraction` | `extraction_attempts` | |
+| `version` | unchanged | |
+| `rapport_precedent_id` | `previous_report_id` | `ON DELETE SET NULL` |
+| `checksum_sha256` | unchanged | |
+| `score_global_declare` | `declared_global_score` | |
+| `score_global_declare_preuve_id` | `declared_global_score_proof_id` | `ON DELETE SET NULL` |
+| `rapport_synthese_genere` | `synthesis_report_path` | |
+| — | `official_score`, `coverage_rate`, `config_hash` | new, filled by tasks 1.6 and 3.1 |
+| rel. `entreprise`, `auditeur`, `indicateurs`, `donnees_carbone`, `avis_audit`, `couvertures`, `score_global_declare_preuve` | `company`, `auditor`, `metrics`, `carbon_data`, `audit_opinions`, `coverages`, `declared_global_score_proof` | `scores` unchanged |
+
+### 2.3 `indicateur_esg` → `esg_metrics` (`IndicateurESG` → `ESGMetric`)
+
+| Current | Target | Note |
+|---|---|---|
+| `rapport_id` | `report_id` | `ON DELETE CASCADE`; unique `(report_id, metric_code)` |
+| `pilier` | `pillar` | enum `Pilier` unchanged until task 3.1 |
+| `code` | `metric_code` | |
+| `valeur` | `value` | |
+| `unite` | `unit` | |
+| `methode` | `method` | |
+| `preuve_id` | `proof_id` | `ON DELETE CASCADE` (no value without proof) |
+| `valeur_brute` | `raw_value` | |
+| `section` | unchanged | |
+| `citation_source` | `proof_text` | |
+| `annee_valeur` | `value_year` | |
+| `confiance` | `confidence` | |
+| — | `auditor_overridden`, `override_value`, `override_reason`, `overridden_by_id`, `overridden_at` | new; `overridden_by_id` `ON DELETE SET NULL` |
+| rel. `rapport`, `preuve`, `signalements` | `report`, `proof`, `discrepancy_flags` | |
+
+### 2.4 Report status (`StatutRapport` → `ReportStatus` + `ExtractionStatus`)
+
+| `statut` | `status` | `extraction_status` |
+|---|---|---|
+| — | `DRAFT` | `NOT_STARTED` |
+| `ENVOYE` | `SUBMITTED` | `QUEUED` |
+| `EN_EXTRACTION` | `SUBMITTED` | from timestamps: error → `FAILED`, finished → `DONE`, started → `RUNNING`, else `QUEUED` |
+| `AFFECTE_AUDITEUR` | `PENDING_AUDIT` | from timestamps |
+| `EN_VALIDATION` | `PENDING_DECISION` | from timestamps |
+| `DEMANDE_CORRECTION` | `REVISION_REQUESTED` | from timestamps |
+| `VALIDE` | `VALIDATED` | from timestamps |
+| `REJETE` | `REJECTED` | from timestamps |
+
+"From timestamps" for a status past `SUBMITTED` falls back to `NOT_STARTED` when no extraction
+timestamp exists. Downgrade maps back one-to-one; `SUBMITTED` goes back to `ENVOYE` when
+extraction is `QUEUED`/`NOT_STARTED`, otherwise to `EN_EXTRACTION`; `DRAFT` goes back to `ENVOYE`.
+
+### 2.5 Inbound foreign keys fixed in task 1.1 (names unchanged)
+
+| Column | Target of | `ON DELETE` | Index |
+|---|---|---|---|
+| `analyse_entreprise.entreprise_id` | companies | CASCADE | add |
+| `analyse_entreprise.rapport_id` | esg_reports | SET NULL | add |
+| `avis_audit.rapport_id` | esg_reports | CASCADE | add |
+| `couverture_indicateur.rapport_id` | esg_reports | CASCADE | exists (unique) |
+| `donnee_carbone.rapport_id` | esg_reports | CASCADE | add |
+| `position_portefeuille.entreprise_id` | companies | CASCADE | add |
+| `projet_document.rapport_id` | esg_reports | CASCADE | add |
+| `projet_entreprise.entreprise_id` | companies | CASCADE | add |
+| `score_esg.rapport_id` | esg_reports | CASCADE | exists |
+| `signalement_ecart.entreprise_id` | companies | CASCADE | add |
+| `signalement_ecart.indicateur_id` | esg_metrics | CASCADE | add |
+
+The application never hard-deletes a company or a report (suspension and versioning are the
+application-level operations); these rules define what an administrative purge removes.
+
+## 3. Later renames
+
+| Task | Tables | Classes |
+|---|---|---|
+| 1.2 | `utilisateur` → `users`; `activation_compte`, `reinitialisation_mot_de_passe` | `Utilisateur` → `User`; `Role` values → `ADMIN`, `ENTERPRISE`, `AUDITOR`, `INVESTOR`, `RESEARCHER`, `INSTITUTION` |
+| 2.1 | `portefeuille` → `portfolios`, `position_portefeuille` → `portfolio_positions` | `Portefeuille` → `Portfolio`, `PositionPortefeuille` → `PortfolioPosition` |
+| 2.3 | `donnee_carbone` → `carbon_emissions`, `preuve_documentaire` → `evidence`, `couverture_indicateur` → `metric_coverage`, `signalement_ecart` → `discrepancy_flags` | matching classes |
+| 3.1 | `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores` | `ConfigurationPonderation` → `ScoringConfig`, `ScoreESG` → `Score`; `Pilier` → `Pillar` |
+| 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names | remaining classes |

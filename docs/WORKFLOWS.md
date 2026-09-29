@@ -32,12 +32,18 @@ Conventions used below:
 | onboard (KYC) | ADMIN | status `PENDING_ONBOARDING`; ISIN or LEI present; revenue and EVIC present | status `ACTIVE`, onboarded_by/at, audit log, notification | — |
 | suspend / reactivate | ADMIN | — | status change, audit log, sessions of the owner revoked on suspend | — |
 
-**Rule:** a company that isn't `ACTIVE` is invisible to `INVESTOR` and `RESEARCHER`, and can't
-submit reports.
+**Rules:**
+- A `PENDING_ONBOARDING` company is invisible to every role except `ADMIN` and its owner.
+- Only an `ACTIVE` company can submit reports or receive new investments.
+- A `SUSPENDED` company stays visible to investors who already hold it (so they see the
+  warning), but can't receive new positions.
+- Onboarding and **publication** are separate: `published_at` records when the admin last
+  published the company's official score, and only published companies appear in the
+  investor and researcher catalogues.
 
 *Current:* no public registration; the admin creates the user, the user activates by email link
 (`app/auth/activation.py`). Publication is a separate `date_publication` timestamp set by the
-admin. See open decision D5 in the architecture document.
+admin. Decision D5 gates self-registration behind this onboarding step.
 
 ### 1.2 Report lifecycle
 
@@ -55,8 +61,7 @@ admin. See open decision D5 in the architecture document.
                                                                                       ▼
                                                                                   VALIDATED
 ```
-\* `PENDING_DECISION` is open decision D2; without it this state is `PENDING_AUDIT` with an
-audit opinion present.
+\* `PENDING_DECISION` was added by decision D2 (replaces `EN_VALIDATION`).
 
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|

@@ -24,7 +24,7 @@ with PCAF financed emissions.
 | `AUDITOR` | `AUDITEUR` | Reviews evidence snippets, issues the audit opinion |
 | `INVESTOR` | `INVESTISSEUR` | Portfolios, positions, aggregated ESG and PCAF analytics |
 | `RESEARCHER` | `CHERCHEUR` | Custom YAML weights, recalculation, explainability, dataset cross-validation |
-| *(open decision)* | `INSTITUTION` | Supervises research projects today — see §9 |
+| `INSTITUTION` (kept, D1) | `INSTITUTION` | Creates research projects, invites researchers, reviews their analyses |
 
 The mission brief uses both `PORTFOLIO_MANAGER` and `INVESTOR` for the same actor. This document
 standardises on **`INVESTOR`** (matches the `users` role list in the brief and the existing
@@ -74,11 +74,13 @@ companies 1───* esg_reports 1───* esg_metrics
 | `country` | char(2) | ISO 3166-1 alpha-2 |
 | `revenue` | numeric(20,2) + `revenue_currency` | needed for carbon intensity (WACI) |
 | `enterprise_value` | numeric(20,2) + `ev_currency` + `ev_as_of` | **EVIC**, needed for the PCAF attribution factor |
-| `status` | enum `PENDING_ONBOARDING`, `ACTIVE`, `SUSPENDED` | replaces `actif` + `date_publication` pair |
+| `status` | enum `PENDING_ONBOARDING`, `ACTIVE`, `SUSPENDED` | account / KYC lifecycle; replaces the `actif` flag |
+| `published_at` | timestamptz, nullable | last publication of the company's official score (was `date_publication`); a separate concept from onboarding |
 | `owner_user_id` | FK users, nullable | |
 
 *Current:* `entreprise` (`nom`, `secteur`, `pays`, `actif`, `date_publication`, …). No ISIN,
-LEI, revenue or EVIC — PCAF can't be computed without them.
+LEI, revenue or EVIC — PCAF can't be computed without them. `country` stays free text until
+registration (task 1.3) validates ISO codes on input.
 
 ### 3.2 `esg_reports` — fiscal reporting (module `app/ingestion` → `app/reporting`)
 
@@ -86,7 +88,7 @@ LEI, revenue or EVIC — PCAF can't be computed without them.
 |---|---|---|
 | `id` | UUID PK | |
 | `company_id` | FK companies | |
-| `fiscal_year` | int | unique with `company_id` and `version` |
+| `fiscal_year` | int | indexed with `company_id` (not unique, see below) |
 | `version`, `previous_report_id` | int, FK self | correction chain (already exists) |
 | `status` | enum, see §3.2.1 | |
 | `extraction_status` | enum `NOT_STARTED`, `QUEUED`, `RUNNING`, `DONE`, `FAILED` | separates the pipeline state from the business status |
@@ -103,10 +105,13 @@ LEI, revenue or EVIC — PCAF can't be computed without them.
 | `ENVOYE` | `SUBMITTED` | `QUEUED` |
 | `EN_EXTRACTION` | `SUBMITTED` | `RUNNING` / `DONE` / `FAILED` |
 | `AFFECTE_AUDITEUR` | `PENDING_AUDIT` | `DONE` |
-| `EN_VALIDATION` | `PENDING_AUDIT` (auditor opinion present) — **see §9** | `DONE` |
-| `DEMANDE_CORRECTION` | `REVISION_REQUESTED` | — |
-| `VALIDE` | `VALIDATED` | — |
-| `REJETE` | `REJECTED` | — |
+| `EN_VALIDATION` | `PENDING_DECISION` (D2) | `DONE` |
+| `DEMANDE_CORRECTION` | `REVISION_REQUESTED` | derived from the extraction timestamps |
+| `VALIDE` | `VALIDATED` | derived from the extraction timestamps |
+| `REJETE` | `REJECTED` | derived from the extraction timestamps |
+
+`(company_id, fiscal_year)` is **indexed, not unique**: a company can file several report types
+(annual, ESG, climate) for the same year, and each correction adds a version.
 
 ### 3.3 `esg_metrics` — data points
 
@@ -245,12 +250,12 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
 
 ---
 
-## 9. Open decisions
+## 9. Decisions (resolved 2026-09-29)
 
-| # | Question | Default if not decided |
+| # | Decision | Consequence |
 |---|---|---|
-| D1 | Keep the `INSTITUTION` role (research-project supervision), or fold it into `RESEARCHER`/`ADMIN`? | Keep it; the brief doesn't mention it but removing it deletes a working feature |
-| D2 | `EN_VALIDATION` (auditor opinion given, admin decision pending) has no target status. Add `PENDING_DECISION`, or derive it from "PENDING_AUDIT + opinion present"? | Add `PENDING_DECISION` |
-| D3 | Rename tables and enums to English in place (Alembic renames), or keep French names at the database level and only rename the API/schemas? | Rename in place, one module per migration |
-| D4 | Minimum password length 12: force existing users to change on next login, or only apply to new passwords? | Only apply when a password is set |
-| D5 | Self-service company registration (brief task 1.3) opens a public sign-up where today accounts are created by an admin. Needs CAPTCHA/rate-limit and the KYC gate before any data is visible | Registration creates `PENDING_ONBOARDING`, nothing visible until the admin onboards it |
+| D1 | **Keep** the `INSTITUTION` role. | Research-project supervision stays as it is; the role is renamed with its module. |
+| D2 | **Add** `PENDING_DECISION` for reports that have an auditor opinion and wait for the admin's sign-off. | Replaces `EN_VALIDATION`; the admin decision queue filters on it. |
+| D3 | **Rename to English in place**, module by module, together with each phase's refactoring, using consolidated Alembic migrations. | Plan and boundary rules: [`RENAME_PLAN.md`](RENAME_PLAN.md). |
+| D4 | **12 characters minimum** (72 UTF-8 bytes maximum) on every password that is set: registration/activation, reset, change. | Existing hashes stay valid; nobody is forced to change a password. |
+| D5 | **Gate self-registration** behind admin onboarding: a registered company starts in `PENDING_ONBOARDING`. | Nothing about the company is visible to other roles until an admin onboards it. |

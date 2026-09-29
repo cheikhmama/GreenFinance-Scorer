@@ -12,18 +12,22 @@ Rules for every task:
 
 ## Phase 0: Decisions and groundwork
 
-- [ ] 0.1 Settle the open decisions D1–D5 in `docs/ARCHITECTURE.md` §9 (INSTITUTION role, `PENDING_DECISION` status, rename strategy, password policy rollout, public registration).
-- [ ] 0.2 Domain rename plan: map every table, column and enum from French to the target English names, and write it down as a checklist (one migration per module).
-- [ ] 0.3 Regenerate the OpenAPI client (`npm run api:generate`) after each rename and update the frontend in the same commit; CI `api:check` must stay green.
+- [x] 0.1 Settle the open decisions D1–D5 in `docs/ARCHITECTURE.md` §9 (INSTITUTION role, `PENDING_DECISION` status, rename strategy, password policy rollout, public registration).
+- [x] 0.2 Domain rename plan: map every table, column and enum from French to the target English names — [`RENAME_PLAN.md`](RENAME_PLAN.md) (boundary rules, task 1.1 glossary, later renames).
+- [x] 0.3 Rule adopted: regenerate the OpenAPI client (`npm run api:generate`) whenever the HTTP contract changes and update the frontend in the same commit; CI `api:check` must stay green.
 
 ## Phase 1: Enterprise Management & Onboarding
 
 - [ ] 1.1 DB Models: Refactor `Company`, `ESGReport`, and `ESGMetric` models according to domain spec.
-  - [ ] Add `isin`, `lei` (check-digit validated), `revenue`, `enterprise_value` (EVIC) with currencies and dates, `status`.
-  - [ ] Split report `status` from `extraction_status`; add `DRAFT`, `official_score`, `coverage_rate`, `config_hash`.
+  - [ ] Rename `entreprise`/`rapport_esg`/`indicateur_esg` to `companies`/`esg_reports`/`esg_metrics` per [`RENAME_PLAN.md`](RENAME_PLAN.md) §2, in one consolidated migration.
+  - [ ] Add `isin`, `lei` (check-digit validated), `revenue`, `enterprise_value` (EVIC) with currencies and dates, `status` (replaces `actif`; `published_at` keeps the publication timestamp).
+  - [ ] Split report `status` from `extraction_status`; add `DRAFT`, `PENDING_DECISION` (D2), `official_score`, `coverage_rate`, `config_hash`.
   - [ ] Unique `(report_id, metric_code)` on metrics **[review]** (the scoring engine silently keeps the last duplicate today).
   - [ ] Auditor override fields on metrics.
+  - [ ] Explicit `ON DELETE` rules and indexes on every foreign key to or from the three tables (RENAME_PLAN §2.5).
 - [ ] 1.2 Auth & Email Sanitization: Enforce lowercase email normalization and Pydantic password validation (12-72 bytes).
+  - [ ] Rename `utilisateur` → `users` per RENAME_PLAN §3.
+  - [ ] Password policy per D4: 12 characters minimum on activation, reset and change; existing hashes untouched.
   - [ ] Lower-case email on login, admin creation, profile update and reset; unique index on `lower(email)`; data migration that reports existing case-duplicates before adding the index **[review]**.
   - [ ] One shared password validator used by activation, reset **and** change-password (change-password has none today) **[review]**.
   - [ ] Rate-limit `POST /auth/changer-mot-de-passe` like verify-password **[review]**.
@@ -82,4 +86,5 @@ Rules for every task:
 - [ ] 4.5 Test coverage **[review]**
   - [ ] Backend: extraction pipeline (with a stubbed LLM), semantic search, completeness, explainability, activation, avatar, CSRF middleware in isolation.
   - [ ] Frontend: at least one flow test per user space (currently only auth, contact, prototype, `RequireRole`).
+- [ ] 4.7 Finish the English rename: remaining modules and the remaining French JSON field names (RENAME_PLAN §3), with the regenerated client and frontend.
 - [ ] 4.6 Documentation: expand `README.md` (features, roles and permissions, architecture diagram, deployment, screenshots).
