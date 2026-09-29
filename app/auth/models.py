@@ -64,7 +64,10 @@ class User(SQLModel, table=True):
     institution_profile: Optional["InstitutionProfil"] = Relationship(
         back_populates="utilisateur"
     )
-    company: Optional["Company"] = Relationship(back_populates="owner")
+    company: Optional["Company"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={"foreign_keys": "[Company.owner_user_id]"},
+    )
     audited_reports: list["ESGReport"] = Relationship(back_populates="auditor")
     scoring_configs: list["ConfigurationPonderation"] = Relationship(
         back_populates="utilisateur"

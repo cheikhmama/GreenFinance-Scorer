@@ -41,7 +41,12 @@ Rules for every task:
   - [x] Uniform `202` (no disclosure of known e-mails / ISIN / LEI); per-IP rate limit; trap field. No CAPTCHA — needs a third-party service decision before production.
   - [x] Admin actions can't bypass onboarding: reactivate only from `SUSPENDED`, suspend only from `ACTIVE`, no activation-link resend for a pending company; `statut` added to the company API contract.
   - [x] Frontend: public page `/inscription-entreprise` (linked from login), pending badge in the admin views.
-- [ ] 1.4 Admin KYC API: Implement onboarding approval endpoint (`PATCH /api/v1/admin/companies/{id}/onboard`).
+- [x] 1.4 Admin KYC API: Implement onboarding approval endpoint (`PATCH /api/v1/admin/companies/{id}/onboard`). (migration `e7d012541fce`)
+  - [x] `approve`: company `ACTIVE`, `onboarded_at` / `onboarded_by_id` recorded, owner's activation link sent — status and token in one commit, company row locked.
+  - [x] `reject` (reason required): registration deleted, reason e-mailed, decision kept in the audit journal; the requester can register again.
+  - [x] Decision: no ISIN/LEI or financial data required to approve (unlisted companies); revisit with PCAF (2.3).
+  - [x] `envoyer_lien_activation` no longer commits: callers commit the token with the rest of their change.
+  - [x] Frontend: approve / reject panel on a pending company's admin page; end-to-end test register → approve → activate → log in.
 - [ ] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`).
 - [x] 1.6 Audit Queue & Atomic Validation: Refactor `valider_rapport` to run score calculation and status transition inside a single atomic BDD transaction. **[review]** (migration `834bf70ae1b9`)
   - [x] Remove `session.commit()` from `obtenir_configuration_reference`; `INSERT ... ON CONFLICT` on a new partial unique index (one reference row per version); existing duplicate rows merged by the migration.

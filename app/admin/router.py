@@ -26,6 +26,7 @@ from app.admin.apercu import (
 )
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import lister_journal_audit
+from app.admin.onboarding import decider_inscription
 from app.admin.review_queue import (
     consulter_entreprise_admin,
     demander_correction,
@@ -58,6 +59,8 @@ from app.admin.schemas import (
     AnalyseAdmin,
     ApercuActeursAdmin,
     ChargeAuditeurAdmin,
+    CompanyOnboardingRequest,
+    CompanyOnboardingResult,
     CreerUtilisateurRequest,
     DecisionAdminRequest,
     EntrepriseAdmin,
@@ -203,6 +206,7 @@ def creer_utilisateur_route(
         pays=payload.pays,
     )
     envoyer_lien_activation(session, utilisateur, background_tasks)
+    session.commit()
     return UtilisateurCree(
         id=utilisateur.id,
         email=utilisateur.email,
@@ -673,6 +677,24 @@ def lister_entreprises_avec_score_route(
         page_size=page_size,
         total=total,
         pages=math.ceil(total / page_size) if page_size else 0,
+    )
+
+
+@router.patch(
+    "/admin/companies/{company_id}/onboard",
+    response_model=CompanyOnboardingResult,
+    operation_id="onboardCompany",
+    summary="Valider ou refuser l'inscription d'une entreprise",
+)
+def onboard_company(
+    company_id: uuid.UUID,
+    payload: CompanyOnboardingRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyOnboardingResult:
+    return decider_inscription(
+        session, current_user.id, company_id, payload.decision, payload.reason, background_tasks
     )
 
 

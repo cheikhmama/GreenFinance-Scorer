@@ -297,6 +297,47 @@ export interface ChercheurDisponible {
   nom: string | null;
 }
 
+export type OnboardingDecision = typeof OnboardingDecision[keyof typeof OnboardingDecision];
+
+
+export const OnboardingDecision = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+/**
+ * PATCH /admin/companies/{id}/onboard (tâche 1.4, contrat JSON en anglais). Un refus exige un
+ * motif : il est transmis au demandeur par e-mail.
+ */
+export interface CompanyOnboardingRequest {
+  decision: OnboardingDecision;
+  reason?: string | null;
+}
+
+/**
+ * Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
+ * score (Company.published_at).
+ */
+export type CompanyStatus = typeof CompanyStatus[keyof typeof CompanyStatus];
+
+
+export const CompanyStatus = {
+  PENDING_ONBOARDING: 'PENDING_ONBOARDING',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+/**
+ * `status` est None après un refus : l'inscription refusée est supprimée (le demandeur peut
+ * en déposer une nouvelle), il n'y a plus d'entreprise à décrire.
+ */
+export interface CompanyOnboardingResult {
+  company_id: string;
+  decision: OnboardingDecision;
+  status: CompanyStatus | null;
+  onboarded_at: string | null;
+}
+
 /**
  * POST /companies/register — inscription publique d'une entreprise (tâche 1.3, décision D5).
  *
@@ -331,19 +372,6 @@ export interface CompanyRegistrationRequest {
   contact_email: string;
   company_fax?: string | null;
 }
-
-/**
- * Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
- * score (Company.published_at).
- */
-export type CompanyStatus = typeof CompanyStatus[keyof typeof CompanyStatus];
-
-
-export const CompanyStatus = {
-  PENDING_ONBOARDING: 'PENDING_ONBOARDING',
-  ACTIVE: 'ACTIVE',
-  SUSPENDED: 'SUSPENDED',
-} as const;
 
 /**
  * POST /auth/confirmer-changement-email — jeton reçu à la nouvelle adresse

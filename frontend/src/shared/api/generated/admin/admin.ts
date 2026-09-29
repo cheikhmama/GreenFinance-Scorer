@@ -9,6 +9,8 @@ import type {
   ApercuActeursAdmin,
   AvisAuditAdmin,
   BodyUploadCompanyLogo,
+  CompanyOnboardingRequest,
+  CompanyOnboardingResult,
   CreerUtilisateurRequest,
   DecisionAdminRequest,
   EntrepriseAdmin,
@@ -796,6 +798,36 @@ export const listCompaniesWithScore = async (params?: ListCompaniesWithScorePara
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getOnboardCompanyUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/onboard`
+}
+
+/**
+ * @summary Valider ou refuser l'inscription d'une entreprise
+ */
+export const onboardCompany = async (companyId: string,
+    companyOnboardingRequest: CompanyOnboardingRequest, options?: RequestInit): Promise<CompanyOnboardingResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<CompanyOnboardingResult>(getOnboardCompanyUrl(companyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyOnboardingRequest)
   }
 );}
 

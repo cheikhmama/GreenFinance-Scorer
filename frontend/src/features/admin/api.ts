@@ -38,6 +38,7 @@ import {
   rejectReport,
   requestReportCorrection,
   retryExtraction,
+  onboardCompany,
   suspendCompany,
   updateCompanyProfile,
   uploadCompanyLogo,
@@ -45,6 +46,8 @@ import {
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
+  CompanyOnboardingRequest,
+  CompanyOnboardingResult,
   AffecterAuditeurRequest,
   ApercuActeursAdmin,
   AvisAuditAdmin,
@@ -351,6 +354,23 @@ export function useSuspendCompany() {
   return useMutation<EntreprisePublic, ApiError, string>({
     mutationFn: (entrepriseId) => suspendCompany(entrepriseId),
     onSuccess: (_entreprise, entrepriseId) => {
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+      queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
+    },
+  });
+}
+
+/** PATCH /admin/companies/{id}/onboard — valide (lien d'activation envoyé au titulaire) ou refuse
+ * (inscription supprimée, motif envoyé) une inscription en attente (app/admin/onboarding.py). */
+export function useOnboardCompany() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    CompanyOnboardingResult,
+    ApiError,
+    { entrepriseId: string } & CompanyOnboardingRequest
+  >({
+    mutationFn: ({ entrepriseId, ...decision }) => onboardCompany(entrepriseId, decision),
+    onSuccess: (_resultat, { entrepriseId }) => {
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
       queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
     },

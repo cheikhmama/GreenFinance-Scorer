@@ -5,12 +5,14 @@ Jamais réutilisés comme modèles de persistance (voir ARCHITECTURE.md §2).
 
 import uuid
 from datetime import datetime
+from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.auth.schemas import EmailNormalise
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
+    CompanyStatus,
     DevisePosition,
     ReportStatus,
     Role,
@@ -293,3 +295,34 @@ class ProjetAdmin(BaseModel):
     date_creation: datetime
     date_limite: datetime | None
     date_cloture: datetime | None
+
+
+class OnboardingDecision(str, Enum):
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
+class CompanyOnboardingRequest(BaseModel):
+    """PATCH /admin/companies/{id}/onboard (tâche 1.4, contrat JSON en anglais). Un refus exige un
+    motif : il est transmis au demandeur par e-mail."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    decision: OnboardingDecision
+    reason: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def _motif_si_refus(self) -> "CompanyOnboardingRequest":
+        if self.decision == OnboardingDecision.REJECT and not self.reason:
+            raise ValueError("Un motif est requis pour refuser une inscription.")
+        return self
+
+
+class CompanyOnboardingResult(BaseModel):
+    """`status` est None après un refus : l'inscription refusée est supprimée (le demandeur peut
+    en déposer une nouvelle), il n'y a plus d'entreprise à décrire."""
+
+    company_id: uuid.UUID
+    decision: OnboardingDecision
+    status: CompanyStatus | None
+    onboarded_at: datetime | None

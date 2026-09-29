@@ -12,6 +12,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
+import { OnboardingPanel } from "./OnboardingPanel";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -211,6 +212,10 @@ export function AdminCompanyDetailPage() {
       <Link to="/admin/entreprises" className="text-sm text-brand-green underline underline-offset-2">
         ← Entreprises
       </Link>
+
+      {entreprise.statut === "PENDING_ONBOARDING" ? (
+        <OnboardingPanel entrepriseId={entrepriseId} nom={entreprise.nom} />
+      ) : null}
 
       <Card>
         <CardHeader>

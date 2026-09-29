@@ -74,8 +74,19 @@ class Company(SQLModel, table=True):
     # de la Company — "valider" un rapport et "publier" une entreprise sont deux gestes
     # délibérément séparés côté Administrateur.
     published_at: datetime | None = Field(default=None)
+    # Validation de l'inscription par l'Administrateur (tâche 1.4, décision D5). Nuls pour une
+    # entreprise provisionnée directement par l'Administrateur ou antérieure à cette tâche.
+    onboarded_at: datetime | None = Field(default=None)
+    onboarded_by_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
+    )
 
-    owner: Optional["User"] = Relationship(back_populates="company")
+    # Deux clés vers users (titulaire, valideur de l'inscription) : la relation désigne
+    # explicitement celle du titulaire.
+    owner: Optional["User"] = Relationship(
+        back_populates="company",
+        sa_relationship_kwargs={"foreign_keys": "[Company.owner_user_id]"},
+    )
     reports: list["ESGReport"] = Relationship(back_populates="company")
     positions: list["PositionPortefeuille"] = Relationship(back_populates="entreprise")
     discrepancy_flags: list["SignalementEcart"] = Relationship(back_populates="entreprise")

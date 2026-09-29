@@ -68,7 +68,12 @@ def envoyer_lien_activation(
     (app/admin/utilisateurs.py::creer_utilisateur) et pour un renvoi (renvoyer_lien_activation).
 
     Un nouveau lien invalide les précédents, encore valides ou non — jamais plus d'un lien
-    utilisable à la fois pour un même compte (même règle que password_reset.py)."""
+    utilisable à la fois pour un même compte (même règle que password_reset.py).
+
+    Ne commite pas (tâche 1.4) : l'appelant commite le jeton avec le reste de son geste — création
+    du compte, renvoi, ou validation d'une inscription — pour qu'un lien ne parte jamais pour un
+    changement qui n'aurait pas été enregistré. L'envoi est une tâche de fond, exécutée après la
+    réponse, donc après ce commit."""
     anciens = session.exec(
         select(AccountActivationToken).where(
             col(AccountActivationToken.user_id) == utilisateur.id,
@@ -86,7 +91,7 @@ def envoyer_lien_activation(
             expires_at=utcnow() + ACTIVATION_TOKEN_TTL,
         )
     )
-    session.commit()
+    session.flush()
 
     background_tasks.add_task(_envoyer_lien, utilisateur.email, jeton_clair)
 

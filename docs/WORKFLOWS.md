@@ -29,7 +29,8 @@ Conventions used below:
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|
 | register (*task 1.3*) | public | Valid ISIN/LEI check digits if given (both optional); email, ISIN and LEI not already known; 3 requests per IP per hour; trap field empty. Same `202` answer whatever the outcome — the requester learns it by e-mail | company `PENDING_ONBOARDING` + owner user `ENTERPRISE` **without password** + audit log + admin notification `ENTREPRISE_INSCRITE` | acknowledgment e-mail (or "not processed" e-mail on a duplicate). The activation link is sent at onboarding, never before |
-| onboard (KYC) | ADMIN | status `PENDING_ONBOARDING`; ISIN or LEI present; revenue and EVIC present | status `ACTIVE`, onboarded_by/at, audit log, notification | — |
+| onboard — approve (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING` (row locked); owner account present. **No ISIN/LEI or financial data required** — many unlisted companies have none; the admin may complete the profile first, and PCAF (task 2.3) asks for figures when it needs them | status `ACTIVE`, onboarded_by/at, activation token, audit log | activation e-mail to the owner |
+| onboard — reject (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING`; a reason is required | company and owner account deleted (the owner never had a password), audit log keeps the decision and the reason | e-mail with the reason; the requester may register again |
 | suspend / reactivate | ADMIN | — | status change, audit log, sessions of the owner revoked on suspend | — |
 
 **Rules:**
