@@ -8,6 +8,9 @@ export interface ApiErrorBody {
     code: string;
     message: string;
     correlation_id: string | null;
+    /** Détail par champ — ou par ligne pour un import (`line_<n>`, `file`) — quand l'API en
+     * fournit (app/core/exceptions.py::_error_body). */
+    fields?: Record<string, string>;
   };
 }
 
@@ -21,6 +24,7 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly correlationId: string | null;
+  readonly fields: Record<string, string> | null;
 
   constructor(status: number, body: ApiErrorBody) {
     super(body.error.message);
@@ -28,5 +32,6 @@ export class ApiError extends Error {
     this.status = status;
     this.code = body.error.code;
     this.correlationId = body.error.correlation_id;
+    this.fields = body.error.fields ?? null;
   }
 }

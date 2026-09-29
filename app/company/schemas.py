@@ -35,6 +35,9 @@ def company_vers_contrat(company: Company) -> dict[str, Any]:
         "devise_montant_minimum": company.minimum_investment_currency,
         "date_publication": company.published_at,
         "utilisateur_id": company.owner_user_id,
+        "isin": company.isin,
+        "lei": company.lei,
+        "ticker": company.ticker,
     }
 
 
@@ -67,6 +70,10 @@ class EntreprisePublic(CompanyContractMixin):
     montant_minimum_investissement: float | None
     devise_montant_minimum: DevisePosition | None
     date_publication: datetime | None
+    # Identifiants de marché (tâches 1.3, 2.2) — donnée publique, clé de l'import de portefeuille.
+    isin: str | None = None
+    lei: str | None = None
+    ticker: str | None = None
 
 
 class ImporterRapportParURLRequest(BaseModel):

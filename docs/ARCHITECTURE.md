@@ -146,7 +146,8 @@ hard-coded placeholder `3` is removed).
 
 ### 3.4 `portfolios` and `portfolio_positions` (module `app/investor`)
 
-*Implemented in task 2.1* (amounts still `float`, `Decimal` with task 2.3; import endpoint: task 2.2).
+*Implemented in task 2.1* (amounts still `float`, `Decimal` with task 2.3). Import endpoint: task 2.2,
+which also adds `companies.ticker` (indexed, not unique).
 
 | Table | Column | Notes |
 |---|---|---|

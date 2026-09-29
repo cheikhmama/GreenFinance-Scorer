@@ -43,6 +43,7 @@ from app.admin.review_queue import (
     lister_toutes_les_entreprises,
     lister_versions,
     modifier_entreprise_admin,
+    modifier_identifiants,
     publier_entreprise,
     reactiver_entreprise,
     recalculer_score,
@@ -59,6 +60,8 @@ from app.admin.schemas import (
     AnalyseAdmin,
     ApercuActeursAdmin,
     ChargeAuditeurAdmin,
+    CompanyIdentifiers,
+    CompanyIdentifiersRequest,
     CompanyOnboardingRequest,
     CompanyOnboardingResult,
     CreerUtilisateurRequest,
@@ -679,6 +682,26 @@ def lister_entreprises_avec_score_route(
         page_size=page_size,
         total=total,
         pages=math.ceil(total / page_size) if page_size else 0,
+    )
+
+
+@router.patch(
+    "/admin/companies/{company_id}/identifiers",
+    response_model=CompanyIdentifiers,
+    operation_id="updateCompanyIdentifiers",
+    summary="Renseigner l'ISIN, le LEI ou le ticker d'une entreprise",
+)
+def update_company_identifiers(
+    company_id: uuid.UUID,
+    payload: CompanyIdentifiersRequest,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyIdentifiers:
+    entreprise = modifier_identifiants(
+        session, company_id, payload.model_dump(include=payload.model_fields_set)
+    )
+    return CompanyIdentifiers(
+        company_id=entreprise.id, isin=entreprise.isin, lei=entreprise.lei, ticker=entreprise.ticker
     )
 
 

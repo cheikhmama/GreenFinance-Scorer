@@ -68,9 +68,14 @@ Rules for every task:
   - [x] Aggregation counts unmatched lines in the total but never scores them (coverage drops, scores don't); sector breakdown skips them.
   - [x] `ON DELETE`: `portfolios.user_id` CASCADE, `portfolio_positions.portfolio_id` CASCADE + index.
   - [x] Found while renaming: three attribute writes (archive, rename, close position) that mypy cannot see on SQLModel — fixed; archive/close were already covered by tests, a rename test was added (verified to fail on the old code); one more timing-flaky test made deterministic.
-- [ ] 2.2 Portfolio API: CSV/JSON upload endpoint for portfolio positions mapped by ISIN/Ticker.
-  - [ ] All-or-nothing import with a per-line error report; unmatched lines kept.
-  - [ ] Weight-only imports require a total portfolio value (PCAF needs amounts).
+- [x] 2.2 Portfolio API: CSV/JSON upload endpoint for portfolio positions mapped by ISIN/Ticker. (migration `161f99c1f733`)
+  - [x] `POST /portfolios/{id}/positions/import` (multipart `file` + optional `total_value`, `app/investor/importation.py`): CSV (`,` `;` or tab, decimal comma with `;`) or JSON, 1 MB / 5 000 lines max.
+  - [x] All-or-nothing import with a per-line error report (`fields.line_<n>`, `fields.file`); unmatched lines kept (`UNMATCHED` / `AMBIGUOUS`), shown with their raw identifier and never scored.
+  - [x] Weight-only imports require a total portfolio value (PCAF needs amounts); amount and weight modes cannot be mixed; weights sum to 1 ± 0.001.
+  - [x] Matching only against **published** companies (an import never reveals a pending one); a matched company follows the manual-entry rules (`ACTIVE`, minimum investment).
+  - [x] Scope choice: import only into an **empty**, non-archived portfolio — replacing positions that have a history would destroy it (re-import: later, with 2.3's recompute job).
+  - [x] `companies.ticker` (indexed, never unique: one symbol can exist on several exchanges → `AMBIGUOUS`); `PATCH /admin/companies/{id}/identifiers` (partial, English contract) + admin form; ISIN/LEI/ticker added to the company contract.
+  - [x] Frontend: import form in the empty-portfolio state; `ApiError.fields` exposed.
 - [ ] 2.3 PCAF Carbon Engine: Implement real Scope 1, 2, 3 carbon footprint calculations (replacing placeholder scores). **[review]**
   - [ ] Attribution factor (amount / EVIC), financed emissions per scope, carbon footprint, WACI, weighted data quality.
   - [ ] Scope 3 reported separately; missing data excluded and counted in coverage, never zero.

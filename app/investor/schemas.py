@@ -13,7 +13,12 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.company.schemas import CompanyContractMixin, EntreprisePublic
-from app.core.enums import DevisePosition, TypeDureeInvestissement
+from app.core.enums import (
+    DevisePosition,
+    IdentifierType,
+    MatchStatus,
+    TypeDureeInvestissement,
+)
 from app.ingestion.schemas import (
     CouvertureResume,
     DonneeCarboneDetail,
@@ -150,7 +155,12 @@ class EntrepriseSommaire(CompanyContractMixin):
 class PositionDetail(BaseModel):
     id: uuid.UUID
     portefeuille_id: uuid.UUID
-    entreprise: EntrepriseSommaire
+    # Nulle pour une ligne importée qu'aucune entreprise publiée ne reconnaît (tâche 2.2) : elle
+    # reste listée avec son identifiant d'origine et statut_rapprochement.
+    entreprise: EntrepriseSommaire | None
+    identifiant: str | None = None
+    type_identifiant: IdentifierType | None = None
+    statut_rapprochement: MatchStatus = MatchStatus.MATCHED
     montant_investi: float
     devise: DevisePosition
     montant_converti: float
@@ -200,3 +210,14 @@ class TableauDeBordInvestisseur(BaseModel):
     repartition_secteur: list[RepartitionSecteur]
     publications_recentes: list[EntreprisePublieePublic]
     entreprises_suivies_suspendues: list[EntrepriseSommaire]
+
+
+class PortfolioImportResult(BaseModel):
+    """POST /portfolios/{id}/positions/import (tâche 2.2) — contrat JSON en anglais. Les lignes en
+    erreur ne figurent jamais ici : un import refusé répond 422 avec `fields.line_<n>`."""
+
+    portfolio_id: uuid.UUID
+    imported: int
+    matched: int
+    unmatched: int
+    ambiguous: int

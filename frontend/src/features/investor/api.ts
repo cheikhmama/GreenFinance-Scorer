@@ -11,6 +11,7 @@ import {
   deletePosition,
   getInvestorDashboard,
   getPortfolioDetail,
+  importPortfolioPositions,
   getPublishedCompanyDetail,
   listMyPortfolios,
   listPublishedCompanies,
@@ -20,6 +21,8 @@ import {
 } from "@/shared/api/generated/investor/investor";
 import type {
   AjouterPositionRequest,
+  BodyImportPortfolioPositions,
+  PortfolioImportResult,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
   FermerPositionRequest,
@@ -111,6 +114,19 @@ export function usePortfolioDetail(portefeuilleId: string) {
     queryKey: portefeuilleKey(portefeuilleId),
     queryFn: () => getPortfolioDetail(portefeuilleId),
     enabled: portefeuilleId.length > 0,
+  });
+}
+
+/** POST /portfolios/{id}/positions/import (tâche 2.2) — tout ou rien : une 422 porte
+ * `fields.line_<n>` / `fields.file`, et rien n'est enregistré. */
+export function useImportPositions(portefeuilleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<PortfolioImportResult, ApiError, BodyImportPortfolioPositions>({
+    mutationFn: (payload) => importPortfolioPositions(portefeuilleId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: portefeuilleKey(portefeuilleId) });
+      queryClient.invalidateQueries({ queryKey: PORTEFEUILLES_KEY });
+    },
   });
 }
 

@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import structlog
 from sqlalchemy import ColumnElement
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, func, or_, select
 
 from app.audit.models import AvisAudit
@@ -719,4 +720,27 @@ def supprimer_logo_entreprise(session: Session, entreprise_id: uuid.UUID) -> Com
     session.commit()
     session.refresh(entreprise)
     logger.info("entreprise_logo_supprime", entreprise_id=str(entreprise_id))
+    return entreprise
+
+
+def modifier_identifiants(
+    session: Session, entreprise_id: uuid.UUID, valeurs: dict[str, str | None]
+) -> Company:
+    """Met à jour ISIN / LEI / ticker (tâche 2.2) — `valeurs` ne contient que les champs fournis
+    par l'appelant. L'unicité de l'ISIN et du LEI est portée par la base
+    (companies_isin_key / companies_lei_key) : un conflit devient une 422 lisible, jamais une 500."""
+    entreprise = consulter_entreprise_admin(session, entreprise_id)
+    for champ, valeur in valeurs.items():
+        setattr(entreprise, champ, valeur)
+    session.add(entreprise)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise ValidationError(
+            "Cet ISIN ou ce LEI est déjà attribué à une autre entreprise.",
+            code="identifiant_deja_utilise",
+        ) from exc
+    session.refresh(entreprise)
+    logger.info("entreprise_identifiants_modifies", entreprise_id=str(entreprise_id))
     return entreprise

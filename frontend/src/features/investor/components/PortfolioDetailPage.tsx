@@ -48,6 +48,7 @@ import type {
   EntreprisePublieePublic,
   PositionDetail,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { ImportPositionsForm } from "./ImportPositionsForm";
 
 export function PortfolioDetailPage() {
   const { portefeuilleId = "" } = useParams();
@@ -162,7 +163,10 @@ export function PortfolioDetailPage() {
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <p className="text-brand-grey">Ce portefeuille ne contient encore aucune position.</p>
               {!portefeuille.archive ? (
-                <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
+                <>
+                  <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
+                  <ImportPositionsForm portefeuilleId={portefeuille.id} />
+                </>
               ) : null}
             </div>
           ) : (
@@ -189,11 +193,23 @@ export function PortfolioDetailPage() {
                   {portefeuille.positions.map((position) => (
                     <tr key={position.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
-                        <CompanyIdentity
-                          nom={position.entreprise.nom}
-                          logo={position.entreprise.logo}
-                          secteur={position.entreprise.secteur}
-                        />
+                        {position.entreprise ? (
+                          <CompanyIdentity
+                            nom={position.entreprise.nom}
+                            logo={position.entreprise.logo}
+                            secteur={position.entreprise.secteur}
+                          />
+                        ) : (
+                          // Ligne importée qu'aucune entreprise publiée ne reconnaît (tâche 2.2).
+                          <div className="space-y-1">
+                            <p className="font-mono text-sm">{position.identifiant}</p>
+                            <Badge variant="outline">
+                              {position.statut_rapprochement === "AMBIGUOUS"
+                                ? "Plusieurs entreprises possibles"
+                                : "Entreprise non reconnue"}
+                            </Badge>
+                          </div>
+                        )}
                       </td>
                       <td className="py-2 pr-4">
                         <p>{formatMontant(position.montant_investi, position.devise)}</p>
@@ -220,10 +236,12 @@ export function PortfolioDetailPage() {
                       <td className="py-2 pr-4">{formatScore(position.score.valeur_globale)}</td>
                       <td className="py-2">
                         <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" asChild>
-                            <Link to={`/investor/entreprises/${position.entreprise.id}`}>Détails</Link>
-                          </Button>
-                          {position.etat === "PLANIFIEE" ? (
+                          {position.entreprise ? (
+                            <Button size="sm" variant="outline" asChild>
+                              <Link to={`/investor/entreprises/${position.entreprise.id}`}>Détails</Link>
+                            </Button>
+                          ) : null}
+                          {position.etat === "PLANIFIEE" && position.entreprise ? (
                             <>
                               <Button
                                 size="sm"
@@ -436,7 +454,7 @@ function FormulaireFermeture({
   return (
     <div className="space-y-4">
       <p className="text-sm text-brand-grey">
-        Position sur <strong>{position.entreprise.nom}</strong>, ouverte le{" "}
+        Position sur <strong>{position.entreprise?.nom ?? position.identifiant}</strong>, ouverte le{" "}
         {new Date(position.date_debut).toLocaleDateString("fr-FR")}.
       </p>
       {serverError ? (
@@ -493,7 +511,7 @@ function FormulairePosition({
   // En modification, l'entreprise est figée sur la position existante (jamais changeable, voir
   // le formulaire plus bas) — on récupère son montant minimum pré-converti via la même route que
   // la fiche détaillée, plutôt que de le dupliquer dans PositionDetail.entreprise.
-  const { data: entrepriseDetail } = useCompanyDetail(position?.entreprise.id ?? "");
+  const { data: entrepriseDetail } = useCompanyDetail(position?.entreprise?.id ?? "");
   const entrepriseActive = position ? entrepriseDetail : entrepriseSelectionnee;
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -503,7 +521,8 @@ function FormulairePosition({
     resolver: zodResolver(ajouterPositionSchema),
     defaultValues: position
       ? {
-          entreprise_id: position.entreprise.id,
+          // Formulaire jamais ouvert pour une ligne non rapprochée (bouton masqué plus haut).
+          entreprise_id: position.entreprise?.id ?? "",
           montant: position.montant_investi,
           devise: position.devise,
           type_duree: position.type_duree,

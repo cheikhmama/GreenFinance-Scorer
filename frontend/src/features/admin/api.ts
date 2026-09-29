@@ -40,12 +40,15 @@ import {
   retryExtraction,
   onboardCompany,
   suspendCompany,
+  updateCompanyIdentifiers,
   updateCompanyProfile,
   uploadCompanyLogo,
   validateReport,
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
+  CompanyIdentifiers,
+  CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
   CompanyOnboardingResult,
   AffecterAuditeurRequest,
@@ -407,6 +410,19 @@ export function useUpdateCompanyProfile(entrepriseId: string) {
     mutationFn: (payload) => updateCompanyProfile(entrepriseId, payload),
     onSuccess: (entreprise) => {
       queryClient.setQueryData(companyDetailKey(entrepriseId), entreprise);
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
+  });
+}
+
+/** PATCH /admin/companies/{id}/identifiers (tâche 2.2) — patch partiel : seuls les champs
+ * envoyés changent, `null` efface. Relit la fiche (qui expose isin/lei/ticker) au succès. */
+export function useUpdateCompanyIdentifiers(entrepriseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<CompanyIdentifiers, ApiError, CompanyIdentifiersRequest>({
+    mutationFn: (payload) => updateCompanyIdentifiers(entrepriseId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
     },
   });

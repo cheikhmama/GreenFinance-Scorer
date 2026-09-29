@@ -8,7 +8,7 @@ appeler cette logique (même convention que les autres espaces, voir ARCHITECTUR
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
@@ -16,10 +16,10 @@ from app.auth.models import User
 from app.auth.permissions import require_role
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role
+from app.core.enums import MatchStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.investor import dashboard, entreprises, portfolio
+from app.investor import dashboard, entreprises, importation, portfolio
 from app.investor.models import Portfolio, PortfolioPosition
 from app.investor.schemas import (
     AjouterPositionRequest,
@@ -30,6 +30,7 @@ from app.investor.schemas import (
     ModifierPositionRequest,
     PortefeuilleDetail,
     PortefeuilleResume,
+    PortfolioImportResult,
     PositionDetail,
     RenommerPortefeuilleRequest,
     TableauDeBordInvestisseur,
@@ -272,6 +273,35 @@ def _position_detail_apres_mutation(
     assert portefeuille is not None
     resume = portfolio.resume_portefeuille(session, portefeuille)
     return portfolio.position_detail(session, position, resume.montant_total)
+
+
+@router.post(
+    "/portfolios/{portfolio_id}/positions/import",
+    response_model=PortfolioImportResult,
+    status_code=201,
+    operation_id="importPortfolioPositions",
+    summary="Importer les positions d'un portefeuille vide (CSV ou JSON, par ISIN ou ticker)",
+)
+def import_portfolio_positions(
+    portfolio_id: uuid.UUID,
+    file: UploadFile,
+    total_value: float | None = Form(default=None, gt=0),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
+    session: Session = Depends(get_session),
+) -> PortfolioImportResult:
+    # Lecture bornée : un octet de plus que la limite suffit à refuser le fichier.
+    contenu = file.file.read(importation.TAILLE_MAX_OCTETS + 1)
+    positions = importation.importer_positions(
+        session, current_user.id, portfolio_id, contenu, file.filename, total_value
+    )
+    statuts = [position.match_status for position in positions]
+    return PortfolioImportResult(
+        portfolio_id=portfolio_id,
+        imported=len(positions),
+        matched=statuts.count(MatchStatus.MATCHED),
+        unmatched=statuts.count(MatchStatus.UNMATCHED),
+        ambiguous=statuts.count(MatchStatus.AMBIGUOUS),
+    )
 
 
 @router.post(

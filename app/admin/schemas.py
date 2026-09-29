@@ -3,6 +3,7 @@
 Jamais réutilisés comme modèles de persistance (voir ARCHITECTURE.md §2).
 """
 
+import re
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -10,6 +11,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.auth.schemas import EmailNormalise
+from app.company.identifiers import isin_valide, lei_valide
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
     CompanyStatus,
@@ -326,3 +328,53 @@ class CompanyOnboardingResult(BaseModel):
     decision: OnboardingDecision
     status: CompanyStatus | None
     onboarded_at: datetime | None
+
+
+class CompanyIdentifiersRequest(BaseModel):
+    """PATCH /admin/companies/{id}/identifiers (tâche 2.2, contrat JSON en anglais). Seuls les
+    champs présents dans le corps changent ; `null` efface l'identifiant. Distinct de la
+    modification du profil (remplacement complet) pour qu'un formulaire qui ignore ces champs ne
+    les efface jamais."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    isin: str | None = None
+    lei: str | None = None
+    ticker: str | None = Field(default=None, max_length=20)
+
+    @field_validator("isin")
+    @classmethod
+    def _isin(cls, valeur: str | None) -> str | None:
+        if not valeur:
+            return None
+        valeur = valeur.replace(" ", "").upper()
+        if not isin_valide(valeur):
+            raise ValueError("ISIN invalide (12 caractères, chiffre de contrôle incorrect).")
+        return valeur
+
+    @field_validator("lei")
+    @classmethod
+    def _lei(cls, valeur: str | None) -> str | None:
+        if not valeur:
+            return None
+        valeur = valeur.replace(" ", "").upper()
+        if not lei_valide(valeur):
+            raise ValueError("LEI invalide (20 caractères, chiffres de contrôle incorrects).")
+        return valeur
+
+    @field_validator("ticker")
+    @classmethod
+    def _ticker(cls, valeur: str | None) -> str | None:
+        if not valeur:
+            return None
+        valeur = valeur.replace(" ", "").upper()
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9.\-]{0,19}", valeur):
+            raise ValueError("Ticker invalide (lettres, chiffres, point ou tiret).")
+        return valeur
+
+
+class CompanyIdentifiers(BaseModel):
+    company_id: uuid.UUID
+    isin: str | None
+    lei: str | None
+    ticker: str | None

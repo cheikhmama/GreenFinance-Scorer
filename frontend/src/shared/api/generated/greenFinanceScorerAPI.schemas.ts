@@ -230,6 +230,11 @@ export interface AvisAuditAdmin {
   auditeur_id: string;
 }
 
+export interface BodyImportPortfolioPositions {
+  file: Blob;
+  total_value?: number | null;
+}
+
 export type TypeRapport = typeof TypeRapport[keyof typeof TypeRapport];
 
 
@@ -299,6 +304,25 @@ export interface ChercheurDisponible {
   id: string;
   email: string;
   nom: string | null;
+}
+
+export interface CompanyIdentifiers {
+  company_id: string;
+  isin: string | null;
+  lei: string | null;
+  ticker: string | null;
+}
+
+/**
+ * PATCH /admin/companies/{id}/identifiers (tâche 2.2, contrat JSON en anglais). Seuls les
+ * champs présents dans le corps changent ; `null` efface l'identifiant. Distinct de la
+ * modification du profil (remplacement complet) pour qu'un formulaire qui ignore ces champs ne
+ * les efface jamais.
+ */
+export interface CompanyIdentifiersRequest {
+  isin?: string | null;
+  lei?: string | null;
+  ticker?: string | null;
 }
 
 export type OnboardingDecision = typeof OnboardingDecision[keyof typeof OnboardingDecision];
@@ -599,6 +623,9 @@ export interface EntrepriseAdmin {
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
+  isin?: string | null;
+  lei?: string | null;
+  ticker?: string | null;
   utilisateur_id: string | null;
   nombre_rapports: number;
   dernier_statut_rapport: ReportStatus | null;
@@ -676,6 +703,9 @@ export interface EntrepriseDetailInvestisseur {
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
+  isin?: string | null;
+  lei?: string | null;
+  ticker?: string | null;
   score: ScoreEntreprisePublic;
   carbone: DonneesCarboneAgregees;
   montant_minimum_par_devise: Partial<Record<DevisePosition, number>> | null;
@@ -705,6 +735,9 @@ export interface EntreprisePublic {
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
+  isin?: string | null;
+  lei?: string | null;
+  ticker?: string | null;
 }
 
 /**
@@ -727,6 +760,9 @@ export interface EntreprisePublieePublic {
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
+  isin?: string | null;
+  lei?: string | null;
+  ticker?: string | null;
   score: ScoreEntreprisePublic;
   carbone: DonneesCarboneAgregees;
   montant_minimum_par_devise: Partial<Record<DevisePosition, number>> | null;
@@ -785,6 +821,17 @@ export interface HTTPValidationError {
 }
 
 /**
+ * Identifiant de marché d'une ligne de portefeuille importée (tâche 2.2).
+ */
+export type IdentifierType = typeof IdentifierType[keyof typeof IdentifierType];
+
+
+export const IdentifierType = {
+  ISIN: 'ISIN',
+  TICKER: 'TICKER',
+} as const;
+
+/**
  * Corps de POST /company/rapports/import-url (CanalDepot.AUTOMATIQUE). entreprise_id n'est
  * lu que pour un appelant Administrateur -- un appelant Entreprise est toujours rattaché à sa
  * propre entreprise (voir app/company/router.py), un entreprise_id fourni par lui est ignoré.
@@ -830,6 +877,18 @@ export interface LoginRequest {
   email: string;
   password: string;
 }
+
+/**
+ * Rapprochement d'une ligne de portefeuille avec une entreprise de la plateforme.
+ */
+export type MatchStatus = typeof MatchStatus[keyof typeof MatchStatus];
+
+
+export const MatchStatus = {
+  MATCHED: 'MATCHED',
+  UNMATCHED: 'UNMATCHED',
+  AMBIGUOUS: 'AMBIGUOUS',
+} as const;
 
 export interface ModifierAnalyseRequest {
   titre: string;
@@ -1128,7 +1187,10 @@ export interface PerformanceESGAdmin {
 export interface PositionDetail {
   id: string;
   portefeuille_id: string;
-  entreprise: EntrepriseSommaire;
+  entreprise: EntrepriseSommaire | null;
+  identifiant?: string | null;
+  type_identifiant?: IdentifierType | null;
+  statut_rapprochement?: MatchStatus;
   montant_investi: number;
   devise: DevisePosition;
   montant_converti: number;
@@ -1160,6 +1222,18 @@ export interface PortefeuilleDetail {
   nombre_positions_actives: number;
   nombre_positions_cloturees: number;
   positions: PositionDetail[];
+}
+
+/**
+ * POST /portfolios/{id}/positions/import (tâche 2.2) — contrat JSON en anglais. Les lignes en
+ * erreur ne figurent jamais ici : un import refusé répond 422 avec `fields.line_<n>`.
+ */
+export interface PortfolioImportResult {
+  portfolio_id: string;
+  imported: number;
+  matched: number;
+  unmatched: number;
+  ambiguous: number;
 }
 
 export interface ProjetAffecte {

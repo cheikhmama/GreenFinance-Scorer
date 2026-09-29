@@ -30,6 +30,7 @@ import {
   useValidateReport,
 } from "../api";
 import { DEVISES, type ModifierEntrepriseForm, modifierEntrepriseSchema } from "../schemas";
+import { CompanyIdentifiersCard } from "./CompanyIdentifiersCard";
 
 function LogoEditor({
   entrepriseId,
@@ -474,6 +475,8 @@ export function AdminCompanyDetailPage() {
           </Form>
         </CardContent>
       </Card>
+
+      <CompanyIdentifiersCard key={entreprise.id} entreprise={entreprise} />
     </div>
   );
 }

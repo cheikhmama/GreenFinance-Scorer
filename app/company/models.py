@@ -47,6 +47,10 @@ class Company(SQLModel, table=True):
     # rapprochement des positions importées (tâche 2.2) et des jeux de données publics (tâche 3.3).
     isin: str | None = Field(default=None, max_length=12, unique=True)
     lei: str | None = Field(default=None, max_length=20, unique=True)
+    # Symbole boursier (tâche 2.2), en majuscules. Jamais unique : un même ticker peut désigner
+    # des sociétés différentes sur plusieurs places — l'import le signale AMBIGUOUS plutôt que de
+    # choisir au hasard.
+    ticker: str | None = Field(default=None, max_length=20, index=True)
     # Données financières requises par PCAF (docs/WORKFLOWS.md §2.4) : chiffre d'affaires pour la
     # WACI, valeur d'entreprise trésorerie incluse (EVIC) pour le facteur d'attribution. Montants
     # en Decimal, jamais en float.

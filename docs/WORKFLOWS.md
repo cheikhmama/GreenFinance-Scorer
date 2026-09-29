@@ -134,8 +134,15 @@ Steps:
    reference currency with the FX rate frozen at import.
 4. Tx: replace positions, set status `MATCHED`. Job: `recompute_portfolio`.
 
-*Current:* positions are entered one at a time with an amount, currency and a fixed/open
-duration; there is no ISIN, no ticker, no bulk import and no weight.
+*Implemented in task 2.2* (`POST /portfolios/{id}/positions/import`, `app/investor/importation.py`),
+with these differences from the target:
+- import only into an **empty** portfolio (`portefeuille_non_vide` otherwise) — no replace and no
+  status/job yet (recompute job: task 2.3);
+- matching is against **published** companies (an unpublished one gives `UNMATCHED`); a matched
+  company that is not `ACTIVE` or below its minimum investment is a line error, like a manual entry;
+- each created line is an open position starting today; errors are returned as `fields.line_<n>`
+  (CSV header = line 1) and `fields.file`.
+Tickers are set by an admin (`PATCH /admin/companies/{id}/identifiers`).
 
 ### 2.3 Metric aggregation (job `recompute_portfolio`)
 

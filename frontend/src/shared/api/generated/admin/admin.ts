@@ -9,6 +9,8 @@ import type {
   ApercuActeursAdmin,
   AvisAuditAdmin,
   BodyUploadCompanyLogo,
+  CompanyIdentifiers,
+  CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
   CompanyOnboardingResult,
   CreerUtilisateurRequest,
@@ -798,6 +800,36 @@ export const listCompaniesWithScore = async (params?: ListCompaniesWithScorePara
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getUpdateCompanyIdentifiersUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/identifiers`
+}
+
+/**
+ * @summary Renseigner l'ISIN, le LEI ou le ticker d'une entreprise
+ */
+export const updateCompanyIdentifiers = async (companyId: string,
+    companyIdentifiersRequest: CompanyIdentifiersRequest, options?: RequestInit): Promise<CompanyIdentifiers> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<CompanyIdentifiers>(getUpdateCompanyIdentifiersUrl(companyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyIdentifiersRequest)
   }
 );}
 

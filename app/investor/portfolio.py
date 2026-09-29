@@ -166,13 +166,14 @@ def _agreger(
 def position_detail(
     session: Session, position: PortfolioPosition, montant_total_portefeuille: float
 ) -> PositionDetail:
-    # Invariant tant que l'import par ISIN/ticker (tâche 2.2) n'existe pas : toute position est
-    # saisie en choisissant l'entreprise, donc MATCHED. La tâche 2.2 étendra ce contrat aux lignes
-    # non rapprochées.
-    assert position.company_id is not None
-    entreprise = session.get(Company, position.company_id)
-    assert entreprise is not None  # invariant : FK company_id garantie par la base
-    rapport = entreprises_investisseur.dernier_rapport_valide(session, position.company_id)
+    # Ligne importée non rapprochée (tâche 2.2) : ni entreprise, ni score, ni preuve — elle reste
+    # affichée avec son identifiant d'origine.
+    entreprise = session.get(Company, position.company_id) if position.company_id else None
+    rapport = (
+        entreprises_investisseur.dernier_rapport_valide(session, position.company_id)
+        if position.company_id
+        else None
+    )
     score = entreprises_investisseur.score_public(session, rapport)
     preuves_disponibles = rapport is not None and (
         session.exec(
@@ -185,7 +186,10 @@ def position_detail(
     return PositionDetail(
         id=position.id,
         portefeuille_id=position.portfolio_id,
-        entreprise=EntrepriseSommaire.model_validate(entreprise),
+        entreprise=EntrepriseSommaire.model_validate(entreprise) if entreprise else None,
+        identifiant=position.identifier_raw,
+        type_identifiant=position.identifier_type,
+        statut_rapprochement=position.match_status,
         montant_investi=position.outstanding_amount,
         devise=position.currency,
         montant_converti=position.converted_amount,
@@ -194,9 +198,10 @@ def position_detail(
         type_duree=position.duration_type,
         date_debut=position.start_date,
         date_fin=position.end_date,
-        etat=etat_position(position, entreprise.status == CompanyStatus.ACTIVE),
+        # Sans entreprise, seul l'état temporel compte (jamais « entreprise suspendue »).
+        etat=etat_position(position, entreprise is None or entreprise.status == CompanyStatus.ACTIVE),
         score=score,
-        date_publication_utilisee=entreprise.published_at,
+        date_publication_utilisee=entreprise.published_at if entreprise else None,
         preuves_disponibles=preuves_disponibles,
     )
 
@@ -407,6 +412,12 @@ def modifier_position(
     en plus d'une existante déjà active)."""
     portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
+    if position.company_id is None:
+        # Ligne importée non rapprochée (tâche 2.2) : aucune entreprise dont appliquer les règles.
+        raise ValidationError(
+            "Une ligne importée non rapprochée ne se modifie pas.",
+            code="position_non_rapprochee",
+        )
     entreprise = session.get(Company, position.company_id)
     assert entreprise is not None
 
@@ -483,9 +494,10 @@ def supprimer_position(
 ) -> None:
     _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
-    entreprise = session.get(Company, position.company_id)
-    assert entreprise is not None
-    if etat_position(position, entreprise.status == CompanyStatus.ACTIVE) != EtatPosition.PLANIFIEE:
+    entreprise = session.get(Company, position.company_id) if position.company_id else None
+    # Sans entreprise (ligne non rapprochée), seul l'état temporel compte.
+    entreprise_active = entreprise is None or entreprise.status == CompanyStatus.ACTIVE
+    if etat_position(position, entreprise_active) != EtatPosition.PLANIFIEE:
         raise ValidationError(
             "Seule une position encore planifiée peut être supprimée.",
             code="position_non_supprimable",
@@ -514,9 +526,10 @@ def exporter_positions_csv(session: Session, portefeuille: Portfolio) -> str:
         detail = position_detail(session, position, montant_total)
         writer.writerow(
             [
-                detail.entreprise.nom,
-                detail.entreprise.secteur,
-                detail.entreprise.pays,
+                # Ligne non rapprochée (tâche 2.2) : son identifiant d'origine tient lieu de nom.
+                detail.entreprise.nom if detail.entreprise else f"[{detail.identifiant}]",
+                detail.entreprise.secteur if detail.entreprise else "",
+                detail.entreprise.pays if detail.entreprise else "",
                 detail.montant_investi,
                 detail.devise.value,
                 round(detail.montant_converti, 2),
