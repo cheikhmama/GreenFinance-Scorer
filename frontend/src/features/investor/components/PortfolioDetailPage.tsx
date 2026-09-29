@@ -49,6 +49,7 @@ import type {
   PositionDetail,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { ImportPositionsForm } from "./ImportPositionsForm";
+import { PortfolioCarbonCard } from "./PortfolioCarbonCard";
 
 export function PortfolioDetailPage() {
   const { portefeuilleId = "" } = useParams();
@@ -145,6 +146,8 @@ export function PortfolioDetailPage() {
             <Synthese label="Social (S)" value={formatScore(portefeuille.score_social_agrege)} />
             <Synthese label="Gouvernance (G)" value={formatScore(portefeuille.score_gouvernance_agrege)} />
           </div>
+
+          <PortfolioCarbonCard portefeuilleId={portefeuille.id} />
         </>
       ) : null}
 

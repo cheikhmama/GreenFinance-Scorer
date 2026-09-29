@@ -12,10 +12,10 @@ from sqlmodel import Session, select
 
 from app.core.exceptions import NotFoundError
 from app.ingestion.models import (
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
 )
 
 
@@ -36,8 +36,8 @@ def fichier_preuve(session: Session, rapport_id: uuid.UUID, preuve_id: uuid.UUID
         ).first()
         is not None
         or session.exec(
-            select(DonneeCarbone.id).where(
-                DonneeCarbone.preuve_id == preuve_id, DonneeCarbone.rapport_id == rapport_id
+            select(CarbonEmission.id).where(
+                CarbonEmission.proof_id == preuve_id, CarbonEmission.report_id == rapport_id
             )
         ).first()
         is not None
@@ -45,6 +45,6 @@ def fichier_preuve(session: Session, rapport_id: uuid.UUID, preuve_id: uuid.UUID
     if not appartient_au_rapport:
         raise NotFoundError("Preuve introuvable.", code="preuve_introuvable")
 
-    preuve = session.get(PreuveDocumentaire, preuve_id)
+    preuve = session.get(Evidence, preuve_id)
     assert preuve is not None  # invariant : la requête ci-dessus vient de la trouver par FK
-    return preuve.pdf_extrait_genere
+    return preuve.excerpt_pdf_path

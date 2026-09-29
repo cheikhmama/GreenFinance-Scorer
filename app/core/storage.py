@@ -15,7 +15,7 @@ from app.core.config import get_settings
 def save_bytes(relative_path: str, content: bytes) -> str:
     """Écrit `content` sous STORAGE_PATH/relative_path (crée les dossiers parents si besoin) et
     renvoie relative_path tel quel — la valeur à stocker dans ESGReport.source_file ou
-    PreuveDocumentaire.pdf_extrait_genere, jamais un chemin absolu (portable entre environnements)."""
+    Evidence.excerpt_pdf_path, jamais un chemin absolu (portable entre environnements)."""
     path = resolve_path(relative_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)

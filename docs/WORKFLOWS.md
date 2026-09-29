@@ -137,7 +137,7 @@ Steps:
 *Implemented in task 2.2* (`POST /portfolios/{id}/positions/import`, `app/investor/importation.py`),
 with these differences from the target:
 - import only into an **empty** portfolio (`portefeuille_non_vide` otherwise) — no replace and no
-  status/job yet (recompute job: task 2.3);
+  status/job yet (recompute job: task 4.1);
 - matching is against **published** companies (an unpublished one gives `UNMATCHED`); a matched
   company that is not `ACTIVE` or below its minimum investment is a line error, like a manual entry;
 - each created line is an open position starting today; errors are returned as `fields.line_<n>`
@@ -176,8 +176,22 @@ Rules:
 - The PCAF data-quality score comes from the extraction (reported and verified = 1–2, reported
   unverified = 2–3, estimated = 4–5). No placeholder value is ever stored.
 
-*Current:* `app/carbon/pcaf.py` and `emission_factors.py` are empty; carbon rows store a
-hard-coded `score_qualite_pcaf = 3`.
+*Implemented in task 2.3* (`GET /portfolios/{id}/carbon`; engine `app/carbon/pcaf.py`, data
+assembly `app/investor/carbon.py`), with these choices:
+- only **active** positions count (PCAF measures holdings at a point in time; planned and closed
+  positions are left out), computed on read — no cached aggregate or job yet (task 4.1);
+- emissions come from the company's latest **validated** report; Scope 2 uses the market-based
+  value, else the unqualified one, else location-based;
+- Scopes 1+2 need **both** scopes — a company that reports only one is `MISSING_EMISSIONS`, never
+  half-counted; the carbon footprint divides by the **covered** value (not the whole portfolio,
+  which would dilute it), and WACI weights are renormalised over the covered lines;
+- a line's data quality is the worse of its Scope 1 and Scope 2 scores; unknown stays unknown;
+- quality derived at extraction from the method: reported 2, calculated 3, estimated 4. Score 1
+  (verified) needs third-party assurance information the extraction does not capture yet;
+- EVIC and revenue are entered by an admin (`PUT /admin/companies/{id}/financials`); the EVIC
+  date is shown next to the emissions year rather than matched automatically;
+- coverages are returned as shares of the total amount (0–1), one per metric, and every excluded
+  line carries its reason (`UNMATCHED`, `NO_VALIDATED_REPORT`, `MISSING_EMISSIONS`, `MISSING_EVIC`).
 
 ---
 

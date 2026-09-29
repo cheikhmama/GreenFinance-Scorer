@@ -17,10 +17,10 @@ from app.core.enums import (
 )
 from app.core.models import Notification
 from app.ingestion.models import (
+    DiscrepancyFlag,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
-    SignalementEcart,
+    Evidence,
 )
 
 
@@ -48,13 +48,13 @@ def _rapport_avec_indicateur(session) -> tuple[ESGReport, ESGMetric]:
     )
     session.add(rapport)
     session.flush()
-    preuve = PreuveDocumentaire(
-        nom_document="doc.pdf",
-        annee=2025,
-        nombre_pages_total=10,
-        page_debut=1,
-        page_fin=2,
-        pdf_extrait_genere="s3://bucket/extrait.pdf",
+    preuve = Evidence(
+        document_name="doc.pdf",
+        year=2025,
+        total_pages=10,
+        page_start=1,
+        page_end=2,
+        excerpt_pdf_path="s3://bucket/extrait.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -95,19 +95,19 @@ def test_creation_avis_audit(session) -> None:
 def test_creation_signalement_ecart_ciblant_un_indicateur(session) -> None:
     rapport, indicateur = _rapport_avec_indicateur(session)
 
-    signalement = SignalementEcart(
-        indicateur_id=indicateur.id,
-        entreprise_id=rapport.company_id,
-        nature_ecart="Valeur incohérente avec l'année précédente",
+    signalement = DiscrepancyFlag(
+        metric_id=indicateur.id,
+        company_id=rapport.company_id,
+        nature="Valeur incohérente avec l'année précédente",
     )
     session.add(signalement)
     session.flush()
 
     assert signalement.id is not None
-    assert signalement.statut == "OUVERT"
-    assert signalement.indicateur_id == indicateur.id
+    assert signalement.status == "OUVERT"
+    assert signalement.metric_id == indicateur.id
     # La cible est bien l'indicateur, jamais uniquement le rapport entier.
-    assert signalement.indicateur.report_id == rapport.id
+    assert signalement.metric.report_id == rapport.id
     assert signalement in indicateur.discrepancy_flags
 
 
@@ -116,10 +116,10 @@ def test_indicateur_id_doit_referencer_un_indicateur_pas_un_rapport(session) -> 
 
     # rapport.id n'est pas une clé valide de la table indicateur_esg : la
     # contrainte de clé étrangère rejette la confusion rapport/indicateur.
-    signalement = SignalementEcart(
-        indicateur_id=rapport.id,
-        entreprise_id=rapport.company_id,
-        nature_ecart="x",
+    signalement = DiscrepancyFlag(
+        metric_id=rapport.id,
+        company_id=rapport.company_id,
+        nature="x",
     )
     session.add(signalement)
     with pytest.raises(IntegrityError):

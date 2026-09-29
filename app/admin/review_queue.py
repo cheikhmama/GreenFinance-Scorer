@@ -8,6 +8,8 @@ ARCHITECTURE.md §1).
 
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any
 
 import structlog
 from sqlalchemy import ColumnElement
@@ -676,7 +678,7 @@ def modifier_entreprise_admin(
     pays: str,
     description: str | None,
     site_officiel: str | None,
-    montant_minimum_investissement: float | None,
+    montant_minimum_investissement: Decimal | None,
     devise_montant_minimum: DevisePosition | None,
 ) -> Company:
     """Remplace le profil complet d'une entreprise — jamais de logique métier dérivée ici,
@@ -744,3 +746,20 @@ def modifier_identifiants(
     session.refresh(entreprise)
     logger.info("entreprise_identifiants_modifies", entreprise_id=str(entreprise_id))
     return entreprise
+
+
+def modifier_donnees_financieres(
+    session: Session, entreprise_id: uuid.UUID, valeurs: dict[str, Any]
+) -> Company:
+    """Remplace chiffre d'affaires et EVIC (tâche 2.3) — `valeurs` porte tous les champs de
+    app/admin/schemas.py::CompanyFinancialsRequest, un champ nul efface la donnée."""
+    entreprise = consulter_entreprise_admin(session, entreprise_id)
+    assert set(valeurs) <= set(Company.model_fields), set(valeurs) - set(Company.model_fields)
+    for champ, valeur in valeurs.items():
+        setattr(entreprise, champ, valeur)
+    session.add(entreprise)
+    session.commit()
+    session.refresh(entreprise)
+    logger.info("entreprise_donnees_financieres_modifiees", entreprise_id=str(entreprise_id))
+    return entreprise
+

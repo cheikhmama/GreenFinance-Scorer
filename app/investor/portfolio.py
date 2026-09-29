@@ -12,6 +12,7 @@ import uuid
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 import pydantic
@@ -40,7 +41,7 @@ from app.investor.schemas import (
 )
 
 
-def _portefeuille_de_investisseur(
+def portefeuille_de_investisseur(
     session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID
 ) -> Portfolio:
     portefeuille = session.get(Portfolio, portefeuille_id)
@@ -58,7 +59,7 @@ def _position_du_portefeuille(
     return position
 
 
-def _etat_temporel(position: PortfolioPosition) -> EtatPosition:
+def etat_temporel(position: PortfolioPosition) -> EtatPosition:
     maintenant = utcnow()
     if position.start_date > maintenant:
         return EtatPosition.PLANIFIEE
@@ -73,7 +74,7 @@ def etat_position(position: PortfolioPosition, entreprise_actif: bool) -> EtatPo
     (voir ajouter_position)."""
     if not entreprise_actif:
         return EtatPosition.ENTREPRISE_SUSPENDUE
-    return _etat_temporel(position)
+    return etat_temporel(position)
 
 
 def _construire_position(valeurs: dict[str, Any]) -> PortfolioPosition:
@@ -95,7 +96,7 @@ def _construire_position(valeurs: dict[str, Any]) -> PortfolioPosition:
 
 def _verifier_montant_minimum(
     entreprise: Company,
-    montant_converti: float,
+    montant_converti: Decimal,
     devise_portefeuille: DevisePosition,
     chemin_taux: str,
 ) -> None:
@@ -119,15 +120,18 @@ def _verifier_montant_minimum(
 
 def _agreger(
     session: Session, positions: list[PortfolioPosition]
-) -> tuple[float, float | None, float | None, float | None, float | None, float]:
+) -> tuple[Decimal, float | None, float | None, float | None, float | None, float]:
     """Retourne (montant_total, score_global, score_e, score_s, score_g, couverture_pct).
+
+    Le montant total reste en Decimal ; les pondérations de score, elles, sont des float (un
+    score n'est pas de l'argent).
 
     Chaque agrégat pondéré n'inclut que les positions dont l'entreprise a effectivement ce
     score/pilier calculé — jamais comptée comme 0 si absente (même principe que
     app/scoring/engine.py sur les piliers manquants)."""
-    montant_total = sum(p.converted_amount for p in positions)
+    montant_total = sum((p.converted_amount for p in positions), Decimal(0))
     if montant_total == 0:
-        return 0.0, None, None, None, None, 0.0
+        return Decimal(0), None, None, None, None, 0.0
 
     # Une ligne non rapprochée (company_id nul, tâche 2.2) compte dans le montant total mais n'a
     # aucun score : elle réduit la couverture, jamais les scores eux-mêmes.
@@ -147,8 +151,8 @@ def _agreger(
         for p in positions:
             valeur = valeur_pilier(scores[p.id])
             if valeur is not None:
-                numerateur += p.converted_amount * valeur
-                denominateur += p.converted_amount
+                numerateur += float(p.converted_amount) * valeur
+                denominateur += float(p.converted_amount)
         return (numerateur / denominateur) if denominateur > 0 else None
 
     score_global = agreger_pilier(lambda s: s.valeur_globale)
@@ -157,14 +161,15 @@ def _agreger(
     score_g = agreger_pilier(lambda s: s.score_gouvernance)
 
     montant_couvert = sum(
-        p.converted_amount for p in positions if scores[p.id].valeur_globale is not None
+        (p.converted_amount for p in positions if scores[p.id].valeur_globale is not None),
+        Decimal(0),
     )
-    couverture = (montant_couvert / montant_total * 100) if montant_total else 0.0
+    couverture = float(montant_couvert / montant_total * 100)
     return montant_total, score_global, score_e, score_s, score_g, couverture
 
 
 def position_detail(
-    session: Session, position: PortfolioPosition, montant_total_portefeuille: float
+    session: Session, position: PortfolioPosition, montant_total_portefeuille: Decimal
 ) -> PositionDetail:
     # Ligne importée non rapprochée (tâche 2.2) : ni entreprise, ni score, ni preuve — elle reste
     # affichée avec son identifiant d'origine.
@@ -181,7 +186,11 @@ def position_detail(
         ).first()
         is not None
     )
-    poids = position.converted_amount / montant_total_portefeuille if montant_total_portefeuille else 0.0
+    poids = (
+        float(position.converted_amount / montant_total_portefeuille)
+        if montant_total_portefeuille
+        else 0.0
+    )
 
     return PositionDetail(
         id=position.id,
@@ -204,6 +213,20 @@ def position_detail(
         date_publication_utilisee=entreprise.published_at if entreprise else None,
         preuves_disponibles=preuves_disponibles,
     )
+
+
+def detail_position_du_portefeuille(session: Session, position: PortfolioPosition) -> PositionDetail:
+    """Détail d'une position juste créée ou modifiée : son poids se calcule sur le montant total du
+    portefeuille, sans recalculer les scores de toutes les autres positions."""
+    montant_total = sum(
+        session.exec(
+            select(col(PortfolioPosition.converted_amount)).where(
+                PortfolioPosition.portfolio_id == position.portfolio_id
+            )
+        ).all(),
+        Decimal(0),
+    )
+    return position_detail(session, position, montant_total)
 
 
 def resume_portefeuille(session: Session, portefeuille: Portfolio) -> PortefeuilleResume:
@@ -237,7 +260,7 @@ def detail_portefeuille(session: Session, portefeuille: Portfolio) -> Portefeuil
     )
     montant_total, score_global, score_e, score_s, score_g, couverture = _agreger(session, positions)
     positions_detail = [position_detail(session, p, montant_total) for p in positions]
-    compte = Counter(_etat_temporel(p) for p in positions)
+    compte = Counter(etat_temporel(p) for p in positions)
 
     return PortefeuilleDetail(
         id=portefeuille.id,
@@ -305,7 +328,7 @@ def lister_mes_portefeuilles(
 def renommer_portefeuille(
     session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID, nom: str
 ) -> Portfolio:
-    portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     portefeuille.name = nom
     session.add(portefeuille)
     session.commit()
@@ -316,7 +339,7 @@ def renommer_portefeuille(
 def archiver_portefeuille(
     session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID
 ) -> Portfolio:
-    portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     portefeuille.archived = True
     session.add(portefeuille)
     session.commit()
@@ -327,7 +350,7 @@ def archiver_portefeuille(
 def restaurer_portefeuille(
     session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID
 ) -> Portfolio:
-    portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     portefeuille.archived = False
     session.add(portefeuille)
     session.commit()
@@ -338,7 +361,7 @@ def restaurer_portefeuille(
 def supprimer_portefeuille(
     session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID
 ) -> None:
-    portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     nb_positions = session.exec(
         select(func.count())
         .select_from(PortfolioPosition)
@@ -359,7 +382,7 @@ def ajouter_position(
     portefeuille_id: uuid.UUID,
     payload: AjouterPositionRequest,
 ) -> PortfolioPosition:
-    portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     entreprise = session.get(Company, payload.entreprise_id)
     if entreprise is None or entreprise.published_at is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
@@ -410,7 +433,7 @@ def modifier_position(
     date_fin). Sûr uniquement parce que la position est encore PLANIFIEE — jamais activée, donc
     rien à tracer côté historique (contrairement au renforcement, qui crée toujours une position
     en plus d'une existante déjà active)."""
-    portefeuille = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
     if position.company_id is None:
         # Ligne importée non rapprochée (tâche 2.2) : aucune entreprise dont appliquer les règles.
@@ -463,7 +486,7 @@ def fermer_position(
     position_id: uuid.UUID,
     date_fin: datetime | None,
 ) -> PortfolioPosition:
-    _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
     if position.duration_type != TypeDureeInvestissement.OUVERTE:
         raise ValidationError(
@@ -492,7 +515,7 @@ def supprimer_position(
     portefeuille_id: uuid.UUID,
     position_id: uuid.UUID,
 ) -> None:
-    _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
     entreprise = session.get(Company, position.company_id) if position.company_id else None
     # Sans entreprise (ligne non rapprochée), seul l'état temporel compte.
@@ -566,7 +589,7 @@ def lister_portefeuilles_admin(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Portfolio, User, int, float]], int]:
+) -> tuple[list[tuple[Portfolio, User, int, Decimal]], int]:
     """Vue de suivi Administrateur de tous les portefeuilles non archivés, avec titulaire et nombre
     de positions — le détail derrière "Portefeuilles non archivés" de l'Aperçu (indicateur → liste
     filtrée). montant_total est déjà dans la devise de référence du portefeuille
@@ -598,7 +621,7 @@ def lister_portefeuilles_admin(
         ).all()
     )
 
-    resultats: list[tuple[Portfolio, User, int, float]] = []
+    resultats: list[tuple[Portfolio, User, int, Decimal]] = []
     for portefeuille in portefeuilles:
         investisseur = session.get(User, portefeuille.user_id)
         assert investisseur is not None  # FK NOT NULL, ne peut pas être absent

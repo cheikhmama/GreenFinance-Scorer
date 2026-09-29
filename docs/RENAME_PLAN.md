@@ -187,12 +187,27 @@ Landed in migration `be63d4541f22` (upgrade/downgrade round-trip and `alembic ch
 | rel. `investisseur`, `portefeuille`, `entreprise` | `user`, `portfolio`, `company` | |
 
 `DevisePosition` and `TypeDureeInvestissement` keep their class names for now (their values are
-part of the API). Amounts stay `float` until task 2.3 (`Decimal` with the PCAF engine).
+part of the API). Amounts are `Decimal` / `numeric` since task 2.3.
+
+## 3c. Task 2.3 — carbon, evidence, coverage, discrepancy tables (migration `c3a9f2d71b58`)
+
+| Old table (class) | New table (class) | Columns |
+|---|---|---|
+| `donnee_carbone` (`DonneeCarbone`) | `carbon_emissions` (`CarbonEmission`) | `rapport_id` → `report_id`, `categorie_ges` → `ghg_category`, `valeur_tonnes_co2e` → `tonnes_co2e`, `annee` → `year`, `methode` → `method`, `score_qualite_pcaf` → `pcaf_data_quality` (**nullable**), `preuve_id` → `proof_id` (CASCADE + index, had neither), `valeur_brute` → `raw_value`, `citation_source` → `proof_text`, `annee_valeur` → `value_year`, `confiance` → `confidence` |
+| `preuve_documentaire` (`PreuveDocumentaire`) | `evidence` (`Evidence`) | `nom_document` → `document_name`, `annee` → `year`, `nombre_pages_total` → `total_pages`, `page_debut` / `page_fin` → `page_start` / `page_end`, `pdf_extrait_genere` → `excerpt_pdf_path` |
+| `couverture_indicateur` (`CouvertureIndicateur`) | `metric_coverage` (`MetricCoverage`) | `rapport_id` → `report_id`, `code` → `metric_code`, `statut` → `status`, `pages_examinees` → `pages_examined` |
+| `signalement_ecart` (`SignalementEcart`) | `discrepancy_flags` (`DiscrepancyFlag`) | `indicateur_id` → `metric_id`, `entreprise_id` → `company_id`, `nature_ecart` → `nature`, `statut` → `status`, `date_signalement` → `flagged_at` |
+
+Relationships follow (`report`, `proof`, `metric`, `company`, `Evidence.metrics` /
+`carbon_emissions`). The JSON contract is unchanged (rule 3): `PreuveDocumentairePublic`,
+`DonneeCarboneDetail` and `CouvertureIndicateurPublic` map the English attributes explicitly;
+only `score_qualite_pcaf` becomes nullable. `StatutCouvertureIndicateur` and `MethodeDonnee` keep
+their names (their values are in the API).
 
 ## 4. Later renames
 
 | Task | Tables | Classes |
 |---|---|---|
-| 2.3 | `donnee_carbone` → `carbon_emissions`, `preuve_documentaire` → `evidence`, `couverture_indicateur` → `metric_coverage`, `signalement_ecart` → `discrepancy_flags` | matching classes |
+| ~~2.3~~ | done — see §3c | |
 | 3.1 | `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores` | `ConfigurationPonderation` → `ScoringConfig`, `ScoreESG` → `Score`; `Pilier` → `Pillar` |
 | 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names; audit journal labels | remaining classes |

@@ -22,7 +22,7 @@ from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
 # Import pour effet de bord uniquement : force l'enregistrement de TOUS les modèles SQLModel de
 # l'application (relations à référence différée par nom de classe, ex. Utilisateur -> Entreprise)
-# avant que calculer_couverture ne construise une instance de CouvertureIndicateur ci-dessous —
+# avant que calculer_couverture ne construise une instance de MetricCoverage ci-dessous —
 # sans cet import, la configuration paresseuse du mapper SQLAlchemy échoue avec une
 # InvalidRequestError dès la première instanciation d'une table dans un test qui n'importe que
 # app.ingestion.*.
@@ -169,15 +169,15 @@ def test_calculer_couverture_classe_les_trois_statuts() -> None:
     couvertures = calculer_couverture(
         uuid.uuid4(), extraction, codes, pages_examinees_par_code, recherche_exhaustive_par_code
     )
-    par_code = {c.code: c for c in couvertures}
+    par_code = {c.metric_code: c for c in couvertures}
 
-    assert par_code["A"].statut == StatutCouvertureIndicateur.TROUVE
-    assert par_code["B"].statut == StatutCouvertureIndicateur.ABSENT_CONFIRME
-    assert par_code["C"].statut == StatutCouvertureIndicateur.NON_TROUVE
+    assert par_code["A"].status == StatutCouvertureIndicateur.TROUVE
+    assert par_code["B"].status == StatutCouvertureIndicateur.ABSENT_CONFIRME
+    assert par_code["C"].status == StatutCouvertureIndicateur.NON_TROUVE
     # pages_examinees est bien lu par code, jamais un entier partagé.
-    assert par_code["A"].pages_examinees == 10
-    assert par_code["B"].pages_examinees == 20
-    assert par_code["C"].pages_examinees == 5
+    assert par_code["A"].pages_examined == 10
+    assert par_code["B"].pages_examined == 20
+    assert par_code["C"].pages_examined == 5
 
 
 def test_selectionner_pages_adaptatif_sur_un_grand_corpus_synthetique() -> None:

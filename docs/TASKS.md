@@ -64,7 +64,7 @@ Rules for every task:
 
 - [x] 2.1 DB Models: Implement `Portfolio` and `PortfolioPosition` models. (migration `be63d4541f22`)
   - [x] Renamed to `portfolios` / `portfolio_positions` with English columns (RENAME_PLAN §3b).
-  - [x] Extended with `identifier_type`, `identifier_raw`, `match_status`, `weight`; `company_id` nullable for lines kept unmatched (CHECK ties it to `match_status`); cached aggregates on `portfolios` (filled by 2.3).
+  - [x] Extended with `identifier_type`, `identifier_raw`, `match_status`, `weight`; `company_id` nullable for lines kept unmatched (CHECK ties it to `match_status`); cached aggregates on `portfolios` (filled by the recompute job, task 4.1 — see 2.3).
   - [x] Aggregation counts unmatched lines in the total but never scores them (coverage drops, scores don't); sector breakdown skips them.
   - [x] `ON DELETE`: `portfolios.user_id` CASCADE, `portfolio_positions.portfolio_id` CASCADE + index.
   - [x] Found while renaming: three attribute writes (archive, rename, close position) that mypy cannot see on SQLModel — fixed; archive/close were already covered by tests, a rename test was added (verified to fail on the old code); one more timing-flaky test made deterministic.
@@ -73,14 +73,17 @@ Rules for every task:
   - [x] All-or-nothing import with a per-line error report (`fields.line_<n>`, `fields.file`); unmatched lines kept (`UNMATCHED` / `AMBIGUOUS`), shown with their raw identifier and never scored.
   - [x] Weight-only imports require a total portfolio value (PCAF needs amounts); amount and weight modes cannot be mixed; weights sum to 1 ± 0.001.
   - [x] Matching only against **published** companies (an import never reveals a pending one); a matched company follows the manual-entry rules (`ACTIVE`, minimum investment).
-  - [x] Scope choice: import only into an **empty**, non-archived portfolio — replacing positions that have a history would destroy it (re-import: later, with 2.3's recompute job).
+  - [x] Scope choice: import only into an **empty**, non-archived portfolio — replacing positions that have a history would destroy it (re-import: later, with the recompute job of task 4.1).
   - [x] `companies.ticker` (indexed, never unique: one symbol can exist on several exchanges → `AMBIGUOUS`); `PATCH /admin/companies/{id}/identifiers` (partial, English contract) + admin form; ISIN/LEI/ticker added to the company contract.
   - [x] Frontend: import form in the empty-portfolio state; `ApiError.fields` exposed.
-- [ ] 2.3 PCAF Carbon Engine: Implement real Scope 1, 2, 3 carbon footprint calculations (replacing placeholder scores). **[review]**
-  - [ ] Attribution factor (amount / EVIC), financed emissions per scope, carbon footprint, WACI, weighted data quality.
-  - [ ] Scope 3 reported separately; missing data excluded and counted in coverage, never zero.
-  - [ ] Remove `PLACEHOLDER_SCORE_QUALITE_PCAF = 3` (`app/ingestion/extractor.py:142`); make `pcaf_data_quality` nullable and derive it from the extraction.
-  - [ ] Use `Decimal` for monetary amounts and FX; return `422` for an unknown currency instead of a `500` **[review]**.
+- [x] 2.3 PCAF Carbon Engine: Implement real Scope 1, 2, 3 carbon footprint calculations (replacing placeholder scores). **[review]** (migration `c3a9f2d71b58`)
+  - [x] Attribution factor (amount / EVIC), financed emissions per scope, carbon footprint, WACI, weighted data quality — pure engine `app/carbon/pcaf.py`, assembled by `app/investor/carbon.py`, served by `GET /portfolios/{id}/carbon` (English contract) + carbon card on the portfolio page.
+  - [x] Scope 3 reported separately; missing data excluded and counted in coverage, never zero (each excluded line carries its reason: `UNMATCHED`, `NO_VALIDATED_REPORT`, `MISSING_EMISSIONS`, `MISSING_EVIC`).
+  - [x] Remove `PLACEHOLDER_SCORE_QUALITE_PCAF = 3`; `pcaf_data_quality` nullable and derived from the extraction method (reported 2, calculated 3, estimated 4 — never 1 without assurance information); existing rows re-derived by the migration.
+  - [x] Use `Decimal` for monetary amounts and FX (`numeric` columns; amounts at most two decimals, refused otherwise); return `422` (`devise_non_prise_en_charge`) for a currency missing from the rates file instead of a `500` **[review]**.
+  - [x] Revenue and EVIC had no input path: `GET`/`PUT /admin/companies/{id}/financials` + admin form (task 1.4 decision revisited: still not required at onboarding, PCAF reports the gap).
+  - [x] Renamed `donnee_carbone` → `carbon_emissions`, `preuve_documentaire` → `evidence`, `couverture_indicateur` → `metric_coverage`, `signalement_ecart` → `discrepancy_flags` (RENAME_PLAN §4); `carbon_emissions.proof_id` gets `ON DELETE CASCADE` + index (it had neither).
+  - [x] Scope choices: computed on read, active positions only; the cached aggregates on `portfolios` are left for the recompute job of task 4.1 (they need the worker to stay fresh when a new score is published).
 
 ## Phase 3: Researcher Tooling & SHAP Explainability
 

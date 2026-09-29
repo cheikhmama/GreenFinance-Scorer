@@ -218,7 +218,9 @@ export function AdminReportDetailPage() {
                     <TableCell>{donnee.categorie_ges ?? "—"}</TableCell>
                     <TableCell>{donnee.valeur_tonnes_co2e}</TableCell>
                     <TableCell>{donnee.annee}</TableCell>
-                    <TableCell>{donnee.score_qualite_pcaf}/5</TableCell>
+                    <TableCell>
+                      {donnee.score_qualite_pcaf != null ? `${donnee.score_qualite_pcaf}/5` : "—"}
+                    </TableCell>
                     <TableCell className="text-brand-grey">
                       {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
                     </TableCell>

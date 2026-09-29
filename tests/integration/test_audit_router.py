@@ -22,10 +22,10 @@ from app.core.enums import (
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
 )
 from app.main import app
 
@@ -103,13 +103,13 @@ def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
 def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> None:
     auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
-    preuve = PreuveDocumentaire(
-        nom_document="rapport.pdf",
-        annee=2024,
-        nombre_pages_total=25,
-        page_debut=3,
-        page_fin=3,
-        pdf_extrait_genere="preuves/test/page_3.pdf",
+    preuve = Evidence(
+        document_name="rapport.pdf",
+        year=2024,
+        total_pages=25,
+        page_start=3,
+        page_end=3,
+        excerpt_pdf_path="preuves/test/page_3.pdf",
     )
     session.add(preuve)
     session.commit()
@@ -125,14 +125,14 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
         )
     )
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=1,
-            valeur_tonnes_co2e=100.0,
-            annee=2024,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=3,
-            preuve_id=preuve.id,
+            tonnes_co2e=100.0,
+            year=2024,
+            method=MethodeDonnee.RAPPORTEE,
+            pcaf_data_quality=3,
+            proof_id=preuve.id,
         )
     )
     session.commit()

@@ -147,7 +147,9 @@ export function CompanyReportDetailPage() {
                       </td>
                       <td className="py-2 pr-4">{donnee.valeur_tonnes_co2e} tCO2e</td>
                       <td className="py-2 pr-4">{donnee.methode}</td>
-                      <td className="py-2 pr-4">{donnee.score_qualite_pcaf}/5</td>
+                      <td className="py-2 pr-4">
+                        {donnee.score_qualite_pcaf != null ? `${donnee.score_qualite_pcaf}/5` : "—"}
+                      </td>
                       <td className="py-2 text-brand-grey">
                         {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
                       </td>

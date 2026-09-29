@@ -2,7 +2,7 @@
 
 Persiste, pour CHAQUE code de INDICATEURS_CIBLES, ce que le LLM d'extraction a réellement répondu
 — y compris "non trouvé" — plutôt que de ne garder trace que des indicateurs effectivement présents
-(voir app/ingestion/models.py::CouvertureIndicateur). Sert deux besoins :
+(voir app/ingestion/models.py::MetricCoverage). Sert deux besoins :
   - transparence à l'écran : une donnée absente doit être signalée comme telle, jamais laissée
     silencieusement invisible (décision produit, voir la conversation qui a motivé ce module) ;
   - diagnostic de couverture sémantique : distinguer TROUVE / NON_TROUVE / ABSENT_CONFIRME (voir
@@ -14,7 +14,7 @@ Persiste, pour CHAQUE code de INDICATEURS_CIBLES, ce que le LLM d'extraction a r
 import uuid
 
 from app.core.enums import StatutCouvertureIndicateur
-from app.ingestion.models import CouvertureIndicateur
+from app.ingestion.models import MetricCoverage
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
 # Reçoit une liste de codes (pas app.ingestion.extractor.CibleIndicateur directement) pour éviter
@@ -45,7 +45,7 @@ def calculer_couverture(
     codes: list[str],
     pages_examinees_par_code: dict[str, int],
     recherche_exhaustive_par_code: dict[str, bool],
-) -> list[CouvertureIndicateur]:
+) -> list[MetricCoverage]:
     """Une ligne par code cible — jamais seulement pour ceux trouvés. Si le LLM a omis un code de
     sa réponse (ne devrait pas arriver, le prompt l'exige explicitement, mais un fournisseur externe
     ne garantit rien), il compte comme non trouvé plutôt que de disparaître silencieusement.
@@ -65,11 +65,11 @@ def calculer_couverture(
         else:
             statut = StatutCouvertureIndicateur.NON_TROUVE
         couvertures.append(
-            CouvertureIndicateur(
-                rapport_id=rapport_id,
-                code=code,
-                statut=statut,
-                pages_examinees=pages_examinees_par_code.get(code, 0),
+            MetricCoverage(
+                report_id=rapport_id,
+                metric_code=code,
+                status=statut,
+                pages_examined=pages_examinees_par_code.get(code, 0),
             )
         )
     return couvertures

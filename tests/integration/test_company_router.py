@@ -24,11 +24,11 @@ from app.core.enums import (
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    CouvertureIndicateur,
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
+    MetricCoverage,
 )
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 from app.investor.entreprises import couverture_publique
@@ -585,13 +585,13 @@ def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) 
     monkeypatch.setattr("app.ingestion.extractor._call_llm_extraction", lambda **_k: extraction)
 
     def _fake_proof(*, source_pdf_path, nom_document, annee, nombre_pages_total, page, rapport_id):
-        return PreuveDocumentaire(
-            nom_document=nom_document,
-            annee=annee,
-            nombre_pages_total=nombre_pages_total,
-            page_debut=page,
-            page_fin=page,
-            pdf_extrait_genere=f"preuves/{rapport_id}/page_{page}.pdf",
+        return Evidence(
+            document_name=nom_document,
+            year=annee,
+            total_pages=nombre_pages_total,
+            page_start=page,
+            page_end=page,
+            excerpt_pdf_path=f"preuves/{rapport_id}/page_{page}.pdf",
         )
 
     monkeypatch.setattr("app.ingestion.extractor.proof_generator.generate_page_proof", _fake_proof)
@@ -653,22 +653,22 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
     assert rapport.status == ReportStatus.SUBMITTED
 
     donnees_carbone = session.exec(
-        select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport.id)
+        select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)
     ).all()
     indicateurs = session.exec(
         select(ESGMetric).where(ESGMetric.report_id == rapport.id)
     ).all()
     assert len(donnees_carbone) == 1
     assert donnees_carbone[0].scope == 1
-    assert donnees_carbone[0].valeur_tonnes_co2e == 100.0
-    assert donnees_carbone[0].valeur_brute == "100 tCO2e"
-    assert donnees_carbone[0].confiance == NiveauConfiance.ELEVE
+    assert donnees_carbone[0].tonnes_co2e == 100.0
+    assert donnees_carbone[0].raw_value == "100 tCO2e"
+    assert donnees_carbone[0].confidence == NiveauConfiance.ELEVE
     assert len(indicateurs) == 1
     assert indicateurs[0].metric_code == "intensite_scope_1_2_marketbased"
 
     # Les deux valeurs trouvées sont sur la même page (3) : une seule preuve doit être créée et
     # partagée, pas une par indicateur.
-    assert donnees_carbone[0].preuve_id == indicateurs[0].proof_id
+    assert donnees_carbone[0].proof_id == indicateurs[0].proof_id
 
 
 def test_pipeline_ne_persiste_quun_indicateur_par_code_meme_si_le_llm_le_repete(
@@ -783,13 +783,13 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     monkeypatch.setattr("app.ingestion.extractor._call_llm_extraction", _fake_call_llm_extraction)
 
     def _fake_proof(*, source_pdf_path, nom_document, annee, nombre_pages_total, page, rapport_id):
-        return PreuveDocumentaire(
-            nom_document=nom_document,
-            annee=annee,
-            nombre_pages_total=nombre_pages_total,
-            page_debut=page,
-            page_fin=page,
-            pdf_extrait_genere=f"preuves/{rapport_id}/page_{page}.pdf",
+        return Evidence(
+            document_name=nom_document,
+            year=annee,
+            total_pages=nombre_pages_total,
+            page_start=page,
+            page_end=page,
+            excerpt_pdf_path=f"preuves/{rapport_id}/page_{page}.pdf",
         )
 
     monkeypatch.setattr("app.ingestion.extractor.proof_generator.generate_page_proof", _fake_proof)
@@ -818,11 +818,11 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     assert appels_llm[1] == ["scope_3"]
 
     couvertures = session.exec(
-        select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport.id)
+        select(MetricCoverage).where(MetricCoverage.report_id == rapport.id)
     ).all()
-    par_code = {c.code: c for c in couvertures}
-    assert par_code["scope_1"].statut == StatutCouvertureIndicateur.TROUVE
-    assert par_code["scope_3"].statut == StatutCouvertureIndicateur.ABSENT_CONFIRME
+    par_code = {c.metric_code: c for c in couvertures}
+    assert par_code["scope_1"].status == StatutCouvertureIndicateur.TROUVE
+    assert par_code["scope_3"].status == StatutCouvertureIndicateur.ABSENT_CONFIRME
     assert len(couvertures) == len(extractor.INDICATEURS_CIBLES)
 
     # couverture_publique (app/investor/entreprises.py) lit désormais .statut au lieu de .trouve —
@@ -1046,13 +1046,13 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
     )
     session.add(rapport)
     session.commit()
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.flush()

@@ -10,6 +10,7 @@ import {
   deletePortfolio,
   deletePosition,
   getInvestorDashboard,
+  getPortfolioCarbon,
   getPortfolioDetail,
   importPortfolioPositions,
   getPublishedCompanyDetail,
@@ -22,6 +23,7 @@ import {
 import type {
   AjouterPositionRequest,
   BodyImportPortfolioPositions,
+  PortfolioCarbon,
   PortfolioImportResult,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
@@ -113,6 +115,17 @@ export function usePortfolioDetail(portefeuilleId: string) {
   return useQuery<PortefeuilleDetail, ApiError>({
     queryKey: portefeuilleKey(portefeuilleId),
     queryFn: () => getPortfolioDetail(portefeuilleId),
+    enabled: portefeuilleId.length > 0,
+  });
+}
+
+/** GET /portfolios/{id}/carbon (tâche 2.3) — empreinte PCAF, calculée à la demande. Sa clé est
+ * rangée sous celle du portefeuille : toute invalidation après une mutation de position la
+ * rafraîchit aussi. */
+export function usePortfolioCarbon(portefeuilleId: string) {
+  return useQuery<PortfolioCarbon, ApiError>({
+    queryKey: [...portefeuilleKey(portefeuilleId), "carbon"],
+    queryFn: () => getPortfolioCarbon(portefeuilleId),
     enabled: portefeuilleId.length > 0,
   });
 }

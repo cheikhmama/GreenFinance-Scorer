@@ -12,7 +12,7 @@ simplement remplacé) :
 Séparation stricte, jamais mélangée visuellement, cohérente avec config/weights/default.yaml :
   - les indicateurs ESG réellement extraits (hors les 3 codes auto-déclarés) alimentent le score
     calculé et sont présentés comme tels ;
-  - les données carbone Scope 1/2/3 (DonneeCarbone) sont présentées, mais explicitement étiquetées
+  - les données carbone Scope 1/2/3 (CarbonEmission) sont présentées, mais explicitement étiquetées
     comme non intégrées au score calculé (tonnage brut sans dénominateur, voir le commentaire de
     config/weights/default.yaml) ;
   - les scores auto-déclarés par l'entreprise (CODES_AUTO_DECLARES_PAR_PILIER +
@@ -42,7 +42,7 @@ from sqlmodel import Session, col, select
 
 from app.core.database import utcnow
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
-from app.ingestion.models import DonneeCarbone, ESGMetric, ESGReport
+from app.ingestion.models import CarbonEmission, ESGMetric, ESGReport
 from app.scoring.engine import score_officiel
 from app.scoring.models import ScoreESG
 
@@ -109,7 +109,7 @@ def _section_indicateurs(indicateurs: list[ESGMetric]) -> list:
                 f"{indicateur.value:g}",
                 indicateur.unit or "-",
                 str(indicateur.value_year) if indicateur.value_year else "-",
-                f"p. {indicateur.proof.page_debut}",
+                f"p. {indicateur.proof.page_start}",
             ]
         )
     table = Table(donnees, colWidths=[5 * cm, 2.7 * cm, 2 * cm, 2 * cm, 1.8 * cm, 2 * cm])
@@ -118,7 +118,7 @@ def _section_indicateurs(indicateurs: list[ESGMetric]) -> list:
     return elements
 
 
-def _section_carbone(donnees_carbone: list[DonneeCarbone]) -> list:
+def _section_carbone(donnees_carbone: list[CarbonEmission]) -> list:
     elements: list = [Paragraph("Émissions carbone (Scope 1/2/3)", _STYLE_SECTION)]
     elements.append(
         Paragraph(
@@ -138,10 +138,10 @@ def _section_carbone(donnees_carbone: list[DonneeCarbone]) -> list:
         donnees.append(
             [
                 str(dc.scope),
-                dc.categorie_ges or "-",
-                f"{dc.valeur_tonnes_co2e:g}",
-                str(dc.annee_valeur or dc.annee),
-                f"p. {dc.preuve.page_debut}",
+                dc.ghg_category or "-",
+                f"{dc.tonnes_co2e:g}",
+                str(dc.value_year or dc.year),
+                f"p. {dc.proof.page_start}",
             ]
         )
     table = Table(donnees, colWidths=[2 * cm, 3.5 * cm, 3 * cm, 2 * cm, 2 * cm])
@@ -181,7 +181,7 @@ def generer_rapport_synthese(session: Session, rapport: ESGReport) -> bytes:
         session.exec(select(ESGMetric).where(col(ESGMetric.report_id) == rapport.id)).all()
     )
     donnees_carbone = list(
-        session.exec(select(DonneeCarbone).where(col(DonneeCarbone.rapport_id) == rapport.id)).all()
+        session.exec(select(CarbonEmission).where(col(CarbonEmission.report_id) == rapport.id)).all()
     )
     score = score_officiel(session, rapport.id)
 

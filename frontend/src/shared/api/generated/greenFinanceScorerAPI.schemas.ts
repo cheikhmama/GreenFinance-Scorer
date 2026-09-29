@@ -63,8 +63,7 @@ export const TypeDureeInvestissement = {
 
 export interface AjouterPositionRequest {
   entreprise_id: string;
-  /** @exclusiveMinimum 0 */
-  montant: number;
+  montant: number | string;
   devise: DevisePosition;
   type_duree: TypeDureeInvestissement;
   date_debut: string;
@@ -232,7 +231,7 @@ export interface AvisAuditAdmin {
 
 export interface BodyImportPortfolioPositions {
   file: Blob;
-  total_value?: number | null;
+  total_value?: number | string | null;
 }
 
 export type TypeRapport = typeof TypeRapport[keyof typeof TypeRapport];
@@ -275,6 +274,19 @@ export const CanalDepot = {
   ENTREPRISE: 'ENTREPRISE',
 } as const;
 
+/**
+ * Pourquoi une ligne ne participe pas aux émissions financées (Scopes 1+2).
+ */
+export type CarbonExclusionReason = typeof CarbonExclusionReason[keyof typeof CarbonExclusionReason];
+
+
+export const CarbonExclusionReason = {
+  UNMATCHED: 'UNMATCHED',
+  NO_VALIDATED_REPORT: 'NO_VALIDATED_REPORT',
+  MISSING_EMISSIONS: 'MISSING_EMISSIONS',
+  MISSING_EVIC: 'MISSING_EVIC',
+} as const;
+
 export interface ChangerMotDePasseRequest {
   mot_de_passe_actuel: string;
   /**
@@ -304,6 +316,35 @@ export interface ChercheurDisponible {
   id: string;
   email: string;
   nom: string | null;
+}
+
+/**
+ * Réponse de GET / PUT /admin/companies/{id}/financials : montants en nombres JSON (un
+ * Decimal serait sérialisé en chaîne).
+ */
+export interface CompanyFinancials {
+  company_id: string;
+  revenue: number | null;
+  revenue_currency: DevisePosition | null;
+  enterprise_value: number | null;
+  enterprise_value_currency: DevisePosition | null;
+  enterprise_value_as_of: string | null;
+}
+
+/**
+ * PUT /admin/companies/{id}/financials (tâche 2.3, contrat JSON en anglais) : les
+ * données financières dont le moteur PCAF a besoin (docs/WORKFLOWS.md §2.4). Chiffre d'affaires
+ * pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur d'attribution.
+ * Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais affichée à
+ * côté des émissions, pour juger de l'écart entre les deux exercices. Remplacement complet : un
+ * champ omis vaut null.
+ */
+export interface CompanyFinancialsRequest {
+  revenue?: number | string | null;
+  revenue_currency?: DevisePosition | null;
+  enterprise_value?: number | string | null;
+  enterprise_value_currency?: DevisePosition | null;
+  enterprise_value_as_of?: string | null;
 }
 
 export interface CompanyIdentifiers {
@@ -435,7 +476,7 @@ export interface ContactMessageRequest {
 
 /**
  * Statut à 3 valeurs d'un code cible pour un rapport (Phase 6, remplace l'ancien booléen
- * CouvertureIndicateur.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
+ * MetricCoverage.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
  * sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
  * simple absence dans les pages examinées, qui reste NON_TROUVE.
  */
@@ -544,6 +585,9 @@ export const MethodeDonnee = {
   CALCULEE: 'CALCULEE',
 } as const;
 
+/**
+ * Contrat JSON historique d'une Evidence (docs/RENAME_PLAN.md §1, règle 3).
+ */
 export interface PreuveDocumentairePublic {
   id: string;
   nom_document: string;
@@ -563,6 +607,9 @@ export const NiveauConfiance = {
   FAIBLE: 'FAIBLE',
 } as const;
 
+/**
+ * Contrat JSON historique d'une CarbonEmission (docs/RENAME_PLAN.md §1, règle 3).
+ */
 export interface DonneeCarboneDetail {
   id: string;
   scope: number;
@@ -570,7 +617,7 @@ export interface DonneeCarboneDetail {
   valeur_tonnes_co2e: number;
   annee: number;
   methode: MethodeDonnee;
-  score_qualite_pcaf: number;
+  score_qualite_pcaf: number | null;
   preuve: PreuveDocumentairePublic;
   valeur_brute: string | null;
   section: string | null;
@@ -911,7 +958,7 @@ export interface ModifierEntrepriseAdminRequest {
   pays: string;
   description?: string | null;
   site_officiel?: string | null;
-  montant_minimum_investissement?: number | null;
+  montant_minimum_investissement?: number | string | null;
   devise_montant_minimum?: DevisePosition | null;
 }
 
@@ -921,8 +968,7 @@ export interface ModifierEntrepriseAdminRequest {
  * seule une fermeture puis une nouvelle position permet de changer de cible.
  */
 export interface ModifierPositionRequest {
-  /** @exclusiveMinimum 0 */
-  montant: number;
+  montant: number | string;
   devise: DevisePosition;
   type_duree: TypeDureeInvestissement;
   date_debut: string;
@@ -1222,6 +1268,49 @@ export interface PortefeuilleDetail {
   nombre_positions_actives: number;
   nombre_positions_cloturees: number;
   positions: PositionDetail[];
+}
+
+/**
+ * Une position active dans l'empreinte carbone PCAF (tâche 2.3). `excluded_reason` dit
+ * pourquoi elle ne compte pas dans les émissions financées Scopes 1+2 — une donnée manquante
+ * n'est jamais comptée comme zéro.
+ */
+export interface PositionCarbon {
+  position_id: string;
+  company_id: string | null;
+  company_name: string | null;
+  identifier: string | null;
+  amount: number;
+  attribution_factor: number | null;
+  financed_emissions_scope_1_2: number | null;
+  financed_emissions_scope_3: number | null;
+  carbon_intensity: number | null;
+  data_quality: number | null;
+  emissions_year: number | null;
+  scope_2_basis: string | null;
+  enterprise_value_as_of: string | null;
+  excluded_reason: CarbonExclusionReason | null;
+}
+
+/**
+ * GET /portfolios/{id}/carbon (tâche 2.3, contrat JSON en anglais, docs/WORKFLOWS.md §2.4).
+ * Les couvertures sont des parts du montant total, entre 0 et 1 ; chaque agrégat est nul quand
+ * aucune position ne le permet.
+ */
+export interface PortfolioCarbon {
+  portfolio_id: string;
+  currency: DevisePosition;
+  total_value: number;
+  financed_emissions_scope_1_2: number | null;
+  financed_emissions_scope_3: number | null;
+  carbon_footprint_scope_1_2: number | null;
+  waci_scope_1_2: number | null;
+  data_quality_scope_1_2: number | null;
+  data_quality_scope_3: number | null;
+  coverage_scope_1_2: number;
+  coverage_scope_3: number;
+  coverage_waci: number;
+  positions: PositionCarbon[];
 }
 
 /**

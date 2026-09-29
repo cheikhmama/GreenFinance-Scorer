@@ -7,6 +7,7 @@ appeler cette logique (même convention que les autres espaces, voir ARCHITECTUR
 """
 
 import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -19,8 +20,8 @@ from app.core.dependencies import get_session
 from app.core.enums import MatchStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.investor import dashboard, entreprises, importation, portfolio
-from app.investor.models import Portfolio, PortfolioPosition
+from app.investor import carbon, dashboard, entreprises, importation, portfolio
+from app.investor.models import Portfolio
 from app.investor.schemas import (
     AjouterPositionRequest,
     CreerPortefeuilleRequest,
@@ -30,6 +31,7 @@ from app.investor.schemas import (
     ModifierPositionRequest,
     PortefeuilleDetail,
     PortefeuilleResume,
+    PortfolioCarbon,
     PortfolioImportResult,
     PositionDetail,
     RenommerPortefeuilleRequest,
@@ -266,13 +268,19 @@ def exporter_portefeuille_route(
     )
 
 
-def _position_detail_apres_mutation(
-    session: Session, portefeuille_id: uuid.UUID, position: PortfolioPosition
-) -> PositionDetail:
-    portefeuille = session.get(Portfolio, portefeuille_id)
-    assert portefeuille is not None
-    resume = portfolio.resume_portefeuille(session, portefeuille)
-    return portfolio.position_detail(session, position, resume.montant_total)
+@router.get(
+    "/portfolios/{portfolio_id}/carbon",
+    response_model=PortfolioCarbon,
+    operation_id="getPortfolioCarbon",
+    summary="Empreinte carbone PCAF d'un portefeuille (Scopes 1+2, Scope 3 à part)",
+)
+def get_portfolio_carbon(
+    portfolio_id: uuid.UUID,
+    current_user: User = Depends(require_role(Role.INVESTOR)),
+    session: Session = Depends(get_session),
+) -> PortfolioCarbon:
+    portefeuille = portfolio.portefeuille_de_investisseur(session, current_user.id, portfolio_id)
+    return carbon.empreinte_carbone(session, portefeuille)
 
 
 @router.post(
@@ -285,7 +293,7 @@ def _position_detail_apres_mutation(
 def import_portfolio_positions(
     portfolio_id: uuid.UUID,
     file: UploadFile,
-    total_value: float | None = Form(default=None, gt=0),
+    total_value: Decimal | None = Form(default=None, gt=0, max_digits=20, decimal_places=2),
     current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortfolioImportResult:
@@ -318,7 +326,7 @@ def ajouter_position_route(
     session: Session = Depends(get_session),
 ) -> PositionDetail:
     position = portfolio.ajouter_position(session, current_user.id, portefeuille_id, payload)
-    return _position_detail_apres_mutation(session, portefeuille_id, position)
+    return portfolio.detail_position_du_portefeuille(session, position)
 
 
 @router.patch(
@@ -337,7 +345,7 @@ def modifier_position_route(
     position = portfolio.modifier_position(
         session, current_user.id, portefeuille_id, position_id, payload
     )
-    return _position_detail_apres_mutation(session, portefeuille_id, position)
+    return portfolio.detail_position_du_portefeuille(session, position)
 
 
 @router.post(
@@ -356,7 +364,7 @@ def fermer_position_route(
     position = portfolio.fermer_position(
         session, current_user.id, portefeuille_id, position_id, payload.date_fin
     )
-    return _position_detail_apres_mutation(session, portefeuille_id, position)
+    return portfolio.detail_position_du_portefeuille(session, position)
 
 
 @router.delete(

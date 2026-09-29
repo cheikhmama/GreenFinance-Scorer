@@ -5,10 +5,10 @@ from app.core.database import utcnow
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, TypeRapport
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import (
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
 )
 from app.ingestion.synthesis_report import (
     _section_carbone,
@@ -43,14 +43,14 @@ def _rapport(session) -> ESGReport:
     return rapport
 
 
-def _preuve(session) -> PreuveDocumentaire:
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=3,
-        page_fin=3,
-        pdf_extrait_genere="preuves/test/page_3.pdf",
+def _preuve(session) -> Evidence:
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=3,
+        page_end=3,
+        excerpt_pdf_path="preuves/test/page_3.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -137,16 +137,16 @@ def test_section_declare_par_lentreprise_isole_les_codes_auto_declares(session) 
 
 def test_section_carbone_signale_explicitement_la_non_integration_au_score(session) -> None:
     preuve = _preuve(session)
-    dc = DonneeCarbone(
-        rapport_id=uuid.uuid4(),
+    dc = CarbonEmission(
+        report_id=uuid.uuid4(),
         scope=1,
-        valeur_tonnes_co2e=1200.5,
-        annee=2025,
-        methode=MethodeDonnee.RAPPORTEE,
-        score_qualite_pcaf=3,
-        preuve_id=preuve.id,
+        tonnes_co2e=1200.5,
+        year=2025,
+        method=MethodeDonnee.RAPPORTEE,
+        pcaf_data_quality=3,
+        proof_id=preuve.id,
     )
-    dc.preuve = preuve
+    dc.proof = preuve
 
     elements = _section_carbone([dc])
     assert "non intégrées au score calculé" in _texte(elements)
@@ -169,14 +169,14 @@ def test_generer_rapport_synthese_produit_un_pdf_valide(session) -> None:
         )
     )
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=1,
-            valeur_tonnes_co2e=500.0,
-            annee=2025,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=3,
-            preuve_id=preuve.id,
+            tonnes_co2e=500.0,
+            year=2025,
+            method=MethodeDonnee.RAPPORTEE,
+            pcaf_data_quality=3,
+            proof_id=preuve.id,
         )
     )
     session.commit()

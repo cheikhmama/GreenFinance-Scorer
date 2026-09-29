@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
@@ -175,8 +176,8 @@ def test_taux_change_fige_independant_entre_positions(session) -> None:
             portefeuille.id,
             entreprise.id,
             start_date=debut,
-            fx_rate_used=36.5,
-            converted_amount=36500.0,
+            fx_rate_used=Decimal("36.5"),
+            converted_amount=Decimal(36500),
         )
     )
     position_soir = PortfolioPosition.model_validate(
@@ -184,16 +185,19 @@ def test_taux_change_fige_independant_entre_positions(session) -> None:
             portefeuille.id,
             entreprise.id,
             start_date=debut,
-            fx_rate_used=36.8,
-            converted_amount=36800.0,
+            fx_rate_used=Decimal("36.8"),
+            converted_amount=Decimal(36800),
         )
     )
     session.add(position_matin)
     session.add(position_soir)
     session.flush()
+    session.refresh(position_matin)
+    session.refresh(position_soir)
 
-    assert position_matin.fx_rate_used == 36.5
-    assert position_soir.fx_rate_used == 36.8
+    # Relus depuis la base (numeric) : Decimal exact, jamais 36.799999…
+    assert position_matin.fx_rate_used == Decimal("36.5")
+    assert position_soir.fx_rate_used == Decimal("36.8")
     assert position_matin.fx_rate_used != position_soir.fx_rate_used
 
 

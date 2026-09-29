@@ -19,9 +19,9 @@ from app.core.enums import (
     TypeRapport,
 )
 from app.ingestion.models import (
-    DonneeCarbone,
+    CarbonEmission,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
 )
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
@@ -87,13 +87,13 @@ def _entreprise_publiee(
     session.add(rapport)
     session.commit()
 
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.commit()
@@ -105,15 +105,15 @@ def _entreprise_publiee(
         (3, None, 1000.0),
     ]:
         session.add(
-            DonneeCarbone(
-                rapport_id=rapport.id,
+            CarbonEmission(
+                report_id=rapport.id,
                 scope=scope,
-                categorie_ges=categorie,
-                valeur_tonnes_co2e=valeur,
-                annee=2025,
-                methode=MethodeDonnee.RAPPORTEE,
-                score_qualite_pcaf=3,
-                preuve_id=preuve.id,
+                ghg_category=categorie,
+                tonnes_co2e=valeur,
+                year=2025,
+                method=MethodeDonnee.RAPPORTEE,
+                pcaf_data_quality=3,
+                proof_id=preuve.id,
             )
         )
     session.commit()

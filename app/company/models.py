@@ -23,7 +23,7 @@ from app.core.enums import CompanyStatus, DevisePosition, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import User
-    from app.ingestion.models import ESGReport, SignalementEcart
+    from app.ingestion.models import DiscrepancyFlag, ESGReport
     from app.investor.models import PortfolioPosition
 
 
@@ -65,7 +65,9 @@ class Company(SQLModel, table=True):
         default=None, sa_column=sa_enum_column(DevisePosition, nullable=True)
     )
     enterprise_value_as_of: date | None = None
-    minimum_investment_amount: float | None = None
+    minimum_investment_amount: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
+    )
     # Devise dans laquelle minimum_investment_amount est exprimé — toujours renseignée de pair
     # avec lui (voir app/admin/review_queue.py::modifier_entreprise_admin), jamais l'une sans
     # l'autre : app/investor/portfolio.py::_verifier_montant_minimum en a besoin pour convertir le
@@ -93,4 +95,4 @@ class Company(SQLModel, table=True):
     )
     reports: list["ESGReport"] = Relationship(back_populates="company")
     positions: list["PortfolioPosition"] = Relationship(back_populates="company")
-    discrepancy_flags: list["SignalementEcart"] = Relationship(back_populates="entreprise")
+    discrepancy_flags: list["DiscrepancyFlag"] = Relationship(back_populates="company")

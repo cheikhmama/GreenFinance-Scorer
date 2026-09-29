@@ -30,7 +30,7 @@ from app.core.enums import (
     TypeRapport,
 )
 from app.core.models import JournalAudit, Notification
-from app.ingestion.models import ESGMetric, ESGReport, PreuveDocumentaire
+from app.ingestion.models import ESGMetric, ESGReport, Evidence
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
 from app.scoring.models import ConfigurationPonderation, ScoreESG
@@ -123,13 +123,13 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
     # Au moins un ESGMetric (Phase 5 §9) : valider_rapport calcule désormais un score dans la
     # même transaction que la transition VALIDE (app/admin/review_queue.py) -- sans indicateur,
     # calculer_score lèverait score_incalculable et /valider échouerait pour ce fixture partagé.
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -1424,13 +1424,13 @@ def test_verifier_score_calculable_route(session) -> None:
         status=ReportStatus.PENDING_DECISION,
         extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
     )
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -1468,13 +1468,13 @@ def test_recalculer_score_route(session) -> None:
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
 
     sans_score = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.flush()

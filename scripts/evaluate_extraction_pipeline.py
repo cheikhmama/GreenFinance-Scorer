@@ -271,7 +271,7 @@ def evaluer_entreprise(entree: dict, *, cache_docling_dir: Path | None) -> dict:
     couvertures = completeness.calculer_couverture(
         uuid.uuid4(), extraction, codes, pages_examinees_par_code, recherche_exhaustive_par_code
     )
-    statut_par_code = {c.code: c.statut.value for c in couvertures}
+    statut_par_code = {c.metric_code: c.status.value for c in couvertures}
 
     # Diagnostic mesure-seule (ne modifie rien à extractor.py) : rejoue les étapes internes du 1er
     # passage pour isoler l'effet de _elargir_aux_voisins et de TABLE_SCORE_BOOST.

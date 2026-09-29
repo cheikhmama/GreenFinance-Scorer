@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DevisePosition, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
 export { Role };
 export { DevisePosition };
@@ -78,7 +79,10 @@ export const modifierEntrepriseSchema = z
     description: z.string().optional(),
     site_officiel: z.string().optional(),
     impose_minimum: z.boolean(),
-    montant_minimum_investissement: z.number().optional(),
+    montant_minimum_investissement: z
+      .number()
+      .refine(auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES)
+      .optional(),
     devise_montant_minimum: z.enum(DevisePosition).optional(),
   })
   .superRefine((values, ctx) => {

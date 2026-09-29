@@ -79,7 +79,7 @@ class MethodeDonnee(str, Enum):
 
 class StatutCouvertureIndicateur(str, Enum):
     """Statut à 3 valeurs d'un code cible pour un rapport (Phase 6, remplace l'ancien booléen
-    CouvertureIndicateur.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
+    MetricCoverage.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
     sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
     simple absence dans les pages examinées, qui reste NON_TROUVE."""
 

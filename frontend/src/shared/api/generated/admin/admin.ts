@@ -9,6 +9,8 @@ import type {
   ApercuActeursAdmin,
   AvisAuditAdmin,
   BodyUploadCompanyLogo,
+  CompanyFinancials,
+  CompanyFinancialsRequest,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
@@ -1243,6 +1245,59 @@ export const listProjectsAdmin = async (params?: ListProjectsAdminParams, option
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getGetCompanyFinancialsUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/financials`
+}
+
+/**
+ * @summary Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)
+ */
+export const getCompanyFinancials = async (companyId: string, options?: RequestInit): Promise<CompanyFinancials> => {
+
+  return apiFetch<CompanyFinancials>(getGetCompanyFinancialsUrl(companyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getUpdateCompanyFinancialsUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/financials`
+}
+
+/**
+ * @summary Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)
+ */
+export const updateCompanyFinancials = async (companyId: string,
+    companyFinancialsRequest: CompanyFinancialsRequest, options?: RequestInit): Promise<CompanyFinancials> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<CompanyFinancials>(getUpdateCompanyFinancialsUrl(companyId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyFinancialsRequest)
   }
 );}
 

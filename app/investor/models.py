@@ -14,16 +14,17 @@ Notes d'implémentation :
   importée par ISIN/ticker que rien ne reconnaît encore (tâche 2.2), conservée sans entreprise
   (UNMATCHED / AMBIGUOUS) — jamais écartée en silence. ck_portfolio_positions_company_iff_matched
   lie les deux.
-- Montants en float jusqu'à la tâche 2.3 (Decimal pour les montants et le change, avec le moteur
-  PCAF qui en dépend).
+- Montants et taux de change en Decimal (numeric en base, tâche 2.3) : jamais de float pour de
+  l'argent, le moteur PCAF (app/carbon/pcaf.py) en dépend.
 """
 
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import ConfigDict, ValidationInfo, model_validator
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, Column, Numeric
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -97,18 +98,20 @@ class PortfolioPosition(SQLModel, table=True):
     )
     # Montant tel que saisi par l'investisseur, dans la devise ci-dessous — requis par PCAF
     # (facteur d'attribution = montant / EVIC, docs/WORKFLOWS.md §2.4).
-    outstanding_amount: float
+    outstanding_amount: Decimal = Field(sa_column=Column(Numeric(20, 2), nullable=False))
     currency: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
     # Nul si aucune conversion n'était nécessaire (currency == devise de référence du
     # portefeuille) ; sinon figé à la valeur en vigueur au moment de la création.
-    fx_rate_used: float | None = None
+    fx_rate_used: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(20, 10), nullable=True)
+    )
     # Toujours renseigné, dans la devise de référence du portefeuille — égal à outstanding_amount
     # quand aucune conversion n'était nécessaire. Jamais nul : l'agrégation de portefeuille
     # (app/investor/portfolio.py) a besoin d'une valeur exploitable pour CHAQUE position.
-    converted_amount: float
+    converted_amount: Decimal = Field(sa_column=Column(Numeric(20, 2), nullable=False))
     # Poids déclaré à l'import (tâche 2.2), dans ]0, 1]. Nul pour une position saisie par montant :
     # le poids est alors dérivé des montants à l'affichage.
-    weight: float | None = Field(default=None)
+    weight: Decimal | None = Field(default=None, sa_column=Column(Numeric(11, 10), nullable=True))
     duration_type: TypeDureeInvestissement = Field(
         sa_column=sa_enum_column(TypeDureeInvestissement)
     )

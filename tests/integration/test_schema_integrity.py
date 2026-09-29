@@ -12,6 +12,7 @@ modèles SQLModel, pas seulement que chaque table existe isolément.
 
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import delete
@@ -34,10 +35,10 @@ from app.core.enums import (
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
 )
 from app.investor.models import Portfolio, PortfolioPosition
 from app.scoring.models import ConfigurationPonderation, ScoreESG
@@ -79,14 +80,14 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     assert rapport in entreprise.reports
     assert rapport.company.id == entreprise.id
 
-    # --- PreuveDocumentaire + ESGMetric + DonneeCarbone ---------------
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-annuel-2025.pdf",
-        annee=2025,
-        nombre_pages_total=120,
-        page_debut=42,
-        page_fin=44,
-        pdf_extrait_genere="s3://bucket/extraits/42-44.pdf",
+    # --- Evidence + ESGMetric + CarbonEmission ---------------
+    preuve = Evidence(
+        document_name="rapport-annuel-2025.pdf",
+        year=2025,
+        total_pages=120,
+        page_start=42,
+        page_end=44,
+        excerpt_pdf_path="s3://bucket/extraits/42-44.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -100,14 +101,14 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         method=MethodeDonnee.RAPPORTEE,
         proof_id=preuve.id,
     )
-    donnee_carbone = DonneeCarbone(
-        rapport_id=rapport.id,
+    donnee_carbone = CarbonEmission(
+        report_id=rapport.id,
         scope=1,
-        valeur_tonnes_co2e=123.4,
-        annee=2025,
-        methode=MethodeDonnee.RAPPORTEE,
-        score_qualite_pcaf=3,
-        preuve_id=preuve.id,
+        tonnes_co2e=123.4,
+        year=2025,
+        method=MethodeDonnee.RAPPORTEE,
+        pcaf_data_quality=3,
+        proof_id=preuve.id,
     )
     session.add(indicateur)
     session.add(donnee_carbone)
@@ -115,12 +116,12 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
 
     assert indicateur.report.id == rapport.id
     assert indicateur in rapport.metrics
-    assert donnee_carbone.rapport.id == rapport.id
+    assert donnee_carbone.report.id == rapport.id
     assert donnee_carbone in rapport.carbon_data
     assert indicateur.proof.id == preuve.id
-    assert indicateur in preuve.indicateurs
-    assert donnee_carbone.preuve.id == preuve.id
-    assert donnee_carbone in preuve.donnees_carbone
+    assert indicateur in preuve.metrics
+    assert donnee_carbone.proof.id == preuve.id
+    assert donnee_carbone in preuve.carbon_emissions
 
     # --- ConfigurationPonderation de référence ET personnalisée (Chercheur)
     chercheur = _utilisateur(session, Role.RESEARCHER)
@@ -186,10 +187,10 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         {
             "portfolio_id": portefeuille.id,
             "company_id": entreprise.id,
-            "outstanding_amount": 1000.0,
+            "outstanding_amount": Decimal(1000),
             "currency": DevisePosition.USD,
-            "fx_rate_used": 0.92,
-            "converted_amount": 920.0,
+            "fx_rate_used": Decimal("0.92"),
+            "converted_amount": Decimal(920),
             "duration_type": TypeDureeInvestissement.OUVERTE,
             "start_date": utcnow(),
         }
@@ -222,8 +223,8 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.add(position_ouverte)
     session.flush()
 
-    assert position_usd.fx_rate_used == 0.92
-    assert position_usd.converted_amount == 920.0
+    assert position_usd.fx_rate_used == Decimal("0.92")
+    assert position_usd.converted_amount == Decimal(920)
     assert position_fixe.end_date is not None
     assert position_ouverte.end_date is None
     assert {position_usd.id, position_fixe.id, position_ouverte.id} == {
@@ -276,13 +277,13 @@ def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
     )
     session.add(rapport)
     session.flush()
-    preuve = PreuveDocumentaire(
-        nom_document="rapport.pdf",
-        annee=2025,
-        nombre_pages_total=10,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="s3://bucket/extraits/1.pdf",
+    preuve = Evidence(
+        document_name="rapport.pdf",
+        year=2025,
+        total_pages=10,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="s3://bucket/extraits/1.pdf",
     )
     session.add(preuve)
     session.flush()

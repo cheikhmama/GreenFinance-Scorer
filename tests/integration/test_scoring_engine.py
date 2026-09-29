@@ -9,7 +9,7 @@ from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import CanalDepot, MethodeDonnee, Pilier, Role, TypeRapport
 from app.core.exceptions import ValidationError
-from app.ingestion.models import ESGMetric, ESGReport, PreuveDocumentaire
+from app.ingestion.models import ESGMetric, ESGReport, Evidence
 from app.scoring.engine import (
     calculer_score,
     obtenir_configuration_reference,
@@ -34,14 +34,14 @@ def _rapport(session) -> ESGReport:
     return rapport
 
 
-def _preuve(session) -> PreuveDocumentaire:
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+def _preuve(session) -> Evidence:
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.flush()

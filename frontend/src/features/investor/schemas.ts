@@ -3,6 +3,7 @@ import {
   DevisePosition,
   TypeDureeInvestissement,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
 export { DevisePosition, TypeDureeInvestissement };
 export const DEVISES = Object.values(DevisePosition);
@@ -27,7 +28,10 @@ export type RenommerPortefeuilleForm = z.infer<typeof renommerPortefeuilleSchema
 // z.number() (pas z.coerce.number(), voir features/company/schemas.ts) : le formulaire convertit
 // déjà la saisie en number via valueAsNumber dans l'input, jamais une string à coercer ici.
 const positionBaseSchema = z.object({
-  montant: z.number({ message: "Le montant est requis." }).positive("Le montant doit être positif."),
+  montant: z
+    .number({ message: "Le montant est requis." })
+    .positive("Le montant doit être positif.")
+    .refine(auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES),
   devise: z.enum(DevisePosition),
   type_duree: z.enum(TypeDureeInvestissement),
   date_debut: z.string().min(1, "La date de début est requise."),

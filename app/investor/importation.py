@@ -26,6 +26,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, ROUND_UP, Decimal, InvalidOperation
 from typing import Any
 
 from sqlmodel import Session, col, select
@@ -43,16 +44,18 @@ from app.core.enums import (
 )
 from app.core.exceptions import ValidationError
 from app.investor import fx
+from app.investor.fx import CENTIME
 from app.investor.models import Portfolio, PortfolioPosition
 from app.investor.portfolio import (
     _construire_position,
-    _portefeuille_de_investisseur,
     _verifier_montant_minimum,
+    portefeuille_de_investisseur,
 )
 
 TAILLE_MAX_OCTETS = 1024 * 1024
 LIGNES_MAX = 5000
-TOLERANCE_SOMME_POIDS = 0.001
+TOLERANCE_SOMME_POIDS = Decimal("0.001")
+PRECISION_POIDS = Decimal("1e-10")
 _TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,19}$")
 _COLONNES = {"identifier", "identifier_type", "outstanding_amount", "currency", "weight"}
 
@@ -62,9 +65,9 @@ class _Ligne:
     numero: int
     identifiant: str
     type_identifiant: IdentifierType
-    montant: float | None
+    montant: Decimal | None
     devise: DevisePosition | None
-    poids: float | None
+    poids: Decimal | None
 
 
 @dataclass
@@ -72,15 +75,22 @@ class ResultatImport:
     positions: list[PortfolioPosition]
 
 
-def _nombre(brut: Any, decimale_virgule: bool) -> float | None:
+def _nombre(brut: Any, decimale_virgule: bool) -> Decimal | None:
+    """Decimal, jamais float (tâche 2.3). ValueError pour un nombre illisible ou non fini."""
     if brut is None or (isinstance(brut, str) and not brut.strip()):
         return None
-    if isinstance(brut, int | float) and not isinstance(brut, bool):
-        return float(brut)
+    # str() d'abord : un float JSON (0.1) garderait sinon son erreur binaire. Espaces (y compris
+    # insécables) retirés : séparateurs de milliers d'un export tableur.
     texte = str(brut).strip().replace(" ", "").replace(" ", "")
     if decimale_virgule:
         texte = texte.replace(",", ".")
-    return float(texte)  # ValueError géré par l'appelant
+    try:
+        valeur = Decimal(texte)
+    except InvalidOperation as exc:
+        raise ValueError(texte) from exc
+    if not valeur.is_finite():
+        raise ValueError(texte)
+    return valeur
 
 
 def _lire(contenu: bytes, nom_fichier: str | None) -> tuple[list[tuple[int, dict[str, Any]]], bool]:
@@ -153,13 +163,19 @@ def _valider_ligne(numero: int, valeurs: dict[str, Any], decimale_virgule: bool)
     if montant is not None:
         if montant <= 0:
             raise ValueError("outstanding_amount doit être strictement positif")
+        if montant != montant.quantize(CENTIME):
+            raise ValueError("outstanding_amount : au plus deux décimales")
         try:
             devise = DevisePosition(brut_devise)
         except ValueError as exc:
             devises = ", ".join(d.value for d in DevisePosition)
             raise ValueError(f"currency doit valoir {devises}") from exc
-    if poids is not None and not 0 < poids <= 1:
-        raise ValueError("weight doit être compris entre 0 (exclu) et 1")
+    if poids is not None:
+        # Précision de la colonne (numeric(11,10)) : un poids qui s'arrondirait à 0 est refusé ici
+        # plutôt qu'en violation de contrainte à l'écriture.
+        poids = poids.quantize(PRECISION_POIDS)
+        if not 0 < poids <= 1:
+            raise ValueError("weight doit être compris entre 0 (exclu) et 1")
     return _Ligne(numero, identifiant, type_identifiant, montant, devise, poids)
 
 
@@ -181,9 +197,9 @@ def importer_positions(
     portefeuille_id: uuid.UUID,
     contenu: bytes,
     nom_fichier: str | None,
-    total_value: float | None,
+    total_value: Decimal | None,
 ) -> list[PortfolioPosition]:
-    portefeuille: Portfolio = _portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
+    portefeuille: Portfolio = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     if portefeuille.archived:
         raise ValidationError("Ce portefeuille est archivé.", code="portefeuille_archive")
     if session.exec(
@@ -221,7 +237,7 @@ def importer_positions(
     if par_poids and len(par_poids) != len(lignes):
         erreurs["file"] = "Toutes les lignes doivent utiliser le même mode : montants ou poids."
     elif par_poids and not erreurs:
-        somme = sum(ligne.poids or 0 for ligne in par_poids)
+        somme = sum((ligne.poids or Decimal(0) for ligne in par_poids), Decimal(0))
         if abs(somme - 1) > TOLERANCE_SOMME_POIDS:
             erreurs["file"] = f"La somme des poids vaut {somme:.4f} au lieu de 1."
         elif total_value is None or total_value <= 0:
@@ -232,12 +248,16 @@ def importer_positions(
 
     chemin_taux = get_settings().fx_rates_path
     devise_ref = portefeuille.reference_currency
-    preparees: list[tuple[_Ligne, MatchStatus, Company | None, float, float, float | None]] = []
+    preparees: list[tuple[_Ligne, MatchStatus, Company | None, Decimal, Decimal, Decimal | None]] = []
     if not erreurs:
         for ligne in lignes:
             if ligne.poids is not None:
                 assert total_value is not None
-                montant, devise = ligne.poids * total_value, devise_ref
+                montant = (ligne.poids * total_value).quantize(CENTIME, rounding=ROUND_HALF_UP)
+                devise = devise_ref
+                if montant <= 0:
+                    erreurs[f"line_{ligne.numero}"] = "poids trop faible : montant nul au centime"
+                    continue
             else:
                 assert ligne.montant is not None and ligne.devise is not None
                 montant, devise = ligne.montant, ligne.devise
@@ -264,7 +284,7 @@ def importer_positions(
             fields=erreurs,
         )
 
-    total_converti = sum(converti for _l, _s, _e, converti, _m, _t in preparees)
+    total_converti = sum((converti for _l, _s, _e, converti, _m, _t in preparees), Decimal(0))
     aujourdhui = utcnow()
     positions = [
         _construire_position(
@@ -280,7 +300,10 @@ def importer_positions(
                 "converted_amount": converti,
                 # Poids déclaré, sinon dérivé des montants convertis : toute ligne importée porte
                 # son poids.
-                "weight": ligne.poids if ligne.poids is not None else converti / total_converti,
+                # Arrondi par excès : un poids dérivé n'est jamais nul (ck_portfolio_positions_weight_range).
+                "weight": ligne.poids
+                if ligne.poids is not None
+                else (converti / total_converti).quantize(PRECISION_POIDS, rounding=ROUND_UP),
                 "duration_type": TypeDureeInvestissement.OUVERTE,
                 "start_date": aujourdhui,
             }

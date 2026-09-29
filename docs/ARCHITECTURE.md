@@ -140,14 +140,19 @@ API with its role-based scope.
 scoring engine silently keeps the last duplicate. Auditor overrides don't exist today: the
 auditor can only issue an opinion.
 
-Carbon data (`carbon_emissions`, current `donnee_carbone`) keeps its structure: `scope` 1/2/3,
-`ghg_category`, `tonnes_co2e`, `year`, `pcaf_data_quality` (1–5, **nullable** — the current
-hard-coded placeholder `3` is removed).
+Carbon data (`carbon_emissions`) keeps its structure: `scope` 1/2/3, `ghg_category`,
+`tonnes_co2e`, `year`, `pcaf_data_quality` (1–5, **nullable**, derived from the extraction
+method — the old hard-coded placeholder `3` is gone). *Implemented in task 2.3*, together with
+`evidence`, `metric_coverage` and `discrepancy_flags` (renamed from `preuve_documentaire`,
+`couverture_indicateur`, `signalement_ecart`); the JSON of existing endpoints keeps its French
+field names.
 
 ### 3.4 `portfolios` and `portfolio_positions` (module `app/investor`)
 
-*Implemented in task 2.1* (amounts still `float`, `Decimal` with task 2.3). Import endpoint: task 2.2,
-which also adds `companies.ticker` (indexed, not unique).
+*Implemented in task 2.1*; amounts and FX rate in `numeric` / `Decimal` since task 2.3. Import
+endpoint: task 2.2, which also adds `companies.ticker` (indexed, not unique). The cached
+aggregates on `portfolios` stay empty until the recompute job (task 4.1); until then every figure
+is computed on read.
 
 | Table | Column | Notes |
 |---|---|---|

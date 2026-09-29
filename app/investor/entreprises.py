@@ -6,6 +6,7 @@ source de vérité, jamais dupliquée ici.
 """
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
@@ -16,11 +17,11 @@ from app.core.config import get_settings
 from app.core.enums import DevisePosition, ReportStatus, StatutCouvertureIndicateur
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import (
-    CouvertureIndicateur,
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
+    MetricCoverage,
 )
 from app.ingestion.schemas import CouvertureResume
 from app.investor import fx
@@ -41,13 +42,13 @@ def couverture_publique(session: Session, rapport: ESGReport | None) -> Couvertu
     if rapport is None:
         return _COUVERTURE_VIDE
     couvertures = session.exec(
-        select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport.id)
+        select(MetricCoverage).where(MetricCoverage.report_id == rapport.id)
     ).all()
     return CouvertureResume(
         total_cibles=len(couvertures),
-        trouves=sum(1 for c in couvertures if c.statut == StatutCouvertureIndicateur.TROUVE),
+        trouves=sum(1 for c in couvertures if c.status == StatutCouvertureIndicateur.TROUVE),
         codes_manquants=[
-            c.code for c in couvertures if c.statut != StatutCouvertureIndicateur.TROUVE
+            c.metric_code for c in couvertures if c.status != StatutCouvertureIndicateur.TROUVE
         ],
     )
 from app.scoring.engine import score_officiel
@@ -95,8 +96,8 @@ def score_public(session: Session, rapport: ESGReport | None) -> ScoreEntreprise
 def carbone_agrege(session: Session, rapport: ESGReport | None) -> DonneesCarboneAgregees:
     if rapport is None:
         return _CARBONE_VIDE
-    donnees = session.exec(select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport.id)).all()
-    par_cle = {(d.scope, d.categorie_ges): d.valeur_tonnes_co2e for d in donnees}
+    donnees = session.exec(select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)).all()
+    par_cle = {(d.scope, d.ghg_category): d.tonnes_co2e for d in donnees}
     return DonneesCarboneAgregees(
         scope_1=par_cle.get((1, None)),
         scope_2_market_based=par_cle.get((2, "market_based")),
@@ -107,7 +108,7 @@ def carbone_agrege(session: Session, rapport: ESGReport | None) -> DonneesCarbon
 
 def montant_minimum_par_devise(
     entreprise: Company, chemin_taux: str
-) -> dict[DevisePosition, float] | None:
+) -> dict[DevisePosition, Decimal] | None:
     """None si l'entreprise n'impose aucun minimum — jamais une carte à 3 zéros qui laisserait
     croire à un minimum réel de 0. Sinon, converti dans les 3 devises depuis
     Company.minimum_investment_currency (toujours renseignée de pair, voir
@@ -207,9 +208,9 @@ def consulter_entreprise_publiee(
         )
         donnees_carbone = list(
             session.exec(
-                select(DonneeCarbone)
-                .where(DonneeCarbone.rapport_id == rapport.id)
-                .order_by(col(DonneeCarbone.scope), col(DonneeCarbone.categorie_ges))
+                select(CarbonEmission)
+                .where(CarbonEmission.report_id == rapport.id)
+                .order_by(col(CarbonEmission.scope), col(CarbonEmission.ghg_category))
             ).all()
         )
 
@@ -230,7 +231,7 @@ def fichier_preuve(
     perimetre_autorise: set[uuid.UUID] | None = None,
 ) -> str:
     """Chemin de stockage du mini-PDF (une page) prouvant un indicateur ou une donnée carbone —
-    jamais un simple session.get(PreuveDocumentaire, preuve_id) : sans vérifier que cette preuve
+    jamais un simple session.get(Evidence, preuve_id) : sans vérifier que cette preuve
     appartient bien au rapport VALIDATED actuellement publié de CETTE entreprise, un UUID de preuve
     deviné donnerait accès à l'extrait d'un rapport non publié ou d'une autre entreprise."""
     entreprise = session.get(Company, entreprise_id)
@@ -250,8 +251,8 @@ def fichier_preuve(
         ).first()
         is not None
         or session.exec(
-            select(DonneeCarbone.id).where(
-                DonneeCarbone.preuve_id == preuve_id, DonneeCarbone.rapport_id == rapport.id
+            select(CarbonEmission.id).where(
+                CarbonEmission.proof_id == preuve_id, CarbonEmission.report_id == rapport.id
             )
         ).first()
         is not None
@@ -259,9 +260,9 @@ def fichier_preuve(
     if not appartient_au_rapport:
         raise NotFoundError("Preuve introuvable.", code="preuve_introuvable")
 
-    preuve = session.get(PreuveDocumentaire, preuve_id)
+    preuve = session.get(Evidence, preuve_id)
     assert preuve is not None  # invariant : la requête ci-dessus vient de la trouver par FK
-    return preuve.pdf_extrait_genere
+    return preuve.excerpt_pdf_path
 
 
 _MAX_ENTREPRISES_COMPARAISON = 4

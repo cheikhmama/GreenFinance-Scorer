@@ -42,6 +42,7 @@ from app.admin.review_queue import (
     lister_tous_les_rapports,
     lister_toutes_les_entreprises,
     lister_versions,
+    modifier_donnees_financieres,
     modifier_entreprise_admin,
     modifier_identifiants,
     publier_entreprise,
@@ -60,6 +61,8 @@ from app.admin.schemas import (
     AnalyseAdmin,
     ApercuActeursAdmin,
     ChargeAuditeurAdmin,
+    CompanyFinancials,
+    CompanyFinancialsRequest,
     CompanyIdentifiers,
     CompanyIdentifiersRequest,
     CompanyOnboardingRequest,
@@ -1076,3 +1079,45 @@ def lister_projets_admin_route(
         total=total,
         pages=math.ceil(total / page_size) if page_size else 0,
     )
+
+
+def _donnees_financieres(entreprise: Company) -> CompanyFinancials:
+    return CompanyFinancials(
+        company_id=entreprise.id,
+        revenue=entreprise.revenue,
+        revenue_currency=entreprise.revenue_currency,
+        enterprise_value=entreprise.enterprise_value,
+        enterprise_value_currency=entreprise.enterprise_value_currency,
+        enterprise_value_as_of=entreprise.enterprise_value_as_of,
+    )
+
+
+@router.get(
+    "/admin/companies/{company_id}/financials",
+    response_model=CompanyFinancials,
+    operation_id="getCompanyFinancials",
+    summary="Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)",
+)
+def get_company_financials(
+    company_id: uuid.UUID,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyFinancials:
+    return _donnees_financieres(consulter_entreprise_admin(session, company_id))
+
+
+@router.put(
+    "/admin/companies/{company_id}/financials",
+    response_model=CompanyFinancials,
+    operation_id="updateCompanyFinancials",
+    summary="Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)",
+)
+def update_company_financials(
+    company_id: uuid.UUID,
+    payload: CompanyFinancialsRequest,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyFinancials:
+    entreprise = modifier_donnees_financieres(session, company_id, payload.model_dump())
+    return _donnees_financieres(entreprise)
+

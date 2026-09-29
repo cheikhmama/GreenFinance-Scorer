@@ -18,6 +18,7 @@ import type {
   PagePortefeuilleResume,
   PortefeuilleDetail,
   PortefeuilleResume,
+  PortfolioCarbon,
   PortfolioImportResult,
   PositionDetail,
   RenommerPortefeuilleRequest,
@@ -358,6 +359,29 @@ export const getExportPortfolioUrl = (portefeuilleId: string,) => {
 export const exportPortfolio = async (portefeuilleId: string, options?: RequestInit): Promise<unknown> => {
 
   return apiFetch<unknown>(getExportPortfolioUrl(portefeuilleId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetPortfolioCarbonUrl = (portfolioId: string,) => {
+
+
+
+
+  return `/portfolios/${portfolioId}/carbon`
+}
+
+/**
+ * @summary Empreinte carbone PCAF d'un portefeuille (Scopes 1+2, Scope 3 à part)
+ */
+export const getPortfolioCarbon = async (portfolioId: string, options?: RequestInit): Promise<PortfolioCarbon> => {
+
+  return apiFetch<PortfolioCarbon>(getGetPortfolioCarbonUrl(portfolioId),
   {
     ...options,
     method: 'GET'

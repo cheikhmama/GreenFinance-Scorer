@@ -83,7 +83,7 @@ def construire_tableau_de_bord(
             position.converted_amount, devise_portefeuille, DevisePosition.USD, chemin_taux
         )
         repartition_usd[entreprise_de_la_position.sector] = (
-            repartition_usd.get(entreprise_de_la_position.sector, 0.0) + montant_usd
+            repartition_usd.get(entreprise_de_la_position.sector, 0.0) + float(montant_usd)
         )
 
     repartition_secteur = [

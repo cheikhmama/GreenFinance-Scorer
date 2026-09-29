@@ -7,11 +7,13 @@ même garantie (jamais l'auditeur_id, voir RapportESGDetail).
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.carbon.pcaf import CarbonExclusionReason
 from app.company.schemas import CompanyContractMixin, EntreprisePublic
 from app.core.enums import (
     DevisePosition,
@@ -99,8 +101,10 @@ class AjouterPositionRequest(BaseModel):
     entreprise_id: uuid.UUID
     # gt=0, jamais seulement le CheckConstraint SQL ("montant_investi > 0", voir
     # app/investor/models.py) : sans cette validation ici, un montant négatif ou nul remonterait
-    # comme une IntegrityError Postgres non rattrapée (500) plutôt qu'un 422 propre.
-    montant: float = Field(gt=0)
+    # comme une IntegrityError Postgres non rattrapée (500) plutôt qu'un 422 propre. Decimal au
+    # centime près (tâche 2.3) : un montant à plus de deux décimales est refusé, jamais arrondi
+    # en silence.
+    montant: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
     devise: DevisePosition
     type_duree: TypeDureeInvestissement
     date_debut: datetime
@@ -117,7 +121,7 @@ class ModifierPositionRequest(BaseModel):
     app/investor/portfolio.py) — l'entreprise concernée n'est jamais modifiable après création,
     seule une fermeture puis une nouvelle position permet de changer de cible."""
 
-    montant: float = Field(gt=0)
+    montant: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
     devise: DevisePosition
     type_duree: TypeDureeInvestissement
     date_debut: datetime
@@ -221,3 +225,45 @@ class PortfolioImportResult(BaseModel):
     matched: int
     unmatched: int
     ambiguous: int
+
+
+class PositionCarbon(BaseModel):
+    """Une position active dans l'empreinte carbone PCAF (tâche 2.3). `excluded_reason` dit
+    pourquoi elle ne compte pas dans les émissions financées Scopes 1+2 — une donnée manquante
+    n'est jamais comptée comme zéro."""
+
+    position_id: uuid.UUID
+    company_id: uuid.UUID | None
+    company_name: str | None
+    identifier: str | None
+    amount: float  # dans la devise du portefeuille
+    attribution_factor: float | None
+    financed_emissions_scope_1_2: float | None  # tCO₂e
+    financed_emissions_scope_3: float | None  # tCO₂e, jamais additionné aux Scopes 1+2
+    carbon_intensity: float | None  # tCO₂e par million de chiffre d'affaires
+    data_quality: int | None  # score PCAF 1 (meilleur) à 5
+    emissions_year: int | None
+    scope_2_basis: str | None  # market_based, location_based, ou null si non précisé
+    enterprise_value_as_of: date | None
+    excluded_reason: CarbonExclusionReason | None
+
+
+class PortfolioCarbon(BaseModel):
+    """GET /portfolios/{id}/carbon (tâche 2.3, contrat JSON en anglais, docs/WORKFLOWS.md §2.4).
+    Les couvertures sont des parts du montant total, entre 0 et 1 ; chaque agrégat est nul quand
+    aucune position ne le permet."""
+
+    portfolio_id: uuid.UUID
+    currency: DevisePosition
+    total_value: float
+    financed_emissions_scope_1_2: float | None
+    financed_emissions_scope_3: float | None
+    carbon_footprint_scope_1_2: float | None  # tCO₂e par million investi
+    waci_scope_1_2: float | None  # tCO₂e par million de chiffre d'affaires
+    data_quality_scope_1_2: float | None
+    data_quality_scope_3: float | None
+    coverage_scope_1_2: float
+    coverage_scope_3: float
+    coverage_waci: float
+    positions: list[PositionCarbon]
+

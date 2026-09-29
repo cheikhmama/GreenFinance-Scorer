@@ -29,7 +29,13 @@ from app.core.enums import (
     StatutCouvertureIndicateur,
     TypeRapport,
 )
-from app.ingestion.models import ESGMetric, ESGReport
+from app.ingestion.models import (
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
+    MetricCoverage,
+)
 from app.scoring.schemas import ScoreESGPublic
 
 
@@ -148,7 +154,24 @@ class RapportESGPublic(BaseModel):
 
 
 class PreuveDocumentairePublic(BaseModel):
+    """Contrat JSON historique d'une Evidence (docs/RENAME_PLAN.md §1, règle 3)."""
+
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _depuis_evidence(cls, data: Any) -> Any:
+        if not isinstance(data, Evidence):
+            return data
+        return {
+            "id": data.id,
+            "nom_document": data.document_name,
+            "annee": data.year,
+            "nombre_pages_total": data.total_pages,
+            "page_debut": data.page_start,
+            "page_fin": data.page_end,
+            "pdf_extrait_genere": data.excerpt_pdf_path,
+        }
 
     id: uuid.UUID
     nom_document: str
@@ -197,7 +220,30 @@ class IndicateurESGDetail(BaseModel):
 
 
 class DonneeCarboneDetail(BaseModel):
+    """Contrat JSON historique d'une CarbonEmission (docs/RENAME_PLAN.md §1, règle 3)."""
+
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _depuis_emission(cls, data: Any) -> Any:
+        if not isinstance(data, CarbonEmission):
+            return data
+        return {
+            "id": data.id,
+            "scope": data.scope,
+            "categorie_ges": data.ghg_category,
+            "valeur_tonnes_co2e": data.tonnes_co2e,
+            "annee": data.year,
+            "methode": data.method,
+            "score_qualite_pcaf": data.pcaf_data_quality,
+            "preuve": data.proof,
+            "valeur_brute": data.raw_value,
+            "section": data.section,
+            "citation_source": data.proof_text,
+            "annee_valeur": data.value_year,
+            "confiance": data.confidence,
+        }
 
     id: uuid.UUID
     scope: int
@@ -205,7 +251,8 @@ class DonneeCarboneDetail(BaseModel):
     valeur_tonnes_co2e: float
     annee: int
     methode: MethodeDonnee
-    score_qualite_pcaf: int
+    # Nulle quand la qualité PCAF ne peut pas être dérivée (tâche 2.3) — plus de placeholder 3.
+    score_qualite_pcaf: int | None
     preuve: PreuveDocumentairePublic
     valeur_brute: str | None
     section: str | None
@@ -216,6 +263,13 @@ class DonneeCarboneDetail(BaseModel):
 
 class CouvertureIndicateurPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _depuis_couverture(cls, data: Any) -> Any:
+        if not isinstance(data, MetricCoverage):
+            return data
+        return {"code": data.metric_code, "statut": data.status}
 
     code: str
     statut: StatutCouvertureIndicateur

@@ -40,6 +40,8 @@ import {
   retryExtraction,
   onboardCompany,
   suspendCompany,
+  getCompanyFinancials,
+  updateCompanyFinancials,
   updateCompanyIdentifiers,
   updateCompanyProfile,
   uploadCompanyLogo,
@@ -47,6 +49,8 @@ import {
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
+  CompanyFinancials,
+  CompanyFinancialsRequest,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
@@ -424,6 +428,30 @@ export function useUpdateCompanyIdentifiers(entrepriseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
+  });
+}
+
+const financialsKey = (entrepriseId: string) =>
+  [...companyDetailKey(entrepriseId), "financials"] as const;
+
+/** GET /admin/companies/{id}/financials (tâche 2.3) — chiffre d'affaires et EVIC, dont le moteur
+ * PCAF a besoin. */
+export function useCompanyFinancials(entrepriseId: string) {
+  return useQuery<CompanyFinancials, ApiError>({
+    queryKey: financialsKey(entrepriseId),
+    queryFn: () => getCompanyFinancials(entrepriseId),
+    enabled: entrepriseId.length > 0,
+  });
+}
+
+/** PUT /admin/companies/{id}/financials — remplacement complet (un champ omis vaut null). */
+export function useUpdateCompanyFinancials(entrepriseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<CompanyFinancials, ApiError, CompanyFinancialsRequest>({
+    mutationFn: (payload) => updateCompanyFinancials(entrepriseId, payload),
+    onSuccess: (financieres) => {
+      queryClient.setQueryData(financialsKey(entrepriseId), financieres);
     },
   });
 }

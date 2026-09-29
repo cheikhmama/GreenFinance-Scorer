@@ -15,10 +15,10 @@ from app.core.enums import (
     TypeRapport,
 )
 from app.ingestion.models import (
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
 )
 
 
@@ -91,14 +91,14 @@ def test_sept_statuts_tous_atteignables(session, statut: ReportStatus) -> None:
     assert rapport.status == statut
 
 
-def _preuve(session) -> PreuveDocumentaire:
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-annuel-2025.pdf",
-        annee=2025,
-        nombre_pages_total=120,
-        page_debut=42,
-        page_fin=44,
-        pdf_extrait_genere="s3://bucket/extraits/42-44.pdf",
+def _preuve(session) -> Evidence:
+    preuve = Evidence(
+        document_name="rapport-annuel-2025.pdf",
+        year=2025,
+        total_pages=120,
+        page_start=42,
+        page_end=44,
+        excerpt_pdf_path="s3://bucket/extraits/42-44.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -121,26 +121,26 @@ def test_indicateur_et_donnee_carbone_lies_au_meme_rapport(session) -> None:
         method=MethodeDonnee.RAPPORTEE,
         proof_id=preuve.id,
     )
-    donnee_carbone = DonneeCarbone(
-        rapport_id=rapport.id,
+    donnee_carbone = CarbonEmission(
+        report_id=rapport.id,
         scope=1,
-        valeur_tonnes_co2e=123.4,
-        annee=2025,
-        methode=MethodeDonnee.RAPPORTEE,
-        score_qualite_pcaf=3,
-        preuve_id=preuve.id,
+        tonnes_co2e=123.4,
+        year=2025,
+        method=MethodeDonnee.RAPPORTEE,
+        pcaf_data_quality=3,
+        proof_id=preuve.id,
     )
     session.add(indicateur)
     session.add(donnee_carbone)
     session.flush()
 
-    assert indicateur.report_id == donnee_carbone.rapport_id == rapport.id
+    assert indicateur.report_id == donnee_carbone.report_id == rapport.id
     assert indicateur.report.id == rapport.id
-    assert donnee_carbone.rapport.id == rapport.id
+    assert donnee_carbone.report.id == rapport.id
     assert indicateur in rapport.metrics
     assert donnee_carbone in rapport.carbon_data
-    assert indicateur in preuve.indicateurs
-    assert donnee_carbone in preuve.donnees_carbone
+    assert indicateur in preuve.metrics
+    assert donnee_carbone in preuve.carbon_emissions
 
 
 @pytest.mark.parametrize("score_invalide", [0, 6, -1])
@@ -155,15 +155,15 @@ def test_score_qualite_pcaf_hors_bornes_rejete(session, score_invalide: int) -> 
     preuve = _preuve(session)
 
     with pytest.raises(ValidationError):
-        DonneeCarbone.model_validate(
+        CarbonEmission.model_validate(
             {
-                "rapport_id": rapport.id,
+                "report_id": rapport.id,
                 "scope": 1,
-                "valeur_tonnes_co2e": 1.0,
-                "annee": 2025,
-                "methode": MethodeDonnee.RAPPORTEE,
-                "score_qualite_pcaf": score_invalide,
-                "preuve_id": preuve.id,
+                "tonnes_co2e": 1.0,
+                "year": 2025,
+                "method": MethodeDonnee.RAPPORTEE,
+                "pcaf_data_quality": score_invalide,
+                "proof_id": preuve.id,
             }
         )
 
@@ -171,7 +171,7 @@ def test_score_qualite_pcaf_hors_bornes_rejete(session, score_invalide: int) -> 
 @pytest.mark.parametrize("scope_invalide", [0, 4, -1])
 def test_scope_hors_bornes_rejete_en_base(session, scope_invalide: int) -> None:
     """Complète test_score_qualite_pcaf_hors_bornes_rejete : ici la construction passe par
-    DonneeCarbone(**kwargs) directe (comme le fait le code applicatif réel, ex.
+    CarbonEmission(**kwargs) directe (comme le fait le code applicatif réel, ex.
     app/ingestion/extractor.py), qui ne déclenche jamais la validation Pydantic — seule la
     contrainte CHECK côté PostgreSQL (Phase 5 §6) protège ce chemin."""
     entreprise = _entreprise(session)
@@ -181,14 +181,14 @@ def test_scope_hors_bornes_rejete_en_base(session, scope_invalide: int) -> None:
     preuve = _preuve(session)
 
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=scope_invalide,
-            valeur_tonnes_co2e=1.0,
-            annee=2025,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=3,
-            preuve_id=preuve.id,
+            tonnes_co2e=1.0,
+            year=2025,
+            method=MethodeDonnee.RAPPORTEE,
+            pcaf_data_quality=3,
+            proof_id=preuve.id,
         )
     )
     with pytest.raises(IntegrityError):
@@ -204,14 +204,14 @@ def test_valeur_tonnes_co2e_negative_rejetee_en_base(session) -> None:
     preuve = _preuve(session)
 
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=1,
-            valeur_tonnes_co2e=-0.01,
-            annee=2025,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=3,
-            preuve_id=preuve.id,
+            tonnes_co2e=-0.01,
+            year=2025,
+            method=MethodeDonnee.RAPPORTEE,
+            pcaf_data_quality=3,
+            proof_id=preuve.id,
         )
     )
     with pytest.raises(IntegrityError):
@@ -230,14 +230,14 @@ def test_score_qualite_pcaf_hors_bornes_rejete_en_base(session, pcaf_invalide: i
     preuve = _preuve(session)
 
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=1,
-            valeur_tonnes_co2e=1.0,
-            annee=2025,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=pcaf_invalide,
-            preuve_id=preuve.id,
+            tonnes_co2e=1.0,
+            year=2025,
+            method=MethodeDonnee.RAPPORTEE,
+            pcaf_data_quality=pcaf_invalide,
+            proof_id=preuve.id,
         )
     )
     with pytest.raises(IntegrityError):
@@ -270,7 +270,7 @@ def test_checksum_nul_plusieurs_fois_autorise_meme_entreprise(session) -> None:
 
 
 def test_suppression_rapport_reference_echoue_proprement(session) -> None:
-    """Comportement documenté : rapport_id (ESGMetric, DonneeCarbone) ne
+    """Comportement documenté : rapport_id (ESGMetric, CarbonEmission) ne
     porte pas de cascade de suppression. Supprimer un ESGReport encore
     référencé échoue avec une IntegrityError — jamais de suppression
     silencieuse des indicateurs/données carbone associés."""

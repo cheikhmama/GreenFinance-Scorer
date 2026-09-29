@@ -1,8 +1,8 @@
 """Entités de persistance produites par le pipeline d'extraction documentaire.
 
 ESGReport porte le cycle de vie documentaire (ReportStatus) et l'avancement de son extraction
-(ExtractionStatus). Les entités qui en dérivent (ESGMetric, DonneeCarbone, PreuveDocumentaire —
-Prompt 3.5 ; SignalementEcart — Prompt 3.8) sont exclusivement produites
+(ExtractionStatus). Les entités qui en dérivent (ESGMetric, CarbonEmission, Evidence —
+Prompt 3.5 ; DiscrepancyFlag — Prompt 3.8) sont exclusivement produites
 par le pipeline automatique (Étapes 4 à 7) : un Auditeur les consulte et
 les valide via AvisAudit (app/audit/models.py), il ne les crée jamais
 lui-même — aucun champ ni table ici ne permet une saisie manuelle par
@@ -123,7 +123,7 @@ class ESGReport(SQLModel, table=True):
     # accompagné de sa preuve documentaire (garantie G1 "aucune valeur sans preuve").
     declared_global_score: float | None = Field(default=None)
     declared_global_score_proof_id: uuid.UUID | None = Field(
-        default=None, foreign_key="preuve_documentaire.id", ondelete="SET NULL", index=True
+        default=None, foreign_key="evidence.id", ondelete="SET NULL", index=True
     )
     # Chemin de stockage (app/core/storage.py) du dernier PDF de synthèse généré par la
     # plateforme (app/ingestion/synthesis_report.py) — remplacé à chaque régénération.
@@ -137,26 +137,30 @@ class ESGReport(SQLModel, table=True):
     company: "Company" = Relationship(back_populates="reports")
     auditor: Optional["User"] = Relationship(back_populates="audited_reports")
     metrics: list["ESGMetric"] = Relationship(back_populates="report")
-    carbon_data: list["DonneeCarbone"] = Relationship(back_populates="rapport")
+    carbon_data: list["CarbonEmission"] = Relationship(back_populates="report")
     scores: list["ScoreESG"] = Relationship(back_populates="rapport")
     audit_opinions: list["AvisAudit"] = Relationship(back_populates="rapport")
-    declared_global_score_proof: Optional["PreuveDocumentaire"] = Relationship()
-    coverages: list["CouvertureIndicateur"] = Relationship(back_populates="rapport")
+    declared_global_score_proof: Optional["Evidence"] = Relationship()
+    coverages: list["MetricCoverage"] = Relationship(back_populates="report")
 
 
-class PreuveDocumentaire(SQLModel, table=True):
-    __tablename__ = "preuve_documentaire"
+class Evidence(SQLModel, table=True):
+    """Table `evidence` (docs/RENAME_PLAN.md §4, tâche 2.3) : extrait PDF prouvant une valeur
+    extraite — aucune valeur sans preuve."""
+
+    __tablename__ = "evidence"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    nom_document: str
-    annee: int
-    nombre_pages_total: int
-    page_debut: int
-    page_fin: int
-    pdf_extrait_genere: str
+    document_name: str
+    year: int
+    total_pages: int
+    page_start: int
+    page_end: int
+    # Chemin relatif sous le stockage (app/core/storage.py), jamais absolu.
+    excerpt_pdf_path: str
 
-    indicateurs: list["ESGMetric"] = Relationship(back_populates="proof")
-    donnees_carbone: list["DonneeCarbone"] = Relationship(back_populates="preuve")
+    metrics: list["ESGMetric"] = Relationship(back_populates="proof")
+    carbon_emissions: list["CarbonEmission"] = Relationship(back_populates="proof")
 
 
 class ESGMetric(SQLModel, table=True):
@@ -176,7 +180,7 @@ class ESGMetric(SQLModel, table=True):
     unit: str
     method: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
     proof_id: uuid.UUID = Field(
-        foreign_key="preuve_documentaire.id", ondelete="CASCADE", index=True
+        foreign_key="evidence.id", ondelete="CASCADE", index=True
     )
     # Champs étendus de traçabilité (Phase 6) — renseignés par le LLM d'extraction quand
     # disponibles, jamais fabriqués : None reste None plutôt qu'une valeur inventée. raw_value
@@ -201,50 +205,53 @@ class ESGMetric(SQLModel, table=True):
     overridden_at: datetime | None = Field(default=None)
 
     report: ESGReport = Relationship(back_populates="metrics")
-    proof: PreuveDocumentaire = Relationship(back_populates="indicateurs")
-    discrepancy_flags: list["SignalementEcart"] = Relationship(back_populates="indicateur")
+    proof: Evidence = Relationship(back_populates="metrics")
+    discrepancy_flags: list["DiscrepancyFlag"] = Relationship(back_populates="metric")
 
 
-class DonneeCarbone(SQLModel, table=True):
-    """Scope/qualité PCAF/valeur sont bornés à la fois côté Pydantic (Field ci-dessous) et côté
-    PostgreSQL (__table_args__, Phase 5 §6) — un INSERT direct ou un futur endpoint qui
-    contournerait le modèle Pydantic reste protégé par la contrainte SQL."""
+class CarbonEmission(SQLModel, table=True):
+    """Table `carbon_emissions` (docs/RENAME_PLAN.md §4, tâche 2.3). Scope, qualité PCAF et
+    valeur sont bornés à la fois côté Pydantic et côté PostgreSQL (__table_args__) — un INSERT
+    direct reste protégé par la contrainte SQL.
 
-    __tablename__ = "donnee_carbone"
+    pcaf_data_quality (1 = meilleure, 5 = pire) est dérivée de la méthode d'obtention à
+    l'extraction (app/carbon/pcaf.py::qualite_donnee_pcaf) ; nulle quand elle ne peut pas l'être —
+    jamais une valeur par défaut qui se ferait passer pour une vraie notation."""
+
+    __tablename__ = "carbon_emissions"
     __table_args__ = (
-        CheckConstraint("scope IN (1, 2, 3)", name="ck_donnee_carbone_scope_valide"),
+        CheckConstraint("scope IN (1, 2, 3)", name="ck_carbon_emissions_scope"),
+        # Nulle acceptée : un CHECK sur NULL n'échoue pas.
         CheckConstraint(
-            "score_qualite_pcaf BETWEEN 1 AND 5", name="ck_donnee_carbone_pcaf_borne"
+            "pcaf_data_quality BETWEEN 1 AND 5", name="ck_carbon_emissions_pcaf_data_quality_range"
         ),
-        CheckConstraint(
-            "valeur_tonnes_co2e >= 0", name="ck_donnee_carbone_valeur_non_negative"
-        ),
+        CheckConstraint("tonnes_co2e >= 0", name="ck_carbon_emissions_tonnes_non_negative"),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    rapport_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
+    report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
     scope: int = Field(ge=1, le=3)
-    categorie_ges: str | None = None
-    valeur_tonnes_co2e: float = Field(ge=0)
-    annee: int
-    methode: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
-    score_qualite_pcaf: int = Field(ge=1, le=5)
-    preuve_id: uuid.UUID = Field(foreign_key="preuve_documentaire.id")
-    # Champs étendus de traçabilité (Phase 6) — voir ESGMetric ci-dessus pour la justification,
-    # identique ici.
-    valeur_brute: str | None = Field(default=None)
+    # Précision du Scope 2 (`market_based` / `location_based`), nulle quand le rapport ne la donne pas.
+    ghg_category: str | None = None
+    tonnes_co2e: float = Field(ge=0)
+    year: int
+    method: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
+    pcaf_data_quality: int | None = Field(default=None, ge=1, le=5)
+    proof_id: uuid.UUID = Field(foreign_key="evidence.id", ondelete="CASCADE", index=True)
+    # Traçabilité (Phase 6) — voir ESGMetric ci-dessus, même justification.
+    raw_value: str | None = Field(default=None)
     section: str | None = Field(default=None)
-    citation_source: str | None = Field(default=None)
-    annee_valeur: int | None = Field(default=None)
-    confiance: NiveauConfiance | None = Field(
+    proof_text: str | None = Field(default=None)
+    value_year: int | None = Field(default=None)
+    confidence: NiveauConfiance | None = Field(
         default=None, sa_column=sa_enum_column(NiveauConfiance, nullable=True)
     )
 
-    rapport: ESGReport = Relationship(back_populates="carbon_data")
-    preuve: PreuveDocumentaire = Relationship(back_populates="donnees_carbone")
+    report: ESGReport = Relationship(back_populates="carbon_data")
+    proof: Evidence = Relationship(back_populates="carbon_emissions")
 
 
-class CouvertureIndicateur(SQLModel, table=True):
+class MetricCoverage(SQLModel, table=True):
     """Persiste, pour CHAQUE code de INDICATEURS_CIBLES (pas seulement les trouvés), ce que le
     LLM a réellement répondu à l'extraction. Sert deux besoins distincts avec la même donnée :
     signaler à l'écran qu'une donnée est absente plutôt que de la laisser silencieusement invisible
@@ -254,32 +261,32 @@ class CouvertureIndicateur(SQLModel, table=True):
     chaque nouvelle tentative d'extraction du même rapport (voir run_extraction_pipeline, même
     purge que ESGMetric)."""
 
-    __tablename__ = "couverture_indicateur"
+    __tablename__ = "metric_coverage"
     __table_args__ = (
-        UniqueConstraint("rapport_id", "code", name="uq_couverture_indicateur_rapport_code"),
+        UniqueConstraint("report_id", "metric_code", name="uq_metric_coverage_report_metric_code"),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    rapport_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE")
-    code: str
-    statut: StatutCouvertureIndicateur = Field(sa_column=sa_enum_column(StatutCouvertureIndicateur))
-    pages_examinees: int
+    report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE")
+    metric_code: str
+    status: StatutCouvertureIndicateur = Field(sa_column=sa_enum_column(StatutCouvertureIndicateur))
+    pages_examined: int
 
-    rapport: ESGReport = Relationship(back_populates="coverages")
+    report: ESGReport = Relationship(back_populates="coverages")
 
 
-class SignalementEcart(SQLModel, table=True):
-    """Écart signalé sur un indicateur précis — jamais uniquement sur un
-    rapport entier."""
+class DiscrepancyFlag(SQLModel, table=True):
+    """Table `discrepancy_flags` (tâche 2.3) : écart signalé sur un indicateur précis — jamais
+    uniquement sur un rapport entier."""
 
-    __tablename__ = "signalement_ecart"
+    __tablename__ = "discrepancy_flags"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    indicateur_id: uuid.UUID = Field(foreign_key="esg_metrics.id", ondelete="CASCADE", index=True)
-    entreprise_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
-    nature_ecart: str
-    statut: str = Field(default="OUVERT")
-    date_signalement: datetime = Field(default_factory=utcnow)
+    metric_id: uuid.UUID = Field(foreign_key="esg_metrics.id", ondelete="CASCADE", index=True)
+    company_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
+    nature: str
+    status: str = Field(default="OUVERT")
+    flagged_at: datetime = Field(default_factory=utcnow)
 
-    indicateur: ESGMetric = Relationship(back_populates="discrepancy_flags")
-    entreprise: "Company" = Relationship(back_populates="discrepancy_flags")
+    metric: ESGMetric = Relationship(back_populates="discrepancy_flags")
+    company: "Company" = Relationship(back_populates="discrepancy_flags")

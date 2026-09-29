@@ -5,7 +5,8 @@ Jamais réutilisés comme modèles de persistance (voir ARCHITECTURE.md §2).
 
 import re
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -41,7 +42,9 @@ class ModifierEntrepriseAdminRequest(BaseModel):
     pays: str
     description: str | None = None
     site_officiel: str | None = None
-    montant_minimum_investissement: float | None = None
+    montant_minimum_investissement: Decimal | None = Field(
+        default=None, gt=0, max_digits=20, decimal_places=2
+    )
     devise_montant_minimum: DevisePosition | None = None
 
     @field_validator("nom", "secteur", "pays")
@@ -378,3 +381,42 @@ class CompanyIdentifiers(BaseModel):
     isin: str | None
     lei: str | None
     ticker: str | None
+
+
+class CompanyFinancialsRequest(BaseModel):
+    """PUT /admin/companies/{id}/financials (tâche 2.3, contrat JSON en anglais) : les
+    données financières dont le moteur PCAF a besoin (docs/WORKFLOWS.md §2.4). Chiffre d'affaires
+    pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur d'attribution.
+    Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais affichée à
+    côté des émissions, pour juger de l'écart entre les deux exercices. Remplacement complet : un
+    champ omis vaut null."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    revenue: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
+    revenue_currency: DevisePosition | None = None
+    enterprise_value: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
+    enterprise_value_currency: DevisePosition | None = None
+    enterprise_value_as_of: date | None = None
+
+    @model_validator(mode="after")
+    def _montant_et_devise_ensemble(self) -> "CompanyFinancialsRequest":
+        if (self.revenue is None) != (self.revenue_currency is None):
+            raise ValueError("revenue et revenue_currency vont ensemble.")
+        if (self.enterprise_value is None) != (self.enterprise_value_currency is None):
+            raise ValueError("enterprise_value et enterprise_value_currency vont ensemble.")
+        if self.enterprise_value is None and self.enterprise_value_as_of is not None:
+            raise ValueError("enterprise_value_as_of n'a de sens qu'avec enterprise_value.")
+        return self
+
+
+class CompanyFinancials(BaseModel):
+    """Réponse de GET / PUT /admin/companies/{id}/financials : montants en nombres JSON (un
+    Decimal serait sérialisé en chaîne)."""
+
+    company_id: uuid.UUID
+    revenue: float | None
+    revenue_currency: DevisePosition | None
+    enterprise_value: float | None
+    enterprise_value_currency: DevisePosition | None
+    enterprise_value_as_of: date | None

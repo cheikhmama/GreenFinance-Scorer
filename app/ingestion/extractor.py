@@ -39,6 +39,7 @@ from google.genai import types as genai_types
 from sqlmodel import Session, col, select
 
 from app.auth.models import User
+from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
@@ -47,11 +48,11 @@ from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
 from app.ingestion.completeness import calculer_couverture
 from app.ingestion.models import (
-    CouvertureIndicateur,
-    DonneeCarbone,
+    CarbonEmission,
     ESGMetric,
     ESGReport,
-    PreuveDocumentaire,
+    Evidence,
+    MetricCoverage,
 )
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
@@ -136,10 +137,6 @@ TABLE_SCORE_BOOST = 1.15
 # valeurs, ≥85% pages, 0% hallucination, data_test/ground_truth.yaml) a été mesurée avec Claude à
 # l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
 EXTRACTION_MODEL = "gemini-3.6-flash"
-
-# Score PCAF non calculé à cette étape (Étape 13, app/carbon/) — placeholder documenté plutôt
-# qu'une valeur inventée qui se ferait passer pour une vraie notation.
-PLACEHOLDER_SCORE_QUALITE_PCAF = 3
 
 EXTRACTION_TOOL = genai_types.FunctionDeclaration(
     name="extraction_indicateurs",
@@ -673,7 +670,7 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             # run_extraction_pipeline soit rejouable (ex. après élargissement d'INDICATEURS_CIBLES)
             # sans dupliquer les lignes. Ne touche jamais ESGReport (le PDF déposé) ni AvisAudit —
             # seules les données automatiques, best-effort et remplaçables sont concernées.
-            # PreuveDocumentaire n'a pas de rapport_id direct (liée uniquement via le preuve_id des
+            # Evidence n'a pas de rapport_id direct (liée uniquement via le preuve_id des
             # lignes ci-dessous, et son fichier est stocké sous preuves/{rapport_id}/page_N.pdf,
             # app/ingestion/proof_generator.py — jamais partagée entre rapports) : ses ids doivent
             # être collectés avant de supprimer les lignes qui les référencent.
@@ -681,15 +678,15 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 select(ESGMetric).where(ESGMetric.report_id == rapport_id)
             ).all()
             anciennes_donnees_carbone = session.exec(
-                select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport_id)
+                select(CarbonEmission).where(CarbonEmission.report_id == rapport_id)
             ).all()
             anciennes_couvertures = session.exec(
-                select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport_id)
+                select(MetricCoverage).where(MetricCoverage.report_id == rapport_id)
             ).all()
             for ancienne_couverture in anciennes_couvertures:
                 session.delete(ancienne_couverture)
             anciennes_preuve_ids = {i.proof_id for i in anciens_indicateurs} | {
-                d.preuve_id for d in anciennes_donnees_carbone
+                d.proof_id for d in anciennes_donnees_carbone
             }
             if rapport.declared_global_score_proof_id is not None:
                 anciennes_preuve_ids.add(rapport.declared_global_score_proof_id)
@@ -700,19 +697,19 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 session.delete(ancienne_ligne)
             if anciennes_preuve_ids:
                 for ancienne_preuve in session.exec(
-                    select(PreuveDocumentaire).where(
-                        col(PreuveDocumentaire.id).in_(anciennes_preuve_ids)
+                    select(Evidence).where(
+                        col(Evidence.id).in_(anciennes_preuve_ids)
                     )
                 ).all():
                     session.delete(ancienne_preuve)
             session.flush()
 
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}
-            preuves_par_page: dict[int, PreuveDocumentaire] = {}
+            preuves_par_page: dict[int, Evidence] = {}
             # Le LLM peut renvoyer deux fois le même code : la première occurrence exploitable
             # l'emporte, jamais deux lignes pour un même code (uq_esg_metrics_report_metric_code
             # l'impose en base pour ESGMetric ; le même principe évite un double comptage des
-            # émissions pour DonneeCarbone).
+            # émissions pour CarbonEmission).
             codes_persistes: set[str] = set()
             for indicateur in extraction.indicateurs:
                 if indicateur.code in codes_persistes:
@@ -756,20 +753,20 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 if cible.cible == "donnee_carbone":
                     assert cible.scope is not None  # invariant garanti par INDICATEURS_CIBLES
                     session.add(
-                        DonneeCarbone(
-                            rapport_id=rapport_id,
+                        CarbonEmission(
+                            report_id=rapport_id,
                             scope=cible.scope,
-                            categorie_ges=cible.categorie_ges,
-                            valeur_tonnes_co2e=indicateur.valeur,
-                            annee=annee_reporting,
-                            methode=MethodeDonnee.RAPPORTEE,
-                            score_qualite_pcaf=PLACEHOLDER_SCORE_QUALITE_PCAF,
-                            preuve_id=preuve.id,
-                            valeur_brute=indicateur.valeur_brute,
+                            ghg_category=cible.categorie_ges,
+                            tonnes_co2e=indicateur.valeur,
+                            year=annee_reporting,
+                            method=MethodeDonnee.RAPPORTEE,
+                            pcaf_data_quality=qualite_donnee_pcaf(MethodeDonnee.RAPPORTEE),
+                            proof_id=preuve.id,
+                            raw_value=indicateur.valeur_brute,
                             section=indicateur.section,
-                            citation_source=indicateur.citation_source,
-                            annee_valeur=indicateur.annee_valeur,
-                            confiance=indicateur.confiance,
+                            proof_text=indicateur.citation_source,
+                            value_year=indicateur.annee_valeur,
+                            confidence=indicateur.confiance,
                         )
                     )
                 elif cible.cible == "indicateur_esg":
