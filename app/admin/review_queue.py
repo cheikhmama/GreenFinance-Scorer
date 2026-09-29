@@ -592,6 +592,10 @@ def suspendre_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
     entreprise = session.get(Company, entreprise_id)
     if entreprise is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
+    if entreprise.status != CompanyStatus.ACTIVE:
+        raise ValidationError(
+            "Seule une entreprise active peut être suspendue.", code="transition_invalide"
+        )
 
     entreprise.status = CompanyStatus.SUSPENDED
     session.add(entreprise)
@@ -613,6 +617,11 @@ def reactiver_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
     entreprise = session.get(Company, entreprise_id)
     if entreprise is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
+    # Jamais depuis PENDING_ONBOARDING : réactiver n'est pas valider une inscription (tâche 1.4).
+    if entreprise.status != CompanyStatus.SUSPENDED:
+        raise ValidationError(
+            "Seule une entreprise suspendue peut être réactivée.", code="transition_invalide"
+        )
 
     entreprise.status = CompanyStatus.ACTIVE
     session.add(entreprise)

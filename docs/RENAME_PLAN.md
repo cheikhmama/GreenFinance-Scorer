@@ -23,7 +23,9 @@ anything, add or check its row here; after a rename lands, tick it.
    - *Exceptions (task 1.1):* report status **values** change in the API (`statut` now carries
      `ReportStatus`), and reports gain `statut_extraction` (`ExtractionStatus`) — the frontend
      needs both to tell a queued report from one being extracted. Company `actif` stays a boolean
-     in the API (true only for `ACTIVE`).
+     in the API (true only for `ACTIVE`); task 1.3 adds `statut` (`CompanyStatus`) next to it.
+   - New endpoints use English JSON from the start (first one: `POST /companies/register`,
+     task 1.3).
 4. **One consolidated migration per task**, with a working `downgrade()` that restores the
    previous names, values and constraints. Data transformations (status mapping) are written in
    SQL inside that migration, in both directions.

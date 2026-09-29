@@ -10,7 +10,7 @@ surface API directe) — la logique appelée ici invoque directement app.ingesti
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
@@ -25,7 +25,12 @@ from app.company.rapports import (
     lister_mes_rapports,
     rapport_de_lentreprise,
 )
-from app.company.schemas import EntreprisePublic, ImporterRapportParURLRequest
+from app.company.registration import enregistrer_demande
+from app.company.schemas import (
+    CompanyRegistrationRequest,
+    EntreprisePublic,
+    ImporterRapportParURLRequest,
+)
 from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import Role, TypeRapport
@@ -35,6 +40,28 @@ from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.scoring.engine import score_public
 
 router = APIRouter(tags=["company"])
+
+
+@router.post(
+    "/companies/register",
+    status_code=202,
+    operation_id="registerCompany",
+    summary="Demander l'inscription d'une entreprise (validation par l'Administrateur)",
+    responses={
+        202: {"description": "Demande reçue. Réponse identique que la demande aboutisse ou non."},
+        429: {"description": "Limite de demandes par adresse IP atteinte."},
+        503: {"description": "Envoi d'e-mails indisponible."},
+    },
+)
+def register_company(
+    payload: CompanyRegistrationRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> None:
+    enregistrer_demande(
+        session, payload, request.client.host if request.client else None, background_tasks
+    )
 
 
 def _entreprise_id(current_user: User) -> uuid.UUID:

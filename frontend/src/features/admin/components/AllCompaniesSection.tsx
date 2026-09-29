@@ -122,7 +122,10 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
               {entreprise.secteur} — {entreprise.pays}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {!entreprise.actif ? <Badge variant="destructive">Suspendue</Badge> : null}
+              {entreprise.statut === "PENDING_ONBOARDING" ? (
+                <Badge variant="warning">Inscription à valider</Badge>
+              ) : null}
+              {entreprise.statut === "SUSPENDED" ? <Badge variant="destructive">Suspendue</Badge> : null}
               {entreprise.dernier_statut_rapport ? (
                 <Badge variant={variantStatutRapport(entreprise.dernier_statut_rapport)}>
                   {libelleStatutRapport(entreprise.dernier_statut_rapport)}
@@ -166,11 +169,14 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
               Valider
             </Button>
           ) : null}
-          {entreprise.actif ? (
+          {/* Une inscription en attente ne se suspend ni ne se réactive : seule sa validation
+              (tâche 1.4) la rend active. */}
+          {entreprise.statut === "ACTIVE" ? (
             <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
               Suspendre
             </Button>
-          ) : (
+          ) : null}
+          {entreprise.statut === "SUSPENDED" ? (
             <Button
               size="sm"
               variant="outline"
@@ -185,7 +191,7 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
             >
               Réactiver
             </Button>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>

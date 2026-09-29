@@ -1,3 +1,4 @@
+import type { CompanyStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, CheckCircle2, FileText, X } from "lucide-react";
 import { useRef, useState } from "react";
@@ -111,6 +112,18 @@ function LogoEditor({
  * publiée (logo, nom, secteur, pays, description, site officiel, montant minimum) pour que ces
  * données soient consultées ET modifiées depuis un seul endroit, plutôt que dispersées entre le
  * profil auto-déclaré de l'Entreprise et les seuls logo/montant jusqu'ici gérables ici. */
+const LIBELLE_STATUT: Record<CompanyStatus, string> = {
+  PENDING_ONBOARDING: "Inscription à valider",
+  ACTIVE: "Active",
+  SUSPENDED: "Suspendue",
+};
+
+const VARIANTE_STATUT: Record<CompanyStatus, "warning" | "success" | "destructive"> = {
+  PENDING_ONBOARDING: "warning",
+  ACTIVE: "success",
+  SUSPENDED: "destructive",
+};
+
 export function AdminCompanyDetailPage() {
   const { entrepriseId = "" } = useParams<{ entrepriseId: string }>();
   const { data: entreprise, isLoading, isError } = useCompanyDetail(entrepriseId);
@@ -208,8 +221,8 @@ export function AdminCompanyDetailPage() {
             <LogoEditor entrepriseId={entrepriseId} nom={entreprise.nom} logo={entreprise.logo} />
             <div className="flex flex-col items-center gap-1.5 sm:items-start">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <Badge variant={entreprise.actif ? "success" : "destructive"}>
-                  {entreprise.actif ? "Active" : "Suspendue"}
+                <Badge variant={VARIANTE_STATUT[entreprise.statut]}>
+                  {LIBELLE_STATUT[entreprise.statut]}
                 </Badge>
                 <Badge variant={entreprise.date_publication ? "success" : "outline"}>
                   {entreprise.date_publication ? "Publiée" : "Non publiée"}
@@ -276,11 +289,13 @@ export function AdminCompanyDetailPage() {
                 Publier
               </Button>
             ) : null}
-            {entreprise.actif ? (
+            {/* Voir AllCompaniesSection : jamais d'action de statut sur une inscription en attente. */}
+            {entreprise.statut === "ACTIVE" ? (
               <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
                 Suspendre
               </Button>
-            ) : (
+            ) : null}
+            {entreprise.statut === "SUSPENDED" ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -295,7 +310,7 @@ export function AdminCompanyDetailPage() {
               >
                 Réactiver
               </Button>
-            )}
+            ) : null}
           </div>
         </CardContent>
       </Card>

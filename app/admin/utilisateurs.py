@@ -19,7 +19,7 @@ from app.auth.revocation import revoke_all_sessions
 from app.company.models import Company
 from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
-from app.core.enums import Role
+from app.core.enums import CompanyStatus, Role
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 
 # Quota de départ pour un compte Institution (Étape 17 §quota d'export) — pas encore un champ du
@@ -189,6 +189,16 @@ def renvoyer_lien_activation(
         raise NotFoundError("Utilisateur introuvable.", code="utilisateur_introuvable")
     if utilisateur.activated_at is not None:
         raise ValidationError("Ce compte est déjà activé.", code="compte_deja_active")
+    if (
+        utilisateur.company is not None
+        and utilisateur.company.status == CompanyStatus.PENDING_ONBOARDING
+    ):
+        # Le lien part à la validation de l'inscription (tâche 1.4), jamais avant : sinon le
+        # titulaire se connecterait à une entreprise que personne n'a encore validée.
+        raise ValidationError(
+            "L'inscription de cette entreprise n'est pas encore validée.",
+            code="inscription_non_validee",
+        )
 
     envoyer_lien_activation(session, utilisateur, background_tasks)
     auditer(session, acteur_id, "renvoi_lien_activation", "Utilisateur", utilisateur.id, "succes")

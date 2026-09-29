@@ -7,6 +7,7 @@
 import type {
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
+  CompanyRegistrationRequest,
   EntreprisePublic,
   ImporterRapportParURLRequest,
   RapportESGDetail,
@@ -14,6 +15,35 @@ import type {
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
+
+export const getRegisterCompanyUrl = () => {
+
+
+
+
+  return `/companies/register`
+}
+
+/**
+ * @summary Demander l'inscription d'une entreprise (validation par l'Administrateur)
+ */
+export const registerCompany = async (companyRegistrationRequest: CompanyRegistrationRequest, options?: RequestInit): Promise<unknown> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<unknown>(getRegisterCompanyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyRegistrationRequest)
+  }
+);}
+
 
 export const getGetMyCompanyProfileUrl = () => {
 

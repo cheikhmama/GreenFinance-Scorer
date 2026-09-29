@@ -95,6 +95,11 @@ def _creer_rapport(
     canal: CanalDepot = CanalDepot.ENTREPRISE,
 ) -> ESGReport:
     entreprise = session.get(Company, entreprise_id)
+    if entreprise is not None and entreprise.status == CompanyStatus.PENDING_ONBOARDING:
+        raise ValidationError(
+            "L'inscription de cette entreprise n'est pas encore validée.",
+            code="inscription_non_validee",
+        )
     if entreprise is not None and entreprise.status != CompanyStatus.ACTIVE:
         raise ValidationError("Cette entreprise est suspendue.", code="entreprise_suspendue")
 

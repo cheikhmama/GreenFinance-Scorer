@@ -128,6 +128,15 @@ export function LoginPage() {
         <LockKeyhole size={13} aria-hidden="true" />
         Un accès sécurisé à votre espace professionnel
       </p>
+      <p className="mt-3 text-center text-sm text-muted-foreground">
+        Votre entreprise n’est pas encore sur la plateforme ?{" "}
+        <Link
+          to="/inscription-entreprise"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Inscrire mon entreprise
+        </Link>
+      </p>
 
       {isPrototypeEnabled ? (
         <div className="mt-6 border-t pt-5">

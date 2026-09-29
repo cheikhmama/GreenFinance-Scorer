@@ -28,7 +28,7 @@ Conventions used below:
 
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|
-| register | public | Valid ISIN/LEI check digits if given; email not already used (case-insensitive); rate limit per IP | company `PENDING_ONBOARDING` + user `ENTERPRISE` (inactive) + audit log | activation email |
+| register (*task 1.3*) | public | Valid ISIN/LEI check digits if given (both optional); email, ISIN and LEI not already known; 3 requests per IP per hour; trap field empty. Same `202` answer whatever the outcome — the requester learns it by e-mail | company `PENDING_ONBOARDING` + owner user `ENTERPRISE` **without password** + audit log + admin notification `ENTREPRISE_INSCRITE` | acknowledgment e-mail (or "not processed" e-mail on a duplicate). The activation link is sent at onboarding, never before |
 | onboard (KYC) | ADMIN | status `PENDING_ONBOARDING`; ISIN or LEI present; revenue and EVIC present | status `ACTIVE`, onboarded_by/at, audit log, notification | — |
 | suspend / reactivate | ADMIN | — | status change, audit log, sessions of the owner revoked on suspend | — |
 

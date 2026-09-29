@@ -298,6 +298,54 @@ export interface ChercheurDisponible {
 }
 
 /**
+ * POST /companies/register — inscription publique d'une entreprise (tâche 1.3, décision D5).
+ *
+ * Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3) : nouvel endpoint, donc
+ * directement dans les noms cibles. ISIN et LEI restent facultatifs (beaucoup d'entreprises non
+ * cotées n'en ont pas) mais, fournis, leur chiffre de contrôle est vérifié.
+ *
+ * `company_fax` est un champ piège : invisible dans le formulaire, un humain le laisse vide ; un
+ * robot qui remplit tous les champs est ignoré sans le savoir (voir app/company/registration.py).
+ */
+export interface CompanyRegistrationRequest {
+  /**
+     * @minLength 2
+     * @maxLength 200
+     */
+  company_name: string;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  sector: string;
+  /** Code pays ISO 3166-1 alpha-2, ex. MR */
+  country: string;
+  isin?: string | null;
+  lei?: string | null;
+  website?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  contact_name: string;
+  contact_email: string;
+  company_fax?: string | null;
+}
+
+/**
+ * Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
+ * score (Company.published_at).
+ */
+export type CompanyStatus = typeof CompanyStatus[keyof typeof CompanyStatus];
+
+
+export const CompanyStatus = {
+  PENDING_ONBOARDING: 'PENDING_ONBOARDING',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+/**
  * POST /auth/confirmer-changement-email — jeton reçu à la nouvelle adresse
  * (app/auth/email_change.py::TOKEN_TTL, usage unique).
  */
@@ -515,6 +563,7 @@ export interface EntrepriseAdmin {
   description: string | null;
   site_officiel: string | null;
   actif: boolean;
+  statut: CompanyStatus;
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
@@ -591,6 +640,7 @@ export interface EntrepriseDetailInvestisseur {
   description: string | null;
   site_officiel: string | null;
   actif: boolean;
+  statut: CompanyStatus;
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
@@ -619,6 +669,7 @@ export interface EntreprisePublic {
   description: string | null;
   site_officiel: string | null;
   actif: boolean;
+  statut: CompanyStatus;
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;
@@ -640,6 +691,7 @@ export interface EntreprisePublieePublic {
   description: string | null;
   site_officiel: string | null;
   actif: boolean;
+  statut: CompanyStatus;
   montant_minimum_investissement: number | null;
   devise_montant_minimum: DevisePosition | null;
   date_publication: string | null;

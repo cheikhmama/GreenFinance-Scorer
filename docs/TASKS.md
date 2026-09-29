@@ -35,7 +35,12 @@ Rules for every task:
   - [x] Require the current password and a confirmation link to change email **[review]**; frontend confirmation page `/confirmer-email`.
   - [x] Atomic `INCR` + `EXPIRE` in rate-limit counters; add a per-IP limit behind a trusted proxy **[review]**.
   - [x] Found while testing: the activation e-mail linked to `/activer-compte`, a frontend page that did not exist — added (shares the reset page).
-- [ ] 1.3 Company Registration API: Implement Self-Service registration (`POST /api/v1/companies/register`).
+- [x] 1.3 Company Registration API: Implement Self-Service registration (`POST /api/v1/companies/register`).
+  - [x] Public endpoint with the first English JSON contract; ISIN (ISO 6166) and LEI (ISO 17442) check digits validated when given (`app/company/identifiers.py`).
+  - [x] Company `PENDING_ONBOARDING` + owner account without password; no activation link before onboarding (1.4); admins notified.
+  - [x] Uniform `202` (no disclosure of known e-mails / ISIN / LEI); per-IP rate limit; trap field. No CAPTCHA — needs a third-party service decision before production.
+  - [x] Admin actions can't bypass onboarding: reactivate only from `SUSPENDED`, suspend only from `ACTIVE`, no activation-link resend for a pending company; `statut` added to the company API contract.
+  - [x] Frontend: public page `/inscription-entreprise` (linked from login), pending badge in the admin views.
 - [ ] 1.4 Admin KYC API: Implement onboarding approval endpoint (`PATCH /api/v1/admin/companies/{id}/onboard`).
 - [ ] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`).
 - [x] 1.6 Audit Queue & Atomic Validation: Refactor `valider_rapport` to run score calculation and status transition inside a single atomic BDD transaction. **[review]** (migration `834bf70ae1b9`)
