@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -76,3 +76,60 @@ class AnalyseEntreprise(SQLModel, table=True):
 
     analyse: Analyse = Relationship(back_populates="entreprises")
     entreprise: Optional["Company"] = Relationship()
+
+
+class ReferenceDataset(SQLModel, table=True):
+    """Jeu de données ESG public importé par un Chercheur pour une validation croisée (tâche 3.3,
+    docs/WORKFLOWS.md §3.4) — Kaggle, CDP, GRI ou autre. Zone de préparation : ces données ne
+    modifient jamais celles de la plateforme et ne sont visibles que de leur auteur.
+
+    L'échelle et le sens des scores sont déclarés à l'import (un score de risque Sustainalytics
+    est « plus bas = meilleur », une note Kaggle peut aller de 0 à 1 000) : ils servent à ramener
+    chaque valeur sur l'échelle 0-100 de la plateforme avant tout écart moyen."""
+
+    __tablename__ = "reference_datasets"
+    __table_args__ = (
+        CheckConstraint("scale_max > scale_min", name="ck_reference_datasets_scale"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
+    name: str = Field(max_length=200)
+    source_url: str = Field(max_length=500)
+    licence: str = Field(max_length=200)
+    scale_min: float
+    scale_max: float
+    higher_is_better: bool
+    created_at: datetime = Field(default_factory=utcnow)
+
+    rows: list["ReferenceDatasetRow"] = Relationship(
+        back_populates="dataset", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class ReferenceDatasetRow(SQLModel, table=True):
+    """Une ligne importée, telle que fournie (valeurs brutes, dans l'échelle du jeu de données).
+    Au moins un identifiant de marché : le rapprochement se fait par ISIN ou LEI, jamais par nom
+    seul — `company_name` n'est qu'informatif."""
+
+    __tablename__ = "reference_dataset_rows"
+    __table_args__ = (
+        CheckConstraint(
+            "isin IS NOT NULL OR lei IS NOT NULL", name="ck_reference_dataset_rows_identifier"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    dataset_id: uuid.UUID = Field(
+        foreign_key="reference_datasets.id", ondelete="CASCADE", index=True
+    )
+    line_number: int
+    isin: str | None = Field(default=None, max_length=12)
+    lei: str | None = Field(default=None, max_length=20)
+    company_name: str | None = Field(default=None, max_length=200)
+    environmental_score: float | None = None
+    social_score: float | None = None
+    governance_score: float | None = None
+    total_score: float | None = None
+
+    dataset: ReferenceDataset = Relationship(back_populates="rows")

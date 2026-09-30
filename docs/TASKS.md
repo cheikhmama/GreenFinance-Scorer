@@ -99,7 +99,12 @@ Rules for every task:
   - [x] Baseline = mean normalised value of each indicator over the latest validated report of the other published companies, under the **same** stored config as the explained score; sector by default, whole universe when the sector has fewer than 3 peers (flagged). An indicator no peer publishes has no baseline and a zero contribution — never an invented mean.
   - [x] Access follows what each role already sees: `/reports` perimeter for admin, company and auditor; latest validated report of a published company for the others, inside the project perimeter for researcher and institution. Company detail gains `rapport_id`.
   - [x] Removed the empty `app/explainability/justification.py` stub (textual justifications are in no task).
-- [ ] 3.3 Public dataset cross-validation (Kaggle / CDP / GRI): staging import, ISIN/LEI matching, Spearman and MAE report.
+- [x] 3.3 Public dataset cross-validation (Kaggle / CDP / GRI): staging import, ISIN/LEI matching, Spearman and MAE report. (migration `a7e3b9c2d410`)
+  - [x] Staging tables `reference_datasets` (source URL and licence required, declared scale and direction) / `reference_dataset_rows`, private to their researcher (`owner_user_id` CASCADE), never read by scoring.
+  - [x] Generic CSV import (no dataset ships with the repo, and Kaggle/CDP/GRI files differ): `isin` / `lei` + any of `environmental`, `social`, `governance`, `total`; other columns ignored; unusable lines skipped with their reason (invalid identifier, unreadable or out-of-scale score), all-unusable → 422 and nothing saved.
+  - [x] Matching by ISIN, then LEI — never by name — against the published companies of the researcher's project perimeter (governance decision of 2026-09-02; an unmatched line never reveals a company outside it). Duplicates and companies without an official score are listed separately.
+  - [x] Report per score (E, S, G, global): pairs, Spearman (average ranks for ties; `null` under 3 pairs or for a constant series — never a misleading 0), mean absolute difference after rescaling the dataset to 0-100 (inverted for "lower is better" risk scores). Pure-Python statistics, checked against `scipy` in a property test.
+  - [x] Endpoints under `/researcher/reference-datasets` (import, list, report, delete; English contract) + "Validation croisée" researcher page.
 
 ## Phase 4: Architecture & Quality
 

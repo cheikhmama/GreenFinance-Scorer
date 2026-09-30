@@ -8,7 +8,9 @@ analyses}.py — ce router ne fait qu'appliquer le contrôle d'accès par rôle 
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+import pydantic
+from fastapi import APIRouter, Depends, Form, Query, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from sqlmodel import Session, col, select
 
@@ -27,14 +29,18 @@ from app.institution.schemas import (
 )
 from app.investor import entreprises
 from app.investor.schemas import EntrepriseDetailInvestisseur, EntreprisePublieePublic
-from app.researcher import analyses, projets, rattachements
+from app.researcher import analyses, cross_validation, projets, rattachements
 from app.researcher.models import Analyse
 from app.researcher.schemas import (
     AnalyseDetail,
     AnalysePublic,
     CreerAnalyseRequest,
+    CrossValidationReport,
     ModifierAnalyseRequest,
     ProjetAffecte,
+    ReferenceDatasetImportResult,
+    ReferenceDatasetRequest,
+    ReferenceDatasetSummary,
 )
 
 router = APIRouter(tags=["researcher"])
@@ -361,3 +367,90 @@ def historique_analyse_route(
     session: Session = Depends(get_session),
 ) -> list[Analyse]:
     return analyses.historique_analyse(session, current_user.id, analyse_id)
+
+
+# --- Validation croisée (tâche 3.3) ---------------------------------------------------------
+
+
+def _metadonnees_dataset(
+    name: str = Form(),
+    source_url: str = Form(),
+    licence: str = Form(),
+    scale_min: float = Form(default=0),
+    scale_max: float = Form(default=100),
+    higher_is_better: bool = Form(default=True),
+) -> ReferenceDatasetRequest:
+    """Champs de formulaire à plat à côté du fichier (un modèle Form mêlé à un fichier serait
+    imbriqué par FastAPI) ; les règles de ReferenceDatasetRequest restent la seule validation,
+    et leurs erreurs une 422 par champ comme toute validation de requête."""
+    try:
+        return ReferenceDatasetRequest(
+            name=name,
+            source_url=source_url,
+            licence=licence,
+            scale_min=scale_min,
+            scale_max=scale_max,
+            higher_is_better=higher_is_better,
+        )
+    except pydantic.ValidationError as exc:
+        raise RequestValidationError(exc.errors(include_url=False)) from exc
+
+
+@router.post(
+    "/researcher/reference-datasets",
+    response_model=ReferenceDatasetImportResult,
+    status_code=201,
+    operation_id="importReferenceDataset",
+    summary="Importer un jeu de données ESG public (CSV) pour une validation croisée",
+)
+def import_reference_dataset(
+    file: UploadFile,
+    metadata: ReferenceDatasetRequest = Depends(_metadonnees_dataset),
+    current_user: User = Depends(require_role(Role.RESEARCHER)),
+    session: Session = Depends(get_session),
+) -> ReferenceDatasetImportResult:
+    # Lecture bornée : un octet de plus que la limite suffit à refuser le fichier.
+    contenu = file.file.read(cross_validation.TAILLE_MAX_OCTETS + 1)
+    return cross_validation.importer(session, current_user, metadata, contenu)
+
+
+@router.get(
+    "/researcher/reference-datasets",
+    response_model=list[ReferenceDatasetSummary],
+    operation_id="listReferenceDatasets",
+    summary="Lister mes jeux de données de référence",
+)
+def list_reference_datasets(
+    current_user: User = Depends(require_role(Role.RESEARCHER)),
+    session: Session = Depends(get_session),
+) -> list[ReferenceDatasetSummary]:
+    return cross_validation.lister(session, current_user)
+
+
+@router.get(
+    "/researcher/reference-datasets/{dataset_id}/cross-validation",
+    response_model=CrossValidationReport,
+    operation_id="getCrossValidationReport",
+    summary="Comparer les scores de la plateforme à un jeu de données de référence",
+)
+def get_cross_validation_report(
+    dataset_id: uuid.UUID,
+    current_user: User = Depends(require_role(Role.RESEARCHER)),
+    session: Session = Depends(get_session),
+) -> CrossValidationReport:
+    return cross_validation.rapport(session, current_user, dataset_id)
+
+
+@router.delete(
+    "/researcher/reference-datasets/{dataset_id}",
+    status_code=204,
+    operation_id="deleteReferenceDataset",
+    summary="Supprimer un jeu de données de référence",
+)
+def delete_reference_dataset(
+    dataset_id: uuid.UUID,
+    current_user: User = Depends(require_role(Role.RESEARCHER)),
+    session: Session = Depends(get_session),
+) -> None:
+    cross_validation.supprimer(session, current_user, dataset_id)
+

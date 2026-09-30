@@ -6,22 +6,28 @@ import {
   correctAnalysis,
   createAnalysis,
   declineInstitutionInvitation,
+  deleteReferenceDataset,
+  getCrossValidationReport,
   getAnalysisDetail,
   getAnalysisHistory,
   getPublishedCompanyDetailForResearcher,
+  importReferenceDataset,
   listMyAnalyses,
   listMyAssignedProjects,
   listMyInstitutionInvitations,
   listProjectDocumentsForResearcher,
   listProjectScopeForResearcher,
   listPublishedCompaniesForResearcher,
+  listReferenceDatasets,
   submitAnalysis,
   updateAnalysis,
 } from "@/shared/api/generated/researcher/researcher";
 import type {
   AnalyseDetail,
   AnalysePublic,
+  BodyImportReferenceDataset,
   CreerAnalyseRequest,
+  CrossValidationReport,
   DocumentProjetPublic,
   EntreprisePerimetrePublic,
   EntrepriseDetailInvestisseur,
@@ -30,6 +36,8 @@ import type {
   PageEntreprisePublieePublic,
   ProjetAffecte,
   RattachementPublic,
+  ReferenceDatasetImportResult,
+  ReferenceDatasetSummary,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export const TAILLE_PAGE_RESEARCHER = 10;
@@ -204,5 +212,42 @@ export function useAnalysisHistory(analyseId: string) {
     queryKey: historiqueKey(analyseId),
     queryFn: () => getAnalysisHistory(analyseId),
     enabled: analyseId.length > 0,
+  });
+}
+
+// --- Validation croisée (tâche 3.3) ----------------------------------------------------------
+
+const JEUX_DE_DONNEES_KEY = ["researcher", "reference-datasets"] as const;
+
+export function useReferenceDatasets() {
+  return useQuery<ReferenceDatasetSummary[], ApiError>({
+    queryKey: JEUX_DE_DONNEES_KEY,
+    queryFn: () => listReferenceDatasets(),
+  });
+}
+
+/** POST /researcher/reference-datasets — les lignes inexploitables sont écartées avec leur motif
+ * (skipped_lines) ; aucune ligne importable : 422 `import_vide`, rien n'est enregistré. */
+export function useImportReferenceDataset() {
+  const queryClient = useQueryClient();
+  return useMutation<ReferenceDatasetImportResult, ApiError, BodyImportReferenceDataset>({
+    mutationFn: (payload) => importReferenceDataset(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: JEUX_DE_DONNEES_KEY }),
+  });
+}
+
+export function useCrossValidationReport(datasetId: string | null) {
+  return useQuery<CrossValidationReport, ApiError>({
+    queryKey: [...JEUX_DE_DONNEES_KEY, datasetId, "cross-validation"],
+    queryFn: () => getCrossValidationReport(datasetId ?? ""),
+    enabled: datasetId !== null,
+  });
+}
+
+export function useDeleteReferenceDataset() {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, string>({
+    mutationFn: (datasetId) => deleteReferenceDataset(datasetId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: JEUX_DE_DONNEES_KEY }),
   });
 }

@@ -260,5 +260,11 @@ as baseline (zero contribution, `baseline_value: null`). Computed on read, not s
 - Report: rank correlation (Spearman) and mean absolute difference per pillar, plus the
   unmatched list. Results are researcher-scoped and never modify platform data.
 
+*Implemented in task 3.3* (`/researcher/reference-datasets`, `app/researcher/cross_validation.py`).
+The dataset's scale and direction are declared at import, and every value is rescaled to 0-100
+before the mean absolute difference (Spearman is scale-free). Matching is limited to the
+researcher's project perimeter, like every other researcher view, so the sample is only as large
+as the perimeter the institution built. The report is computed on read.
+
 *Current:* researchers work in projects supervised by an institution (`Analyse`, `Projet`,
 `Rattachement`); explainability: see §3.3 (task 3.2).

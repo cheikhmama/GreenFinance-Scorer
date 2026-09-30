@@ -7,8 +7,10 @@
 import type {
   AnalyseDetail,
   AnalysePublic,
+  BodyImportReferenceDataset,
   CompareCompaniesForResearcherParams,
   CreerAnalyseRequest,
+  CrossValidationReport,
   DocumentProjetPublic,
   EntrepriseDetailInvestisseur,
   EntreprisePerimetrePublic,
@@ -16,7 +18,9 @@ import type {
   ModifierAnalyseRequest,
   PageEntreprisePublieePublic,
   ProjetAffecte,
-  RattachementPublic
+  RattachementPublic,
+  ReferenceDatasetImportResult,
+  ReferenceDatasetSummary
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
@@ -449,6 +453,112 @@ export const getAnalysisHistory = async (analyseId: string, options?: RequestIni
   {
     ...options,
     method: 'GET'
+
+
+  }
+);}
+
+
+export const getImportReferenceDatasetUrl = () => {
+
+
+
+
+  return `/researcher/reference-datasets`
+}
+
+/**
+ * @summary Importer un jeu de données ESG public (CSV) pour une validation croisée
+ */
+export const importReferenceDataset = async (bodyImportReferenceDataset: BodyImportReferenceDataset, options?: RequestInit): Promise<ReferenceDatasetImportResult> => {
+    const formData = new FormData();
+formData.append(`file`, bodyImportReferenceDataset.file);
+formData.append(`name`, bodyImportReferenceDataset.name);
+formData.append(`source_url`, bodyImportReferenceDataset.source_url);
+formData.append(`licence`, bodyImportReferenceDataset.licence);
+if(bodyImportReferenceDataset.scale_min !== undefined) {
+ formData.append(`scale_min`, bodyImportReferenceDataset.scale_min.toString())
+ }
+if(bodyImportReferenceDataset.scale_max !== undefined) {
+ formData.append(`scale_max`, bodyImportReferenceDataset.scale_max.toString())
+ }
+if(bodyImportReferenceDataset.higher_is_better !== undefined) {
+ formData.append(`higher_is_better`, bodyImportReferenceDataset.higher_is_better.toString())
+ }
+
+  return apiFetch<ReferenceDatasetImportResult>(getImportReferenceDatasetUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+export const getListReferenceDatasetsUrl = () => {
+
+
+
+
+  return `/researcher/reference-datasets`
+}
+
+/**
+ * @summary Lister mes jeux de données de référence
+ */
+export const listReferenceDatasets = async ( options?: RequestInit): Promise<ReferenceDatasetSummary[]> => {
+
+  return apiFetch<ReferenceDatasetSummary[]>(getListReferenceDatasetsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetCrossValidationReportUrl = (datasetId: string,) => {
+
+
+
+
+  return `/researcher/reference-datasets/${datasetId}/cross-validation`
+}
+
+/**
+ * @summary Comparer les scores de la plateforme à un jeu de données de référence
+ */
+export const getCrossValidationReport = async (datasetId: string, options?: RequestInit): Promise<CrossValidationReport> => {
+
+  return apiFetch<CrossValidationReport>(getGetCrossValidationReportUrl(datasetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getDeleteReferenceDatasetUrl = (datasetId: string,) => {
+
+
+
+
+  return `/researcher/reference-datasets/${datasetId}`
+}
+
+/**
+ * @summary Supprimer un jeu de données de référence
+ */
+export const deleteReferenceDataset = async (datasetId: string, options?: RequestInit): Promise<void> => {
+
+  return apiFetch<void>(getDeleteReferenceDatasetUrl(datasetId),
+  {
+    ...options,
+    method: 'DELETE'
 
 
   }

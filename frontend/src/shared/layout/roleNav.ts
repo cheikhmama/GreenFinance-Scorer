@@ -83,6 +83,7 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/researcher/entreprises", label: "Données", icon: Building2 },
       { to: "/researcher/projets", label: "Mes projets", icon: FolderKanban },
       { to: "/researcher/analyses", label: "Analyses", icon: FlaskConical },
+      { to: "/researcher/validation-croisee", label: "Validation croisée", icon: Scale },
       { to: "/researcher/rattachements", label: "Rattachements", icon: UserPlus },
     ],
   },

@@ -257,6 +257,16 @@ export interface BodyImportPortfolioPositions {
   total_value?: number | string | null;
 }
 
+export interface BodyImportReferenceDataset {
+  file: Blob;
+  name: string;
+  source_url: string;
+  licence: string;
+  scale_min?: number;
+  scale_max?: number;
+  higher_is_better?: boolean;
+}
+
 export type TypeRapport = typeof TypeRapport[keyof typeof TypeRapport];
 
 
@@ -466,6 +476,19 @@ export interface CompanyRegistrationRequest {
 }
 
 /**
+ * Score comparé par une validation croisée (tâche 3.3) : un pilier ou le score global.
+ */
+export type ComparedScore = typeof ComparedScore[keyof typeof ComparedScore];
+
+
+export const ComparedScore = {
+  ENVIRONMENTAL: 'ENVIRONMENTAL',
+  SOCIAL: 'SOCIAL',
+  GOVERNANCE: 'GOVERNANCE',
+  GLOBAL: 'GLOBAL',
+} as const;
+
+/**
  * POST /auth/confirmer-changement-email — jeton reçu à la nouvelle adresse
  * (app/auth/email_change.py::TOKEN_TTL, usage unique).
  */
@@ -572,6 +595,67 @@ export interface CreerUtilisateurRequest {
   nom_entreprise?: string | null;
   secteur?: string | null;
   pays?: string | null;
+}
+
+export interface CrossValidationMatch {
+  line: number;
+  company_id: string;
+  company_name: string;
+  dataset_scores: Partial<Record<ComparedScore, number | null>>;
+  platform_scores: Partial<Record<ComparedScore, number | null>>;
+}
+
+export interface ReferenceDatasetSummary {
+  id: string;
+  name: string;
+  source_url: string;
+  licence: string;
+  scale_min: number;
+  scale_max: number;
+  higher_is_better: boolean;
+  created_at: string;
+  row_count: number;
+}
+
+/**
+ * Accord entre le jeu de données et la plateforme sur un score. Spearman nul sous 3 paires ou
+ * pour une série constante ; écart absolu moyen sur l'échelle 0-100 de la plateforme.
+ */
+export interface ScoreAgreement {
+  score: ComparedScore;
+  pairs: number;
+  spearman: number | null;
+  mean_absolute_difference: number | null;
+}
+
+/**
+ * Pourquoi une ligne d'un jeu de référence n'entre pas dans la comparaison (tâche 3.3).
+ * UNKNOWN ne distingue jamais une entreprise inconnue d'une entreprise hors du périmètre.
+ */
+export type UnmatchedReason = typeof UnmatchedReason[keyof typeof UnmatchedReason];
+
+
+export const UnmatchedReason = {
+  UNKNOWN: 'UNKNOWN',
+  DUPLICATE: 'DUPLICATE',
+  NO_PLATFORM_SCORE: 'NO_PLATFORM_SCORE',
+} as const;
+
+export interface UnmatchedLine {
+  line: number;
+  isin: string | null;
+  lei: string | null;
+  company_name: string | null;
+  reason: UnmatchedReason;
+}
+
+export interface CrossValidationReport {
+  dataset: ReferenceDatasetSummary;
+  matched: number;
+  unmatched: number;
+  agreement: ScoreAgreement[];
+  matches: CrossValidationMatch[];
+  unmatched_lines: UnmatchedLine[];
 }
 
 export interface DecisionAdminRequest {
@@ -1474,6 +1558,18 @@ export interface RattachementPublic {
   date_invitation: string;
   date_reponse: string | null;
   conditions_collaboration: string | null;
+}
+
+export interface SkippedLine {
+  line: number;
+  reason: string;
+}
+
+export interface ReferenceDatasetImportResult {
+  dataset: ReferenceDatasetSummary;
+  imported: number;
+  skipped: number;
+  skipped_lines: SkippedLine[];
 }
 
 /**

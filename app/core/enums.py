@@ -125,6 +125,24 @@ class BaselineScope(str, Enum):
     UNIVERSE = "UNIVERSE"
 
 
+class ComparedScore(str, Enum):
+    """Score comparé par une validation croisée (tâche 3.3) : un pilier ou le score global."""
+
+    ENVIRONMENTAL = "ENVIRONMENTAL"
+    SOCIAL = "SOCIAL"
+    GOVERNANCE = "GOVERNANCE"
+    GLOBAL = "GLOBAL"
+
+
+class UnmatchedReason(str, Enum):
+    """Pourquoi une ligne d'un jeu de référence n'entre pas dans la comparaison (tâche 3.3).
+    UNKNOWN ne distingue jamais une entreprise inconnue d'une entreprise hors du périmètre."""
+
+    UNKNOWN = "UNKNOWN"
+    DUPLICATE = "DUPLICATE"  # entreprise déjà rapprochée par une ligne précédente
+    NO_PLATFORM_SCORE = "NO_PLATFORM_SCORE"
+
+
 class IdentifierType(str, Enum):
     """Identifiant de marché d'une ligne de portefeuille importée (tâche 2.2)."""
 
