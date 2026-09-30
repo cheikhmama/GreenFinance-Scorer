@@ -89,12 +89,12 @@ def test_erreur_non_transitoire_jamais_retentee(session, monkeypatch) -> None:
 def test_job_extraction_retente_avec_delai_croissant(monkeypatch) -> None:
     appels: list[bool] = []
 
-    def _pipeline(_rapport_id, _annee, *, derniere_tentative: bool) -> None:
+    def _pipeline(_rapport_id, _annee, derniere_tentative: bool) -> None:
         appels.append(derniere_tentative)
         if not derniere_tentative:
             raise extractor.ExtractionTransitoire("appel_llm_echoue")
 
-    monkeypatch.setattr(jobs, "run_extraction_pipeline", _pipeline)
+    monkeypatch.setattr(jobs, "_executer_extraction", _pipeline)
     rapport_id = uuid.uuid4()
 
     with pytest.raises(Retry) as premiere:
@@ -254,12 +254,13 @@ def test_workers_declarent_leurs_jobs_sur_des_files_separees() -> None:
     assert all(f.keep_result_s == 0 for f in [*WorkerSettings.functions, *ExtractionWorkerSettings.functions])
 
 
-def test_l_api_ne_charge_plus_la_pile_d_extraction() -> None:
-    """Docling, torch et bge-m3 ne vivent que dans le worker d'extraction (prépare la tâche 4.2)."""
+def test_ni_l_api_ni_le_worker_par_defaut_ne_chargent_la_pile_d_extraction() -> None:
+    """Docling, torch et bge-m3 ne vivent que dans le worker d'extraction : l'API et le worker par
+    défaut tournent sur l'image légère (tâche 4.2), sans ces dépendances."""
     code = (
-        "import sys, app.main; "
-        "print(sorted(m for m in ('torch', 'docling', 'FlagEmbedding', "
-        "'app.ingestion.extractor') if m in sys.modules))"
+        "import sys, app.main, app.worker.settings; "
+        "print(sorted(m for m in ('torch', 'torchvision', 'docling', 'FlagEmbedding', 'faiss', "
+        "'paddle', 'paddleocr', 'google.genai', 'app.ingestion.extractor') if m in sys.modules))"
     )
     sortie = subprocess.run(
         [sys.executable, "-c", code],

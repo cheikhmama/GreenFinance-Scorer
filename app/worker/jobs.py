@@ -22,7 +22,7 @@ from sqlmodel import Session
 from app.core.database import engine
 from app.core.email import EmailDeliveryError, ensure_email_configured, send_email
 from app.ingestion import supervision, synthesis_report
-from app.ingestion.extractor import ExtractionTransitoire, run_extraction_pipeline
+from app.ingestion.etat_extraction import ExtractionTransitoire
 from app.ingestion.models import ESGReport
 from app.worker.queue import FILE_EXTRACTION
 
@@ -37,12 +37,18 @@ def _delai(ctx: dict[str, Any]) -> int:
     return DELAI_REPRISE_SECONDES * int(ctx["job_try"])
 
 
+def _executer_extraction(rapport_id: uuid.UUID, annee_reporting: int, derniere: bool) -> None:
+    # Import au premier job : la pile d'extraction (Docling, torch, bge-m3) n'est chargée que par
+    # le worker d'extraction, jamais par le worker par défaut ni par l'API (image légère, 4.2).
+    from app.ingestion.extractor import run_extraction_pipeline
+
+    run_extraction_pipeline(rapport_id, annee_reporting, derniere_tentative=derniere)
+
+
 async def extract_report(ctx: dict[str, Any], rapport_id: uuid.UUID, annee_reporting: int) -> None:
     derniere = int(ctx["job_try"]) >= MAX_TENTATIVES_EXTRACTION
     try:
-        await asyncio.to_thread(
-            run_extraction_pipeline, rapport_id, annee_reporting, derniere_tentative=derniere
-        )
+        await asyncio.to_thread(_executer_extraction, rapport_id, annee_reporting, derniere)
     except ExtractionTransitoire as exc:
         raise Retry(defer=_delai(ctx)) from exc
 

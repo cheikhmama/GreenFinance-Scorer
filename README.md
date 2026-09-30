@@ -17,7 +17,21 @@ uv run arq app.worker.settings.ExtractionWorkerSettings    # terminal 4 : extrac
 
 Les e-mails et l'extraction des rapports sont traités par les workers ARQ (Redis) : sans eux,
 les jobs attendent dans Redis et sont traités au démarrage d'un worker. En Docker :
-`docker compose up api worker worker-extraction`.
+`docker compose up api worker worker-extraction` (développement : ports et identifiants de
+`docker-compose.override.yml`).
+
+## Production (Docker)
+
+```bash
+POSTGRES_PASSWORD=… REDIS_PASSWORD=… \
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Deux images depuis le même `Dockerfile` : `api` (API, worker par défaut, migrations — sans la
+pile d'extraction) et `worker` (extraction Docling/torch). Utilisateur non privilégié, ni tests
+ni outils de développement. Le service `migrate` applique `alembic upgrade head` avant tout le
+reste ; seul le port de l'API est publié, Postgres et Redis restent sur le réseau Docker, Redis
+exige un mot de passe.
 
 Frontend sur `http://localhost:5173`, API sur `http://localhost:8000` (même port que
 `docker compose up api`, voir `docker-compose.yml` — un seul port à retenir quel que soit

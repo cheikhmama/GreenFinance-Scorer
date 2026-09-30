@@ -42,8 +42,8 @@ from sqlmodel import Session, col, select
 
 from app.core import storage
 from app.core.database import utcnow
-from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import CarbonEmission, ESGMetric, ESGReport
+from app.ingestion.vocabulaire import CODES_AUTO_DECLARES_PAR_PILIER
 from app.scoring.engine import score_officiel
 from app.scoring.models import Score
 

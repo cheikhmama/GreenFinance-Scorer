@@ -114,10 +114,11 @@ Rules for every task:
   - [x] Found by running a real worker: the worker must load every model module (`app/core/registre_modeles.py`), and ARQ logs job arguments at INFO — e-mail links with tokens — so its loggers are raised to WARNING in the worker. Result keys are not kept (`keep_result=0`).
   - [x] The API process no longer imports the extraction stack (torch, Docling, bge-m3) — checked by a test; prepares separate images in 4.2. `redis-py` goes from 8.x to 5.x (pinned by `arq`), with typed helpers in `app/core/redis.py`.
   - [x] Not done here: the `recompute_portfolio` job — portfolio figures are computed on read and nothing consumes the cached columns on `portfolios` yet (decision pending: implement when a consumer needs them, or drop the columns).
-- [ ] 4.2 Docker Multi-Stage Refactoring: Production build cleanup (non-root user, slim image). **[review]**
-  - [ ] Separate `api` and `worker` images; `uv sync --no-dev --frozen`; no `tests/` in the image.
-  - [ ] Move `pytest`, `pytest-cov` to the `dev` group.
-  - [ ] Run `alembic upgrade head` at deploy; don't publish Postgres/Redis ports outside dev; Redis password.
+- [x] 4.2 Docker Multi-Stage Refactoring: Production build cleanup (non-root user, slim image). **[review]**
+  - [x] Separate `api` and `worker` images; `uv sync --no-dev --frozen`; no `tests/` in the image. One multi-stage `Dockerfile`, targets `api` (API, default worker, migrations — 468 MB, 48 packages, no torch/Docling) and `worker` (extraction). Build stages hold uv and its cache; runtime images run as uid 10001; `.dockerignore` is an allow-list (`app/`, `alembic/`, `config/`, lock files) — no tests, secrets or storage in the build context.
+  - [x] Move `pytest`, `pytest-cov` to the `dev` group; the extraction stack (Docling, Paddle, torch, bge-m3, faiss, genai) moves to an `extraction` group, installed by default locally (`default-groups`) but only in the worker image (`--no-default-groups --group extraction`).
+  - [x] The default worker no longer loads the extraction stack either: `ExtractionTransitoire` / `marquer_echec` moved to `app/ingestion/etat_extraction.py`, `CODES_AUTO_DECLARES_PAR_PILIER` to `app/ingestion/vocabulaire.py`, and the extraction job imports the pipeline lazily (test extended to the default worker).
+  - [x] Run `alembic upgrade head` at deploy (`migrate` one-shot service, API and workers wait for it); don't publish Postgres/Redis ports outside dev; Redis password. `docker-compose.yml` (shared, no ports, no credentials) + `docker-compose.override.yml` (dev, auto-loaded, unchanged behaviour) + `docker-compose.prod.yml` (`POSTGRES_PASSWORD` / `REDIS_PASSWORD` required, `requirepass`, only the API port published, `ENVIRONMENT=production`).
 - [ ] 4.3 Hardening leftovers **[review]**
   - [ ] `/health` returns a fixed message, not `str(exc)`.
   - [ ] URL import: block every non-global IP (`not ip.is_global`) and add a total download deadline.

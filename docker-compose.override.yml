@@ -1,0 +1,39 @@
+# Développement local — chargé automatiquement par `docker compose` (jamais en production, voir
+# docker-compose.yml). Ports publiés sur la machine et identifiants de développement, comme avant
+# la tâche 4.2 : `./scripts/dev-up.sh`, l'API lancée par uvicorn et les tests continuent de
+# joindre Postgres et Redis sur localhost.
+
+x-environnement-dev: &environnement-dev
+  DATABASE_URL: postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance
+  REDIS_URL: redis://redis:6379/0
+
+services:
+  migrate:
+    environment: *environnement-dev
+
+  api:
+    ports:
+      - "8000:8000"
+    environment: *environnement-dev
+    volumes:
+      - ./storage:/code/storage
+
+  worker:
+    environment: *environnement-dev
+    volumes:
+      - ./storage:/code/storage
+
+  worker-extraction:
+    environment: *environnement-dev
+    volumes:
+      - ./storage:/code/storage
+
+  db:
+    environment:
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"

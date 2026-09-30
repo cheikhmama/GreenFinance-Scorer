@@ -47,6 +47,7 @@ from app.core.enums import ExtractionStatus, MethodeDonnee, Pillar, Role
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
 from app.ingestion.completeness import calculer_couverture
+from app.ingestion.etat_extraction import ExtractionTransitoire, marquer_echec
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
@@ -60,11 +61,6 @@ logger = structlog.get_logger(__name__)
 
 
 
-class ExtractionTransitoire(Exception):
-    """Échec probablement passager (quota ou erreur serveur du LLM, réseau) : le worker retentera
-    plus tard (app/worker/jobs.py::extract_report) au lieu de marquer le rapport en échec."""
-
-
 def _est_transitoire(exc: BaseException) -> bool:
     if isinstance(exc, genai_errors.ServerError):
         return True
@@ -72,24 +68,6 @@ def _est_transitoire(exc: BaseException) -> bool:
         return True
     return isinstance(exc, ConnectionError | TimeoutError | httpx.TransportError)
 
-
-def marquer_echec(session: Session, rapport: ESGReport, cause: str) -> None:
-    """Échec classifié d'une extraction : cause fixe (jamais str(exc)), tentative comptée,
-    entreprise prévenue. Partagé par le pipeline et la reprise planifiée des extractions bloquées
-    (app/worker/jobs.py::reprendre_extractions). Ne commite pas."""
-    rapport.extraction_error = cause
-    rapport.extraction_status = ExtractionStatus.FAILED
-    rapport.extraction_attempts += 1
-    session.add(rapport)
-    if rapport.company.owner_user_id is not None:
-        notifier(
-            session,
-            rapport.company.owner_user_id,
-            "RAPPORT_EXTRACTION_ECHOUEE",
-            f"L'extraction de votre rapport {rapport.type.value} ({rapport.fiscal_year}) "
-            "a échoué. Vous pouvez déposer une nouvelle version.",
-            id_ressource=rapport.id,
-        )
 
 # Une requête sémantique dédiée par code cible (Phase 6) — remplace les 3 requêtes génériques
 # d'origine (Prompt 4.3/4.4). Sur un rapport de plusieurs centaines de pages, les ~23 codes de
@@ -262,17 +240,6 @@ assert {c.code for c in INDICATEURS_CIBLES} == set(REQUETES_PAR_CODE), (
     "Chaque code de INDICATEURS_CIBLES doit avoir exactement une requête sémantique dédiée "
     "dans REQUETES_PAR_CODE."
 )
-
-# Les 3 codes "score_{pilier}_declare" ci-dessus atterrissent comme des ESGMetric ordinaires
-# (même branche indicateur_esg que n'importe quel autre code) -- rien ne les distingue en base
-# des indicateurs réellement mesurés. Cette constante est le point unique de vérité pour les en
-# exclure explicitement partout où "les indicateurs extraits" doivent rester séparés de "ce que
-# l'entreprise prétend" (config/weights/default.yaml les exclut déjà par omission ; le PDF de
-# synthèse et RapportESGDetail doivent les exclure/isoler activement, pas par omission silencieuse).
-CODES_AUTO_DECLARES_PAR_PILIER = frozenset(
-    {"score_environnement_declare", "score_social_declare", "score_gouvernance_declare"}
-)
-
 
 @lru_cache
 def _get_embed_model() -> BGEM3FlagModel:

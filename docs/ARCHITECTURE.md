@@ -242,7 +242,8 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
 - Job IDs are deterministic (`extract:{report_id}`), so a double submission doesn't start two jobs.
 - Retries with backoff for transient errors (LLM 429/5xx); classified permanent errors set
   `extraction_status=FAILED` with a fixed error code (never `str(exc)`).
-- The worker image contains torch/Docling/Paddle; the API image doesn't.
+- The worker image contains torch/Docling/Paddle; the API image doesn't. *Done in task 4.2*
+  (`Dockerfile` targets `api` and `worker`; the default worker runs on the `api` image).
 - A cron job in the worker marks `RUNNING` jobs stuck longer than `EXTRACTION_TIMEOUT_MINUTES`
   as `FAILED`, replacing today's read-time detection.
 

@@ -1,0 +1,11 @@
+# Contexte de construction minimal (tâche 4.2) : les images ne copient que pyproject.toml, uv.lock,
+# app/, alembic/, alembic.ini et config/ — tout le reste est exclu, secrets compris.
+*
+!pyproject.toml
+!uv.lock
+!app/
+!alembic/
+!alembic.ini
+!config/
+**/__pycache__
+**/*.py[cod]

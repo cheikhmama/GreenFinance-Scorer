@@ -3,7 +3,6 @@ import uuid
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import CanalDepot, MethodeDonnee, Pillar, TypeRapport
-from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
@@ -17,6 +16,7 @@ from app.ingestion.synthesis_report import (
     _section_score_officiel,
     generer_rapport_synthese,
 )
+from app.ingestion.vocabulaire import CODES_AUTO_DECLARES_PAR_PILIER
 from app.scoring.models import Score
 
 

@@ -17,7 +17,7 @@ from sqlmodel import Session, col, select
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import ExtractionStatus
-from app.ingestion.extractor import marquer_echec
+from app.ingestion.etat_extraction import marquer_echec
 from app.ingestion.models import ESGReport
 
 CAUSE_DELAI_DEPASSE = "delai_depasse"
