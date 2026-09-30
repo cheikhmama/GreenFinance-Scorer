@@ -306,29 +306,6 @@ export const listFailedExtractionReports = async ( options?: RequestInit): Promi
 );}
 
 
-export const getListStuckExtractionReportsUrl = () => {
-
-
-
-
-  return `/admin/rapports/extraction-bloquee`
-}
-
-/**
- * @summary Lister les rapports dont l'extraction semble interrompue (aucune erreur, aucune fin)
- */
-export const listStuckExtractionReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
-
-  return apiFetch<RapportESGPublic[]>(getListStuckExtractionReportsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
 export const getRetryExtractionUrl = (rapportId: string,) => {
 
 

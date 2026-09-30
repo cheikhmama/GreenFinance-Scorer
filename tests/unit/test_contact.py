@@ -30,7 +30,7 @@ def contact(monkeypatch):
     settings = Settings.model_construct(contact_to_email="equipe@example.com")
     monkeypatch.setattr("app.contact.router.get_settings", lambda: settings)
     delivery = Mock()
-    monkeypatch.setattr("app.contact.router.send_email", delivery)
+    monkeypatch.setattr("app.contact.router.envoyer_email_differe", delivery)
     return TestClient(app), redis_client, delivery
 
 
@@ -86,7 +86,8 @@ def test_fourth_message_is_blocked_and_forwarded_header_cannot_change_the_key(co
     assert delivery.call_count == 3
     arguments = [call.args for call in redis_client.eval.call_args_list]
     assert len({args[2] for args in arguments}) == 1
-    assert all(args[1] == 1 and args[3] == 3600 for args in arguments)
+    # Envoyée en chaîne (typage redis-py 5, tâche 4.1) : identique sur le fil pour Redis.
+    assert all(args[1] == 1 and args[3] == "3600" for args in arguments)
 
 
 def test_redis_failure_blocks_delivery(contact):

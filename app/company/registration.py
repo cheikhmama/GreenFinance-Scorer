@@ -29,7 +29,11 @@ from app.auth.models import User
 from app.company.models import Company
 from app.company.schemas import CompanyRegistrationRequest
 from app.core.audit import auditer
-from app.core.email import EmailDeliveryError, ensure_email_configured, send_email
+from app.core.email import (
+    EmailDeliveryError,
+    ensure_email_configured,
+    envoyer_email_differe,
+)
 from app.core.enums import CompanyStatus, Role
 from app.core.exceptions import ServiceUnavailableError, TooManyRequestsError
 from app.core.notifications import notifier
@@ -56,7 +60,7 @@ def _limiter_par_ip(adresse_ip: str) -> None:
 
 def _envoyer(destinataire: str, sujet: str, corps: str, evenement: str) -> None:
     try:
-        send_email(recipient=destinataire, subject=sujet, body=corps)
+        envoyer_email_differe(recipient=destinataire, subject=sujet, body=corps)
     except EmailDeliveryError as exc:
         # Jamais l'adresse ni le contenu dans les logs.
         logger.error(evenement, error_type=type(exc.__cause__ or exc).__name__)

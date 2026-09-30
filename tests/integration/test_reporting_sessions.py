@@ -27,14 +27,11 @@ from tests.integration.test_company_router import (
 URL = "/api/v1/reports"
 
 
-@pytest.fixture(autouse=True)
-def _extraction_simulee(monkeypatch) -> list:
-    """Aucune extraction réelle : on vérifie seulement qu'elle est programmée au dépôt."""
-    programmees: list = []
-    monkeypatch.setattr(
-        "app.company.rapports.run_extraction_pipeline", lambda *args: programmees.append(args)
-    )
-    return programmees
+@pytest.fixture()
+def _extraction_simulee(jobs_enfiles) -> list:
+    """Aucune extraction réelle : on vérifie seulement qu'elle est mise en file au dépôt (tâche 4.1,
+    enregistrée par tests/conftest.py::jobs_enfiles)."""
+    return jobs_enfiles
 
 
 @pytest.fixture()
@@ -185,7 +182,13 @@ def test_soumettre_un_brouillon_le_depose_et_programme_lextraction(
     assert corps["extraction_status"] == ExtractionStatus.QUEUED.value
     assert corps["submitted_at"] is not None
     assert corps["original_filename"] == "rapport-2024.pdf"
-    assert [(str(rid), annee) for rid, annee in _extraction_simulee] == [(brouillon["id"], 2024)]
+    assert [
+        (fonction, str(args[0]), args[1], job_id, file)
+        for fonction, args, job_id, file in _extraction_simulee
+        if fonction == "extract_report"
+    ] == [
+        ("extract_report", brouillon["id"], 2024, f"extract:{brouillon['id']}", "arq:extraction")
+    ]
     assert seconde.status_code == 422
     assert seconde.json()["error"]["code"] == "transition_invalide"
 

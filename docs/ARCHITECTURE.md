@@ -41,7 +41,7 @@ standardises on **`INVESTOR`** (matches the `users` role list in the brief and t
 | Database | PostgreSQL 16 (+ pgvector image) | same | unchanged |
 | Migrations | Alembic | same | one migration per task; no hand-edited schema |
 | Cache / locks / rate limits | Redis 7 | same | now also the ARQ broker |
-| Job queue | **ARQ** (Redis) | FastAPI `BackgroundTasks` + in-process `threading.Lock` | see §6 |
+| Job queue | **ARQ** (Redis) | ARQ workers since task 4.1 (was FastAPI `BackgroundTasks` + `threading.Lock`) | see §6 |
 | Document extraction | Docling, PaddleOCR, PyMuPDF, bge-m3 + FAISS, Gemini | same | moves to the worker image only |
 | Scoring config | PyYAML + Pydantic schema | same | config content hashed and frozen per score (§5) |
 | Explainability | Exact linear SHAP (closed form); `shap` library optional | per-indicator decomposition (`app/explainability/`) | see §7 |
@@ -245,6 +245,12 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
 - The worker image contains torch/Docling/Paddle; the API image doesn't.
 - A cron job in the worker marks `RUNNING` jobs stuck longer than `EXTRACTION_TIMEOUT_MINUTES`
   as `FAILED`, replacing today's read-time detection.
+
+*Implemented in task 4.1*, with two queues so an e-mail never waits behind a long extraction:
+`arq:extraction` (one job at a time per worker) and `arq:queue` (e-mails, synthesis PDF, the cron).
+Jobs are enqueued after the database commit. `recompute_portfolio` is not implemented: portfolio
+figures are still computed on read. The separate worker image is task 4.2 (the API process
+already no longer imports the extraction stack).
 
 ---
 

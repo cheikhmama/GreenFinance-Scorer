@@ -29,7 +29,11 @@ from app.auth.models import User
 from app.company.models import Company
 from app.core.audit import auditer
 from app.core.database import utcnow
-from app.core.email import EmailDeliveryError, ensure_email_configured, send_email
+from app.core.email import (
+    EmailDeliveryError,
+    ensure_email_configured,
+    envoyer_email_differe,
+)
 from app.core.enums import CompanyStatus
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 
@@ -38,7 +42,7 @@ logger = structlog.get_logger(__name__)
 
 def _prevenir_refus(email: str, nom_entreprise: str, motif: str) -> None:
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=email,
             subject="Votre demande d'inscription — GreenFinance-Scorer",
             body=(

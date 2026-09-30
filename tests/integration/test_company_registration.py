@@ -49,7 +49,7 @@ def _lei_aleatoire() -> str:
 def _envoi_simule(monkeypatch) -> Mock:
     monkeypatch.setattr("app.company.registration.ensure_email_configured", lambda: None)
     envoi = Mock()
-    monkeypatch.setattr("app.company.registration.send_email", envoi)
+    monkeypatch.setattr("app.company.registration.envoyer_email_differe", envoi)
     return envoi
 
 

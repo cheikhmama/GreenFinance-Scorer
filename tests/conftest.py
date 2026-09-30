@@ -82,3 +82,26 @@ os.environ["DATABASE_URL"] = _test_url
 _test_storage_dir = tempfile.mkdtemp(prefix="greenfinance_test_storage_")
 atexit.register(shutil.rmtree, _test_storage_dir, ignore_errors=True)
 os.environ["STORAGE_PATH"] = _test_storage_dir
+
+
+# --- File de travaux (tâche 4.1) -------------------------------------------------------------
+# Aucun test ne dépose de vrai job dans Redis : sans worker pour les consommer, ils s'y
+# accumuleraient d'un run à l'autre (et un job d'extraction `extract:{id}` déjà présent
+# bloquerait le suivant). Chaque dépôt est enregistré dans `jobs_enfiles`, que les tests
+# consultent pour vérifier CE qui a été programmé.
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def jobs_enfiles(monkeypatch) -> list[tuple[str, tuple, str | None, str]]:
+    depots: list[tuple[str, tuple, str | None, str]] = []
+
+    async def _enregistrer(fonction: str, args: tuple, job_id: str | None, file: str) -> bool:
+        if job_id is not None and any(depot[2] == job_id for depot in depots):
+            return False  # même règle qu'ARQ : un identifiant déjà en file n'est pas redéposé
+        depots.append((fonction, args, job_id, file))
+        return True
+
+    monkeypatch.setattr("app.worker.queue._envoyer_a_redis", _enregistrer)
+    return depots

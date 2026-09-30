@@ -40,6 +40,7 @@ from reportlab.platypus import (
 )
 from sqlmodel import Session, col, select
 
+from app.core import storage
 from app.core.database import utcnow
 from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
 from app.ingestion.models import CarbonEmission, ESGMetric, ESGReport
@@ -215,3 +216,15 @@ def generer_rapport_synthese(session: Session, rapport: ESGReport) -> bytes:
 
     document.build(elements)
     return tampon.getvalue()
+
+
+def regenerer_synthese(session: Session, rapport: ESGReport) -> None:
+    """Régénère le PDF de synthèse d'un rapport (job generate_synthesis_pdf, app/worker/jobs.py) —
+    après la validation, pour qu'il affiche le score officiel qui vient d'être commité. Commite
+    seulement le chemin du fichier, écrit avant."""
+    chemin = f"synthese/{rapport.id}.pdf"
+    storage.save_bytes(chemin, generer_rapport_synthese(session, rapport))
+    rapport.synthesis_report_path = chemin
+    session.add(rapport)
+    session.commit()
+

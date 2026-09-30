@@ -20,7 +20,6 @@ import os
 os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 
 import json
-import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -29,6 +28,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import faiss
+import httpx
 import numpy as np
 import structlog
 from docling_core.types.doc.document import DoclingDocument
@@ -58,7 +58,38 @@ from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
 logger = structlog.get_logger(__name__)
 
-_extraction_lock = threading.Lock()
+
+
+class ExtractionTransitoire(Exception):
+    """Échec probablement passager (quota ou erreur serveur du LLM, réseau) : le worker retentera
+    plus tard (app/worker/jobs.py::extract_report) au lieu de marquer le rapport en échec."""
+
+
+def _est_transitoire(exc: BaseException) -> bool:
+    if isinstance(exc, genai_errors.ServerError):
+        return True
+    if isinstance(exc, genai_errors.ClientError) and getattr(exc, "code", None) == 429:
+        return True
+    return isinstance(exc, ConnectionError | TimeoutError | httpx.TransportError)
+
+
+def marquer_echec(session: Session, rapport: ESGReport, cause: str) -> None:
+    """Échec classifié d'une extraction : cause fixe (jamais str(exc)), tentative comptée,
+    entreprise prévenue. Partagé par le pipeline et la reprise planifiée des extractions bloquées
+    (app/worker/jobs.py::reprendre_extractions). Ne commite pas."""
+    rapport.extraction_error = cause
+    rapport.extraction_status = ExtractionStatus.FAILED
+    rapport.extraction_attempts += 1
+    session.add(rapport)
+    if rapport.company.owner_user_id is not None:
+        notifier(
+            session,
+            rapport.company.owner_user_id,
+            "RAPPORT_EXTRACTION_ECHOUEE",
+            f"L'extraction de votre rapport {rapport.type.value} ({rapport.fiscal_year}) "
+            "a échoué. Vous pouvez déposer une nouvelle version.",
+            id_ressource=rapport.id,
+        )
 
 # Une requête sémantique dédiée par code cible (Phase 6) — remplace les 3 requêtes génériques
 # d'origine (Prompt 4.3/4.4). Sur un rapport de plusieurs centaines de pages, les ~23 codes de
@@ -550,11 +581,16 @@ def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> Ex
     )
 
 
-def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None:
-    """Point d'entrée pour un déclenchement BackgroundTasks (app/company/router.py). Ouvre sa
-    propre session DB — celle de la requête HTTP est déjà fermée quand une tâche de fond s'exécute
-    — et est sérialisé par _extraction_lock."""
-    with _extraction_lock, Session(engine) as session:
+def run_extraction_pipeline(
+    rapport_id: uuid.UUID, annee_reporting: int, *, derniere_tentative: bool = True
+) -> None:
+    """Exécuté par le worker (app/worker/jobs.py::extract_report, file d'extraction à un job à la
+    fois — plus de verrou applicatif). Ouvre sa propre session DB.
+
+    derniere_tentative=False : un échec transitoire (_est_transitoire) remet le rapport en QUEUED
+    et lève ExtractionTransitoire pour que le worker retente plus tard ; toute autre erreur, ou un
+    échec transitoire à la dernière tentative, marque le rapport FAILED comme avant."""
+    with Session(engine) as session:
         rapport = session.get(ESGReport, rapport_id)
         if rapport is None:
             logger.error("extraction_rapport_introuvable", rapport_id=str(rapport_id))
@@ -573,8 +609,8 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
         # affectés).
         #
         # extraction_started_at est posé à CHAQUE entrée dans le pipeline (dépôt initial ou
-        # relance manuelle après échec) — sert de référence à lister_rapports_extraction_bloquee
-        # (app/admin/review_queue.py) pour détecter un traitement interrompu ; une relance doit
+        # relance manuelle après échec) — sert de référence à la tâche planifiée
+        # (app/ingestion/supervision.py) pour détecter un traitement interrompu ; une relance doit
         # repartir d'un chronomètre frais, pas de celui de la toute première tentative.
         rapport.extraction_status = ExtractionStatus.RUNNING
         rapport.extraction_started_at = utcnow()
@@ -856,23 +892,22 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             session.commit()
             logger.info("extraction_pipeline_reussie", rapport_id=str(rapport_id))
 
-        except Exception as exc:  # noqa: BLE001 — frontière délibérée du pipeline de fond : toute
+        except Exception as exc:
             # erreur (Docling, réseau, Anthropic, DB) doit être classée et journalisée, jamais
             # remonter silencieusement dans une BackgroundTask sans observateur.
             session.rollback()
-            rapport.extraction_error = etape
-            rapport.extraction_status = ExtractionStatus.FAILED
-            rapport.extraction_attempts += 1
-            session.add(rapport)
-            if rapport.company.owner_user_id is not None:
-                notifier(
-                    session,
-                    rapport.company.owner_user_id,
-                    "RAPPORT_EXTRACTION_ECHOUEE",
-                    f"L'extraction de votre rapport {rapport.type.value} ({rapport.fiscal_year}) "
-                    "a échoué. Vous pouvez déposer une nouvelle version.",
-                    id_ressource=rapport_id,
+            if not derniere_tentative and _est_transitoire(exc):
+                rapport.extraction_status = ExtractionStatus.QUEUED
+                session.add(rapport)
+                session.commit()
+                logger.warning(
+                    "extraction_echec_transitoire",
+                    rapport_id=str(rapport_id),
+                    error_type=type(exc).__name__,
+                    etape=etape,
                 )
+                raise ExtractionTransitoire(etape) from exc
+            marquer_echec(session, rapport, etape)
             session.commit()
             logger.error(
                 "extraction_pipeline_echouee",

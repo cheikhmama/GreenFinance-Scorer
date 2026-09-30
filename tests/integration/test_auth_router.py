@@ -30,9 +30,9 @@ def _mock_password_reset_delivery(monkeypatch):
     """Aucune suite de test ne doit contacter un vrai relais SMTP."""
     monkeypatch.setattr("app.auth.password_reset.ensure_email_configured", lambda: None)
     delivery = Mock()
-    monkeypatch.setattr("app.auth.password_reset.send_email", delivery)
+    monkeypatch.setattr("app.auth.password_reset.envoyer_email_differe", delivery)
     monkeypatch.setattr("app.auth.email_change.ensure_email_configured", lambda: None)
-    monkeypatch.setattr("app.auth.email_change.send_email", delivery)
+    monkeypatch.setattr("app.auth.email_change.envoyer_email_differe", delivery)
     return delivery
 
 

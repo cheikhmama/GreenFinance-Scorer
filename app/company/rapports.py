@@ -28,8 +28,8 @@ from app.core.enums import (
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.storage import resolve_path, save_bytes
-from app.ingestion.extractor import run_extraction_pipeline
 from app.ingestion.models import ESGReport
+from app.worker.queue import enfiler_extraction
 
 logger = structlog.get_logger(__name__)
 
@@ -144,7 +144,7 @@ def deposer_fichier(
     # Le passage QUEUED -> RUNNING se fait DANS run_extraction_pipeline, pas ici : le statut
     # d'extraction doit refléter que l'extraction a réellement démarré, pas seulement été demandée.
     assert rapport.fiscal_year is not None  # toujours fourni au dépôt comme à l'ouverture
-    background_tasks.add_task(run_extraction_pipeline, rapport.id, rapport.fiscal_year)
+    background_tasks.add_task(enfiler_extraction, rapport.id, rapport.fiscal_year)
     logger.info(
         "rapport_depose",
         rapport_id=str(rapport.id),

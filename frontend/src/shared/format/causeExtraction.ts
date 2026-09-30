@@ -12,6 +12,8 @@ const LIBELLES: Record<string, string> = {
   appel_llm_echoue: "Échec de l'appel au modèle d'extraction (réseau ou fournisseur indisponible)",
   persistance_echouee: "Échec de l'enregistrement des données extraites",
   erreur_inattendue: "Erreur inattendue",
+  // Posée par la tâche planifiée du worker (tâche 4.1) : traitement interrompu au-delà du délai.
+  delai_depasse: "Traitement interrompu (délai dépassé)",
 };
 
 export function libelleCauseExtraction(etape: string | null): string {

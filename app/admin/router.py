@@ -37,7 +37,6 @@ from app.admin.review_queue import (
     lister_rapports_echec_extraction,
     lister_rapports_en_retard,
     lister_rapports_en_validation,
-    lister_rapports_extraction_bloquee,
     lister_rapports_orphelins_en_validation,
     lister_tous_les_rapports,
     lister_toutes_les_entreprises,
@@ -109,13 +108,13 @@ from app.core.dependencies import get_session
 from app.core.enums import ReportStatus, Role, StatutAnalyse, StatutProjet
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.ingestion.extractor import run_extraction_pipeline
 from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.institution.projets import lister_projets_admin
 from app.investor.portfolio import lister_portefeuilles_admin
 from app.researcher.analyses import lister_analyses_admin
 from app.scoring.engine import apercu_score, score_public
+from app.worker.queue import enfiler_extraction
 
 router = APIRouter(tags=["admin"])
 
@@ -328,19 +327,6 @@ def lister_rapports_echec_extraction_route(
     return lister_rapports_echec_extraction(session)
 
 
-@router.get(
-    "/admin/rapports/extraction-bloquee",
-    response_model=list[RapportESGPublic],
-    operation_id="listStuckExtractionReports",
-    summary="Lister les rapports dont l'extraction semble interrompue (aucune erreur, aucune fin)",
-)
-def lister_rapports_extraction_bloquee_route(
-    _current_user: User = Depends(require_role(Role.ADMIN)),
-    session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return lister_rapports_extraction_bloquee(session)
-
-
 @router.post(
     "/admin/rapports/{rapport_id}/relancer-extraction",
     response_model=RapportESGPublic,
@@ -355,7 +341,7 @@ def relancer_extraction_route(
 ) -> ESGReport:
     rapport = relancer_extraction(session, rapport_id)
     assert rapport.fiscal_year is not None  # garanti par relancer_extraction ci-dessus
-    background_tasks.add_task(run_extraction_pipeline, rapport.id, rapport.fiscal_year)
+    background_tasks.add_task(enfiler_extraction, rapport.id, rapport.fiscal_year)
     return rapport
 
 

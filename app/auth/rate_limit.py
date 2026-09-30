@@ -23,7 +23,7 @@ import redis
 import structlog
 
 from app.core.exceptions import ServiceUnavailableError, TooManyRequestsError
-from app.core.redis import get_redis_client, incrementer_fenetre
+from app.core.redis import get_redis_client, incrementer_fenetre, lire_entier
 
 logger = structlog.get_logger(__name__)
 
@@ -59,14 +59,14 @@ def enforce_login_rate_limit(email: str, adresse_ip: str | None = None) -> None:
     """À appeler avant toute vérification d'identifiants — lève avant même de toucher la base si
     un des seuils est déjà atteint. `adresse_ip` est omise pour les vérifications d'un compte déjà
     connecté (verifier/changer mot de passe), où seul le compte compte."""
-    attempts = _guarded("get", lambda: get_redis_client().get(_key(email)))
-    if attempts is not None and int(attempts) >= MAX_ATTEMPTS:
+    attempts = _guarded("get", lambda: lire_entier(get_redis_client(), _key(email)))
+    if attempts is not None and attempts >= MAX_ATTEMPTS:
         raise TooManyRequestsError(
             "Trop de tentatives de connexion pour ce compte. Réessayez plus tard."
         )
     if adresse_ip is not None:
-        par_ip = _guarded("get", lambda: get_redis_client().get(_key_ip(adresse_ip)))
-        if par_ip is not None and int(par_ip) >= MAX_ATTEMPTS_PAR_IP:
+        par_ip = _guarded("get", lambda: lire_entier(get_redis_client(), _key_ip(adresse_ip)))
+        if par_ip is not None and par_ip >= MAX_ATTEMPTS_PAR_IP:
             raise TooManyRequestsError(
                 "Trop de tentatives de connexion depuis cette adresse. Réessayez plus tard."
             )

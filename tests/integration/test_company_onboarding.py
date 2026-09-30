@@ -24,7 +24,7 @@ from tests.integration.test_company_registration import _demande
 def _envoi_simule(monkeypatch) -> Mock:
     envoi = Mock()
     for module in ("app.company.registration", "app.admin.onboarding", "app.auth.activation"):
-        monkeypatch.setattr(f"{module}.send_email", envoi)
+        monkeypatch.setattr(f"{module}.envoyer_email_differe", envoi)
     for module in ("app.company.registration", "app.admin.onboarding"):
         monkeypatch.setattr(f"{module}.ensure_email_configured", lambda: None)
     return envoi

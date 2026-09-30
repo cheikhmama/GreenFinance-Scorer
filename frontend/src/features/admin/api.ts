@@ -28,7 +28,6 @@ import {
   listReportsInValidation,
   listReportsToAssign,
   listReportVersions,
-  listStuckExtractionReports,
   listUsersAwaitingActivation,
   listUsersByRole,
   publishCompany,
@@ -167,16 +166,6 @@ export function useOrphanReportsInValidation() {
   return useQuery<RapportESGPublic[], ApiError>({
     queryKey: ORPHELINS_KEY,
     queryFn: () => listOrphanReportsInValidation(),
-  });
-}
-
-/** Rapports SUBMITTED dont l'extraction reste RUNNING, bloqués depuis plus longtemps que
- * settings.extraction_timeout_minutes — traitement probablement interrompu (voir
- * lister_rapports_extraction_bloquee), distinct d'un échec classifié (useFailedExtractionReports). */
-export function useStuckExtractionReports() {
-  return useQuery<RapportESGPublic[], ApiError>({
-    queryKey: EXTRACTION_BLOQUEE_KEY,
-    queryFn: () => listStuckExtractionReports(),
   });
 }
 

@@ -23,7 +23,7 @@ from app.auth.models import AccountActivationToken, User
 from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.email import EmailDeliveryError, send_email
+from app.core.email import EmailDeliveryError, envoyer_email_differe
 from app.core.exceptions import ValidationError
 
 logger = structlog.get_logger(__name__)
@@ -45,7 +45,7 @@ def _construire_lien(jeton_clair: str) -> str:
 
 def _envoyer_lien(email: str, jeton_clair: str) -> None:
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=email,
             subject="Activez votre compte GreenFinance-Scorer",
             body=(

@@ -67,3 +67,25 @@ def send_email(*, recipient: str, subject: str, body: str, reply_to: str | None 
                 raise EmailDeliveryError("Message refusé par le relais SMTP.")
     except (smtplib.SMTPException, OSError, ValueError) as exc:
         raise EmailDeliveryError("Impossible de transmettre le message.") from exc
+
+
+def envoyer_email_differe(
+    *, recipient: str, subject: str, body: str, reply_to: str | None = None
+) -> None:
+    """Dépose l'e-mail dans la file (job send_email, app/worker/jobs.py, tâche 4.1) : l'envoi SMTP
+    et ses reprises se font dans le worker, jamais dans une requête. Adresses vérifiées ici (une
+    adresse invalide ne serait jamais délivrée, inutile de la retenter). EmailDeliveryError si
+    une adresse est invalide ou si la file est indisponible — même contrat qu'avant pour les
+    appelants."""
+    from app.worker.queue import FileIndisponible, enfiler
+
+    try:
+        recipient = str(_EMAIL.validate_python(recipient))
+        reply_to = str(_EMAIL.validate_python(reply_to)) if reply_to is not None else None
+    except ValidationError as exc:
+        raise EmailDeliveryError("Adresse invalide.") from exc
+    try:
+        enfiler("send_email", recipient, subject, body, reply_to)
+    except FileIndisponible as exc:
+        raise EmailDeliveryError("File d'envoi indisponible.") from exc
+

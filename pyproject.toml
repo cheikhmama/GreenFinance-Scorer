@@ -41,6 +41,7 @@ dependencies = [
     # uniquement par scripts/generate_technology_report.py hors périmètre applicatif ; l'API en a
     # désormais besoin au runtime, même raisonnement de promotion que le reste de ce bloc.
     "reportlab",
+    "arq>=0.28.0",
 ]
 
 [dependency-groups]

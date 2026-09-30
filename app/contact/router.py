@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 
 from app.contact.schemas import ContactMessageRequest
 from app.core.config import get_settings
-from app.core.email import EmailDeliveryError, send_email
+from app.core.email import EmailDeliveryError, envoyer_email_differe
 from app.core.exceptions import ServiceUnavailableError, TooManyRequestsError
 from app.core.redis import get_redis_client, incrementer_fenetre
 
@@ -48,7 +48,7 @@ def _enforce_rate_limit(request: Request) -> None:
 def send_contact_message(payload: ContactMessageRequest, request: Request) -> None:
     _enforce_rate_limit(request)
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=get_settings().contact_to_email,
             subject=f"[GreenFinance-Scorer] {payload.sujet}",
             reply_to=str(payload.email),

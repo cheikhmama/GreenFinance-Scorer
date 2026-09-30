@@ -19,16 +19,15 @@ from sqlmodel import Session, col, func, or_, select
 from app.audit.models import AvisAudit
 from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Company
-from app.core import storage
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import CompanyStatus, DevisePosition, ExtractionStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
-from app.ingestion import synthesis_report
 from app.ingestion.models import ESGReport
 from app.scoring.engine import calculer_score, score_officiel
 from app.scoring.models import Score
+from app.worker.queue import FileIndisponible, enfiler
 
 logger = structlog.get_logger(__name__)
 
@@ -74,40 +73,14 @@ def lister_rapports_echec_extraction(session: Session) -> list[ESGReport]:
     )
 
 
-def _extraction_bloquee_depuis(seuil: datetime) -> list[ColumnElement[bool]]:
-    """RUNNING dont la dernière tentative a démarré avant `seuil` : un traitement interrompu
-    (process tué en cours de route) laisse exactement cette signature, indiscernable d'un rapport
-    "encore en cours" sans ce délai."""
-    return [
-        col(ESGReport.extraction_status) == ExtractionStatus.RUNNING,
-        col(ESGReport.extraction_started_at).is_not(None),
-        col(ESGReport.extraction_started_at) < seuil,
-    ]
-
-
-def lister_rapports_extraction_bloquee(session: Session) -> list[ESGReport]:
-    """Rapports soumis dont l'extraction est RUNNING depuis plus de
-    settings.extraction_timeout_minutes. Distincte de lister_rapports_echec_extraction (échec
-    classifié, avec cause) : ici la cause est inconnue, seule la durée anormale le signale."""
-    seuil = utcnow() - timedelta(minutes=get_settings().extraction_timeout_minutes)
-    return list(
-        session.exec(
-            select(ESGReport)
-            .where(ESGReport.status == ReportStatus.SUBMITTED, *_extraction_bloquee_depuis(seuil))
-            .order_by(col(ESGReport.extraction_started_at))
-        ).all()
-    )
-
-
 def relancer_extraction(session: Session, rapport_id: uuid.UUID) -> ESGReport:
-    """Autorise une nouvelle tentative d'extraction pour un rapport soumis en échec classifié OU
-    bloqué au-delà du délai — jamais pour une extraction encore normalement en cours ni pour un
-    rapport déjà avancé dans le workflow. Le repassage à QUEUED DANS CETTE MÊME transaction est la
+    """Autorise une nouvelle tentative d'extraction pour un rapport soumis en échec (cause classifiée,
+    ou `delai_depasse` posé par la tâche planifiée) — jamais pour une extraction encore en cours ni
+    pour un rapport déjà avancé dans le workflow. Le repassage à QUEUED DANS CETTE MÊME transaction est la
     garde de concurrence : un second appel simultané relit QUEUED et se fait rejeter par la
     vérification ci-dessous, sans verrou applicatif supplémentaire — même principe que les autres
-    gardes d'état de ce fichier. La programmation effective de run_extraction_pipeline
-    (BackgroundTasks) reste du ressort de la route, pas de cette fonction de service (voir
-    app/admin/router.py)."""
+    gardes d'état de ce fichier. Le dépôt du job d'extraction, après le commit, reste du
+    ressort de la route (app/admin/router.py)."""
     rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
@@ -116,16 +89,11 @@ def relancer_extraction(session: Session, rapport_id: uuid.UUID) -> ESGReport:
             "Seul un rapport en cours d'extraction peut être relancé.", code="transition_invalide"
         )
 
-    seuil = utcnow() - timedelta(minutes=get_settings().extraction_timeout_minutes)
-    en_echec_classifie = rapport.extraction_status == ExtractionStatus.FAILED
-    bloque_par_timeout = (
-        rapport.extraction_status == ExtractionStatus.RUNNING
-        and rapport.extraction_started_at is not None
-        and rapport.extraction_started_at < seuil
-    )
-    if not (en_echec_classifie or bloque_par_timeout):
+    if rapport.extraction_status != ExtractionStatus.FAILED:
+        # Une extraction interrompue n'a plus à être repérée ici : la tâche planifiée du worker la
+        # passe FAILED (`delai_depasse`, app/ingestion/supervision.py) — tâche 4.1.
         raise ValidationError(
-            "Ce rapport n'est ni en échec ni bloqué : rien à relancer.", code="relance_impossible"
+            "Ce rapport n'est pas en échec d'extraction : rien à relancer.", code="relance_impossible"
         )
     if rapport.fiscal_year is None:
         # Rapport antérieur à l'introduction de cette colonne (nullable, voir app/ingestion/
@@ -342,7 +310,7 @@ def valider_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | 
     (score_incalculable) annule donc toute la décision — jamais un rapport VALIDATED sans le score
     que le cahier des charges exige avant publication. Aucune étape de cette transaction ne
     commite de son côté (voir app/scoring/engine.py). Le PDF de synthèse, effet de bord hors
-    base, n'est produit qu'APRÈS le commit (_regenerer_synthese)."""
+    base, n'est produit qu'APRÈS le commit, par le worker (job generate_synthesis_pdf, tâche 4.1)."""
     rapport = _rapport_en_validation(session, rapport_id)
     rapport.status = ReportStatus.VALIDATED
     session.add(rapport)
@@ -360,32 +328,13 @@ def valider_rapport(session: Session, rapport_id: uuid.UUID, commentaire: str | 
     session.commit()
     logger.info("rapport_decision", rapport_id=str(rapport_id), statut=ReportStatus.VALIDATED.value)
 
-    _regenerer_synthese(session, rapport)
+    try:
+        enfiler("generate_synthesis_pdf", rapport_id)
+    except FileIndisponible:
+        # Best-effort, comme avant : la validation est déjà commitée, le PDF se régénère plus tard.
+        logger.error("synthese_pdf_non_programmee", rapport_id=str(rapport_id))
     session.refresh(rapport)
     return rapport
-
-
-def _regenerer_synthese(session: Session, rapport: ESGReport) -> None:
-    """Second déclencheur de génération du PDF de synthèse (app/ingestion/synthesis_report.py) :
-    le premier, à la fin de l'extraction, ne pouvait afficher qu'un score "en attente" — ici le
-    score officiel vient d'être commité, on régénère le même fichier pour qu'il le reflète.
-    Best-effort et hors de la transaction de décision : un échec ici n'annule jamais une
-    validation déjà commitée, et une validation annulée ne laisse jamais de PDF affichant un
-    score qui n'existe pas (le fichier n'est écrit qu'après le commit). À déplacer dans un job
-    ARQ avec la tâche 4.1."""
-    chemin = f"synthese/{rapport.id}.pdf"
-    try:
-        storage.save_bytes(chemin, synthesis_report.generer_rapport_synthese(session, rapport))
-        rapport.synthesis_report_path = chemin
-        session.add(rapport)
-        session.commit()
-    except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
-        session.rollback()
-        logger.error(
-            "synthese_pdf_regeneration_echouee",
-            rapport_id=str(rapport.id),
-            error_type=type(exc_synthese).__name__,
-        )
 
 
 def recalculer_score(session: Session, rapport_id: uuid.UUID) -> Score:

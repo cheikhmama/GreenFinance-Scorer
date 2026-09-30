@@ -108,9 +108,12 @@ Rules for every task:
 
 ## Phase 4: Architecture & Quality
 
-- [ ] 4.1 ARQ/Redis Task Queue: Offload Docling extraction to asynchronous background tasks. **[review]**
-  - [ ] Worker process with deterministic job IDs, retries with backoff, and a cron job that fails stuck extractions.
-  - [ ] Replace `BackgroundTasks` + `threading.Lock` (`app/ingestion/extractor.py:60`); move synthesis PDF and emails to jobs.
+- [x] 4.1 ARQ/Redis Task Queue: Offload Docling extraction to asynchronous background tasks. **[review]**
+  - [x] Worker process with deterministic job IDs, retries with backoff, and a cron job that fails stuck extractions. Two workers (`app/worker/settings.py`): `ExtractionWorkerSettings` (queue `arq:extraction`, one job at a time) and `WorkerSettings` (queue `arq:queue`: e-mails, synthesis PDF, the cron). Extraction job id `extract:{report_id}`; transient failures (LLM 429/5xx, network) retried with a growing delay up to 3 tries, any other error is FAILED at once with its fixed cause. Cron every 5 min: RUNNING past the timeout → FAILED `delai_depasse` (+ owner notified), QUEUED whose job was lost → re-enqueued (same id, so no duplicate).
+  - [x] Replace `BackgroundTasks` + `threading.Lock`; move synthesis PDF and emails to jobs. Jobs are enqueued **after** the commit (post-response `BackgroundTasks` hook or right after `commit()`); every e-mail goes through the `send_email` job (retried up to 5 times; missing SMTP config is abandoned, not retried). The read-time "stuck extraction" list and endpoint are removed (the cron replaces them); relaunch is FAILED-only.
+  - [x] Found by running a real worker: the worker must load every model module (`app/core/registre_modeles.py`), and ARQ logs job arguments at INFO — e-mail links with tokens — so its loggers are raised to WARNING in the worker. Result keys are not kept (`keep_result=0`).
+  - [x] The API process no longer imports the extraction stack (torch, Docling, bge-m3) — checked by a test; prepares separate images in 4.2. `redis-py` goes from 8.x to 5.x (pinned by `arq`), with typed helpers in `app/core/redis.py`.
+  - [x] Not done here: the `recompute_portfolio` job — portfolio figures are computed on read and nothing consumes the cached columns on `portfolios` yet (decision pending: implement when a consumer needs them, or drop the columns).
 - [ ] 4.2 Docker Multi-Stage Refactoring: Production build cleanup (non-root user, slim image). **[review]**
   - [ ] Separate `api` and `worker` images; `uv sync --no-dev --frozen`; no `tests/` in the image.
   - [ ] Move `pytest`, `pytest-cov` to the `dev` group.

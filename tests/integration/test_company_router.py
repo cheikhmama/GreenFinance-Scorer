@@ -103,7 +103,6 @@ def test_consulter_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(se
 
 
 def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")
 
@@ -120,7 +119,6 @@ def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, mon
 
 
 def test_deposer_rapport_notifie_lentreprise(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")
 
@@ -202,7 +200,6 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
 
 
 def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     assert user.company is not None
     user.company.status = CompanyStatus.SUSPENDED
@@ -262,7 +259,6 @@ def test_lister_rapports_sans_authentification_est_rejete() -> None:
 def test_deposer_rapport_genere_le_nom_de_stockage_cote_serveur(session, monkeypatch) -> None:
     """Phase 4 §4.2 : le nom de fichier fourni par le client n'apparaît jamais dans le chemin de
     stockage, même assaini — seuls des identifiants déjà connus côté serveur le déterminent."""
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     assert user.company is not None
     authed_client = _login(user.email, "s3cret-pass")
@@ -331,7 +327,6 @@ def test_deposer_rapport_pdf_chiffre_est_rejete(session) -> None:
 
 
 def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")
     contenu = _minimal_pdf_bytes()
@@ -354,7 +349,6 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
 
 
 def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     assert user.company is not None
     original = ESGReport(
@@ -851,7 +845,6 @@ def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> User
 def test_importer_rapport_par_url_entreprise_happy_path_marque_canal_automatique(
     session, monkeypatch
 ) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "app.company.rapports.telecharger_pdf_depuis_url", lambda _url: _minimal_pdf_bytes()
     )
@@ -877,7 +870,6 @@ def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
 ) -> None:
     """Un Entreprise ne peut jamais désigner une autre entreprise que la sienne, même en le
     demandant explicitement dans le corps -- même posture que le reste de l'espace Entreprise."""
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "app.company.rapports.telecharger_pdf_depuis_url", lambda _url: _minimal_pdf_bytes()
     )
@@ -941,7 +933,6 @@ def test_importer_rapport_par_url_admin_avec_entreprise_id_inconnu_est_404(sessi
 
 
 def test_importer_rapport_par_url_admin_happy_path(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "app.company.rapports.telecharger_pdf_depuis_url", lambda _url: _minimal_pdf_bytes()
     )

@@ -23,6 +23,42 @@ services:
       redis:
         condition: service_healthy
 
+  # Workers ARQ (tâche 4.1) : même image que l'API pour l'instant — images séparées avec la tâche
+  # 4.2 (seul le worker d'extraction a besoin de Docling/torch). Le worker « default » traite
+  # e-mails et PDF de synthèse et porte la tâche planifiée ; le worker « extraction » ne traite
+  # qu'une extraction à la fois — pour plus de débit, augmenter ses réplicas.
+  worker:
+    build: .
+    command: ["arq", "app.worker.settings.WorkerSettings"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./storage:/code/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-extraction:
+    build: .
+    command: ["arq", "app.worker.settings.ExtractionWorkerSettings"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./storage:/code/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   db:
     image: pgvector/pgvector:pg16
     environment:

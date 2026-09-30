@@ -32,7 +32,11 @@ from app.auth.rate_limit import (
 from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.email import EmailDeliveryError, ensure_email_configured, send_email
+from app.core.email import (
+    EmailDeliveryError,
+    ensure_email_configured,
+    envoyer_email_differe,
+)
 from app.core.exceptions import (
     ServiceUnavailableError,
     UnauthorizedError,
@@ -55,7 +59,7 @@ def _construire_lien(jeton_clair: str) -> str:
 
 def _envoyer_lien(nouvel_email: str, jeton_clair: str) -> None:
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=nouvel_email,
             subject="Confirmez votre nouvelle adresse GreenFinance-Scorer",
             body=(
@@ -73,7 +77,7 @@ def _envoyer_lien(nouvel_email: str, jeton_clair: str) -> None:
 
 def _prevenir_ancienne_adresse(ancien_email: str) -> None:
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=ancien_email,
             subject="Changement d'adresse demandé sur votre compte GreenFinance-Scorer",
             body=(

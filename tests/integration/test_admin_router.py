@@ -48,7 +48,7 @@ def _smtp_configure(monkeypatch):
         update={"smtp_host": "smtp.example.com", "mail_from": "no-reply@example.com"}
     )
     monkeypatch.setattr("app.core.email.get_settings", lambda: settings)
-    monkeypatch.setattr("app.auth.activation.send_email", Mock())
+    monkeypatch.setattr("app.auth.activation.envoyer_email_differe", Mock())
 
 
 def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass", actif: bool = True) -> User:

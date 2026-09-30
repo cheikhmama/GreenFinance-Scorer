@@ -28,13 +28,17 @@ from app.auth.revocation import revoke_all_sessions
 from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.email import EmailDeliveryError, ensure_email_configured, send_email
+from app.core.email import (
+    EmailDeliveryError,
+    ensure_email_configured,
+    envoyer_email_differe,
+)
 from app.core.exceptions import (
     ServiceUnavailableError,
     TooManyRequestsError,
     ValidationError,
 )
-from app.core.redis import get_redis_client, incrementer_fenetre
+from app.core.redis import get_redis_client, incrementer_fenetre, lire_entier
 
 logger = structlog.get_logger(__name__)
 
@@ -78,7 +82,7 @@ def _construire_lien(jeton_clair: str) -> str:
 
 def _envoyer_lien(email: str, jeton_clair: str) -> None:
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=email,
             subject="Réinitialisez votre mot de passe GreenFinance-Scorer",
             body=(
@@ -112,8 +116,10 @@ def demander_reinitialisation(
             "Service de réinitialisation temporairement indisponible. Réessayez plus tard."
         ) from exc
     email_normalise = email.strip().lower()
-    attempts = _guarded("get", lambda: get_redis_client().get(_rate_limit_key(email_normalise)))
-    if attempts is not None and int(attempts) >= _RATE_LIMIT_MAX:
+    attempts = _guarded(
+        "get", lambda: lire_entier(get_redis_client(), _rate_limit_key(email_normalise))
+    )
+    if attempts is not None and attempts >= _RATE_LIMIT_MAX:
         raise TooManyRequestsError(
             "Trop de demandes de réinitialisation pour cette adresse. Réessayez plus tard."
         )

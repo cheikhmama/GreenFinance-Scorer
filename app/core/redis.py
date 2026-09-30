@@ -6,6 +6,7 @@ fois depuis la configuration, jamais recréée par appel.
 """
 
 from functools import lru_cache
+from typing import cast
 
 import redis
 
@@ -33,4 +34,17 @@ def incrementer_fenetre(client: redis.Redis, cle: str, fenetre_secondes: int) ->
     """Incrémente le compteur `cle` d'une fenêtre fixe de `fenetre_secondes` et renvoie sa valeur
     — l'expiration n'est posée qu'au premier incrément de la fenêtre. Point unique pour toute
     limitation de débit (connexion, réinitialisation, contact, import par URL)."""
-    return int(client.eval(_SCRIPT_INCREMENT_FENETRE, 1, cle, fenetre_secondes))
+    return int(cast(str, client.eval(_SCRIPT_INCREMENT_FENETRE, 1, cle, str(fenetre_secondes))))
+
+
+# redis-py 5 (imposé par arq, tâche 4.1) type les réponses du client synchrone en
+# « Awaitable | Any » : ces deux helpers portent l'unique conversion, au lieu d'un cast par appel.
+
+
+def lire_entier(client: redis.Redis, cle: str) -> int | None:
+    valeur = cast("str | None", client.get(cle))
+    return int(valeur) if valeur is not None else None
+
+
+def incrementer(client: redis.Redis, cle: str) -> int:
+    return int(cast(str, client.incr(cle)))

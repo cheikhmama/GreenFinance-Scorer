@@ -67,7 +67,7 @@ admin. Decision D5 gates self-registration behind this onboarding step.
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|
 | create session (*task 1.5*, `POST /reports`) | ENTERPRISE (own ACTIVE company), or ADMIN with `company_id` | fiscal year between 2000 and the current year; no other `DRAFT` for `(company, fiscal_year, report type)` (partial unique index) | report `DRAFT`, no file, `extraction_status=NOT_STARTED` | — |
-| submit (*task 1.5*, `POST /reports/{id}/submit`) | ENTERPRISE owner or ADMIN | `DRAFT` (row locked); PDF valid (magic bytes, size cap, checksum not already used) — same code path as the one-step deposit. Raw metrics without a PDF: not yet | status `SUBMITTED`, `extraction_status=QUEUED`, `submitted_at`, file stored | extraction (BackgroundTasks until task 4.1) |
+| submit (*task 1.5*, `POST /reports/{id}/submit`) | ENTERPRISE owner or ADMIN | `DRAFT` (row locked); PDF valid (magic bytes, size cap, checksum not already used) — same code path as the one-step deposit. Raw metrics without a PDF: not yet | status `SUBMITTED`, `extraction_status=QUEUED`, `submitted_at`, file stored | job `extract_report` (worker, task 4.1) |
 | discard (*task 1.5*, `DELETE /reports/{id}`) | ENTERPRISE owner or ADMIN | `DRAFT` | draft deleted, period free again | — |
 | extraction | worker | `extraction_status in (QUEUED, FAILED-retry)` | metrics + carbon rows + evidence replaced as a whole, coverage rows, `extraction_status=DONE`, **pre-score** (non-official score with the reference config) | `generate_synthesis_pdf` |
 | assign auditor | ADMIN | `extraction_status=DONE` | `auditor_id`, `assigned_at`, status `PENDING_AUDIT`, notification | — |
@@ -78,8 +78,8 @@ admin. Decision D5 gates self-registration behind this onboarding step.
 | new version | ENTERPRISE | `REVISION_REQUESTED` | new report row, `version+1`, `previous_report_id`, status `DRAFT` | — |
 
 *Current:* statuses `ENVOYE → EN_EXTRACTION → AFFECTE_AUDITEUR → EN_VALIDATION → VALIDE / REJETE / DEMANDE_CORRECTION`;
-extraction runs as a FastAPI `BackgroundTasks` in the API process; no draft state; no auditor
-overrides.
+no draft state; no auditor overrides. Extraction ran as a FastAPI `BackgroundTasks` in the API
+process until task 4.1; it now runs in the extraction worker.
 
 ### 1.3 Atomic score publication
 

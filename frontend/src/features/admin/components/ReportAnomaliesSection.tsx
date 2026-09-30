@@ -10,7 +10,6 @@ import {
   useFailedExtractionReports,
   useOrphanReportsInValidation,
   useRetryExtraction,
-  useStuckExtractionReports,
 } from "../api";
 
 function BoutonRelancer({ rapportId }: { rapportId: string }) {
@@ -46,15 +45,12 @@ function BoutonRelancer({ rapportId }: { rapportId: string }) {
  * d'anomalie plutôt que de laisser un doute. */
 export function ReportAnomaliesSection() {
   const { data: echecsExtraction } = useFailedExtractionReports();
-  const { data: bloques } = useStuckExtractionReports();
   const { data: orphelins } = useOrphanReportsInValidation();
 
   const aucuneAnomalie =
     echecsExtraction !== undefined &&
-    bloques !== undefined &&
     orphelins !== undefined &&
     echecsExtraction.length === 0 &&
-    bloques.length === 0 &&
     orphelins.length === 0;
 
   return (
@@ -63,7 +59,7 @@ export function ReportAnomaliesSection() {
         <CardTitle className="text-base text-amber-700">Anomalies à traiter</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {echecsExtraction === undefined || bloques === undefined || orphelins === undefined ? (
+        {echecsExtraction === undefined || orphelins === undefined ? (
           <CardListSkeleton count={2} />
         ) : null}
         {aucuneAnomalie ? (
@@ -86,34 +82,6 @@ export function ReportAnomaliesSection() {
                       {rapport.tentatives_extraction > 0
                         ? ` — ${rapport.tentatives_extraction} tentative(s)`
                         : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <BoutonRelancer rapportId={rapport.id} />
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {bloques && bloques.length > 0 ? (
-          <div>
-            <p className="mb-2 text-sm font-medium text-brand-blue">
-              Extractions probablement interrompues ({bloques.length})
-            </p>
-            <ul className="divide-y">
-              {bloques.map((rapport) => (
-                <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
-                  <div>
-                    <p className="text-sm font-medium text-brand-blue">
-                      {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
-                    </p>
-                    <p className="text-sm text-brand-grey">
-                      Aucune fin ni erreur détectée depuis un délai anormal — le traitement a
-                      probablement été interrompu.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
