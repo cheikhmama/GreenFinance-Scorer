@@ -4,7 +4,7 @@ ESGReport porte le cycle de vie documentaire (ReportStatus) et l'avancement de s
 (ExtractionStatus). Les entités qui en dérivent (ESGMetric, CarbonEmission, Evidence —
 Prompt 3.5 ; DiscrepancyFlag — Prompt 3.8) sont exclusivement produites
 par le pipeline automatique (Étapes 4 à 7) : un Auditeur les consulte et
-les valide via AvisAudit (app/audit/models.py), il ne les crée jamais
+les valide via AuditOpinion (app/audit/models.py), il ne les crée jamais
 lui-même — aucun champ ni table ici ne permet une saisie manuelle par
 l'Auditeur.
 """
@@ -18,19 +18,19 @@ from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
+    ConfidenceLevel,
+    DataMethod,
     ExtractionStatus,
-    MethodeDonnee,
-    NiveauConfiance,
+    MetricCoverageStatus,
     Pillar,
     ReportStatus,
-    StatutCouvertureIndicateur,
-    TypeRapport,
+    ReportType,
+    SubmissionChannel,
     sa_enum_column,
 )
 
 if TYPE_CHECKING:
-    from app.audit.models import AvisAudit
+    from app.audit.models import AuditOpinion
     from app.auth.models import User
     from app.company.models import Company
     from app.scoring.models import Score
@@ -69,8 +69,8 @@ class ESGReport(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     company_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE")
-    type: TypeRapport = Field(sa_column=sa_enum_column(TypeRapport))
-    channel: CanalDepot = Field(sa_column=sa_enum_column(CanalDepot))
+    type: ReportType = Field(sa_column=sa_enum_column(ReportType))
+    channel: SubmissionChannel = Field(sa_column=sa_enum_column(SubmissionChannel))
     created_at: datetime = Field(default_factory=utcnow)
     # Moment du dépôt du fichier : nul tant que le rapport est un brouillon (DRAFT, tâche 1.5).
     submitted_at: datetime | None = Field(default=None)
@@ -93,7 +93,7 @@ class ESGReport(SQLModel, table=True):
     # Persisté dès le dépôt (Phase 4 §4.3). Nullable : les rapports déposés avant cette passe
     # n'ont pas cette valeur.
     fiscal_year: int | None = Field(default=None)
-    # Champ interne réservé à l'accountability (voir aussi AvisAudit.auditeur_id) : jamais exposé
+    # Champ interne réservé à l'accountability (voir aussi AuditOpinion.auditor_id) : jamais exposé
     # à l'Entreprise.
     auditor_id: uuid.UUID | None = Field(
         default=None, foreign_key="users.id", ondelete="SET NULL", index=True
@@ -139,7 +139,7 @@ class ESGReport(SQLModel, table=True):
     metrics: list["ESGMetric"] = Relationship(back_populates="report")
     carbon_data: list["CarbonEmission"] = Relationship(back_populates="report")
     scores: list["Score"] = Relationship(back_populates="report")
-    audit_opinions: list["AvisAudit"] = Relationship(back_populates="rapport")
+    audit_opinions: list["AuditOpinion"] = Relationship(back_populates="report")
     declared_global_score_proof: Optional["Evidence"] = Relationship()
     coverages: list["MetricCoverage"] = Relationship(back_populates="report")
 
@@ -178,7 +178,7 @@ class ESGMetric(SQLModel, table=True):
     metric_code: str
     value: float
     unit: str
-    method: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
+    method: DataMethod = Field(sa_column=sa_enum_column(DataMethod))
     proof_id: uuid.UUID = Field(
         foreign_key="evidence.id", ondelete="CASCADE", index=True
     )
@@ -191,8 +191,8 @@ class ESGMetric(SQLModel, table=True):
     section: str | None = Field(default=None)
     proof_text: str | None = Field(default=None)
     value_year: int | None = Field(default=None)
-    confidence: NiveauConfiance | None = Field(
-        default=None, sa_column=sa_enum_column(NiveauConfiance, nullable=True)
+    confidence: ConfidenceLevel | None = Field(
+        default=None, sa_column=sa_enum_column(ConfidenceLevel, nullable=True)
     )
     # Correction par l'Auditeur (docs/WORKFLOWS.md §1.2) : la valeur extraite reste intacte,
     # override_value la remplace au calcul du score quand auditor_overridden est vrai.
@@ -235,7 +235,7 @@ class CarbonEmission(SQLModel, table=True):
     ghg_category: str | None = None
     tonnes_co2e: float = Field(ge=0)
     year: int
-    method: MethodeDonnee = Field(sa_column=sa_enum_column(MethodeDonnee))
+    method: DataMethod = Field(sa_column=sa_enum_column(DataMethod))
     pcaf_data_quality: int | None = Field(default=None, ge=1, le=5)
     proof_id: uuid.UUID = Field(foreign_key="evidence.id", ondelete="CASCADE", index=True)
     # Traçabilité (Phase 6) — voir ESGMetric ci-dessus, même justification.
@@ -243,8 +243,8 @@ class CarbonEmission(SQLModel, table=True):
     section: str | None = Field(default=None)
     proof_text: str | None = Field(default=None)
     value_year: int | None = Field(default=None)
-    confidence: NiveauConfiance | None = Field(
-        default=None, sa_column=sa_enum_column(NiveauConfiance, nullable=True)
+    confidence: ConfidenceLevel | None = Field(
+        default=None, sa_column=sa_enum_column(ConfidenceLevel, nullable=True)
     )
 
     report: ESGReport = Relationship(back_populates="carbon_data")
@@ -255,7 +255,7 @@ class MetricCoverage(SQLModel, table=True):
     """Persiste, pour CHAQUE code de INDICATEURS_CIBLES (pas seulement les trouvés), ce que le
     LLM a réellement répondu à l'extraction. Sert deux besoins distincts avec la même donnée :
     signaler à l'écran qu'une donnée est absente plutôt que de la laisser silencieusement invisible
-    (transparence, décision produit), et distinguer les 3 statuts (voir StatutCouvertureIndicateur,
+    (transparence, décision produit), et distinguer les 3 statuts (voir MetricCoverageStatus,
     app/core/enums.py) pour juger si la sélection adaptative de pages (app/ingestion/extractor.py)
     fait manquer des indicateurs sur un long rapport. Une ligne par (rapport, code) — remplacée à
     chaque nouvelle tentative d'extraction du même rapport (voir run_extraction_pipeline, même
@@ -269,7 +269,7 @@ class MetricCoverage(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE")
     metric_code: str
-    status: StatutCouvertureIndicateur = Field(sa_column=sa_enum_column(StatutCouvertureIndicateur))
+    status: MetricCoverageStatus = Field(sa_column=sa_enum_column(MetricCoverageStatus))
     pages_examined: int
 
     report: ESGReport = Relationship(back_populates="coverages")

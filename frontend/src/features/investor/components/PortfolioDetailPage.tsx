@@ -41,7 +41,7 @@ import {
   type RenommerPortefeuilleForm,
   renommerPortefeuilleSchema,
   TYPES_DUREE,
-  TypeDureeInvestissement,
+  DurationType,
 } from "../schemas";
 import { EntrepriseCombobox } from "./EntrepriseCombobox";
 import type {
@@ -69,10 +69,10 @@ export function PortfolioDetailPage() {
   if (isError || !portefeuille) return <p className="text-destructive">Portefeuille introuvable.</p>;
 
   async function supprimerPortefeuille() {
-    if (!portefeuille || portefeuille.nombre_positions > 0) return;
+    if (!portefeuille || portefeuille.position_count > 0) return;
     const confirme = await confirm({
       title: "Supprimer ce portefeuille ?",
-      description: `« ${portefeuille.nom} » sera définitivement supprimé. Cette action est irréversible.`,
+      description: `« ${portefeuille.name} » sera définitivement supprimé. Cette action est irréversible.`,
       confirmLabel: "Supprimer",
       destructive: true,
     });
@@ -84,14 +84,14 @@ export function PortfolioDetailPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Investisseur"
-        title={portefeuille.nom}
-        description={`Créé le ${new Date(portefeuille.date_creation).toLocaleDateString("fr-FR")}.`}
+        title={portefeuille.name}
+        description={`Créé le ${new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}.`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => setRenommerOuvert(true)}>
               Renommer
             </Button>
-            {portefeuille.archive ? (
+            {portefeuille.archived ? (
               <Button variant="outline" size="sm" onClick={() => restaurer.mutate()}>
                 Restaurer
               </Button>
@@ -103,11 +103,11 @@ export function PortfolioDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportPortfolioFile(portefeuille.id, portefeuille.nom)}
+              onClick={() => exportPortfolioFile(portefeuille.id, portefeuille.name)}
             >
               Exporter (CSV)
             </Button>
-            {portefeuille.nombre_positions === 0 ? (
+            {portefeuille.position_count === 0 ? (
               <Button variant="destructive" size="sm" onClick={supprimerPortefeuille}>
                 Supprimer
               </Button>
@@ -116,35 +116,35 @@ export function PortfolioDetailPage() {
         }
       />
 
-      {portefeuille.archive ? (
+      {portefeuille.archived ? (
         <Alert>
           <AlertTitle>Portefeuille archivé</AlertTitle>
           <AlertDescription>Restaure-le pour ajouter de nouvelles positions.</AlertDescription>
         </Alert>
       ) : null}
 
-      {portefeuille.nombre_positions > 0 ? (
+      {portefeuille.position_count > 0 ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Synthese
               label="Montant total"
-              value={formatMontant(portefeuille.montant_total, portefeuille.devise_reference)}
+              value={formatMontant(portefeuille.total_amount, portefeuille.reference_currency)}
             />
-            <Synthese label="Score ESG agrégé" value={formatScore(portefeuille.score_esg_agrege)} />
-            <Synthese label="Couverture ESG" value={formatPourcentage(portefeuille.couverture_esg)} />
+            <Synthese label="Score ESG agrégé" value={formatScore(portefeuille.aggregated_esg_score)} />
+            <Synthese label="Couverture ESG" value={formatPourcentage(portefeuille.esg_coverage)} />
             <Synthese
               label="Positions"
-              value={`${portefeuille.nombre_positions_actives} actives · ${portefeuille.nombre_positions_planifiees} planifiées · ${portefeuille.nombre_positions_cloturees} clôturées`}
+              value={`${portefeuille.active_position_count} actives · ${portefeuille.planned_position_count} planifiées · ${portefeuille.closed_position_count} clôturées`}
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <Synthese
               label="Environnement (E)"
-              value={formatScore(portefeuille.score_environnement_agrege)}
+              value={formatScore(portefeuille.aggregated_environmental_score)}
             />
-            <Synthese label="Social (S)" value={formatScore(portefeuille.score_social_agrege)} />
-            <Synthese label="Gouvernance (G)" value={formatScore(portefeuille.score_gouvernance_agrege)} />
+            <Synthese label="Social (S)" value={formatScore(portefeuille.aggregated_social_score)} />
+            <Synthese label="Gouvernance (G)" value={formatScore(portefeuille.aggregated_governance_score)} />
           </div>
 
           <PortfolioCarbonCard portefeuilleId={portefeuille.id} />
@@ -154,7 +154,7 @@ export function PortfolioDetailPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Positions</CardTitle>
-          {!portefeuille.archive && portefeuille.nombre_positions > 0 ? (
+          {!portefeuille.archived && portefeuille.position_count > 0 ? (
             <Button size="sm" onClick={() => setAjoutOuvert(true)}>
               Créer une position
             </Button>
@@ -165,7 +165,7 @@ export function PortfolioDetailPage() {
           {portefeuille.positions.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <p className="text-brand-grey">Ce portefeuille ne contient encore aucune position.</p>
-              {!portefeuille.archive ? (
+              {!portefeuille.archived ? (
                 <>
                   <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
                   <ImportPositionsForm portefeuilleId={portefeuille.id} />
@@ -196,18 +196,18 @@ export function PortfolioDetailPage() {
                   {portefeuille.positions.map((position) => (
                     <tr key={position.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
-                        {position.entreprise ? (
+                        {position.company ? (
                           <CompanyIdentity
-                            nom={position.entreprise.nom}
-                            logo={position.entreprise.logo}
-                            secteur={position.entreprise.secteur}
+                            nom={position.company.name}
+                            logo={position.company.logo}
+                            secteur={position.company.sector}
                           />
                         ) : (
                           // Ligne importée qu'aucune entreprise publiée ne reconnaît (tâche 2.2).
                           <div className="space-y-1">
-                            <p className="font-mono text-sm">{position.identifiant}</p>
+                            <p className="font-mono text-sm">{position.identifier}</p>
                             <Badge variant="outline">
-                              {position.statut_rapprochement === "AMBIGUOUS"
+                              {position.match_status === "AMBIGUOUS"
                                 ? "Plusieurs entreprises possibles"
                                 : "Entreprise non reconnue"}
                             </Badge>
@@ -215,36 +215,36 @@ export function PortfolioDetailPage() {
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        <p>{formatMontant(position.montant_investi, position.devise)}</p>
-                        {position.taux_change_utilise ? (
+                        <p>{formatMontant(position.outstanding_amount, position.currency)}</p>
+                        {position.fx_rate_used ? (
                           <p className="text-xs text-brand-grey">
-                            = {formatMontant(position.montant_converti, portefeuille.devise_reference)}
+                            = {formatMontant(position.converted_amount, portefeuille.reference_currency)}
                           </p>
                         ) : null}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">{formatPourcentage(position.poids * 100)}</td>
+                      <td className="py-2 pr-4 tabular-nums">{formatPourcentage(position.weight * 100)}</td>
                       <td className="py-2 pr-4">
-                        {position.type_duree === TypeDureeInvestissement.FIXE ? "Fixe" : "Ouverte"}
+                        {position.duration_type === DurationType.FIXE ? "Fixe" : "Ouverte"}
                       </td>
                       <td className="py-2 pr-4">
-                        <Badge variant={variantEtatPosition(position.etat)}>
-                          {libelleEtatPosition(position.etat)}
+                        <Badge variant={variantEtatPosition(position.state)}>
+                          {libelleEtatPosition(position.state)}
                         </Badge>
                       </td>
                       <td className="py-2 pr-4">
-                        {position.date_fin
-                          ? new Date(position.date_fin).toLocaleDateString("fr-FR")
+                        {position.end_date
+                          ? new Date(position.end_date).toLocaleDateString("fr-FR")
                           : "—"}
                       </td>
-                      <td className="py-2 pr-4">{formatScore(position.score.valeur_globale)}</td>
+                      <td className="py-2 pr-4">{formatScore(position.score.global_score)}</td>
                       <td className="py-2">
                         <div className="flex flex-wrap gap-2">
-                          {position.entreprise ? (
+                          {position.company ? (
                             <Button size="sm" variant="outline" asChild>
-                              <Link to={`/investor/entreprises/${position.entreprise.id}`}>Détails</Link>
+                              <Link to={`/investor/entreprises/${position.company.id}`}>Détails</Link>
                             </Button>
                           ) : null}
-                          {position.etat === "PLANIFIEE" && position.entreprise ? (
+                          {position.state === "PLANIFIEE" && position.company ? (
                             <>
                               <Button
                                 size="sm"
@@ -260,8 +260,8 @@ export function PortfolioDetailPage() {
                               />
                             </>
                           ) : null}
-                          {position.type_duree === TypeDureeInvestissement.OUVERTE &&
-                          position.date_fin === null ? (
+                          {position.duration_type === DurationType.OUVERTE &&
+                          position.end_date === null ? (
                             <Button size="sm" variant="outline" onClick={() => setPositionAFermer(position)}>
                               Fermer
                             </Button>
@@ -284,7 +284,7 @@ export function PortfolioDetailPage() {
           </DialogHeader>
           <FormulaireRenommer
             portefeuilleId={portefeuille.id}
-            nomActuel={portefeuille.nom}
+            nomActuel={portefeuille.name}
             onDone={() => setRenommerOuvert(false)}
           />
         </DialogContent>
@@ -394,7 +394,7 @@ function FormulaireRenommer({
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<RenommerPortefeuilleForm>({
     resolver: zodResolver(renommerPortefeuilleSchema),
-    defaultValues: { nom: nomActuel },
+    defaultValues: { name: nomActuel },
   });
 
   function onSubmit(values: RenommerPortefeuilleForm) {
@@ -417,7 +417,7 @@ function FormulaireRenommer({
         ) : null}
         <FormField
           control={form.control}
-          name="nom"
+          name="name"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nom du portefeuille</FormLabel>
@@ -457,8 +457,8 @@ function FormulaireFermeture({
   return (
     <div className="space-y-4">
       <p className="text-sm text-brand-grey">
-        Position sur <strong>{position.entreprise?.nom ?? position.identifiant}</strong>, ouverte le{" "}
-        {new Date(position.date_debut).toLocaleDateString("fr-FR")}.
+        Position sur <strong>{position.company?.name ?? position.identifier}</strong>, ouverte le{" "}
+        {new Date(position.start_date).toLocaleDateString("fr-FR")}.
       </p>
       {serverError ? (
         <Alert variant="destructive">
@@ -482,7 +482,7 @@ function FormulaireFermeture({
         disabled={closePosition.isPending}
         onClick={() =>
           closePosition.mutate(
-            { positionId: position.id, payload: { date_fin: new Date(dateFin).toISOString() } },
+            { positionId: position.id, payload: { end_date: new Date(dateFin).toISOString() } },
             {
               onSuccess: onDone,
               onError: (error) =>
@@ -514,7 +514,7 @@ function FormulairePosition({
   // En modification, l'entreprise est figée sur la position existante (jamais changeable, voir
   // le formulaire plus bas) — on récupère son montant minimum pré-converti via la même route que
   // la fiche détaillée, plutôt que de le dupliquer dans PositionDetail.entreprise.
-  const { data: entrepriseDetail } = useCompanyDetail(position?.entreprise?.id ?? "");
+  const { data: entrepriseDetail } = useCompanyDetail(position?.company?.id ?? "");
   const entrepriseActive = position ? entrepriseDetail : entrepriseSelectionnee;
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -525,48 +525,48 @@ function FormulairePosition({
     defaultValues: position
       ? {
           // Formulaire jamais ouvert pour une ligne non rapprochée (bouton masqué plus haut).
-          entreprise_id: position.entreprise?.id ?? "",
-          montant: position.montant_investi,
-          devise: position.devise,
-          type_duree: position.type_duree,
-          date_debut: position.date_debut.slice(0, 10),
-          date_fin: position.date_fin?.slice(0, 10) ?? "",
+          company_id: position.company?.id ?? "",
+          amount: position.outstanding_amount,
+          currency: position.currency,
+          duration_type: position.duration_type,
+          start_date: position.start_date.slice(0, 10),
+          end_date: position.end_date?.slice(0, 10) ?? "",
         }
       : {
-          entreprise_id: "",
-          montant: 0,
-          devise: DEVISES[0],
-          type_duree: TYPES_DUREE[0],
-          date_debut: new Date().toISOString().slice(0, 10),
-          date_fin: "",
+          company_id: "",
+          amount: 0,
+          currency: DEVISES[0],
+          duration_type: TYPES_DUREE[0],
+          start_date: new Date().toISOString().slice(0, 10),
+          end_date: "",
         },
   });
-  const typeDuree = form.watch("type_duree");
-  const deviseChoisie = form.watch("devise");
-  const montantSaisi = form.watch("montant");
-  const minimumPourDevise = entrepriseActive?.montant_minimum_par_devise?.[deviseChoisie] ?? null;
+  const typeDuree = form.watch("duration_type");
+  const deviseChoisie = form.watch("currency");
+  const montantSaisi = form.watch("amount");
+  const minimumPourDevise = entrepriseActive?.minimum_amount_by_currency?.[deviseChoisie] ?? null;
   const montantInsuffisant = minimumPourDevise !== null && montantSaisi < minimumPourDevise;
 
   function onSubmit(values: AjouterPositionForm) {
     setServerError(null);
     const payload = {
-      montant: values.montant,
-      devise: values.devise,
-      type_duree: values.type_duree,
-      date_debut: new Date(values.date_debut).toISOString(),
-      date_fin: values.date_fin ? new Date(values.date_fin).toISOString() : undefined,
+      amount: values.amount,
+      currency: values.currency,
+      duration_type: values.duration_type,
+      start_date: new Date(values.start_date).toISOString(),
+      end_date: values.end_date ? new Date(values.end_date).toISOString() : undefined,
     };
     const onError = (error: unknown) =>
       setServerError(error instanceof ApiError ? error.message : "Échec de l'enregistrement.");
 
     if (position) {
       updatePosition.mutate(
-        { positionId: position.id, payload: { ...payload, date_fin: payload.date_fin ?? null } },
+        { positionId: position.id, payload: { ...payload, end_date: payload.end_date ?? null } },
         { onSuccess: onDone, onError },
       );
     } else {
       addPosition.mutate(
-        { ...payload, entreprise_id: values.entreprise_id },
+        { ...payload, company_id: values.company_id },
         { onSuccess: onDone, onError },
       );
     }
@@ -587,14 +587,14 @@ function FormulairePosition({
         {!position ? (
           <FormField
             control={form.control}
-            name="entreprise_id"
+            name="company_id"
             render={() => (
               <FormItem>
                 <FormLabel>Entreprise publiée</FormLabel>
                 <FormControl>
                   <EntrepriseCombobox
                     onSelect={(entreprise) => {
-                      form.setValue("entreprise_id", entreprise.id, { shouldValidate: true });
+                      form.setValue("company_id", entreprise.id, { shouldValidate: true });
                       setEntrepriseSelectionnee(entreprise);
                     }}
                   />
@@ -608,7 +608,7 @@ function FormulairePosition({
         {entrepriseActive ? (
           <div className="space-y-2 rounded-md bg-slate-50 px-3 py-2">
             <CompanyIdentity
-              nom={entrepriseActive.nom}
+              nom={entrepriseActive.name}
               logo={entrepriseActive.logo}
               avatarClassName="size-8"
             />
@@ -626,7 +626,7 @@ function FormulairePosition({
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="montant"
+            name="amount"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Montant</FormLabel>
@@ -656,7 +656,7 @@ function FormulairePosition({
           />
           <FormField
             control={form.control}
-            name="devise"
+            name="currency"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Devise</FormLabel>
@@ -677,14 +677,14 @@ function FormulairePosition({
 
         <FormField
           control={form.control}
-          name="type_duree"
+          name="duration_type"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Type de durée</FormLabel>
               <FormControl>
                 <Select {...field}>
-                  <option value={TypeDureeInvestissement.OUVERTE}>Ouverte</option>
-                  <option value={TypeDureeInvestissement.FIXE}>Fixe</option>
+                  <option value={DurationType.OUVERTE}>Ouverte</option>
+                  <option value={DurationType.FIXE}>Fixe</option>
                 </Select>
               </FormControl>
               <FormMessage />
@@ -695,7 +695,7 @@ function FormulairePosition({
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="date_debut"
+            name="start_date"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Date de début</FormLabel>
@@ -706,10 +706,10 @@ function FormulairePosition({
               </FormItem>
             )}
           />
-          {typeDuree === TypeDureeInvestissement.FIXE ? (
+          {typeDuree === DurationType.FIXE ? (
             <FormField
               control={form.control}
-              name="date_fin"
+              name="end_date"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Date de fin</FormLabel>

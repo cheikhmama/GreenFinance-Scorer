@@ -9,15 +9,15 @@ const fetchMock = vi.fn<typeof fetch>();
 const PROJET = {
   id: "99999999-9999-9999-9999-999999999999",
   institution_id: "1",
-  nom: "Mines et climat",
+  name: "Mines et climat",
   description: null,
-  objectif: "Comparer l’intensité carbone du secteur minier.",
-  date_debut: "2026-10-01",
-  date_fin_prevue: "2027-03-31",
-  date_limite: null,
-  statut: "OUVERT",
-  date_creation: "2026-09-30T00:00:00",
-  date_cloture: null,
+  objective: "Comparer l’intensité carbone du secteur minier.",
+  start_date: "2026-10-01",
+  planned_end_date: "2027-03-31",
+  deadline: null,
+  status: "OUVERT",
+  created_at: "2026-09-30T00:00:00",
+  closed_at: null,
 };
 
 beforeEach(() => {
@@ -72,12 +72,12 @@ describe("Espace Institution — créer un projet", () => {
     const envoi = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(envoi?.[0]).toBe("/api/v1/institution/projets");
     expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({
-      nom: "Mines et climat",
+      name: "Mines et climat",
       description: null,
-      objectif: null,
-      date_debut: "2026-10-01",
-      date_fin_prevue: "2027-03-31",
-      date_limite: null,
+      objective: null,
+      start_date: "2026-10-01",
+      planned_end_date: "2027-03-31",
+      deadline: null,
     });
   });
 });

@@ -114,16 +114,16 @@ def login(
         auditer(
             session,
             user.id if user else None,
-            "connexion",
-            "Utilisateur",
+            "login",
+            "User",
             user.id if user else None,
-            "echec",
+            "failure",
         )
         session.commit()
         raise UnauthorizedError("Identifiants invalides.", code="invalid_credentials")
 
     clear_login_attempts(payload.email)
-    auditer(session, user.id, "connexion", "Utilisateur", user.id, "succes")
+    auditer(session, user.id, "login", "User", user.id, "success")
     session.commit()
 
     _ouvrir_session(response, user, current_generation(user.id))
@@ -154,7 +154,7 @@ def reinitialiser_mot_de_passe_route(
     payload: ReinitialiserMotDePasseRequest,
     session: Session = Depends(get_session),
 ) -> None:
-    reinitialiser_mot_de_passe(session, payload.token, payload.nouveau_mot_de_passe)
+    reinitialiser_mot_de_passe(session, payload.token, payload.new_password)
 
 
 @router.post(
@@ -167,7 +167,7 @@ def activer_compte_route(
     payload: ActiverCompteRequest,
     session: Session = Depends(get_session),
 ) -> None:
-    activer_compte(session, payload.token, payload.nouveau_mot_de_passe)
+    activer_compte(session, payload.token, payload.new_password)
 
 
 @router.post(
@@ -182,7 +182,7 @@ def logout(
     session: Session = Depends(get_session),
 ) -> None:
     revoke_all_sessions(current_user.id)
-    auditer(session, current_user.id, "deconnexion", "Utilisateur", current_user.id, "succes")
+    auditer(session, current_user.id, "logout", "User", current_user.id, "success")
     session.commit()
     _fermer_session(response)
 
@@ -212,7 +212,7 @@ def modifier_mon_profil(
     """Le nom change immédiatement. Un nouvel e-mail n'est qu'une DEMANDE (voir
     app/auth/email_change.py) : `email` reste l'ancienne adresse et `email_en_attente` indique où
     le lien de confirmation a été envoyé."""
-    current_user.name = payload.nom
+    current_user.name = payload.name
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
@@ -220,12 +220,12 @@ def modifier_mon_profil(
     email_en_attente = None
     if payload.email != current_user.email:
         demander_changement_email(
-            session, current_user, payload.email, payload.mot_de_passe_actuel, background_tasks
+            session, current_user, payload.email, payload.current_password, background_tasks
         )
         email_en_attente = payload.email
 
     return UtilisateurPublic.model_validate(current_user).model_copy(
-        update={"email_en_attente": email_en_attente}
+        update={"pending_email": email_en_attente}
     )
 
 
@@ -309,7 +309,7 @@ def verifier_mon_mot_de_passe(
     # Un compte authentifié a nécessairement déjà un mot de passe (login/activer-compte le
     # garantissent avant d'ouvrir une session) — jamais None ici.
     assert current_user.password_hash is not None
-    if not verify_password(payload.mot_de_passe, current_user.password_hash):
+    if not verify_password(payload.password, current_user.password_hash):
         register_failed_login_attempt(current_user.email)
         raise UnauthorizedError("Mot de passe actuel invalide.", code="invalid_credentials")
     clear_login_attempts(current_user.email)
@@ -332,20 +332,20 @@ def changer_mot_de_passe(
     enforce_login_rate_limit(current_user.email)
     # Voir verifier_mon_mot_de_passe ci-dessus : jamais None pour un compte déjà authentifié.
     assert current_user.password_hash is not None
-    if not verify_password(payload.mot_de_passe_actuel, current_user.password_hash):
+    if not verify_password(payload.current_password, current_user.password_hash):
         register_failed_login_attempt(current_user.email)
         raise UnauthorizedError("Mot de passe actuel invalide.", code="invalid_credentials")
     clear_login_attempts(current_user.email)
 
-    current_user.password_hash = hash_password(payload.nouveau_mot_de_passe)
+    current_user.password_hash = hash_password(payload.new_password)
     session.add(current_user)
     auditer(
         session,
         current_user.id,
-        "changement_mot_de_passe",
-        "Utilisateur",
+        "password_changed",
+        "User",
         current_user.id,
-        "succes",
+        "success",
     )
     session.commit()
     session.refresh(current_user)

@@ -5,7 +5,7 @@ app.main plus bas ne fait qu'enregistrer les modèles SQLModel, sans I/O)."""
 
 import uuid
 
-from app.core.enums import StatutCouvertureIndicateur
+from app.core.enums import MetricCoverageStatus
 from app.ingestion import extractor
 from app.ingestion.completeness import _absence_confirmee, calculer_couverture
 from app.ingestion.extractor import (
@@ -171,9 +171,9 @@ def test_calculer_couverture_classe_les_trois_statuts() -> None:
     )
     par_code = {c.metric_code: c for c in couvertures}
 
-    assert par_code["A"].status == StatutCouvertureIndicateur.TROUVE
-    assert par_code["B"].status == StatutCouvertureIndicateur.ABSENT_CONFIRME
-    assert par_code["C"].status == StatutCouvertureIndicateur.NON_TROUVE
+    assert par_code["A"].status == MetricCoverageStatus.TROUVE
+    assert par_code["B"].status == MetricCoverageStatus.ABSENT_CONFIRME
+    assert par_code["C"].status == MetricCoverageStatus.NON_TROUVE
     # pages_examinees est bien lu par code, jamais un entier partagé.
     assert par_code["A"].pages_examined == 10
     assert par_code["B"].pages_examined == 20

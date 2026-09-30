@@ -1,5 +1,5 @@
 """Téléchargement côté serveur d'un PDF depuis une URL fournie par le client (canal d'import
-automatique, CanalDepot.AUTOMATIQUE).
+automatique, SubmissionChannel.AUTOMATIQUE).
 
 Frontière délibérée, plus sensible qu'un dépôt multipart classique (app/company/upload_validation.py) :
 ici le client ne fournit pas seulement un contenu non fiable, il fournit une CIBLE réseau que le

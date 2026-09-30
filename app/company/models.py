@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Column, Numeric
 from sqlmodel import Field, Relationship, SQLModel
 
-from app.core.enums import CompanyStatus, DevisePosition, sa_enum_column
+from app.core.enums import CompanyStatus, Currency, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import User
@@ -55,14 +55,14 @@ class Company(SQLModel, table=True):
     # WACI, valeur d'entreprise trésorerie incluse (EVIC) pour le facteur d'attribution. Montants
     # en Decimal, jamais en float.
     revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))
-    revenue_currency: DevisePosition | None = Field(
-        default=None, sa_column=sa_enum_column(DevisePosition, nullable=True)
+    revenue_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
     )
     enterprise_value: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(20, 2), nullable=True)
     )
-    enterprise_value_currency: DevisePosition | None = Field(
-        default=None, sa_column=sa_enum_column(DevisePosition, nullable=True)
+    enterprise_value_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
     )
     enterprise_value_as_of: date | None = None
     minimum_investment_amount: Decimal | None = Field(
@@ -72,8 +72,8 @@ class Company(SQLModel, table=True):
     # avec lui (voir app/admin/review_queue.py::modifier_entreprise_admin), jamais l'une sans
     # l'autre : app/investor/portfolio.py::_verifier_montant_minimum en a besoin pour convertir le
     # minimum dans la devise de référence du portefeuille avant comparaison.
-    minimum_investment_currency: DevisePosition | None = Field(
-        default=None, sa_column=sa_enum_column(DevisePosition, nullable=True)
+    minimum_investment_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
     )
     # Dernière publication du score officiel par l'Administrateur : sert à la fois de booléen
     # (publiée dès que non nul) et de "depuis quand". Distinct du statut du rapport et du statut

@@ -14,7 +14,7 @@ def sa_enum_column(enum_cls: type[Enum], *, nullable: bool = False) -> Column:
     """Colonne SQLAlchemy pour un champ enum, stockée en VARCHAR + CHECK
     plutôt qu'en type ENUM natif PostgreSQL (native_enum=False).
 
-    Certaines de ces énumérations (ex. MethodeDonnee) sont réutilisées sur
+    Certaines de ces énumérations (ex. DataMethod) sont réutilisées sur
     plusieurs tables : un type ENUM natif porte le même nom PostgreSQL
     partout où il est utilisé, ce qui expose à un conflit de création lors
     d'une même migration. Le stockage VARCHAR+CHECK évite ce risque tout en
@@ -54,13 +54,13 @@ class CompanyStatus(str, Enum):
     SUSPENDED = "SUSPENDED"
 
 
-class TypeRapport(str, Enum):
+class ReportType(str, Enum):
     RAPPORT_ANNUEL = "RAPPORT_ANNUEL"
     RAPPORT_ESG = "RAPPORT_ESG"
     RAPPORT_CLIMAT = "RAPPORT_CLIMAT"
 
 
-class CanalDepot(str, Enum):
+class SubmissionChannel(str, Enum):
     AUTOMATIQUE = "AUTOMATIQUE"
     ENTREPRISE = "ENTREPRISE"
 
@@ -71,13 +71,13 @@ class Pillar(str, Enum):
     GOUVERNANCE = "GOUVERNANCE"
 
 
-class MethodeDonnee(str, Enum):
+class DataMethod(str, Enum):
     RAPPORTEE = "RAPPORTEE"
     ESTIMEE = "ESTIMEE"
     CALCULEE = "CALCULEE"
 
 
-class StatutCouvertureIndicateur(str, Enum):
+class MetricCoverageStatus(str, Enum):
     """Statut à 3 valeurs d'un code cible pour un rapport (Phase 6, remplace l'ancien booléen
     MetricCoverage.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
     sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
@@ -88,13 +88,13 @@ class StatutCouvertureIndicateur(str, Enum):
     ABSENT_CONFIRME = "ABSENT_CONFIRME"
 
 
-class NiveauConfiance(str, Enum):
+class ConfidenceLevel(str, Enum):
     ELEVE = "ELEVE"
     MOYEN = "MOYEN"
     FAIBLE = "FAIBLE"
 
 
-class DecisionAudit(str, Enum):
+class AuditDecision(str, Enum):
     RECOMMANDE_VALIDATION = "RECOMMANDE_VALIDATION"
     RECOMMANDE_REJET = "RECOMMANDE_REJET"
     DEMANDE_CLARIFICATION = "DEMANDE_CLARIFICATION"
@@ -111,7 +111,7 @@ class Role(str, Enum):
     INSTITUTION = "INSTITUTION"
 
 
-class DevisePosition(str, Enum):
+class Currency(str, Enum):
     MRU = "MRU"
     USD = "USD"
     EUR = "EUR"
@@ -159,23 +159,23 @@ class MatchStatus(str, Enum):
     AMBIGUOUS = "AMBIGUOUS"
 
 
-class TypeDureeInvestissement(str, Enum):
+class DurationType(str, Enum):
     OUVERTE = "OUVERTE"
     FIXE = "FIXE"
 
 
-class StatutRattachement(str, Enum):
+class AffiliationStatus(str, Enum):
     EN_ATTENTE = "EN_ATTENTE"
     ACCEPTE = "ACCEPTE"
     REFUSE = "REFUSE"
 
 
-class StatutProjet(str, Enum):
+class ProjectStatus(str, Enum):
     OUVERT = "OUVERT"
     CLOTURE = "CLOTURE"
 
 
-class StatutAnalyse(str, Enum):
+class AnalysisStatus(str, Enum):
     BROUILLON = "BROUILLON"
     SOUMISE = "SOUMISE"
     VALIDEE = "VALIDEE"

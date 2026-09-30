@@ -39,30 +39,30 @@ export function CompanyReportDetailPage() {
           ← Mes rapports
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
-          Rapport {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
+          Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
         </h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge variant={variantStatutRapport(rapport.statut)}>
-            {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
+          <Badge variant={variantStatutRapport(rapport.status)}>
+            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
           </Badge>
           <span className="text-sm text-brand-grey">
             version {rapport.version}
-            {rapport.rapport_precedent_id ? " (correction)" : ""}
+            {rapport.previous_report_id ? " (correction)" : ""}
           </span>
         </div>
         {/* Même garde que CompanyReportsPage.tsx : une relance d'extraction peut échouer sur un
             rapport déjà avancé dans le workflow -- n'afficher que tant que c'est encore
             actionnable (rapport encore SUBMITTED). */}
-        {rapport.extraction_erreur &&
-        rapport.statut === "SUBMITTED" &&
-        rapport.statut_extraction === "FAILED" ? (
+        {rapport.extraction_error &&
+        rapport.status === "SUBMITTED" &&
+        rapport.extraction_status === "FAILED" ? (
           <p className="mt-2 text-sm text-destructive">
-            Échec d'extraction : {libelleCauseExtraction(rapport.extraction_erreur)}
+            Échec d'extraction : {libelleCauseExtraction(rapport.extraction_error)}
           </p>
         ) : null}
       </div>
 
-      {rapport.statut === "REVISION_REQUESTED" ? (
+      {rapport.status === "REVISION_REQUESTED" ? (
         <FormulaireCorrection rapportId={rapport.id} />
       ) : null}
 
@@ -71,20 +71,20 @@ export function CompanyReportDetailPage() {
           <CardTitle>Indicateurs ESG</CardTitle>
         </CardHeader>
         <CardContent>
-          {rapport.score_global_declare !== null ? (
+          {rapport.declared_global_score !== null ? (
             <p className="mb-3 text-sm">
               Score ESG global auto-déclaré par l'entreprise :{" "}
-              <strong className="text-brand-blue">{rapport.score_global_declare}/100</strong>
-              {rapport.score_global_declare_preuve ? (
+              <strong className="text-brand-blue">{rapport.declared_global_score}/100</strong>
+              {rapport.declared_global_score_proof ? (
                 <span className="text-brand-grey">
                   {" "}
-                  — {rapport.score_global_declare_preuve.nom_document} — p.
-                  {rapport.score_global_declare_preuve.page_debut}
+                  — {rapport.declared_global_score_proof.document_name} — p.
+                  {rapport.declared_global_score_proof.page_start}
                 </span>
               ) : null}
             </p>
           ) : null}
-          {rapport.indicateurs.length === 0 ? (
+          {rapport.metrics.length === 0 ? (
             <p className="text-brand-grey">Aucun indicateur extrait pour l'instant.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -99,16 +99,16 @@ export function CompanyReportDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rapport.indicateurs.map((indicateur) => (
+                  {rapport.metrics.map((indicateur) => (
                     <tr key={indicateur.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{indicateur.pilier}</td>
-                      <td className="py-2 pr-4">{indicateur.code}</td>
+                      <td className="py-2 pr-4">{indicateur.pillar}</td>
+                      <td className="py-2 pr-4">{indicateur.metric_code}</td>
                       <td className="py-2 pr-4">
-                        {indicateur.valeur} {indicateur.unite}
+                        {indicateur.value} {indicateur.unit}
                       </td>
-                      <td className="py-2 pr-4">{indicateur.methode}</td>
+                      <td className="py-2 pr-4">{indicateur.method}</td>
                       <td className="py-2 text-brand-grey">
-                        {indicateur.preuve.nom_document} — p.{indicateur.preuve.page_debut}
+                        {indicateur.proof.document_name} — p.{indicateur.proof.page_start}
                       </td>
                     </tr>
                   ))}
@@ -124,7 +124,7 @@ export function CompanyReportDetailPage() {
           <CardTitle>Données carbone</CardTitle>
         </CardHeader>
         <CardContent>
-          {rapport.donnees_carbone.length === 0 ? (
+          {rapport.carbon_data.length === 0 ? (
             <p className="text-brand-grey">Aucune donnée carbone extraite pour l'instant.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -139,19 +139,19 @@ export function CompanyReportDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rapport.donnees_carbone.map((donnee) => (
+                  {rapport.carbon_data.map((donnee) => (
                     <tr key={donnee.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         Scope {donnee.scope}
-                        {donnee.categorie_ges ? ` — ${donnee.categorie_ges}` : ""}
+                        {donnee.ghg_category ? ` — ${donnee.ghg_category}` : ""}
                       </td>
-                      <td className="py-2 pr-4">{donnee.valeur_tonnes_co2e} tCO2e</td>
-                      <td className="py-2 pr-4">{donnee.methode}</td>
+                      <td className="py-2 pr-4">{donnee.tonnes_co2e} tCO2e</td>
+                      <td className="py-2 pr-4">{donnee.method}</td>
                       <td className="py-2 pr-4">
-                        {donnee.score_qualite_pcaf != null ? `${donnee.score_qualite_pcaf}/5` : "—"}
+                        {donnee.pcaf_data_quality != null ? `${donnee.pcaf_data_quality}/5` : "—"}
                       </td>
                       <td className="py-2 text-brand-grey">
-                        {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
+                        {donnee.proof.document_name} — p.{donnee.proof.page_start}
                       </td>
                     </tr>
                   ))}

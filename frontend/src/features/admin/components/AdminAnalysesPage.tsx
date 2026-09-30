@@ -1,5 +1,5 @@
 import { FlaskConical } from "lucide-react";
-import type { StatutAnalyse } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { AnalysisStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAnalysesAdmin } from "../api";
 import { useOngletParametre } from "../useOngletParametre";
 
-const STATUTS: StatutAnalyse[] = ["BROUILLON", "SOUMISE", "VALIDEE", "CORRECTION_DEMANDEE"];
+const STATUTS: AnalysisStatus[] = ["BROUILLON", "SOUMISE", "VALIDEE", "CORRECTION_DEMANDEE"];
 
 /** Toutes les analyses Chercheur (toutes versions), filtrable par statut — détail derrière
  * "Analyses par statut" / "Corrections demandées" des onglets Chercheur et Institution du tableau
@@ -20,7 +20,7 @@ const STATUTS: StatutAnalyse[] = ["BROUILLON", "SOUMISE", "VALIDEE", "CORRECTION
  * avec ses versions précédentes/suivantes. Suivi en lecture seule, le contenu reste privé aux
  * acteurs concernés (Chercheur/Institution). */
 export function AdminAnalysesPage() {
-  const [statut, setStatut] = useOngletParametre<StatutAnalyse | "">("statut", "");
+  const [statut, setStatut] = useOngletParametre<AnalysisStatus | "">("statut", "");
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAnalysesAdmin(statut || undefined);
 
@@ -38,7 +38,7 @@ export function AdminAnalysesPage() {
           <CardTitle>Analyses</CardTitle>
           <Select
             value={statut}
-            onChange={(event) => setStatut(event.target.value as StatutAnalyse | "")}
+            onChange={(event) => setStatut(event.target.value as AnalysisStatus | "")}
             className="w-56"
           >
             <option value="">Tous les statuts</option>
@@ -71,18 +71,18 @@ export function AdminAnalysesPage() {
               <TableBody>
                 {analyses.map((analyse) => (
                   <TableRow key={analyse.id}>
-                    <TableCell className="font-medium text-brand-blue">{analyse.titre}</TableCell>
+                    <TableCell className="font-medium text-brand-blue">{analyse.title}</TableCell>
                     <TableCell>
-                      <Badge variant={variantStatutAnalyse(analyse.statut)}>
-                        {libelleStatutAnalyse(analyse.statut)}
+                      <Badge variant={variantStatutAnalyse(analyse.status)}>
+                        {libelleStatutAnalyse(analyse.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-brand-grey">{analyse.chercheur_email}</TableCell>
-                    <TableCell className="text-brand-grey">{analyse.projet_nom}</TableCell>
+                    <TableCell className="text-brand-grey">{analyse.researcher_email}</TableCell>
+                    <TableCell className="text-brand-grey">{analyse.project_name}</TableCell>
                     <TableCell className="tabular-nums">{analyse.version}</TableCell>
                     <TableCell className="text-brand-grey">
-                      {analyse.date_soumission
-                        ? new Date(analyse.date_soumission).toLocaleDateString("fr-FR")
+                      {analyse.submitted_at
+                        ? new Date(analyse.submitted_at).toLocaleDateString("fr-FR")
                         : "—"}
                     </TableCell>
                   </TableRow>

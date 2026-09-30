@@ -28,7 +28,7 @@ export function EntrepriseCombobox({
   const resultats = data?.pages.flatMap((page) => page.items) ?? [];
 
   function choisir(entreprise: EntreprisePublieePublic) {
-    setTexte(entreprise.nom);
+    setTexte(entreprise.name);
     setConfirmee(true);
     setOuvert(false);
     onSelect(entreprise);
@@ -67,9 +67,9 @@ export function EntrepriseCombobox({
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
                 onClick={() => choisir(entreprise)}
               >
-                <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-7" />
-                <span className="font-medium text-brand-blue">{entreprise.nom}</span>
-                <span className="text-brand-grey">{entreprise.secteur}</span>
+                <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-7" />
+                <span className="font-medium text-brand-blue">{entreprise.name}</span>
+                <span className="text-brand-grey">{entreprise.sector}</span>
               </button>
             ))
           )}

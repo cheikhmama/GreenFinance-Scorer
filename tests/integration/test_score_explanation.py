@@ -10,13 +10,13 @@ from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
     CompanyStatus,
-    MethodeDonnee,
+    DataMethod,
     Pillar,
     ReportStatus,
+    ReportType,
     Role,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.ingestion.models import ESGMetric, ESGReport, Evidence
 from app.scoring.config_schema import charger_configuration_depuis_fichier
@@ -55,8 +55,8 @@ def _entreprise_scoree(
 def _rapport_valide(session, entreprise: Company, part: float) -> ESGReport:
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
@@ -70,7 +70,7 @@ def _rapport_valide(session, entreprise: Company, part: float) -> ESGReport:
     session.add(
         ESGMetric(
             report_id=rapport.id, pillar=Pillar.GOUVERNANCE, metric_code=CODE,
-            value=_valeur_normalisee_a(part), unit="%", method=MethodeDonnee.RAPPORTEE,
+            value=_valeur_normalisee_a(part), unit="%", method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -163,7 +163,7 @@ def test_rapport_sans_score_officiel(session) -> None:
     session.add(entreprise)
     session.flush()
     rapport = ESGReport(
-        company_id=entreprise.id, type=TypeRapport.RAPPORT_ESG, channel=CanalDepot.ENTREPRISE,
+        company_id=entreprise.id, type=ReportType.RAPPORT_ESG, channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.SUBMITTED, source_file="rapports/x.pdf", submitted_at=utcnow(),
     )
     session.add(rapport)

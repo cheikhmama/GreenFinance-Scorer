@@ -64,17 +64,17 @@ export function AdminAuditeursPage() {
               </TableHeader>
               <TableBody>
                 {auditeurs.map((auditeur) => (
-                  <TableRow key={auditeur.auditeur_id}>
+                  <TableRow key={auditeur.auditor_id}>
                     <TableCell className="font-medium text-brand-blue">{auditeur.email}</TableCell>
-                    <TableCell className="tabular-nums">{auditeur.dossiers_affectes}</TableCell>
+                    <TableCell className="tabular-nums">{auditeur.assigned_reports}</TableCell>
                     <TableCell>
-                      {auditeur.dossiers_en_retard > 0 ? (
-                        <Badge variant="warning">{auditeur.dossiers_en_retard}</Badge>
+                      {auditeur.overdue_reports > 0 ? (
+                        <Badge variant="warning">{auditeur.overdue_reports}</Badge>
                       ) : (
                         <span className="tabular-nums text-brand-grey">0</span>
                       )}
                     </TableCell>
-                    <TableCell className="tabular-nums text-brand-grey">{auditeur.avis_rendus}</TableCell>
+                    <TableCell className="tabular-nums text-brand-grey">{auditeur.opinions_submitted}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

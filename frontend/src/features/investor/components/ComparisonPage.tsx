@@ -26,7 +26,7 @@ export function ComparisonPage() {
 
   const { data: toutesEntreprises } = usePublishedCompanies({});
   const entreprisesConnues = toutesEntreprises?.pages.flatMap((page) => page.items) ?? [];
-  const secteursDisponibles = Array.from(new Set(entreprisesConnues.map((e) => e.secteur))).sort();
+  const secteursDisponibles = Array.from(new Set(entreprisesConnues.map((e) => e.sector))).sort();
 
   const { data: resultatsRecherche, isLoading: chargementRecherche } = usePublishedCompanies({
     recherche: rechercheDebattue,
@@ -57,7 +57,7 @@ export function ComparisonPage() {
     setSearchParams(params);
   }
 
-  function entrepriseSelectionnee(id: string): { nom: string; logo: string | null } | undefined {
+  function entrepriseSelectionnee(id: string): { name: string; logo: string | null } | undefined {
     return entreprisesConnues.find((e) => e.id === id) ?? entreprisesTrouvees.find((e) => e.id === id);
   }
 
@@ -89,15 +89,15 @@ export function ComparisonPage() {
                 return (
                   <Badge key={id} variant="secondary" className="gap-2 py-1.5 pr-1.5 pl-2">
                     <CompanyAvatar
-                      nom={entreprise?.nom ?? "…"}
+                      nom={entreprise?.name ?? "…"}
                       logo={entreprise?.logo ?? null}
                       className="size-5"
                     />
-                    {entreprise?.nom ?? "…"}
+                    {entreprise?.name ?? "…"}
                     <button
                       type="button"
                       onClick={() => retirer(id)}
-                      aria-label={`Retirer ${entreprise?.nom ?? "cette entreprise"} de la comparaison`}
+                      aria-label={`Retirer ${entreprise?.name ?? "cette entreprise"} de la comparaison`}
                       className="rounded-full px-1 text-brand-grey hover:bg-slate-200 hover:text-brand-blue"
                     >
                       ×
@@ -167,10 +167,10 @@ export function ComparisonPage() {
                       : "border-transparent hover:border-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-8" />
+                  <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-brand-blue">{entreprise.nom}</span>
-                    <span className="block truncate text-xs text-brand-grey">{entreprise.secteur}</span>
+                    <span className="block truncate font-medium text-brand-blue">{entreprise.name}</span>
+                    <span className="block truncate text-xs text-brand-grey">{entreprise.sector}</span>
                   </span>
                   <span className="shrink-0 text-xs font-medium text-brand-blue">
                     {dejaSelectionnee ? "Retirer" : "Ajouter"}

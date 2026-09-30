@@ -38,7 +38,7 @@ export function AdminCompanyReportsPage() {
             <li key={rapport.id} className="flex items-center justify-between gap-4 p-4">
               <div>
                 <p className="font-medium text-brand-blue">
-                  {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
+                  {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
                 </p>
                 <p className="text-xs text-brand-grey">
                   {libelleDateRapport(rapport)} — version{" "}
@@ -46,8 +46,8 @@ export function AdminCompanyReportsPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={variantStatutRapport(rapport.statut)}>
-                  {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
+                <Badge variant={variantStatutRapport(rapport.status)}>
+                  {libelleStatutRapport(rapport.status, rapport.extraction_status)}
                 </Badge>
                 <Button asChild size="sm" variant="outline">
                   <Link to={`/admin/rapports/${rapport.id}`}>Ouvrir</Link>

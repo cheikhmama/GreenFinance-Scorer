@@ -94,7 +94,7 @@ from app.admin.utilisateurs import (
     renvoyer_lien_activation,
 )
 from app.audit.assignment import affecter_auditeur, lister_charge_auditeurs
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.audit.schemas import AvisAuditAdmin
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import User
@@ -105,7 +105,7 @@ from app.company.rapports import lister_mes_rapports
 from app.company.schemas import EntreprisePublic
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import ReportStatus, Role, StatutAnalyse, StatutProjet
+from app.core.enums import AnalysisStatus, ProjectStatus, ReportStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
 from app.ingestion.models import ESGReport
@@ -128,10 +128,10 @@ def _vers_entreprise_admin(session: Session, entreprise: Company) -> EntrepriseA
     )
     return EntrepriseAdmin(
         **EntreprisePublic.model_validate(entreprise).model_dump(),
-        utilisateur_id=entreprise.owner_user_id,
-        nombre_rapports=nombre_rapports,
-        dernier_statut_rapport=dernier_statut,
-        dernier_rapport_id=dernier_rapport_id,
+        owner_user_id=entreprise.owner_user_id,
+        report_count=nombre_rapports,
+        latest_report_status=dernier_statut,
+        latest_report_id=dernier_rapport_id,
     )
 
 
@@ -204,21 +204,21 @@ def creer_utilisateur_route(
         session,
         current_user.id,
         payload.email,
-        payload.nom,
+        payload.name,
         payload.role,
-        nom_entreprise=payload.nom_entreprise,
-        secteur=payload.secteur,
-        pays=payload.pays,
+        nom_entreprise=payload.company_name,
+        secteur=payload.sector,
+        pays=payload.country,
     )
     envoyer_lien_activation(session, utilisateur, background_tasks)
     session.commit()
     return UtilisateurCree(
         id=utilisateur.id,
         email=utilisateur.email,
-        nom=utilisateur.name,
+        name=utilisateur.name,
         role=utilisateur.role,
-        date_creation=utilisateur.created_at,
-        actif=utilisateur.active,
+        created_at=utilisateur.created_at,
+        active=utilisateur.active,
     )
 
 
@@ -357,7 +357,7 @@ def affecter_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ESGReport:
-    return affecter_auditeur(session, rapport_id, payload.auditeur_id)
+    return affecter_auditeur(session, rapport_id, payload.auditor_id)
 
 
 @router.get(
@@ -377,11 +377,11 @@ def lister_charge_auditeurs_route(
     return Page[ChargeAuditeurAdmin](
         items=[
             ChargeAuditeurAdmin(
-                auditeur_id=auditeur.id,
+                auditor_id=auditeur.id,
                 email=auditeur.email,
-                dossiers_affectes=affectes,
-                dossiers_en_retard=en_retard,
-                avis_rendus=avis,
+                assigned_reports=affectes,
+                overdue_reports=en_retard,
+                opinions_submitted=avis,
             )
             for auditeur, affectes, en_retard, avis in items
         ],
@@ -431,9 +431,9 @@ def verifier_score_calculable_route(
 ) -> ScoreVerificationAdmin:
     apercu = apercu_score(session, rapport_id)
     return ScoreVerificationAdmin(
-        calculable=apercu.calculable,
-        taux_couverture=apercu.coverage_rate,
-        couverture_minimale=apercu.min_coverage,
+        computable=apercu.calculable,
+        coverage_rate=apercu.coverage_rate,
+        min_coverage=apercu.min_coverage,
     )
 
 
@@ -451,14 +451,14 @@ def recalculer_score_route(
     score = recalculer_score(session, rapport_id)
     return ScoreRecalculeAdmin(
         id=score.id,
-        rapport_id=score.report_id,
-        configuration_id=score.config_id,
-        valeur_globale=score.global_score,
-        score_environnement=score.environmental_score,
-        score_social=score.social_score,
-        score_gouvernance=score.governance_score,
-        taux_couverture=score.coverage_rate,
-        date_calcul=score.computed_at,
+        report_id=score.report_id,
+        config_id=score.config_id,
+        global_score=score.global_score,
+        environmental_score=score.environmental_score,
+        social_score=score.social_score,
+        governance_score=score.governance_score,
+        coverage_rate=score.coverage_rate,
+        computed_at=score.computed_at,
     )
 
 
@@ -477,7 +477,7 @@ def consulter_rapport_route(
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"score_officiel": score_public(session, rapport_id)})
+    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 
 @router.get(
@@ -522,7 +522,7 @@ def lister_avis_route(
     rapport_id: uuid.UUID,
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[AvisAudit]:
+) -> list[AuditOpinion]:
     return lister_avis(session, rapport_id)
 
 
@@ -538,7 +538,7 @@ def valider_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ESGReport:
-    return valider_rapport(session, rapport_id, payload.commentaire)
+    return valider_rapport(session, rapport_id, payload.comment)
 
 
 @router.post(
@@ -553,7 +553,7 @@ def rejeter_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ESGReport:
-    return rejeter_rapport(session, rapport_id, payload.commentaire)
+    return rejeter_rapport(session, rapport_id, payload.comment)
 
 
 @router.post(
@@ -568,7 +568,7 @@ def demander_correction_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ESGReport:
-    return demander_correction(session, rapport_id, payload.commentaire)
+    return demander_correction(session, rapport_id, payload.comment)
 
 
 @router.get(
@@ -591,10 +591,10 @@ def lister_toutes_les_entreprises_route(
         items=[
             EntrepriseAdmin(
                 **EntreprisePublic.model_validate(entreprise).model_dump(),
-                utilisateur_id=entreprise.owner_user_id,
-                nombre_rapports=nombre_rapports,
-                dernier_statut_rapport=dernier_statut,
-                dernier_rapport_id=dernier_rapport_id,
+                owner_user_id=entreprise.owner_user_id,
+                report_count=nombre_rapports,
+                latest_report_status=dernier_statut,
+                latest_report_id=dernier_rapport_id,
             )
             for entreprise, nombre_rapports, dernier_statut, dernier_rapport_id in items
         ],
@@ -673,13 +673,13 @@ def lister_entreprises_avec_score_route(
         items=[
             EntrepriseAvecScoreAdmin(
                 id=entreprise.id,
-                nom=entreprise.name,
-                secteur=entreprise.sector,
-                pays=entreprise.country,
-                score_global=score.global_score if score else None,
-                score_environnement=score.environmental_score if score else None,
-                score_social=score.social_score if score else None,
-                score_gouvernance=score.governance_score if score else None,
+                name=entreprise.name,
+                sector=entreprise.sector,
+                country=entreprise.country,
+                global_score=score.global_score if score else None,
+                environmental_score=score.environmental_score if score else None,
+                social_score=score.social_score if score else None,
+                governance_score=score.governance_score if score else None,
             )
             for entreprise, score in items
         ],
@@ -800,13 +800,13 @@ def modifier_entreprise_route(
     entreprise = modifier_entreprise_admin(
         session,
         entreprise_id,
-        nom=payload.nom,
-        secteur=payload.secteur,
-        pays=payload.pays,
+        nom=payload.name,
+        secteur=payload.sector,
+        pays=payload.country,
         description=payload.description,
-        site_officiel=payload.site_officiel,
-        montant_minimum_investissement=payload.montant_minimum_investissement,
-        devise_montant_minimum=payload.devise_montant_minimum,
+        site_officiel=payload.website,
+        montant_minimum_investissement=payload.minimum_investment_amount,
+        devise_montant_minimum=payload.minimum_investment_currency,
     )
     return _vers_entreprise_admin(session, entreprise)
 
@@ -924,27 +924,27 @@ def apercu_acteurs_route(
 ) -> ApercuActeursAdmin:
     apercu = construire_apercu_acteurs(session)
     return ApercuActeursAdmin(
-        auditeurs=StatistiquesAuditeursAdmin(
-            dossiers_affectes=apercu.auditeurs.dossiers_affectes,
-            avis_rendus=apercu.auditeurs.avis_rendus,
+        auditors=StatistiquesAuditeursAdmin(
+            assigned_reports=apercu.auditeurs.dossiers_affectes,
+            opinions_submitted=apercu.auditeurs.avis_rendus,
         ),
-        investisseurs=StatistiquesInvestisseursAdmin(
-            portefeuilles_non_archives=apercu.investisseurs.portefeuilles_non_archives,
-            positions_declarees=apercu.investisseurs.positions_declarees,
-            entreprises_distinctes=apercu.investisseurs.entreprises_distinctes,
+        investors=StatistiquesInvestisseursAdmin(
+            active_portfolios=apercu.investisseurs.portefeuilles_non_archives,
+            declared_positions=apercu.investisseurs.positions_declarees,
+            distinct_companies=apercu.investisseurs.entreprises_distinctes,
         ),
-        chercheurs=StatistiquesChercheursAdmin(
-            chercheurs_affectes_projets_ouverts=apercu.chercheurs.chercheurs_affectes_projets_ouverts,
-            analyses_brouillon=apercu.chercheurs.analyses_brouillon,
-            analyses_soumises=apercu.chercheurs.analyses_soumises,
-            analyses_validees=apercu.chercheurs.analyses_validees,
-            analyses_correction_demandee=apercu.chercheurs.analyses_correction_demandee,
+        researchers=StatistiquesChercheursAdmin(
+            researchers_on_open_projects=apercu.chercheurs.chercheurs_affectes_projets_ouverts,
+            draft_analyses=apercu.chercheurs.analyses_brouillon,
+            submitted_analyses=apercu.chercheurs.analyses_soumises,
+            approved_analyses=apercu.chercheurs.analyses_validees,
+            analyses_changes_requested=apercu.chercheurs.analyses_correction_demandee,
         ),
         institutions=StatistiquesInstitutionsAdmin(
-            projets_ouverts=apercu.institutions.projets_ouverts,
-            projets_clotures=apercu.institutions.projets_clotures,
-            invitations_en_attente=apercu.institutions.invitations_en_attente,
-            analyses_a_examiner=apercu.institutions.analyses_a_examiner,
+            open_projects=apercu.institutions.projets_ouverts,
+            closed_projects=apercu.institutions.projets_clotures,
+            pending_invitations=apercu.institutions.invitations_en_attente,
+            analyses_to_review=apercu.institutions.analyses_a_examiner,
         ),
     )
 
@@ -961,17 +961,17 @@ def performance_esg_route(
 ) -> PerformanceESGAdmin:
     performance = calculer_performance_esg(session, entreprises_perimetre_esg(session))
     return PerformanceESGAdmin(
-        score_global_moyen=performance.score_global_moyen,
-        score_environnement_moyen=performance.score_environnement_moyen,
-        score_social_moyen=performance.score_social_moyen,
-        score_gouvernance_moyen=performance.score_gouvernance_moyen,
-        entreprises_avec_score=performance.entreprises_avec_score,
-        entreprises_perimetre=performance.entreprises_perimetre,
+        average_global_score=performance.score_global_moyen,
+        average_environmental_score=performance.score_environnement_moyen,
+        average_social_score=performance.score_social_moyen,
+        average_governance_score=performance.score_gouvernance_moyen,
+        companies_with_score=performance.entreprises_avec_score,
+        companies_in_scope=performance.entreprises_perimetre,
         distribution=[
             TrancheScorePublic(
-                borne_min=tranche.borne_min,
-                borne_max=tranche.borne_max,
-                nombre_entreprises=tranche.nombre_entreprises,
+                lower_bound=tranche.borne_min,
+                upper_bound=tranche.borne_max,
+                company_count=tranche.nombre_entreprises,
             )
             for tranche in performance.distribution
         ],
@@ -996,12 +996,12 @@ def lister_portefeuilles_admin_route(
         items=[
             PortefeuilleAdmin(
                 id=portefeuille.id,
-                nom=portefeuille.name,
-                investisseur_email=investisseur.email,
-                devise_reference=portefeuille.reference_currency,
-                nombre_positions=nombre_positions,
-                montant_total=montant_total,
-                date_creation=portefeuille.created_at,
+                name=portefeuille.name,
+                investor_email=investisseur.email,
+                reference_currency=portefeuille.reference_currency,
+                position_count=nombre_positions,
+                total_amount=montant_total,
+                created_at=portefeuille.created_at,
             )
             for portefeuille, investisseur, nombre_positions, montant_total in items
         ],
@@ -1019,7 +1019,7 @@ def lister_portefeuilles_admin_route(
     summary="Lister toutes les analyses Chercheur, filtrable par statut",
 )
 def lister_analyses_admin_route(
-    statut: StatutAnalyse | None = Query(None),
+    statut: AnalysisStatus | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
     _current_user: User = Depends(require_role(Role.ADMIN)),
@@ -1030,14 +1030,14 @@ def lister_analyses_admin_route(
         items=[
             AnalyseAdmin(
                 id=analyse.id,
-                titre=analyse.titre,
-                statut=analyse.statut,
+                title=analyse.title,
+                status=analyse.status,
                 version=analyse.version,
-                chercheur_email=chercheur_email,
-                projet_nom=projet_nom,
-                date_creation=analyse.date_creation,
-                date_soumission=analyse.date_soumission,
-                date_decision=analyse.date_decision,
+                researcher_email=chercheur_email,
+                project_name=projet_nom,
+                created_at=analyse.created_at,
+                submitted_at=analyse.submitted_at,
+                decided_at=analyse.decided_at,
             )
             for analyse, chercheur_email, projet_nom in items
         ],
@@ -1055,7 +1055,7 @@ def lister_analyses_admin_route(
     summary="Lister tous les projets Institution, filtrable par statut",
 )
 def lister_projets_admin_route(
-    statut: StatutProjet | None = Query(None),
+    statut: ProjectStatus | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
     _current_user: User = Depends(require_role(Role.ADMIN)),
@@ -1066,13 +1066,13 @@ def lister_projets_admin_route(
         items=[
             ProjetAdmin(
                 id=projet.id,
-                nom=projet.nom,
-                statut=projet.statut,
+                name=projet.name,
+                status=projet.status,
                 institution_email=institution_email,
-                nombre_chercheurs=nombre_chercheurs,
-                date_creation=projet.date_creation,
-                date_limite=projet.date_limite,
-                date_cloture=projet.date_cloture,
+                researcher_count=nombre_chercheurs,
+                created_at=projet.created_at,
+                deadline=projet.deadline,
+                closed_at=projet.closed_at,
             )
             for projet, institution_email, nombre_chercheurs in items
         ],

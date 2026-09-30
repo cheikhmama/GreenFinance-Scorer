@@ -37,10 +37,10 @@ from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
     CompanyStatus,
-    DevisePosition,
+    Currency,
+    DurationType,
     IdentifierType,
     MatchStatus,
-    TypeDureeInvestissement,
 )
 from app.core.exceptions import ValidationError
 from app.investor import fx
@@ -66,7 +66,7 @@ class _Ligne:
     identifiant: str
     type_identifiant: IdentifierType
     montant: Decimal | None
-    devise: DevisePosition | None
+    devise: Currency | None
     poids: Decimal | None
 
 
@@ -159,16 +159,16 @@ def _valider_ligne(numero: int, valeurs: dict[str, Any], decimale_virgule: bool)
         raise ValueError("renseigner outstanding_amount OU weight, pas les deux")
     if montant is None and poids is None:
         raise ValueError("outstanding_amount ou weight est requis")
-    devise: DevisePosition | None = None
+    devise: Currency | None = None
     if montant is not None:
         if montant <= 0:
             raise ValueError("outstanding_amount doit être strictement positif")
         if montant != montant.quantize(CENTIME):
             raise ValueError("outstanding_amount : au plus deux décimales")
         try:
-            devise = DevisePosition(brut_devise)
+            devise = Currency(brut_devise)
         except ValueError as exc:
-            devises = ", ".join(d.value for d in DevisePosition)
+            devises = ", ".join(d.value for d in Currency)
             raise ValueError(f"currency doit valoir {devises}") from exc
     if poids is not None:
         # Précision de la colonne (numeric(11,10)) : un poids qui s'arrondirait à 0 est refusé ici
@@ -304,7 +304,7 @@ def importer_positions(
                 "weight": ligne.poids
                 if ligne.poids is not None
                 else (converti / total_converti).quantize(PRECISION_POIDS, rounding=ROUND_UP),
-                "duration_type": TypeDureeInvestissement.OUVERTE,
+                "duration_type": DurationType.OUVERTE,
                 "start_date": aujourdhui,
             }
         )

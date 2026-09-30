@@ -159,7 +159,7 @@ def demander_reinitialisation(
             expires_at=utcnow() + TOKEN_TTL,
         )
     )
-    auditer(session, user.id, "demande_reinitialisation_mot_de_passe", "Utilisateur", user.id, "succes")
+    auditer(session, user.id, "password_reset_requested", "User", user.id, "success")
     session.commit()
 
     background_tasks.add_task(_envoyer_lien, user.email, jeton_clair)
@@ -193,7 +193,7 @@ def reinitialiser_mot_de_passe(session: Session, jeton_clair: str, nouveau_mot_d
     session.add(entree)
     session.add(user)
     auditer(
-        session, user.id, "reinitialisation_mot_de_passe", "Utilisateur", user.id, "succes"
+        session, user.id, "password_reset", "User", user.id, "success"
     )
     session.commit()
 

@@ -43,7 +43,7 @@ describe("ActivateAccountPage", () => {
       "/api/v1/auth/activer-compte",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ token: TOKEN, nouveau_mot_de_passe: "premier-secret" }),
+        body: JSON.stringify({ token: TOKEN, new_password: "premier-secret" }),
       }),
     );
   });

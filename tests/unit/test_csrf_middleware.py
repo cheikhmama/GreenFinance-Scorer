@@ -36,7 +36,7 @@ def client() -> TestClient:
 
     @application.post(f"{API_V1_PREFIX}/auth/login")
     def connexion() -> dict[str, str]:
-        return {"ok": "connexion"}
+        return {"ok": "login"}
 
     return TestClient(application, base_url="https://testserver")
 

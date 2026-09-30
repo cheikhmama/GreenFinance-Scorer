@@ -31,11 +31,11 @@ def _create_notification(
     session, utilisateur_id: uuid.UUID, *, lu: bool = False, date_envoi: datetime | None = None
 ) -> Notification:
     notification = Notification(
-        utilisateur_id=utilisateur_id,
+        user_id=utilisateur_id,
         type="TEST",
         message="Message de test.",
-        lu=lu,
-        date_envoi=date_envoi or utcnow(),
+        read=lu,
+        sent_at=date_envoi or utcnow(),
     )
     session.add(notification)
     session.commit()
@@ -104,9 +104,9 @@ def test_marquer_lue_change_le_statut(session) -> None:
     response = authed_client.post(f"/api/v1/notifications/{notification.id}/lu")
 
     assert response.status_code == 200
-    assert response.json()["lu"] is True
+    assert response.json()["read"] is True
     session.refresh(notification)
-    assert notification.lu is True
+    assert notification.read is True
 
 
 def test_marquer_lue_est_idempotent(session) -> None:
@@ -117,7 +117,7 @@ def test_marquer_lue_est_idempotent(session) -> None:
     response = authed_client.post(f"/api/v1/notifications/{notification.id}/lu")
 
     assert response.status_code == 200
-    assert response.json()["lu"] is True
+    assert response.json()["read"] is True
 
 
 def test_marquer_lue_dune_notification_dautrui_est_404(session) -> None:

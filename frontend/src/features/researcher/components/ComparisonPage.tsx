@@ -34,53 +34,53 @@ export function ComparisonPage() {
                   <th className="py-2 pr-4 font-medium">Critère</th>
                   {entreprises.map((entreprise) => (
                     <th key={entreprise.id} className="py-2 pr-4 font-medium text-brand-blue">
-                      {entreprise.nom}
+                      {entreprise.name}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                <Ligne titre="Secteur" entreprises={entreprises} render={(e) => e.secteur} />
-                <Ligne titre="Pays" entreprises={entreprises} render={(e) => e.pays} />
+                <Ligne titre="Secteur" entreprises={entreprises} render={(e) => e.sector} />
+                <Ligne titre="Pays" entreprises={entreprises} render={(e) => e.country} />
                 <Ligne
                   titre="Score global"
                   entreprises={entreprises}
-                  render={(e) => formatScore(e.score.valeur_globale)}
+                  render={(e) => formatScore(e.score.global_score)}
                 />
                 <Ligne
                   titre="Environnement (E)"
                   entreprises={entreprises}
-                  render={(e) => formatScore(e.score.score_environnement)}
+                  render={(e) => formatScore(e.score.environmental_score)}
                 />
                 <Ligne
                   titre="Social (S)"
                   entreprises={entreprises}
-                  render={(e) => formatScore(e.score.score_social)}
+                  render={(e) => formatScore(e.score.social_score)}
                 />
                 <Ligne
                   titre="Gouvernance (G)"
                   entreprises={entreprises}
-                  render={(e) => formatScore(e.score.score_gouvernance)}
+                  render={(e) => formatScore(e.score.governance_score)}
                 />
                 <Ligne
                   titre="Scope 1 (tCO2e)"
                   entreprises={entreprises}
-                  render={(e) => e.carbone.scope_1?.toLocaleString("fr-FR") ?? "—"}
+                  render={(e) => e.carbon.scope_1?.toLocaleString("fr-FR") ?? "—"}
                 />
                 <Ligne
                   titre="Scope 2, market-based (tCO2e)"
                   entreprises={entreprises}
-                  render={(e) => e.carbone.scope_2_market_based?.toLocaleString("fr-FR") ?? "—"}
+                  render={(e) => e.carbon.scope_2_market_based?.toLocaleString("fr-FR") ?? "—"}
                 />
                 <Ligne
                   titre="Scope 2, location-based (tCO2e)"
                   entreprises={entreprises}
-                  render={(e) => e.carbone.scope_2_location_based?.toLocaleString("fr-FR") ?? "—"}
+                  render={(e) => e.carbon.scope_2_location_based?.toLocaleString("fr-FR") ?? "—"}
                 />
                 <Ligne
                   titre="Scope 3 (tCO2e)"
                   entreprises={entreprises}
-                  render={(e) => e.carbone.scope_3?.toLocaleString("fr-FR") ?? "—"}
+                  render={(e) => e.carbon.scope_3?.toLocaleString("fr-FR") ?? "—"}
                 />
               </tbody>
             </table>

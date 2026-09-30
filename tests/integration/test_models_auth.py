@@ -3,7 +3,7 @@ import uuid
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.models import ChercheurInstitution, InstitutionProfil, User
+from app.auth.models import InstitutionProfile, ResearcherAffiliation, User
 from app.core.enums import Role
 
 
@@ -32,18 +32,18 @@ def test_rattachement_chercheur_institution(session) -> None:
     session.add(institution)
     session.flush()
 
-    profil = InstitutionProfil(utilisateur_id=institution.id, quota_export=10)
+    profil = InstitutionProfile(user_id=institution.id, export_quota=10)
     session.add(profil)
     session.flush()
 
-    rattachement = ChercheurInstitution(
-        chercheur_id=chercheur.id, institution_id=institution.id
+    rattachement = ResearcherAffiliation(
+        researcher_id=chercheur.id, institution_id=institution.id
     )
     session.add(rattachement)
     session.flush()
 
     assert rattachement.id is not None
-    assert profil.utilisateur_id == institution.id
+    assert profil.user_id == institution.id
 
 
 def test_email_unique_constraint(session) -> None:

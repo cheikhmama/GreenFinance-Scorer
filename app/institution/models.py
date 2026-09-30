@@ -1,8 +1,8 @@
 """Entités de persistance de l'espace Institution : projets et affectations (Étape 17).
 
 Un Projet est créé par une Institution et peut affecter plusieurs Chercheurs (chacun avec son
-propre fil d'analyse, voir app/researcher/models.py::Analyse) — jamais l'inverse, un Chercheur ne
-crée jamais de projet. L'affectation exige un rattachement ChercheurInstitution déjà ACCEPTE
+propre fil d'analyse, voir app/researcher/models.py::Analysis) — jamais l'inverse, un Chercheur ne
+crée jamais de projet. L'affectation exige un rattachement ResearcherAffiliation déjà ACCEPTE
 (vérifié par app/institution/projets.py, pas ici : ce module ne pose que le schéma).
 """
 
@@ -14,96 +14,99 @@ from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
-from app.core.enums import StatutProjet, sa_enum_column
+from app.core.enums import ProjectStatus, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import User
     from app.company.models import Company
     from app.ingestion.models import ESGReport
-    from app.researcher.models import Analyse
+    from app.researcher.models import Analysis
 
 
-class Projet(SQLModel, table=True):
-    __tablename__ = "projet"
+class Project(SQLModel, table=True):
+    """Table `projects` (tâche 4.7)."""
+
+    __tablename__ = "projects"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     institution_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
-    nom: str
+    name: str
     description: str | None = None
-    # Distinct de description (texte libre) : objectif porte la finalité de la mission, demandée
+    # Distinct de description (texte libre) : objective porte la finalité de la mission, demandée
     # explicitement comme champ séparé (Étape 17bis).
-    objectif: str | None = None
-    # Période prévue du projet (date_debut -> date_fin_prevue) et échéance de remise du travail
-    # (date_limite, optionnelle, distincte de la fin de période) — toutes trois de simples
-    # intentions posées par l'Institution, jamais recalculées. date_cloture (ci-dessous) reste la
+    objective: str | None = None
+    # Période prévue du projet (start_date -> planned_end_date) et échéance de remise du travail
+    # (deadline, optionnelle, distincte de la fin de période) — toutes trois de simples
+    # intentions posées par l'Institution, jamais recalculées. closed_at (ci-dessous) reste la
     # seule date à valeur réelle : la date effective de clôture.
-    date_debut: datetime | None = None
-    date_fin_prevue: datetime | None = None
-    date_limite: datetime | None = None
-    statut: StatutProjet = Field(default=StatutProjet.OUVERT, sa_column=sa_enum_column(StatutProjet))
-    date_creation: datetime = Field(default_factory=utcnow)
+    start_date: datetime | None = None
+    planned_end_date: datetime | None = None
+    deadline: datetime | None = None
+    status: ProjectStatus = Field(
+        default=ProjectStatus.OUVERT, sa_column=sa_enum_column(ProjectStatus)
+    )
+    created_at: datetime = Field(default_factory=utcnow)
     # Nulle tant que le projet est OUVERT — renseignée une seule fois à la clôture, jamais
     # recalculée (même principe que Company.published_at).
-    date_cloture: datetime | None = None
+    closed_at: datetime | None = None
 
     institution: "User" = Relationship(back_populates="projects")
-    affectations: list["AffectationProjet"] = Relationship(back_populates="projet")
-    analyses: list["Analyse"] = Relationship(back_populates="projet")
-    perimetre: list["ProjetEntreprise"] = Relationship(back_populates="projet")
-    documents: list["ProjetDocument"] = Relationship(back_populates="projet")
+    assignments: list["ProjectAssignment"] = Relationship(back_populates="project")
+    analyses: list["Analysis"] = Relationship(back_populates="project")
+    companies: list["ProjectCompany"] = Relationship(back_populates="project")
+    documents: list["ProjectDocument"] = Relationship(back_populates="project")
 
 
-class AffectationProjet(SQLModel, table=True):
-    __tablename__ = "affectation_projet"
+class ProjectAssignment(SQLModel, table=True):
+    """Chercheur affecté à un projet. Table `project_assignments` (tâche 4.7)."""
+
+    __tablename__ = "project_assignments"
     __table_args__ = (
-        UniqueConstraint("projet_id", "chercheur_id", name="uq_affectation_projet_chercheur"),
+        UniqueConstraint(
+            "project_id", "researcher_id", name="uq_project_assignments_project_researcher"
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    chercheur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
-    date_affectation: datetime = Field(default_factory=utcnow)
+    # CASCADE : une affectation n'existe qu'avec son projet. Index fourni par l'unicité.
+    project_id: uuid.UUID = Field(foreign_key="projects.id", ondelete="CASCADE")
+    researcher_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
+    assigned_at: datetime = Field(default_factory=utcnow)
 
-    projet: Projet = Relationship(back_populates="affectations")
-    chercheur: "User" = Relationship(back_populates="project_assignments")
+    project: Project = Relationship(back_populates="assignments")
+    researcher: "User" = Relationship(back_populates="project_assignments")
 
 
-class ProjetEntreprise(SQLModel, table=True):
-    """Le périmètre d'un projet : les entreprises que l'Institution autorise à comparer dans ce
-    projet précis (Étape 17bis). Une entreprise n'y entre que publiée (Company.published_at
-    non nul, vérifié par app/institution/projets.py, pas ici) — un Chercheur affecté au projet ne
-    peut construire une analyse qu'avec des entreprises présentes dans cette table, jamais
-    n'importe quelle entreprise publiée de la plateforme."""
+class ProjectCompany(SQLModel, table=True):
+    """Périmètre d'un projet : les entreprises publiées que ses chercheurs peuvent consulter
+    (app/researcher/projets.py::entreprises_perimetre_chercheur). Table `project_companies`."""
 
-    __tablename__ = "projet_entreprise"
+    __tablename__ = "project_companies"
     __table_args__ = (
-        UniqueConstraint("projet_id", "entreprise_id", name="uq_projet_entreprise"),
+        UniqueConstraint("project_id", "company_id", name="uq_project_companies_project_company"),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    entreprise_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
-    date_ajout: datetime = Field(default_factory=utcnow)
+    project_id: uuid.UUID = Field(foreign_key="projects.id", ondelete="CASCADE")
+    company_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
+    added_at: datetime = Field(default_factory=utcnow)
 
-    projet: Projet = Relationship(back_populates="perimetre")
-    entreprise: "Company" = Relationship()
+    project: Project = Relationship(back_populates="companies")
+    company: "Company" = Relationship()
 
 
-class ProjetDocument(SQLModel, table=True):
-    """Les documents explicitement mis à disposition d'un projet (Étape 17bis) — un niveau plus
-    restrictif que le périmètre (ProjetEntreprise) : appartenir au périmètre ne rend pas
-    automatiquement tous les rapports internes de l'entreprise accessibles, seul un rapport
-    explicitement ajouté ici l'est. N'accepte que le rapport actuellement publié de l'entreprise
-    (voir app/institution/projets.py::ajouter_document, jamais seulement statut == VALIDATED — un
-    ancien rapport validé puis remplacé ne doit jamais redevenir accessible ainsi)."""
+class ProjectDocument(SQLModel, table=True):
+    """Rapport publié joint à un projet. Table `project_documents` (tâche 4.7)."""
 
-    __tablename__ = "projet_document"
-    __table_args__ = (UniqueConstraint("projet_id", "rapport_id", name="uq_projet_document"),)
+    __tablename__ = "project_documents"
+    __table_args__ = (
+        UniqueConstraint("project_id", "report_id", name="uq_project_documents_project_report"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    rapport_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
-    date_ajout: datetime = Field(default_factory=utcnow)
+    project_id: uuid.UUID = Field(foreign_key="projects.id", ondelete="CASCADE")
+    report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
+    added_at: datetime = Field(default_factory=utcnow)
 
-    projet: Projet = Relationship(back_populates="documents")
-    rapport: "ESGReport" = Relationship()
+    project: Project = Relationship(back_populates="documents")
+    report: "ESGReport" = Relationship()

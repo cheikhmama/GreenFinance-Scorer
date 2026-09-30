@@ -56,8 +56,8 @@ export function variantStatutRapport(statut: ReportStatus) {
 /** Date affichée pour un rapport : son dépôt, ou — pour un brouillon (DRAFT, tâche 1.5), qui n'a
  * encore ni fichier ni date de dépôt — son ouverture. Même règle partout, jamais `new Date(null)`
  * (qui afficherait le 1er janvier 1970). */
-export function libelleDateRapport(rapport: { date_depot: string | null; date_creation: string }) {
-  return rapport.date_depot
-    ? `Déposé le ${new Date(rapport.date_depot).toLocaleDateString("fr-FR")}`
-    : `Brouillon ouvert le ${new Date(rapport.date_creation).toLocaleDateString("fr-FR")}`;
+export function libelleDateRapport(rapport: { submitted_at: string | null; created_at: string }) {
+  return rapport.submitted_at
+    ? `Déposé le ${new Date(rapport.submitted_at).toLocaleDateString("fr-FR")}`
+    : `Brouillon ouvert le ${new Date(rapport.created_at).toLocaleDateString("fr-FR")}`;
 }

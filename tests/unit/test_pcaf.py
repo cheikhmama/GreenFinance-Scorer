@@ -15,7 +15,7 @@ from app.carbon.pcaf import (
     choisir_scope_2,
     qualite_donnee_pcaf,
 )
-from app.core.enums import MethodeDonnee
+from app.core.enums import DataMethod
 
 M = Decimal(1_000_000)
 
@@ -133,7 +133,7 @@ def test_scope_2_market_based_prefere() -> None:
 
 @pytest.mark.parametrize(
     ("methode", "attendu"),
-    [(MethodeDonnee.RAPPORTEE, 2), (MethodeDonnee.CALCULEE, 3), (MethodeDonnee.ESTIMEE, 4)],
+    [(DataMethod.RAPPORTEE, 2), (DataMethod.CALCULEE, 3), (DataMethod.ESTIMEE, 4)],
 )
-def test_qualite_derivee_de_la_methode(methode: MethodeDonnee, attendu: int) -> None:
+def test_qualite_derivee_de_la_methode(methode: DataMethod, attendu: int) -> None:
     assert qualite_donnee_pcaf(methode) == attendu

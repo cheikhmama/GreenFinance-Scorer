@@ -5,7 +5,7 @@ en donne le droit — jamais créée hors projet. Une correction demandée par l
 réécrit jamais l'analyse existante : elle reste CORRECTION_DEMANDEE, et une nouvelle ligne est
 créée avec version+1 et analyse_precedente_id pointant vers elle (même principe que
 app/ingestion/models.py::ESGReport). Statut + commentaire_institution suffisent ici, sans
-entité "avis" séparée comme AvisAudit : un seul acteur (l'Institution) décide, il n'y a pas de
+entité "avis" séparée comme AuditOpinion : un seul acteur (l'Institution) décide, il n'y a pas de
 recommandation intermédiaire d'un tiers à tracer séparément.
 """
 
@@ -17,65 +17,72 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
-from app.core.enums import StatutAnalyse, sa_enum_column
+from app.core.enums import AnalysisStatus, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import User
     from app.company.models import Company
-    from app.institution.models import Projet
+    from app.institution.models import Project
 
 
-class Analyse(SQLModel, table=True):
-    __tablename__ = "analyse"
+class Analysis(SQLModel, table=True):
+    """Table `analyses` (tâche 4.7)."""
+
+    __tablename__ = "analyses"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    projet_id: uuid.UUID = Field(foreign_key="projet.id")
-    chercheur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
-    titre: str
-    contenu: str
-    statut: StatutAnalyse = Field(
-        default=StatutAnalyse.BROUILLON, sa_column=sa_enum_column(StatutAnalyse)
+    # RESTRICT : une analyse est un travail rendu, jamais effacée avec son projet.
+    project_id: uuid.UUID = Field(foreign_key="projects.id", ondelete="RESTRICT", index=True)
+    researcher_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
+    title: str
+    content: str
+    status: AnalysisStatus = Field(
+        default=AnalysisStatus.BROUILLON, sa_column=sa_enum_column(AnalysisStatus)
     )
     version: int = Field(default=1)
-    analyse_precedente_id: uuid.UUID | None = Field(default=None, foreign_key="analyse.id")
-    commentaire_institution: str | None = None
-    date_creation: datetime = Field(default_factory=utcnow)
-    date_soumission: datetime | None = None
-    date_decision: datetime | None = None
+    # SET NULL : la version précédente d'une chaîne de corrections n'est qu'un repère.
+    previous_analysis_id: uuid.UUID | None = Field(
+        default=None, foreign_key="analyses.id", ondelete="SET NULL", index=True
+    )
+    institution_comment: str | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    submitted_at: datetime | None = None
+    decided_at: datetime | None = None
 
-    projet: "Projet" = Relationship(back_populates="analyses")
-    chercheur: "User" = Relationship(back_populates="analyses")
-    entreprises: list["AnalyseEntreprise"] = Relationship(back_populates="analyse")
+    project: "Project" = Relationship(back_populates="analyses")
+    researcher: "User" = Relationship(back_populates="analyses")
+    companies: list["AnalysisCompany"] = Relationship(back_populates="analysis")
 
 
-class AnalyseEntreprise(SQLModel, table=True):
+class AnalysisCompany(SQLModel, table=True):
     """Entreprises publiées comparées dans une analyse — jamais l'entreprise brute, toujours via
-    ce lien explicite (une analyse peut en comparer plusieurs)."""
+    ce lien explicite (une analyse peut en comparer plusieurs). Table `analysis_companies`."""
 
-    __tablename__ = "analyse_entreprise"
+    __tablename__ = "analysis_companies"
     __table_args__ = (
-        UniqueConstraint("analyse_id", "entreprise_id", name="uq_analyse_entreprise"),
+        UniqueConstraint("analysis_id", "company_id", name="uq_analysis_companies_analysis_company"),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    analyse_id: uuid.UUID = Field(foreign_key="analyse.id")
-    entreprise_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
+    # CASCADE : n'existe qu'avec son analyse. Index fourni par l'unicité (analysis_id en tête).
+    analysis_id: uuid.UUID = Field(foreign_key="analyses.id", ondelete="CASCADE")
+    company_id: uuid.UUID = Field(foreign_key="companies.id", ondelete="CASCADE", index=True)
     # Figés au moment de l'ajout (jamais fournis par le Chercheur, jamais mis à jour ensuite) :
-    # rapport_id fixe le rapport publié exact (indicateurs, Scope 1/2/3, preuves), score_esg_id le
+    # report_id fixe le rapport publié exact (indicateurs, Scope 1/2/3, preuves), score_id le
     # score E/S/G/global + méthodologie/version exacts (app/scoring/engine.py::score_officiel).
     # Une réévaluation ou republication ultérieure de l'entreprise ne change jamais ces deux
     # valeurs : l'analyse restitue toujours ce qui a réellement été utilisé à sa création.
-    rapport_id: uuid.UUID | None = Field(
+    report_id: uuid.UUID | None = Field(
         default=None, foreign_key="esg_reports.id", ondelete="SET NULL", index=True
     )
-    # SET NULL (tâche 3.1) : comme rapport_id, la suppression d'un rapport — et donc de ses scores
+    # SET NULL (tâche 3.1) : comme report_id, la suppression d'un rapport — et donc de ses scores
     # — ne doit jamais être bloquée par une analyse qui l'a figé.
-    score_esg_id: uuid.UUID | None = Field(
+    score_id: uuid.UUID | None = Field(
         default=None, foreign_key="scores.id", ondelete="SET NULL", index=True
     )
 
-    analyse: Analyse = Relationship(back_populates="entreprises")
-    entreprise: Optional["Company"] = Relationship()
+    analysis: Analysis = Relationship(back_populates="companies")
+    company: Optional["Company"] = Relationship()
 
 
 class ReferenceDataset(SQLModel, table=True):

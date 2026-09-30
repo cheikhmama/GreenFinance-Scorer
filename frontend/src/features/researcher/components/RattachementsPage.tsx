@@ -41,30 +41,30 @@ export function RattachementsPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <InitialsAvatar
-                    nom={rattachement.institution_nom ?? rattachement.institution_email}
+                    nom={rattachement.institution_name ?? rattachement.institution_email}
                     size="sm"
                   />
                   <div>
                     <p className="font-medium text-brand-blue">
-                      {rattachement.institution_nom ?? rattachement.institution_email}
+                      {rattachement.institution_name ?? rattachement.institution_email}
                     </p>
                     <p className="text-xs text-brand-grey">
-                      Invité le {new Date(rattachement.date_invitation).toLocaleDateString("fr-FR")}
+                      Invité le {new Date(rattachement.invited_at).toLocaleDateString("fr-FR")}
                     </p>
                   </div>
                 </div>
-                <Badge variant={variantStatutRattachement(rattachement.statut)}>
-                  {libelleStatutRattachement(rattachement.statut)}
+                <Badge variant={variantStatutRattachement(rattachement.status)}>
+                  {libelleStatutRattachement(rattachement.status)}
                 </Badge>
               </div>
 
-              {rattachement.conditions_collaboration ? (
+              {rattachement.collaboration_terms ? (
                 <p className="rounded-md border-l-4 border-brand-green bg-brand-green-light/40 p-3 text-sm text-brand-blue">
-                  {rattachement.conditions_collaboration}
+                  {rattachement.collaboration_terms}
                 </p>
               ) : null}
 
-              {rattachement.statut === "EN_ATTENTE" ? (
+              {rattachement.status === "EN_ATTENTE" ? (
                 <div className="flex gap-2">
                   <Button
                     size="sm"

@@ -154,7 +154,7 @@ def enregistrer_demande(
     session.add(entreprise)
     session.flush()
 
-    auditer(session, None, "inscription_entreprise", "Entreprise", entreprise.id, "succes")
+    auditer(session, None, "company_registered", "Company", entreprise.id, "success")
     admins = session.exec(
         select(User).where(col(User.role) == Role.ADMIN, col(User.active).is_(True))
     ).all()

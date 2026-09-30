@@ -14,16 +14,16 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
-from app.core.enums import Role, StatutRattachement, sa_enum_column
+from app.core.enums import AffiliationStatus, Role, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.audit.models import AvisAudit
+    from app.audit.models import AuditOpinion
     from app.company.models import Company
     from app.core.models import Notification
     from app.ingestion.models import ESGReport
-    from app.institution.models import AffectationProjet, Projet
+    from app.institution.models import Project, ProjectAssignment
     from app.investor.models import Portfolio
-    from app.researcher.models import Analyse
+    from app.researcher.models import Analysis
     from app.scoring.models import ScoringConfig
 
 
@@ -60,9 +60,7 @@ class User(SQLModel, table=True):
     # séparément ailleurs.
     activated_at: datetime | None = Field(default=None)
 
-    institution_profile: Optional["InstitutionProfil"] = Relationship(
-        back_populates="utilisateur"
-    )
+    institution_profile: Optional["InstitutionProfile"] = Relationship(back_populates="user")
     company: Optional["Company"] = Relationship(
         back_populates="owner",
         sa_relationship_kwargs={"foreign_keys": "[Company.owner_user_id]"},
@@ -72,11 +70,11 @@ class User(SQLModel, table=True):
         back_populates="owner"
     )
     portfolios: list["Portfolio"] = Relationship(back_populates="user")
-    audit_opinions: list["AvisAudit"] = Relationship(back_populates="auditeur")
-    notifications: list["Notification"] = Relationship(back_populates="utilisateur")
-    projects: list["Projet"] = Relationship(back_populates="institution")
-    project_assignments: list["AffectationProjet"] = Relationship(back_populates="chercheur")
-    analyses: list["Analyse"] = Relationship(back_populates="chercheur")
+    audit_opinions: list["AuditOpinion"] = Relationship(back_populates="auditor")
+    notifications: list["Notification"] = Relationship(back_populates="user")
+    projects: list["Project"] = Relationship(back_populates="institution")
+    project_assignments: list["ProjectAssignment"] = Relationship(back_populates="researcher")
+    analyses: list["Analysis"] = Relationship(back_populates="researcher")
 
 
 class PasswordResetToken(SQLModel, table=True):
@@ -135,20 +133,20 @@ class EmailChangeRequest(SQLModel, table=True):
     used_at: datetime | None = Field(default=None)
 
 
-class InstitutionProfil(SQLModel, table=True):
-    """Profil complémentaire 1-1, uniquement pertinent pour un Utilisateur
-    dont le role est INSTITUTION."""
+class InstitutionProfile(SQLModel, table=True):
+    """Profil complémentaire 1-1, uniquement pertinent pour un User dont le role est INSTITUTION
+    (table `institution_profiles`, tâche 4.7)."""
 
-    __tablename__ = "institution_profil"
+    __tablename__ = "institution_profiles"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    utilisateur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", unique=True)
-    quota_export: int
+    user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", unique=True)
+    export_quota: int
 
-    utilisateur: User = Relationship(back_populates="institution_profile")
+    user: User = Relationship(back_populates="institution_profile")
 
 
-class ChercheurInstitution(SQLModel, table=True):
+class ResearcherAffiliation(SQLModel, table=True):
     """Table de rattachement plusieurs-à-plusieurs entre un Utilisateur Chercheur et un
     Utilisateur Institution (Étape 17). Pas de Relationship() vers Utilisateur : deux FK vers la
     même table exigeraient chacune un foreign_keys= explicite pour lever l'ambiguïté côté
@@ -156,22 +154,25 @@ class ChercheurInstitution(SQLModel, table=True):
 
     Une invitation refusée n'est jamais recréée en double : l'Institution peut réinviter le même
     Chercheur, ce qui remet statut à EN_ATTENTE sur la même ligne (voir uq_chercheur_institution
-    ci-dessous, une seule ligne par couple)."""
+    ci-dessous, une seule ligne par couple). Table `researcher_affiliations` (tâche 4.7)."""
 
-    __tablename__ = "chercheur_institution"
+    __tablename__ = "researcher_affiliations"
     __table_args__ = (
-        UniqueConstraint("chercheur_id", "institution_id", name="uq_chercheur_institution"),
+        UniqueConstraint(
+            "researcher_id", "institution_id", name="uq_researcher_affiliations_researcher_institution"
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    chercheur_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
+    # Pas d'index séparé : l'unicité (researcher_id, institution_id) le fournit en tête.
+    researcher_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE")
     institution_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
-    statut: StatutRattachement = Field(
-        default=StatutRattachement.EN_ATTENTE, sa_column=sa_enum_column(StatutRattachement)
+    status: AffiliationStatus = Field(
+        default=AffiliationStatus.EN_ATTENTE, sa_column=sa_enum_column(AffiliationStatus)
     )
-    date_invitation: datetime = Field(default_factory=utcnow)
-    date_reponse: datetime | None = Field(default=None)
+    invited_at: datetime = Field(default_factory=utcnow)
+    responded_at: datetime | None = Field(default=None)
     # Texte libre optionnel renseigné par l'Institution à l'invitation (conditions de
     # collaboration, périmètre annoncé...) — consultable par le Chercheur avant sa réponse. Pas de
     # système juridique dédié : un simple champ texte suffit (voir échange Étape 17bis).
-    conditions_collaboration: str | None = Field(default=None)
+    collaboration_terms: str | None = Field(default=None)

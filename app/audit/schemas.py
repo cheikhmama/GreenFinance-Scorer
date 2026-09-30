@@ -8,7 +8,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.core.enums import DecisionAudit
+from app.core.enums import AuditDecision
 
 
 class AvisAuditPublic(BaseModel):
@@ -19,19 +19,19 @@ class AvisAuditPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    rapport_id: uuid.UUID
-    decision: DecisionAudit
-    commentaire: str | None
-    date_avis: datetime
+    report_id: uuid.UUID
+    decision: AuditDecision
+    comment: str | None
+    submitted_at: datetime
 
 
 class AvisAuditAdmin(AvisAuditPublic):
     """Réservé Administrateur/Auditeur — jamais exposé à un compte Entreprise (voir
-    app/audit/models.py::AvisAudit.auditeur_id)."""
+    app/audit/models.py::AuditOpinion.auditor_id)."""
 
-    auditeur_id: uuid.UUID
+    auditor_id: uuid.UUID
 
 
 class SoumettreAvisRequest(BaseModel):
-    decision: DecisionAudit
-    commentaire: str | None = None
+    decision: AuditDecision
+    comment: str | None = None

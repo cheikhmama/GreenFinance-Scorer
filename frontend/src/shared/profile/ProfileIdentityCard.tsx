@@ -101,7 +101,7 @@ export function ProfileIdentityCard() {
   const [emailEnAttente, setEmailEnAttente] = useState<string | null>(null);
   const form = useForm<ModifierProfilForm>({
     resolver: zodResolver(modifierProfilFormSchema),
-    values: { nom: user?.nom ?? "", email: user?.email ?? "", motDePasseActuel: "" },
+    values: { name: user?.name ?? "", email: user?.email ?? "", motDePasseActuel: "" },
   });
   const emailSaisi = form.watch("email");
 
@@ -118,12 +118,12 @@ export function ProfileIdentityCard() {
     }
     updateProfile.mutate(
       {
-        nom: values.nom,
+        name: values.name,
         email: values.email,
-        mot_de_passe_actuel: changeEmail ? values.motDePasseActuel : undefined,
+        current_password: changeEmail ? values.motDePasseActuel : undefined,
       },
       {
-        onSuccess: (reponse) => setEmailEnAttente(reponse.email_en_attente ?? null),
+        onSuccess: (reponse) => setEmailEnAttente(reponse.pending_email ?? null),
         onError: (error) => {
           if (error instanceof ApiError && error.code === "email_deja_utilise") {
             form.setError("email", { message: error.message });
@@ -146,9 +146,9 @@ export function ProfileIdentityCard() {
     <Card className="overflow-hidden py-0 shadow-sm">
       <div className="bg-gradient-to-br from-brand-navy to-brand-navy/80 px-6 py-8">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end">
-          <AvatarEditor nom={user.nom ?? user.email} avatar={user.avatar} />
+          <AvatarEditor nom={user.name ?? user.email} avatar={user.avatar} />
           <div className="text-center sm:text-left">
-            <p className="text-xl font-semibold text-white">{user.nom || user.email}</p>
+            <p className="text-xl font-semibold text-white">{user.name || user.email}</p>
             <p className="text-sm text-white/80">{user.email}</p>
             <Badge variant="secondary" className="mt-2">
               {LIBELLES_ROLE[user.role] ?? user.role}
@@ -183,12 +183,12 @@ export function ProfileIdentityCard() {
                 Membre depuis
               </p>
               <p className="text-sm font-medium text-brand-blue">
-                {new Date(user.date_creation).toLocaleDateString("fr-FR")}
+                {new Date(user.created_at).toLocaleDateString("fr-FR")}
               </p>
             </div>
           </div>
           <div className="flex items-start gap-2 rounded-lg border p-3">
-            {user.actif ? (
+            {user.active ? (
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-green" />
             ) : (
               <ShieldX className="mt-0.5 size-4 shrink-0 text-destructive" />
@@ -198,7 +198,7 @@ export function ProfileIdentityCard() {
                 Statut du compte
               </p>
               <p className="text-sm font-medium text-brand-blue">
-                {user.actif ? "Actif" : "Désactivé"}
+                {user.active ? "Actif" : "Désactivé"}
               </p>
             </div>
           </div>
@@ -209,7 +209,7 @@ export function ProfileIdentityCard() {
             <div className="flex flex-wrap gap-3">
               <FormField
                 control={form.control}
-                name="nom"
+                name="name"
                 render={({ field }) => (
                   <FormItem className="min-w-48 flex-1">
                     <FormLabel className="flex items-center gap-1.5">

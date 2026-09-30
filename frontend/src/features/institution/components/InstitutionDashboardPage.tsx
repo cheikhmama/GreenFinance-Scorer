@@ -14,10 +14,10 @@ export function InstitutionDashboardPage() {
   const { data: projets } = useMyProjects();
   const { data: analyses } = useMyAnalysesForInstitution();
 
-  const chercheursAcceptes = rattachements?.filter((r) => r.statut === "ACCEPTE").length ?? 0;
-  const invitationsEnAttente = rattachements?.filter((r) => r.statut === "EN_ATTENTE").length ?? 0;
-  const projetsOuverts = projets?.filter((p) => p.statut === "OUVERT").length ?? 0;
-  const analysesADecider = analyses?.filter((a) => a.statut === "SOUMISE").length ?? 0;
+  const chercheursAcceptes = rattachements?.filter((r) => r.status === "ACCEPTE").length ?? 0;
+  const invitationsEnAttente = rattachements?.filter((r) => r.status === "EN_ATTENTE").length ?? 0;
+  const projetsOuverts = projets?.filter((p) => p.status === "OUVERT").length ?? 0;
+  const analysesADecider = analyses?.filter((a) => a.status === "SOUMISE").length ?? 0;
 
   // Taux réel d'acceptation des invitations envoyées — jamais un pourcentage fabriqué (ex. un
   // quota d'export sans plafond connu côté API, voir InstitutionProfilPublic) : ce ratio se

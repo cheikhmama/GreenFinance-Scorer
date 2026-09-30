@@ -23,7 +23,7 @@ from app.auth.models import User
 from app.company.models import Company
 from app.company.rapports import deposer_rapport
 from app.core.database import engine
-from app.core.enums import Role, TypeRapport
+from app.core.enums import ReportType, Role
 from app.core.exceptions import ValidationError
 
 SOURCE_DIR = Path(__file__).resolve().parent.parent / "storage" / "seed_data" / "rapports_esg_mauritanie"
@@ -72,7 +72,7 @@ SNDE_FICHIER = "SNDE_rapport_ESG_2025.pdf"
 async def _deposer(session: Session, entreprise_id: uuid.UUID, contenu: bytes, label: str) -> None:
     tasks = BackgroundTasks()
     rapport = deposer_rapport(
-        session, tasks, entreprise_id, contenu, TypeRapport.RAPPORT_ESG, ANNEE_REPORTING
+        session, tasks, entreprise_id, contenu, ReportType.RAPPORT_ESG, ANNEE_REPORTING
     )
     print(f"[{label}] rapport {rapport.id} deposé (statut={rapport.status}) — extraction en cours...")
     await tasks()

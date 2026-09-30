@@ -20,6 +20,9 @@ anything, add or check its row here; after a rename lands, tick it.
    doesn't change during a persistence rename. Request schemas keep their French fields and the
    service code maps them. The English JSON contract arrives with the redesigned endpoints
    (tasks 1.3–1.5, 2.2, 3.2) and, for the rest, task 4.7.
+   - *Since task 4.7* every JSON field is English and equals the model attribute name; the
+     translation functions are gone (§3e). URL paths, path and query parameters, multipart form
+     fields and enum values keep their French names.
    - *Exceptions (task 1.1):* report status **values** change in the API (`statut` now carries
      `ReportStatus`), and reports gain `statut_extraction` (`ExtractionStatus`) — the frontend
      needs both to tell a queued report from one being extracted. Company `actif` stays a boolean
@@ -218,10 +221,60 @@ contract is unchanged: `ScoreESGPublic` / `ScoreEntreprisePublic` map explicitly
 and now returns `ScoreRecalculeAdmin` with the same field names. `analyse_entreprise.score_esg_id`
 keeps its name until task 4.7.
 
+## 3e. Task 4.7 — remaining tables and the JSON contract (migration `f2a6c9d4e8b1`)
+
+| Old table (class) | New table (class) | Columns |
+|---|---|---|
+| `avis_audit` (`AvisAudit`) | `audit_opinions` (`AuditOpinion`) | `rapport_id` → `report_id`, `auditeur_id` → `auditor_id`, `commentaire` → `comment`, `date_avis` → `submitted_at` |
+| `journal_audit` (`JournalAudit`) | `audit_log` (`AuditLogEntry`) | `acteur_id` → `actor_id`, `type_ressource` → `resource_type`, `id_ressource` → `resource_id`, `date` → `occurred_at`, `resultat` → `result`, `ancienne_valeur` / `nouvelle_valeur` → `old_value` / `new_value` |
+| `notification` (`Notification`) | `notifications` (`Notification`) | `utilisateur_id` → `user_id`, `id_ressource` → `resource_id`, `date_envoi` → `sent_at`, `lu` → `read` |
+| `institution_profil` (`InstitutionProfil`) | `institution_profiles` (`InstitutionProfile`) | `utilisateur_id` → `user_id`, `quota_export` → `export_quota` |
+| `chercheur_institution` (`ChercheurInstitution`) | `researcher_affiliations` (`ResearcherAffiliation`) | `chercheur_id` → `researcher_id`, `statut` → `status`, `date_invitation` → `invited_at`, `date_reponse` → `responded_at`, `conditions_collaboration` → `collaboration_terms` |
+| `analyse` (`Analyse`) | `analyses` (`Analysis`) | `projet_id` → `project_id` (**RESTRICT** + index, had neither), `chercheur_id` → `researcher_id`, `titre` → `title`, `contenu` → `content`, `statut` → `status`, `analyse_precedente_id` → `previous_analysis_id` (**SET NULL** + index), `commentaire_institution` → `institution_comment`, `date_creation` / `date_soumission` / `date_decision` → `created_at` / `submitted_at` / `decided_at` |
+| `analyse_entreprise` (`AnalyseEntreprise`) | `analysis_companies` (`AnalysisCompany`) | `analyse_id` → `analysis_id` (**CASCADE**), `entreprise_id` → `company_id`, `rapport_id` → `report_id`, `score_esg_id` → `score_id` |
+| `projet` (`Projet`) | `projects` (`Project`) | `nom` → `name`, `objectif` → `objective`, `date_debut` → `start_date`, `date_fin_prevue` → `planned_end_date`, `date_limite` → `deadline`, `statut` → `status`, `date_creation` → `created_at`, `date_cloture` → `closed_at` |
+| `affectation_projet` (`AffectationProjet`) | `project_assignments` (`ProjectAssignment`) | `projet_id` → `project_id` (**CASCADE**), `chercheur_id` → `researcher_id`, `date_affectation` → `assigned_at` |
+| `projet_entreprise` (`ProjetEntreprise`) | `project_companies` (`ProjectCompany`) | `projet_id` → `project_id` (**CASCADE**), `entreprise_id` → `company_id`, `date_ajout` → `added_at` |
+| `projet_document` (`ProjetDocument`) | `project_documents` (`ProjectDocument`) | `projet_id` → `project_id` (**CASCADE**), `rapport_id` → `report_id`, `date_ajout` → `added_at` |
+
+Relationships follow (`report`, `auditor`, `user`, `project`, `researcher`, `companies`,
+`assignments`, `documents`). Constraint and index names follow their table
+(`uq_project_companies_project_company`, `ix_audit_log_actor_id`, …).
+
+**Enum classes** (values unchanged — they are in the API): `TypeRapport` → `ReportType`,
+`CanalDepot` → `SubmissionChannel`, `MethodeDonnee` → `DataMethod`,
+`StatutCouvertureIndicateur` → `MetricCoverageStatus`, `NiveauConfiance` → `ConfidenceLevel`,
+`DecisionAudit` → `AuditDecision`, `DevisePosition` → `Currency`, `TypeDureeInvestissement` →
+`DurationType`, `StatutRattachement` → `AffiliationStatus`, `StatutProjet` → `ProjectStatus`,
+`StatutAnalyse` → `AnalysisStatus`.
+
+**Audit log values** (translated by the migration, both ways): actions `connexion` → `login`,
+`deconnexion` → `logout`, `creation_compte` → `account_created`, `activation_compte` →
+`account_activated`, `desactivation_compte` / `reactivation_compte` → `account_deactivated` /
+`account_reactivated`, `changement_mot_de_passe` → `password_changed`,
+`demande_reinitialisation_mot_de_passe` / `reinitialisation_mot_de_passe` →
+`password_reset_requested` / `password_reset`, `demande_changement_email` / `modification_email`
+→ `email_change_requested` / `email_changed`, `changement_role` → `role_changed`,
+`renvoi_lien_activation` → `activation_link_resent`, `inscription_entreprise` →
+`company_registered`, `validation_inscription` / `refus_inscription` → `registration_approved` /
+`registration_rejected`; resource types `Entreprise` / `Utilisateur` → `Company` / `User`; results
+`succes` / `echec` → `success` / `failure`; account state values `actif` / `inactif` → `active` /
+`inactive`.
+
+**JSON contract.** Every response and request field takes the model attribute name
+(`nom` → `name`, `statut` → `status`, `date_creation` → `created_at`, `entreprise_id` →
+`company_id`, `indicateurs` → `metrics`, `donnees_carbone` → `carbon_data`, `score_officiel` →
+`official_score`, `valeur_globale` → `global_score`, …). Fields with no model attribute follow the
+same vocabulary (`nombre_positions` → `position_count`, `rapports_soumis` → `submitted_reports`,
+`taux_couverture_esg_plateforme` → `platform_esg_coverage_rate`, …); the schemas in
+`app/*/schemas.py` are the reference. Schema class names (`EntreprisePublic`, `RapportESGDetail`, …) and the generated
+TypeScript type names are unchanged. `RapportESGDetail.official_score` (the computed score object)
+is never read from `ESGReport.official_score` (the denormalised float) — the routes set it.
+
 ## 4. Later renames
 
 | Task | Tables | Classes |
 |---|---|---|
 | ~~2.3~~ | done — see §3c | |
 | ~~3.1~~ | done — see §3d | |
-| 4.7 | audit, researcher, institution, core (`notification`, `journal_audit`) tables; remaining French JSON field names; audit journal labels | remaining classes |
+| ~~4.7~~ | done — see §3e | |

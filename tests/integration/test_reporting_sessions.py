@@ -10,12 +10,12 @@ from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
     CompanyStatus,
     ExtractionStatus,
     ReportStatus,
+    ReportType,
     Role,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.ingestion.models import ESGReport
 from tests.integration.test_company_router import (
@@ -52,7 +52,7 @@ def _utilisateur(session, role: Role) -> tuple[User, TestClient]:
 
 
 def _ouvrir(client: TestClient, **surcharges) -> dict:
-    corps = {"fiscal_year": 2024, "report_type": TypeRapport.RAPPORT_ESG.value, **surcharges}
+    corps = {"fiscal_year": 2024, "report_type": ReportType.RAPPORT_ESG.value, **surcharges}
     reponse = client.post(URL, json=corps)
     assert reponse.status_code == 201, reponse.text
     return reponse.json()
@@ -70,9 +70,9 @@ def test_ouvrir_une_declaration_cree_un_brouillon_sans_fichier(session, entrepri
     # Les listes historiques de l'espace Entreprise l'affichent aussi (contrat rendu nullable).
     anciens = client.get("/api/v1/company/rapports").json()
     ligne = next(r for r in anciens if r["id"] == brouillon["id"])
-    assert ligne["statut"] == ReportStatus.DRAFT.value
-    assert ligne["date_depot"] is None
-    assert ligne["fichier_source"] is None
+    assert ligne["status"] == ReportStatus.DRAFT.value
+    assert ligne["submitted_at"] is None
+    assert ligne["source_file"] is None
 
 
 def test_un_seul_brouillon_par_exercice_et_type(session, entreprise) -> None:
@@ -128,8 +128,8 @@ def test_perimetre_entreprise_et_auditeur(session, entreprise) -> None:
     auditeur, client_auditeur = _utilisateur(session, Role.AUDITOR)
     affecte = ESGReport(
         company_id=autre_user.company.id,
-        type=TypeRapport.RAPPORT_CLIMAT,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_CLIMAT,
+        channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=2023,
         status=ReportStatus.PENDING_AUDIT,
         source_file="rapports/test/affecte.pdf",

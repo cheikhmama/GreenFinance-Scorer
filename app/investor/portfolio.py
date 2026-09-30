@@ -23,7 +23,7 @@ from app.auth.models import User
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, DevisePosition, TypeDureeInvestissement
+from app.core.enums import CompanyStatus, Currency, DurationType
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.recherche import contient
 from app.ingestion.models import ESGMetric
@@ -98,7 +98,7 @@ def _construire_position(valeurs: dict[str, Any]) -> PortfolioPosition:
 def _verifier_montant_minimum(
     entreprise: Company,
     montant_converti: Decimal,
-    devise_portefeuille: DevisePosition,
+    devise_portefeuille: Currency,
     chemin_taux: str,
 ) -> None:
     """montant_converti est déjà dans devise_portefeuille (voir ajouter_position/
@@ -156,13 +156,13 @@ def _agreger(
                 denominateur += float(p.converted_amount)
         return (numerateur / denominateur) if denominateur > 0 else None
 
-    score_global = agreger_pilier(lambda s: s.valeur_globale)
-    score_e = agreger_pilier(lambda s: s.score_environnement)
-    score_s = agreger_pilier(lambda s: s.score_social)
-    score_g = agreger_pilier(lambda s: s.score_gouvernance)
+    score_global = agreger_pilier(lambda s: s.global_score)
+    score_e = agreger_pilier(lambda s: s.environmental_score)
+    score_s = agreger_pilier(lambda s: s.social_score)
+    score_g = agreger_pilier(lambda s: s.governance_score)
 
     montant_couvert = sum(
-        (p.converted_amount for p in positions if scores[p.id].valeur_globale is not None),
+        (p.converted_amount for p in positions if scores[p.id].global_score is not None),
         Decimal(0),
     )
     couverture = float(montant_couvert / montant_total * 100)
@@ -195,24 +195,24 @@ def position_detail(
 
     return PositionDetail(
         id=position.id,
-        portefeuille_id=position.portfolio_id,
-        entreprise=EntrepriseSommaire.model_validate(entreprise) if entreprise else None,
-        identifiant=position.identifier_raw,
-        type_identifiant=position.identifier_type,
-        statut_rapprochement=position.match_status,
-        montant_investi=position.outstanding_amount,
-        devise=position.currency,
-        montant_converti=position.converted_amount,
-        taux_change_utilise=position.fx_rate_used,
-        poids=poids,
-        type_duree=position.duration_type,
-        date_debut=position.start_date,
-        date_fin=position.end_date,
+        portfolio_id=position.portfolio_id,
+        company=EntrepriseSommaire.model_validate(entreprise) if entreprise else None,
+        identifier=position.identifier_raw,
+        identifier_type=position.identifier_type,
+        match_status=position.match_status,
+        outstanding_amount=position.outstanding_amount,
+        currency=position.currency,
+        converted_amount=position.converted_amount,
+        fx_rate_used=position.fx_rate_used,
+        weight=poids,
+        duration_type=position.duration_type,
+        start_date=position.start_date,
+        end_date=position.end_date,
         # Sans entreprise, seul l'état temporel compte (jamais « entreprise suspendue »).
-        etat=etat_position(position, entreprise is None or entreprise.status == CompanyStatus.ACTIVE),
+        state=etat_position(position, entreprise is None or entreprise.status == CompanyStatus.ACTIVE),
         score=score,
-        date_publication_utilisee=entreprise.published_at if entreprise else None,
-        preuves_disponibles=preuves_disponibles,
+        published_at_used=entreprise.published_at if entreprise else None,
+        evidence_available=preuves_disponibles,
     )
 
 
@@ -239,17 +239,17 @@ def resume_portefeuille(session: Session, portefeuille: Portfolio) -> Portefeuil
     montant_total, score_global, score_e, score_s, score_g, couverture = _agreger(session, positions)
     return PortefeuilleResume(
         id=portefeuille.id,
-        nom=portefeuille.name,
-        devise_reference=portefeuille.reference_currency,
-        montant_total=montant_total,
-        nombre_positions=len(positions),
-        score_esg_agrege=score_global,
-        score_environnement_agrege=score_e,
-        score_social_agrege=score_s,
-        score_gouvernance_agrege=score_g,
-        couverture_esg=couverture,
-        date_creation=portefeuille.created_at,
-        archive=portefeuille.archived,
+        name=portefeuille.name,
+        reference_currency=portefeuille.reference_currency,
+        total_amount=montant_total,
+        position_count=len(positions),
+        aggregated_esg_score=score_global,
+        aggregated_environmental_score=score_e,
+        aggregated_social_score=score_s,
+        aggregated_governance_score=score_g,
+        esg_coverage=couverture,
+        created_at=portefeuille.created_at,
+        archived=portefeuille.archived,
     )
 
 
@@ -265,20 +265,20 @@ def detail_portefeuille(session: Session, portefeuille: Portfolio) -> Portefeuil
 
     return PortefeuilleDetail(
         id=portefeuille.id,
-        nom=portefeuille.name,
-        devise_reference=portefeuille.reference_currency,
-        montant_total=montant_total,
-        nombre_positions=len(positions),
-        score_esg_agrege=score_global,
-        score_environnement_agrege=score_e,
-        score_social_agrege=score_s,
-        score_gouvernance_agrege=score_g,
-        couverture_esg=couverture,
-        date_creation=portefeuille.created_at,
-        archive=portefeuille.archived,
-        nombre_positions_planifiees=compte.get(EtatPosition.PLANIFIEE, 0),
-        nombre_positions_actives=compte.get(EtatPosition.ACTIVE, 0),
-        nombre_positions_cloturees=compte.get(EtatPosition.CLOTUREE, 0),
+        name=portefeuille.name,
+        reference_currency=portefeuille.reference_currency,
+        total_amount=montant_total,
+        position_count=len(positions),
+        aggregated_esg_score=score_global,
+        aggregated_environmental_score=score_e,
+        aggregated_social_score=score_s,
+        aggregated_governance_score=score_g,
+        esg_coverage=couverture,
+        created_at=portefeuille.created_at,
+        archived=portefeuille.archived,
+        planned_position_count=compte.get(EtatPosition.PLANIFIEE, 0),
+        active_position_count=compte.get(EtatPosition.ACTIVE, 0),
+        closed_position_count=compte.get(EtatPosition.CLOTUREE, 0),
         positions=positions_detail,
     )
 
@@ -288,7 +288,7 @@ def creer_portefeuille(session: Session, investisseur_id: uuid.UUID, nom: str) -
     (voir app/investor/fx.py) — un portefeuille n'a plus besoin d'une devise choisie à la
     création, seulement d'un nom (Étape Dashboard/Portefeuille, simplification du formulaire)."""
     portefeuille = Portfolio(
-        user_id=investisseur_id, name=nom, reference_currency=DevisePosition.USD
+        user_id=investisseur_id, name=nom, reference_currency=Currency.USD
     )
     session.add(portefeuille)
     session.commit()
@@ -319,7 +319,7 @@ def lister_mes_portefeuilles(
     )
     resumes = [resume_portefeuille(session, p) for p in tous]
     if avec_position is not None:
-        resumes = [r for r in resumes if (r.nombre_positions > 0) == avec_position]
+        resumes = [r for r in resumes if (r.position_count > 0) == avec_position]
 
     total = len(resumes)
     debut = (page - 1) * page_size
@@ -384,7 +384,7 @@ def ajouter_position(
     payload: AjouterPositionRequest,
 ) -> PortfolioPosition:
     portefeuille = portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
-    entreprise = session.get(Company, payload.entreprise_id)
+    entreprise = session.get(Company, payload.company_id)
     if entreprise is None or entreprise.published_at is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
     if entreprise.status != CompanyStatus.ACTIVE:
@@ -395,7 +395,7 @@ def ajouter_position(
 
     chemin_taux = get_settings().fx_rates_path
     montant_converti, taux = fx.convertir(
-        payload.montant, payload.devise, portefeuille.reference_currency, chemin_taux
+        payload.amount, payload.currency, portefeuille.reference_currency, chemin_taux
     )
     _verifier_montant_minimum(entreprise, montant_converti, portefeuille.reference_currency, chemin_taux)
 
@@ -405,14 +405,14 @@ def ajouter_position(
     position = _construire_position(
         {
             "portfolio_id": portefeuille_id,
-            "company_id": payload.entreprise_id,
-            "outstanding_amount": payload.montant,
-            "currency": payload.devise,
+            "company_id": payload.company_id,
+            "outstanding_amount": payload.amount,
+            "currency": payload.currency,
             "fx_rate_used": taux,
             "converted_amount": montant_converti,
-            "duration_type": payload.type_duree,
-            "start_date": payload.date_debut,
-            "end_date": payload.date_fin,
+            "duration_type": payload.duration_type,
+            "start_date": payload.start_date,
+            "end_date": payload.end_date,
         }
     )
     session.add(position)
@@ -453,7 +453,7 @@ def modifier_position(
 
     chemin_taux = get_settings().fx_rates_path
     montant_converti, taux = fx.convertir(
-        payload.montant, payload.devise, portefeuille.reference_currency, chemin_taux
+        payload.amount, payload.currency, portefeuille.reference_currency, chemin_taux
     )
     _verifier_montant_minimum(entreprise, montant_converti, portefeuille.reference_currency, chemin_taux)
 
@@ -463,13 +463,13 @@ def modifier_position(
         {
             "portfolio_id": portefeuille_id,
             "company_id": entreprise.id,
-            "outstanding_amount": payload.montant,
-            "currency": payload.devise,
+            "outstanding_amount": payload.amount,
+            "currency": payload.currency,
             "fx_rate_used": taux,
             "converted_amount": montant_converti,
-            "duration_type": payload.type_duree,
-            "start_date": payload.date_debut,
-            "end_date": payload.date_fin,
+            "duration_type": payload.duration_type,
+            "start_date": payload.start_date,
+            "end_date": payload.end_date,
         }
     )
     session.delete(position)
@@ -489,7 +489,7 @@ def fermer_position(
 ) -> PortfolioPosition:
     portefeuille_de_investisseur(session, investisseur_id, portefeuille_id)
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
-    if position.duration_type != TypeDureeInvestissement.OUVERTE:
+    if position.duration_type != DurationType.OUVERTE:
         raise ValidationError(
             "Seule une position à durée ouverte peut être fermée manuellement.",
             code="fermeture_impossible",
@@ -551,19 +551,19 @@ def exporter_positions_csv(session: Session, portefeuille: Portfolio) -> str:
         writer.writerow(
             [
                 # Ligne non rapprochée (tâche 2.2) : son identifiant d'origine tient lieu de nom.
-                detail.entreprise.nom if detail.entreprise else f"[{detail.identifiant}]",
-                detail.entreprise.secteur if detail.entreprise else "",
-                detail.entreprise.pays if detail.entreprise else "",
-                detail.montant_investi,
-                detail.devise.value,
-                round(detail.montant_converti, 2),
+                detail.company.name if detail.company else f"[{detail.identifier}]",
+                detail.company.sector if detail.company else "",
+                detail.company.country if detail.company else "",
+                detail.outstanding_amount,
+                detail.currency.value,
+                round(detail.converted_amount, 2),
                 portefeuille.reference_currency.value,
-                round(detail.poids * 100, 2),
-                detail.type_duree.value,
-                detail.date_debut.isoformat(),
-                detail.date_fin.isoformat() if detail.date_fin else "",
-                detail.etat.value,
-                detail.score.valeur_globale if detail.score.valeur_globale is not None else "",
+                round(detail.weight * 100, 2),
+                detail.duration_type.value,
+                detail.start_date.isoformat(),
+                detail.end_date.isoformat() if detail.end_date else "",
+                detail.state.value,
+                detail.score.global_score if detail.score.global_score is not None else "",
             ]
         )
     return buffer.getvalue()

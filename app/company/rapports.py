@@ -19,11 +19,11 @@ from app.company.upload_validation import (
 from app.company.url_fetch import telecharger_pdf_depuis_url
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
     CompanyStatus,
     ExtractionStatus,
     ReportStatus,
-    TypeRapport,
+    ReportType,
+    SubmissionChannel,
 )
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
@@ -159,13 +159,13 @@ def _creer_rapport(
     background_tasks: BackgroundTasks,
     *,
     entreprise_id: uuid.UUID,
-    type_rapport: TypeRapport,
+    type_rapport: ReportType,
     annee_reporting: int,
     contenu: bytes,
     version: int,
     rapport_precedent_id: uuid.UUID | None,
     nom_fichier_origine: str | None,
-    canal: CanalDepot = CanalDepot.ENTREPRISE,
+    canal: SubmissionChannel = SubmissionChannel.ENTREPRISE,
 ) -> ESGReport:
     rapport = ESGReport(
         company_id=entreprise_id,
@@ -183,7 +183,7 @@ def deposer_rapport(
     background_tasks: BackgroundTasks,
     entreprise_id: uuid.UUID,
     contenu: bytes,
-    type_rapport: TypeRapport,
+    type_rapport: ReportType,
     annee_reporting: int,
     nom_fichier_origine: str | None,
 ) -> ESGReport:
@@ -205,10 +205,10 @@ def importer_rapport_par_url(
     background_tasks: BackgroundTasks,
     entreprise_id: uuid.UUID,
     url: str,
-    type_rapport: TypeRapport,
+    type_rapport: ReportType,
     annee_reporting: int,
 ) -> ESGReport:
-    """Canal d'import automatique (CanalDepot.AUTOMATIQUE) : le PDF est récupéré côté serveur
+    """Canal d'import automatique (SubmissionChannel.AUTOMATIQUE) : le PDF est récupéré côté serveur
     depuis une URL plutôt que reçu en multipart, mais rejoint ensuite exactement le même chemin
     que deposer_rapport (checksum, dédoublonnage, validation PDF, stockage, extraction en tâche
     de fond) -- seule la provenance du contenu change. La récupération elle-même (résolution DNS,
@@ -225,7 +225,7 @@ def importer_rapport_par_url(
         version=1,
         rapport_precedent_id=None,
         nom_fichier_origine=None,
-        canal=CanalDepot.AUTOMATIQUE,
+        canal=SubmissionChannel.AUTOMATIQUE,
     )
 
 

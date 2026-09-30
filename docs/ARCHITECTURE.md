@@ -144,8 +144,8 @@ Carbon data (`carbon_emissions`) keeps its structure: `scope` 1/2/3, `ghg_catego
 `tonnes_co2e`, `year`, `pcaf_data_quality` (1–5, **nullable**, derived from the extraction
 method — the old hard-coded placeholder `3` is gone). *Implemented in task 2.3*, together with
 `evidence`, `metric_coverage` and `discrepancy_flags` (renamed from `preuve_documentaire`,
-`couverture_indicateur`, `signalement_ecart`); the JSON of existing endpoints keeps its French
-field names.
+`couverture_indicateur`, `signalement_ecart`); their JSON fields take the same English names since
+task 4.7.
 
 ### 3.4 `portfolios` and `portfolio_positions` (module `app/investor`)
 
@@ -189,6 +189,20 @@ task 4.3; company logos are still data URIs in `companies.logo`).
 sorted JSON); uniqueness is one partial index for references (owner NULL) and one per owner.
 `version` is informational. Configs migrated from before 3.1 whose original content could not be
 recovered keep NULL content and hash (a CHECK ties them) and cannot be used for a calculation.
+
+### 3.7 Audit, notifications and research supervision
+
+*Renamed in task 4.7* (RENAME_PLAN §3e): `audit_opinions`, `audit_log`, `notifications`,
+`institution_profiles`, `researcher_affiliations`, `projects` with `project_assignments`,
+`project_companies`, `project_documents`, and `analyses` with `analysis_companies`. A project's
+children are deleted with it (`CASCADE`); a project that still has analyses cannot be deleted
+(`RESTRICT` — an analysis is delivered work); a new analysis version keeps pointing to its
+predecessor, or to nothing if that row is gone (`SET NULL`). Audit log actions, resource types and
+results are English codes (`login`, `User`, `success`); the frontend owns their French labels.
+
+**API contract.** JSON field names equal the model attribute names on every endpoint; schemas read
+the rows directly (`from_attributes`). URL paths, path/query parameters, multipart form fields and
+enum values are still French.
 
 ---
 
@@ -295,6 +309,6 @@ already no longer imports the extraction stack).
 |---|---|---|
 | D1 | **Keep** the `INSTITUTION` role. | Research-project supervision stays as it is; the role is renamed with its module. |
 | D2 | **Add** `PENDING_DECISION` for reports that have an auditor opinion and wait for the admin's sign-off. | Replaces `EN_VALIDATION`; the admin decision queue filters on it. |
-| D3 | **Rename to English in place**, module by module, together with each phase's refactoring, using consolidated Alembic migrations. | Plan and boundary rules: [`RENAME_PLAN.md`](RENAME_PLAN.md). |
+| D3 | **Rename to English in place**, module by module, together with each phase's refactoring, using consolidated Alembic migrations. | Plan and boundary rules: [`RENAME_PLAN.md`](RENAME_PLAN.md). Completed in task 4.7 (tables, classes, JSON). |
 | D4 | **12 characters minimum** (72 UTF-8 bytes maximum) on every password that is set: registration/activation, reset, change. | Existing hashes stay valid; nobody is forced to change a password. |
 | D5 | **Gate self-registration** behind admin onboarding: a registered company starts in `PENDING_ONBOARDING`. | Nothing about the company is visible to other roles until an admin onboards it. |

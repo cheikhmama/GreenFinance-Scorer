@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { TypeRapport } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-export { TypeRapport };
-export const TYPES_RAPPORT = Object.values(TypeRapport);
+export { ReportType };
+export const TYPES_RAPPORT = Object.values(ReportType);
 
 // z.number(), pas z.coerce.number() : coerce sépare le type d'entrée (unknown) du type de
 // sortie (number), ce que le résolveur zodResolver + useForm ne réconcilie pas proprement ici.

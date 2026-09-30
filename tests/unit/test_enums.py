@@ -1,15 +1,15 @@
 from app.core.enums import (
-    CanalDepot,
+    AuditDecision,
     CompanyStatus,
-    DecisionAudit,
-    DevisePosition,
+    Currency,
+    DataMethod,
+    DurationType,
     ExtractionStatus,
-    MethodeDonnee,
     Pillar,
     ReportStatus,
+    ReportType,
     Role,
-    TypeDureeInvestissement,
-    TypeRapport,
+    SubmissionChannel,
 )
 
 
@@ -40,7 +40,7 @@ def test_company_status_values() -> None:
 
 
 def test_type_rapport_values() -> None:
-    assert {t.value for t in TypeRapport} == {
+    assert {t.value for t in ReportType} == {
         "RAPPORT_ANNUEL",
         "RAPPORT_ESG",
         "RAPPORT_CLIMAT",
@@ -48,7 +48,7 @@ def test_type_rapport_values() -> None:
 
 
 def test_canal_depot_values() -> None:
-    assert {c.value for c in CanalDepot} == {"AUTOMATIQUE", "ENTREPRISE"}
+    assert {c.value for c in SubmissionChannel} == {"AUTOMATIQUE", "ENTREPRISE"}
 
 
 def test_pilier_values() -> None:
@@ -56,11 +56,11 @@ def test_pilier_values() -> None:
 
 
 def test_methode_donnee_values() -> None:
-    assert {m.value for m in MethodeDonnee} == {"RAPPORTEE", "ESTIMEE", "CALCULEE"}
+    assert {m.value for m in DataMethod} == {"RAPPORTEE", "ESTIMEE", "CALCULEE"}
 
 
 def test_decision_audit_values() -> None:
-    assert {d.value for d in DecisionAudit} == {
+    assert {d.value for d in AuditDecision} == {
         "RECOMMANDE_VALIDATION",
         "RECOMMANDE_REJET",
         "DEMANDE_CLARIFICATION",
@@ -79,8 +79,8 @@ def test_role_values() -> None:
 
 
 def test_devise_position_values() -> None:
-    assert {d.value for d in DevisePosition} == {"MRU", "USD", "EUR"}
+    assert {d.value for d in Currency} == {"MRU", "USD", "EUR"}
 
 
 def test_type_duree_investissement_values() -> None:
-    assert {t.value for t in TypeDureeInvestissement} == {"OUVERTE", "FIXE"}
+    assert {t.value for t in DurationType} == {"OUVERTE", "FIXE"}

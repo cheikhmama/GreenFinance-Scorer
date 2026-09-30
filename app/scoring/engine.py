@@ -367,10 +367,10 @@ def score_public(session: Session, rapport_id: uuid.UUID) -> ScoreESGPublic | No
     configuration = session.get(ScoringConfig, score.config_id)
     assert configuration is not None  # FK NOT NULL
     return ScoreESGPublic(
-        valeur_globale=score.global_score,
-        score_environnement=score.environmental_score,
-        score_social=score.social_score,
-        score_gouvernance=score.governance_score,
-        taux_couverture=score.coverage_rate,
-        configuration_version=configuration.version,
+        global_score=score.global_score,
+        environmental_score=score.environmental_score,
+        social_score=score.social_score,
+        governance_score=score.governance_score,
+        coverage_rate=score.coverage_rate,
+        config_version=configuration.version,
     )

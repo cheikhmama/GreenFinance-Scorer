@@ -14,7 +14,7 @@ from sqlmodel import Session, col, func, select
 from app.company.models import Company
 from app.company.schemas import EntreprisePublic
 from app.core.config import get_settings
-from app.core.enums import DevisePosition, ReportStatus, StatutCouvertureIndicateur
+from app.core.enums import Currency, MetricCoverageStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.recherche import contient
 from app.ingestion.models import (
@@ -33,7 +33,7 @@ from app.investor.schemas import (
     ScoreEntreprisePublic,
 )
 
-_COUVERTURE_VIDE = CouvertureResume(total_cibles=0, trouves=0, codes_manquants=[])
+_COUVERTURE_VIDE = CouvertureResume(total_targets=0, found=0, missing_codes=[])
 
 
 def couverture_publique(session: Session, rapport: ESGReport | None) -> CouvertureResume:
@@ -46,21 +46,21 @@ def couverture_publique(session: Session, rapport: ESGReport | None) -> Couvertu
         select(MetricCoverage).where(MetricCoverage.report_id == rapport.id)
     ).all()
     return CouvertureResume(
-        total_cibles=len(couvertures),
-        trouves=sum(1 for c in couvertures if c.status == StatutCouvertureIndicateur.TROUVE),
-        codes_manquants=[
-            c.metric_code for c in couvertures if c.status != StatutCouvertureIndicateur.TROUVE
+        total_targets=len(couvertures),
+        found=sum(1 for c in couvertures if c.status == MetricCoverageStatus.TROUVE),
+        missing_codes=[
+            c.metric_code for c in couvertures if c.status != MetricCoverageStatus.TROUVE
         ],
     )
 from app.scoring.engine import score_officiel
 from app.scoring.models import ScoringConfig
 
 _SCORE_VIDE = ScoreEntreprisePublic(
-    valeur_globale=None,
-    score_environnement=None,
-    score_social=None,
-    score_gouvernance=None,
-    configuration_version=None,
+    global_score=None,
+    environmental_score=None,
+    social_score=None,
+    governance_score=None,
+    config_version=None,
 )
 _CARBONE_VIDE = DonneesCarboneAgregees(
     scope_1=None, scope_2_market_based=None, scope_2_location_based=None, scope_3=None
@@ -86,12 +86,12 @@ def score_public(session: Session, rapport: ESGReport | None) -> ScoreEntreprise
         return _SCORE_VIDE
     configuration = session.get(ScoringConfig, score.config_id)
     return ScoreEntreprisePublic(
-        valeur_globale=score.global_score,
-        score_environnement=score.environmental_score,
-        score_social=score.social_score,
-        score_gouvernance=score.governance_score,
-        taux_couverture=score.coverage_rate,
-        configuration_version=configuration.version if configuration else None,
+        global_score=score.global_score,
+        environmental_score=score.environmental_score,
+        social_score=score.social_score,
+        governance_score=score.governance_score,
+        coverage_rate=score.coverage_rate,
+        config_version=configuration.version if configuration else None,
     )
 
 
@@ -110,7 +110,7 @@ def carbone_agrege(session: Session, rapport: ESGReport | None) -> DonneesCarbon
 
 def montant_minimum_par_devise(
     entreprise: Company, chemin_taux: str
-) -> dict[DevisePosition, Decimal] | None:
+) -> dict[Currency, Decimal] | None:
     """None si l'entreprise n'impose aucun minimum — jamais une carte à 3 zéros qui laisserait
     croire à un minimum réel de 0. Sinon, converti dans les 3 devises depuis
     Company.minimum_investment_currency (toujours renseignée de pair, voir
@@ -125,7 +125,7 @@ def montant_minimum_par_devise(
             devise,
             chemin_taux,
         )[0]
-        for devise in DevisePosition
+        for devise in Currency
     }
 
 
@@ -134,8 +134,8 @@ def entreprise_publiee_publique(session: Session, entreprise: Company) -> Entrep
     return EntreprisePublieePublic(
         **EntreprisePublic.model_validate(entreprise).model_dump(),
         score=score_public(session, rapport),
-        carbone=carbone_agrege(session, rapport),
-        montant_minimum_par_devise=montant_minimum_par_devise(
+        carbon=carbone_agrege(session, rapport),
+        minimum_amount_by_currency=montant_minimum_par_devise(
             entreprise, get_settings().fx_rates_path
         ),
     )
@@ -218,10 +218,10 @@ def consulter_entreprise_publiee(
     base = entreprise_publiee_publique(session, entreprise)
     return EntrepriseDetailInvestisseur(
         **base.model_dump(),
-        indicateurs=indicateurs,
-        donnees_carbone=donnees_carbone,
-        couverture=couverture_publique(session, rapport),
-        rapport_id=rapport.id if rapport else None,
+        metrics=indicateurs,
+        carbon_data=donnees_carbone,
+        coverage=couverture_publique(session, rapport),
+        report_id=rapport.id if rapport else None,
     )
 
 

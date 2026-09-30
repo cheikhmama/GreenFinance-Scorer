@@ -4,21 +4,21 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DecisionAudit,
+    AuditDecision,
+    DataMethod,
     ExtractionStatus,
-    MethodeDonnee,
     Pillar,
     ReportStatus,
+    ReportType,
     Role,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
@@ -51,8 +51,8 @@ def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> ESGReport
     session.commit()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.PENDING_AUDIT if auditeur_id else ReportStatus.SUBMITTED,
         source_file="rapports/test/dummy.pdf",
         extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
@@ -120,7 +120,7 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
             metric_code="intensite_scope_1_2_marketbased",
             value=42.0,
             unit="gCO2e/kWh",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -130,7 +130,7 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
             scope=1,
             tonnes_co2e=100.0,
             year=2024,
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             pcaf_data_quality=3,
             proof_id=preuve.id,
         )
@@ -142,11 +142,11 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["indicateurs"]) == 1
-    assert body["indicateurs"][0]["code"] == "intensite_scope_1_2_marketbased"
-    assert body["indicateurs"][0]["preuve"]["page_debut"] == 3
-    assert len(body["donnees_carbone"]) == 1
-    assert body["donnees_carbone"][0]["scope"] == 1
+    assert len(body["metrics"]) == 1
+    assert body["metrics"][0]["metric_code"] == "intensite_scope_1_2_marketbased"
+    assert body["metrics"][0]["proof"]["page_start"] == 3
+    assert len(body["carbon_data"]) == 1
+    assert body["carbon_data"][0]["scope"] == 1
 
 
 def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
@@ -156,18 +156,18 @@ def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
     authed_client = _login(auditeur.email, "s3cret-pass")
     response = authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_VALIDATION", "commentaire": "Données cohérentes."},
+        json={"decision": "RECOMMANDE_VALIDATION", "comment": "Données cohérentes."},
     )
 
     assert response.status_code == 201
-    assert response.json()["decision"] == DecisionAudit.RECOMMANDE_VALIDATION.value
-    assert response.json()["auditeur_id"] == str(auditeur.id)
+    assert response.json()["decision"] == AuditDecision.RECOMMANDE_VALIDATION.value
+    assert response.json()["auditor_id"] == str(auditeur.id)
 
     session.refresh(rapport)
     assert rapport.status == ReportStatus.PENDING_DECISION
-    avis = session.exec(select(AvisAudit).where(AvisAudit.rapport_id == rapport.id)).first()
+    avis = session.exec(select(AuditOpinion).where(AuditOpinion.report_id == rapport.id)).first()
     assert avis is not None
-    assert avis.auditeur_id == auditeur.id
+    assert avis.auditor_id == auditeur.id
 
 
 def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
@@ -182,20 +182,20 @@ def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
 
     authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_REJET", "commentaire": "Données incohérentes."},
+        json={"decision": "RECOMMANDE_REJET", "comment": "Données incohérentes."},
     )
 
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == admin.id, Notification.type == "RAPPORT_AVIS_RENDU_ADMIN"
+            Notification.user_id == admin.id, Notification.type == "RAPPORT_AVIS_RENDU_ADMIN"
         )
     ).one()
-    assert notification.id_ressource == rapport.id
+    assert notification.resource_id == rapport.id
     assert "rejet" in notification.message
 
     notification_inactif = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == admin_inactif.id,
+            Notification.user_id == admin_inactif.id,
             Notification.type == "RAPPORT_AVIS_RENDU_ADMIN",
         )
     ).first()
@@ -261,7 +261,7 @@ def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
     response = authed_client.get("/api/v1/audit/historique")
 
     assert response.status_code == 200
-    rapport_ids = [item["rapport_id"] for item in response.json()]
+    rapport_ids = [item["report_id"] for item in response.json()]
     assert str(rapport_a.id) in rapport_ids
     assert str(rapport_b.id) in rapport_ids
     assert str(rapport_dautrui.id) not in rapport_ids

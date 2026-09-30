@@ -8,51 +8,51 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.core.enums import ComparedScore, StatutAnalyse, StatutProjet, UnmatchedReason
+from app.core.enums import AnalysisStatus, ComparedScore, ProjectStatus, UnmatchedReason
 
 
 class CreerAnalyseRequest(BaseModel):
-    titre: str
-    contenu: str
-    entreprise_ids: list[uuid.UUID]
+    title: str
+    content: str
+    company_ids: list[uuid.UUID]
 
 
 class ModifierAnalyseRequest(BaseModel):
-    titre: str
-    contenu: str
-    entreprise_ids: list[uuid.UUID]
+    title: str
+    content: str
+    company_ids: list[uuid.UUID]
 
 
 class AnalysePublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    projet_id: uuid.UUID
-    chercheur_id: uuid.UUID
-    titre: str
-    contenu: str
-    statut: StatutAnalyse
+    project_id: uuid.UUID
+    researcher_id: uuid.UUID
+    title: str
+    content: str
+    status: AnalysisStatus
     version: int
-    analyse_precedente_id: uuid.UUID | None
-    commentaire_institution: str | None
-    date_creation: datetime
-    date_soumission: datetime | None
-    date_decision: datetime | None
+    previous_analysis_id: uuid.UUID | None
+    institution_comment: str | None
+    created_at: datetime
+    submitted_at: datetime | None
+    decided_at: datetime | None
 
 
 class AnalyseDetail(AnalysePublic):
-    entreprise_ids: list[uuid.UUID]
+    company_ids: list[uuid.UUID]
 
 
 class ProjetAffecte(BaseModel):
     id: uuid.UUID
-    nom: str
+    name: str
     description: str | None
-    objectif: str | None
-    date_debut: datetime | None
-    date_fin_prevue: datetime | None
-    date_limite: datetime | None
-    statut: StatutProjet
+    objective: str | None
+    start_date: datetime | None
+    planned_end_date: datetime | None
+    deadline: datetime | None
+    status: ProjectStatus
     institution_email: str
 
 

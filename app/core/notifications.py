@@ -29,7 +29,7 @@ def notifier(
     shared/notifications/api.ts::resolveNotificationLink) — omis pour les types dont la cible
     est une liste plutôt qu'un élément précis (ex. une invitation de rattachement)."""
     notification = Notification(
-        utilisateur_id=utilisateur_id, type=type_, message=message, id_ressource=id_ressource
+        user_id=utilisateur_id, type=type_, message=message, resource_id=id_ressource
     )
     session.add(notification)
     return notification
@@ -46,16 +46,16 @@ def lister_mes_notifications(
     """Page des notifications d'un utilisateur, plus récentes d'abord — jamais celles d'un
     autre : le filtre sur utilisateur_id n'est pas optionnel, contrairement aux listes
     Administrateur qui parcourent tout le monde."""
-    filtres = [col(Notification.utilisateur_id) == utilisateur_id]
+    filtres = [col(Notification.user_id) == utilisateur_id]
     if non_lues_seulement:
-        filtres.append(col(Notification.lu).is_(False))
+        filtres.append(col(Notification.read).is_(False))
 
     total = session.exec(select(func.count()).select_from(Notification).where(*filtres)).one()
     items = list(
         session.exec(
             select(Notification)
             .where(*filtres)
-            .order_by(col(Notification.date_envoi).desc())
+            .order_by(col(Notification.sent_at).desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
@@ -69,10 +69,10 @@ def marquer_lue(session: Session, utilisateur_id: uuid.UUID, notification_id: uu
     403 ici, pour ne pas confirmer l'existence d'un notification_id d'autrui (même principe que
     app/company/router.py::consulter_rapport)."""
     notification = session.get(Notification, notification_id)
-    if notification is None or notification.utilisateur_id != utilisateur_id:
+    if notification is None or notification.user_id != utilisateur_id:
         raise NotFoundError("Notification introuvable.", code="notification_introuvable")
 
-    notification.lu = True
+    notification.read = True
     session.add(notification)
     session.commit()
     session.refresh(notification)

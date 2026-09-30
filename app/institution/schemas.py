@@ -11,7 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.auth.schemas import UserContractMixin
-from app.core.enums import StatutAnalyse, StatutProjet, StatutRattachement
+from app.core.enums import AffiliationStatus, AnalysisStatus, ProjectStatus
 
 
 class ChercheurDisponible(UserContractMixin):
@@ -22,78 +22,78 @@ class ChercheurDisponible(UserContractMixin):
 
     id: uuid.UUID
     email: str
-    nom: str | None
+    name: str | None
 
 
 class InviterChercheurRequest(BaseModel):
-    chercheur_id: uuid.UUID
-    conditions_collaboration: str | None = None
+    researcher_id: uuid.UUID
+    collaboration_terms: str | None = None
 
 
 class RattachementPublic(BaseModel):
     id: uuid.UUID
-    chercheur_id: uuid.UUID
+    researcher_id: uuid.UUID
     # Dénormalisés depuis Utilisateur au moment de la construction (voir
     # app/institution/router.py::rattachement_public) — jamais une jointure ORM directe, la
     # table de rattachement elle-même ne porte que chercheur_id/institution_id (voir
     # app/auth/models.py). Les deux côtés (Institution consultant ses chercheurs, Chercheur
     # consultant ses institutions) ont symétriquement besoin de savoir qui est qui.
-    chercheur_email: str
-    chercheur_nom: str | None
+    researcher_email: str
+    researcher_name: str | None
     institution_id: uuid.UUID
     institution_email: str
-    institution_nom: str | None
-    statut: StatutRattachement
-    date_invitation: datetime
-    date_reponse: datetime | None
-    conditions_collaboration: str | None
+    institution_name: str | None
+    status: AffiliationStatus
+    invited_at: datetime
+    responded_at: datetime | None
+    collaboration_terms: str | None
 
 
 class CreerProjetRequest(BaseModel):
-    nom: str
+    name: str
     description: str | None = None
-    objectif: str | None = None
-    date_debut: datetime | None = None
-    date_fin_prevue: datetime | None = None
-    date_limite: datetime | None = None
+    objective: str | None = None
+    start_date: datetime | None = None
+    planned_end_date: datetime | None = None
+    deadline: datetime | None = None
 
 
 class AffecterChercheurRequest(BaseModel):
-    chercheur_id: uuid.UUID
+    researcher_id: uuid.UUID
 
 
 class DecisionAnalyseRequest(BaseModel):
-    commentaire: str | None = None
+    comment: str | None = None
 
 
 class AjouterEntreprisePerimetreRequest(BaseModel):
-    entreprise_id: uuid.UUID
+    company_id: uuid.UUID
 
 
 class AjouterDocumentRequest(BaseModel):
-    rapport_id: uuid.UUID
+    report_id: uuid.UUID
 
 
 class EntreprisePerimetrePublic(BaseModel):
     id: uuid.UUID
-    entreprise_id: uuid.UUID
-    entreprise_nom: str
+    company_id: uuid.UUID
+    company_name: str
     # Rapport actuellement publié de l'entreprise (dernier_rapport_valide), s'il existe — c'est le
     # seul rapport_id qu'ajouter_document acceptera pour cette entreprise (voir
     # app/institution/projets.py::ajouter_document). Nul si l'entreprise n'a encore aucun rapport
     # validé, ce qui ne devrait pas arriver pour une entreprise publiée mais reste possible en
     # théorie (voir Company.published_at, jamais garanti par une contrainte SQL).
-    dernier_rapport_id: uuid.UUID | None
-    date_ajout: datetime
+    latest_report_id: uuid.UUID | None
+    added_at: datetime
 
 
 class DocumentProjetPublic(BaseModel):
     id: uuid.UUID
-    rapport_id: uuid.UUID
-    entreprise_id: uuid.UUID
-    entreprise_nom: str
-    annee_reporting: int | None
-    date_ajout: datetime
+    report_id: uuid.UUID
+    company_id: uuid.UUID
+    company_name: str
+    fiscal_year: int | None
+    added_at: datetime
 
 
 class ProjetPublic(BaseModel):
@@ -101,32 +101,32 @@ class ProjetPublic(BaseModel):
 
     id: uuid.UUID
     institution_id: uuid.UUID
-    nom: str
+    name: str
     description: str | None
-    objectif: str | None
-    date_debut: datetime | None
-    date_fin_prevue: datetime | None
-    date_limite: datetime | None
-    statut: StatutProjet
-    date_creation: datetime
-    date_cloture: datetime | None
+    objective: str | None
+    start_date: datetime | None
+    planned_end_date: datetime | None
+    deadline: datetime | None
+    status: ProjectStatus
+    created_at: datetime
+    closed_at: datetime | None
 
 
 class AffectationPublic(BaseModel):
     id: uuid.UUID
-    chercheur_id: uuid.UUID
-    chercheur_email: str
-    date_affectation: datetime
+    researcher_id: uuid.UUID
+    researcher_email: str
+    assigned_at: datetime
 
 
 class AnalyseResume(BaseModel):
     id: uuid.UUID
-    chercheur_id: uuid.UUID
-    titre: str
-    statut: StatutAnalyse
+    researcher_id: uuid.UUID
+    title: str
+    status: AnalysisStatus
     version: int
-    date_creation: datetime
-    date_soumission: datetime | None
+    created_at: datetime
+    submitted_at: datetime | None
 
 
 class AnalyseInstitutionPublic(AnalyseResume):
@@ -134,14 +134,14 @@ class AnalyseInstitutionPublic(AnalyseResume):
     ProjetDetail.analyses) puisque cette liste traverse tous les projets de l'institution à la
     fois, voir app/institution/router.py::lister_mes_analyses_route."""
 
-    projet_id: uuid.UUID
-    projet_nom: str
+    project_id: uuid.UUID
+    project_name: str
 
 
 class ProjetDetail(ProjetPublic):
-    affectations: list[AffectationPublic]
+    assignments: list[AffectationPublic]
     analyses: list[AnalyseResume]
-    perimetre: list[EntreprisePerimetrePublic]
+    companies: list[EntreprisePerimetrePublic]
     documents: list[DocumentProjetPublic]
 
 
@@ -149,4 +149,4 @@ class InstitutionProfilPublic(BaseModel):
     """Lecture seule — quota_export n'est jamais modifié ici, seulement consommé par
     app/institution/analyses.py::_consommer_quota_export au fil des exports réels."""
 
-    quota_export: int
+    export_quota: int

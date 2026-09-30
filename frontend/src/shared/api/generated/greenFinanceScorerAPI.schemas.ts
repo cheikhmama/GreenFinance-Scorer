@@ -18,62 +18,71 @@ export interface ActiverCompteRequest {
      * @minLength 12
      * @maxLength 72
      */
-  nouveau_mot_de_passe: string;
+  new_password: string;
 }
 
 export interface AffectationPublic {
   id: string;
-  chercheur_id: string;
-  chercheur_email: string;
-  date_affectation: string;
+  researcher_id: string;
+  researcher_email: string;
+  assigned_at: string;
 }
 
 export interface AffecterAuditeurRequest {
-  auditeur_id: string;
+  auditor_id: string;
 }
 
 export interface AffecterChercheurRequest {
-  chercheur_id: string;
+  researcher_id: string;
 }
 
+export type AffiliationStatus = typeof AffiliationStatus[keyof typeof AffiliationStatus];
+
+
+export const AffiliationStatus = {
+  EN_ATTENTE: 'EN_ATTENTE',
+  ACCEPTE: 'ACCEPTE',
+  REFUSE: 'REFUSE',
+} as const;
+
 export interface AjouterDocumentRequest {
-  rapport_id: string;
+  report_id: string;
 }
 
 export interface AjouterEntreprisePerimetreRequest {
-  entreprise_id: string;
+  company_id: string;
 }
 
-export type DevisePosition = typeof DevisePosition[keyof typeof DevisePosition];
+export type Currency = typeof Currency[keyof typeof Currency];
 
 
-export const DevisePosition = {
+export const Currency = {
   MRU: 'MRU',
   USD: 'USD',
   EUR: 'EUR',
 } as const;
 
-export type TypeDureeInvestissement = typeof TypeDureeInvestissement[keyof typeof TypeDureeInvestissement];
+export type DurationType = typeof DurationType[keyof typeof DurationType];
 
 
-export const TypeDureeInvestissement = {
+export const DurationType = {
   OUVERTE: 'OUVERTE',
   FIXE: 'FIXE',
 } as const;
 
 export interface AjouterPositionRequest {
-  entreprise_id: string;
-  montant: number | string;
-  devise: DevisePosition;
-  type_duree: TypeDureeInvestissement;
-  date_debut: string;
-  date_fin?: string | null;
+  company_id: string;
+  amount: number | string;
+  currency: Currency;
+  duration_type: DurationType;
+  start_date: string;
+  end_date?: string | null;
 }
 
-export type StatutAnalyse = typeof StatutAnalyse[keyof typeof StatutAnalyse];
+export type AnalysisStatus = typeof AnalysisStatus[keyof typeof AnalysisStatus];
 
 
-export const StatutAnalyse = {
+export const AnalysisStatus = {
   BROUILLON: 'BROUILLON',
   SOUMISE: 'SOUMISE',
   VALIDEE: 'VALIDEE',
@@ -83,34 +92,34 @@ export const StatutAnalyse = {
 /**
  * Une ligne du détail derrière "Analyses par statut" (app/researcher/analyses.py::
  * lister_analyses_admin). Une ligne = une version précise, jamais fusionnée avec ses versions
- * précédentes/suivantes (voir Analyse.analyse_precedente_id).
+ * précédentes/suivantes (voir Analysis.previous_analysis_id).
  */
 export interface AnalyseAdmin {
   id: string;
-  titre: string;
-  statut: StatutAnalyse;
+  title: string;
+  status: AnalysisStatus;
   version: number;
-  chercheur_email: string;
-  projet_nom: string;
-  date_creation: string;
-  date_soumission: string | null;
-  date_decision: string | null;
+  researcher_email: string;
+  project_name: string;
+  created_at: string;
+  submitted_at: string | null;
+  decided_at: string | null;
 }
 
 export interface AnalyseDetail {
   id: string;
-  projet_id: string;
-  chercheur_id: string;
-  titre: string;
-  contenu: string;
-  statut: StatutAnalyse;
+  project_id: string;
+  researcher_id: string;
+  title: string;
+  content: string;
+  status: AnalysisStatus;
   version: number;
-  analyse_precedente_id: string | null;
-  commentaire_institution: string | null;
-  date_creation: string;
-  date_soumission: string | null;
-  date_decision: string | null;
-  entreprise_ids: string[];
+  previous_analysis_id: string | null;
+  institution_comment: string | null;
+  created_at: string;
+  submitted_at: string | null;
+  decided_at: string | null;
+  company_ids: string[];
 }
 
 /**
@@ -120,39 +129,39 @@ export interface AnalyseDetail {
  */
 export interface AnalyseInstitutionPublic {
   id: string;
-  chercheur_id: string;
-  titre: string;
-  statut: StatutAnalyse;
+  researcher_id: string;
+  title: string;
+  status: AnalysisStatus;
   version: number;
-  date_creation: string;
-  date_soumission: string | null;
-  projet_id: string;
-  projet_nom: string;
+  created_at: string;
+  submitted_at: string | null;
+  project_id: string;
+  project_name: string;
 }
 
 export interface AnalysePublic {
   id: string;
-  projet_id: string;
-  chercheur_id: string;
-  titre: string;
-  contenu: string;
-  statut: StatutAnalyse;
+  project_id: string;
+  researcher_id: string;
+  title: string;
+  content: string;
+  status: AnalysisStatus;
   version: number;
-  analyse_precedente_id: string | null;
-  commentaire_institution: string | null;
-  date_creation: string;
-  date_soumission: string | null;
-  date_decision: string | null;
+  previous_analysis_id: string | null;
+  institution_comment: string | null;
+  created_at: string;
+  submitted_at: string | null;
+  decided_at: string | null;
 }
 
 export interface AnalyseResume {
   id: string;
-  chercheur_id: string;
-  titre: string;
-  statut: StatutAnalyse;
+  researcher_id: string;
+  title: string;
+  status: AnalysisStatus;
   version: number;
-  date_creation: string;
-  date_soumission: string | null;
+  created_at: string;
+  submitted_at: string | null;
 }
 
 /**
@@ -160,8 +169,8 @@ export interface AnalyseResume {
  * audits_en_retard vivent déjà dans TableauDeBordAdmin, pas répétés ici.
  */
 export interface StatistiquesAuditeursAdmin {
-  dossiers_affectes: number;
-  avis_rendus: number;
+  assigned_reports: number;
+  opinions_submitted: number;
 }
 
 /**
@@ -169,9 +178,9 @@ export interface StatistiquesAuditeursAdmin {
  * TableauDeBordAdmin, pas répété ici.
  */
 export interface StatistiquesInvestisseursAdmin {
-  portefeuilles_non_archives: number;
-  positions_declarees: number;
-  entreprises_distinctes: number;
+  active_portfolios: number;
+  declared_positions: number;
+  distinct_companies: number;
 }
 
 /**
@@ -179,11 +188,11 @@ export interface StatistiquesInvestisseursAdmin {
  * TableauDeBordAdmin, pas répété ici.
  */
 export interface StatistiquesChercheursAdmin {
-  chercheurs_affectes_projets_ouverts: number;
-  analyses_brouillon: number;
-  analyses_soumises: number;
-  analyses_validees: number;
-  analyses_correction_demandee: number;
+  researchers_on_open_projects: number;
+  draft_analyses: number;
+  submitted_analyses: number;
+  approved_analyses: number;
+  analyses_changes_requested: number;
 }
 
 /**
@@ -191,26 +200,26 @@ export interface StatistiquesChercheursAdmin {
  * TableauDeBordAdmin, pas répété ici.
  */
 export interface StatistiquesInstitutionsAdmin {
-  projets_ouverts: number;
-  projets_clotures: number;
-  invitations_en_attente: number;
-  analyses_a_examiner: number;
+  open_projects: number;
+  closed_projects: number;
+  pending_invitations: number;
+  analyses_to_review: number;
 }
 
 /**
  * Voir app/admin/apercu.py::construire_apercu_acteurs.
  */
 export interface ApercuActeursAdmin {
-  auditeurs: StatistiquesAuditeursAdmin;
-  investisseurs: StatistiquesInvestisseursAdmin;
-  chercheurs: StatistiquesChercheursAdmin;
+  auditors: StatistiquesAuditeursAdmin;
+  investors: StatistiquesInvestisseursAdmin;
+  researchers: StatistiquesChercheursAdmin;
   institutions: StatistiquesInstitutionsAdmin;
 }
 
-export type DecisionAudit = typeof DecisionAudit[keyof typeof DecisionAudit];
+export type AuditDecision = typeof AuditDecision[keyof typeof AuditDecision];
 
 
-export const DecisionAudit = {
+export const AuditDecision = {
   RECOMMANDE_VALIDATION: 'RECOMMANDE_VALIDATION',
   RECOMMANDE_REJET: 'RECOMMANDE_REJET',
   DEMANDE_CLARIFICATION: 'DEMANDE_CLARIFICATION',
@@ -218,15 +227,15 @@ export const DecisionAudit = {
 
 /**
  * Réservé Administrateur/Auditeur — jamais exposé à un compte Entreprise (voir
- * app/audit/models.py::AvisAudit.auditeur_id).
+ * app/audit/models.py::AuditOpinion.auditor_id).
  */
 export interface AvisAuditAdmin {
   id: string;
-  rapport_id: string;
-  decision: DecisionAudit;
-  commentaire: string | null;
-  date_avis: string;
-  auditeur_id: string;
+  report_id: string;
+  decision: AuditDecision;
+  comment: string | null;
+  submitted_at: string;
+  auditor_id: string;
 }
 
 /**
@@ -267,10 +276,10 @@ export interface BodyImportReferenceDataset {
   higher_is_better?: boolean;
 }
 
-export type TypeRapport = typeof TypeRapport[keyof typeof TypeRapport];
+export type ReportType = typeof ReportType[keyof typeof ReportType];
 
 
-export const TypeRapport = {
+export const ReportType = {
   RAPPORT_ANNUEL: 'RAPPORT_ANNUEL',
   RAPPORT_ESG: 'RAPPORT_ESG',
   RAPPORT_CLIMAT: 'RAPPORT_CLIMAT',
@@ -278,7 +287,7 @@ export const TypeRapport = {
 
 export interface BodySubmitCompanyReport {
   fichier: Blob;
-  type: TypeRapport;
+  type: ReportType;
   annee_reporting: number;
 }
 
@@ -299,14 +308,6 @@ export interface BodyUploadMyAvatar {
   fichier: Blob;
 }
 
-export type CanalDepot = typeof CanalDepot[keyof typeof CanalDepot];
-
-
-export const CanalDepot = {
-  AUTOMATIQUE: 'AUTOMATIQUE',
-  ENTREPRISE: 'ENTREPRISE',
-} as const;
-
 /**
  * Pourquoi une ligne ne participe pas aux émissions financées (Scopes 1+2).
  */
@@ -321,12 +322,12 @@ export const CarbonExclusionReason = {
 } as const;
 
 export interface ChangerMotDePasseRequest {
-  mot_de_passe_actuel: string;
+  current_password: string;
   /**
      * @minLength 12
      * @maxLength 72
      */
-  nouveau_mot_de_passe: string;
+  new_password: string;
 }
 
 /**
@@ -334,11 +335,11 @@ export interface ChangerMotDePasseRequest {
  * lister_charge_auditeurs).
  */
 export interface ChargeAuditeurAdmin {
-  auditeur_id: string;
+  auditor_id: string;
   email: string;
-  dossiers_affectes: number;
-  dossiers_en_retard: number;
-  avis_rendus: number;
+  assigned_reports: number;
+  overdue_reports: number;
+  opinions_submitted: number;
 }
 
 /**
@@ -348,7 +349,7 @@ export interface ChargeAuditeurAdmin {
 export interface ChercheurDisponible {
   id: string;
   email: string;
-  nom: string | null;
+  name: string | null;
 }
 
 /**
@@ -358,9 +359,9 @@ export interface ChercheurDisponible {
 export interface CompanyFinancials {
   company_id: string;
   revenue: number | null;
-  revenue_currency: DevisePosition | null;
+  revenue_currency: Currency | null;
   enterprise_value: number | null;
-  enterprise_value_currency: DevisePosition | null;
+  enterprise_value_currency: Currency | null;
   enterprise_value_as_of: string | null;
 }
 
@@ -374,9 +375,9 @@ export interface CompanyFinancials {
  */
 export interface CompanyFinancialsRequest {
   revenue?: number | string | null;
-  revenue_currency?: DevisePosition | null;
+  revenue_currency?: Currency | null;
   enterprise_value?: number | string | null;
-  enterprise_value_currency?: DevisePosition | null;
+  enterprise_value_currency?: Currency | null;
   enterprise_value_as_of?: string | null;
 }
 
@@ -443,7 +444,7 @@ export interface CompanyOnboardingResult {
 /**
  * POST /companies/register — inscription publique d'une entreprise (tâche 1.3, décision D5).
  *
- * Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3) : nouvel endpoint, donc
+ * Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3, tâche 1.3) : nouvel endpoint, donc
  * directement dans les noms cibles. ISIN et LEI restent facultatifs (beaucoup d'entreprises non
  * cotées n'en ont pas) mais, fournis, leur chiffre de contrôle est vérifié.
  *
@@ -488,6 +489,15 @@ export const ComparedScore = {
   GLOBAL: 'GLOBAL',
 } as const;
 
+export type ConfidenceLevel = typeof ConfidenceLevel[keyof typeof ConfidenceLevel];
+
+
+export const ConfidenceLevel = {
+  ELEVE: 'ELEVE',
+  MOYEN: 'MOYEN',
+  FAIBLE: 'FAIBLE',
+} as const;
+
 /**
  * POST /auth/confirmer-changement-email — jeton reçu à la nouvelle adresse
  * (app/auth/email_change.py::TOKEN_TTL, usage unique).
@@ -505,14 +515,14 @@ export interface ContactMessageRequest {
      * @minLength 2
      * @maxLength 100
      */
-  nom: string;
+  name: string;
   /** @maxLength 254 */
   email: string;
   /**
      * @minLength 3
      * @maxLength 150
      */
-  sujet: string;
+  subject: string;
   /**
      * @minLength 20
      * @maxLength 5000
@@ -526,51 +536,51 @@ export interface ContactMessageRequest {
  * sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
  * simple absence dans les pages examinées, qui reste NON_TROUVE.
  */
-export type StatutCouvertureIndicateur = typeof StatutCouvertureIndicateur[keyof typeof StatutCouvertureIndicateur];
+export type MetricCoverageStatus = typeof MetricCoverageStatus[keyof typeof MetricCoverageStatus];
 
 
-export const StatutCouvertureIndicateur = {
+export const MetricCoverageStatus = {
   TROUVE: 'TROUVE',
   NON_TROUVE: 'NON_TROUVE',
   ABSENT_CONFIRME: 'ABSENT_CONFIRME',
 } as const;
 
 export interface CouvertureIndicateurPublic {
-  code: string;
-  statut: StatutCouvertureIndicateur;
+  metric_code: string;
+  status: MetricCoverageStatus;
 }
 
 /**
  * Transparence sur ce qui manque (décision produit, voir app/ingestion/completeness.py) :
- * total_cibles/trouves permettent d'afficher "14/23 indicateurs communiqués" plutôt que de
- * laisser deviner une absence à partir d'un tiret muet ; codes_manquants liste tout code dont le
+ * total_targets/found permettent d'afficher "14/23 indicateurs communiqués" plutôt que de
+ * laisser deviner une absence à partir d'un tiret muet ; missing_codes liste tout code dont le
  * statut n'est pas TROUVE (NON_TROUVE et ABSENT_CONFIRME y comptent tous les deux comme
- * "manquant" — la distinction entre les deux reste disponible via CouvertureIndicateurPublic.statut
+ * "manquant" — la distinction entre les deux reste disponible via CouvertureIndicateurPublic.status
  * pour qui a besoin de savoir si l'absence a été confirmée ou seulement pas encore trouvée).
  */
 export interface CouvertureResume {
-  total_cibles: number;
-  trouves: number;
-  codes_manquants: string[];
+  total_targets: number;
+  found: number;
+  missing_codes: string[];
 }
 
 export interface CreerAnalyseRequest {
-  titre: string;
-  contenu: string;
-  entreprise_ids: string[];
+  title: string;
+  content: string;
+  company_ids: string[];
 }
 
 export interface CreerPortefeuilleRequest {
-  nom: string;
+  name: string;
 }
 
 export interface CreerProjetRequest {
-  nom: string;
+  name: string;
   description?: string | null;
-  objectif?: string | null;
-  date_debut?: string | null;
-  date_fin_prevue?: string | null;
-  date_limite?: string | null;
+  objective?: string | null;
+  start_date?: string | null;
+  planned_end_date?: string | null;
+  deadline?: string | null;
 }
 
 /**
@@ -590,11 +600,11 @@ export const Role = {
 
 export interface CreerUtilisateurRequest {
   email: string;
-  nom?: string | null;
+  name?: string | null;
   role: Role;
-  nom_entreprise?: string | null;
-  secteur?: string | null;
-  pays?: string | null;
+  company_name?: string | null;
+  sector?: string | null;
+  country?: string | null;
 }
 
 export interface CrossValidationMatch {
@@ -658,12 +668,21 @@ export interface CrossValidationReport {
   unmatched_lines: UnmatchedLine[];
 }
 
+export type DataMethod = typeof DataMethod[keyof typeof DataMethod];
+
+
+export const DataMethod = {
+  RAPPORTEE: 'RAPPORTEE',
+  ESTIMEE: 'ESTIMEE',
+  CALCULEE: 'CALCULEE',
+} as const;
+
 export interface DecisionAdminRequest {
-  commentaire?: string | null;
+  comment?: string | null;
 }
 
 export interface DecisionAnalyseRequest {
-  commentaire?: string | null;
+  comment?: string | null;
 }
 
 /**
@@ -676,61 +695,37 @@ export interface DemanderReinitialisationRequest {
 
 export interface DocumentProjetPublic {
   id: string;
-  rapport_id: string;
-  entreprise_id: string;
-  entreprise_nom: string;
-  annee_reporting: number | null;
-  date_ajout: string;
+  report_id: string;
+  company_id: string;
+  company_name: string;
+  fiscal_year: number | null;
+  added_at: string;
 }
 
-export type MethodeDonnee = typeof MethodeDonnee[keyof typeof MethodeDonnee];
-
-
-export const MethodeDonnee = {
-  RAPPORTEE: 'RAPPORTEE',
-  ESTIMEE: 'ESTIMEE',
-  CALCULEE: 'CALCULEE',
-} as const;
-
-/**
- * Contrat JSON historique d'une Evidence (docs/RENAME_PLAN.md §1, règle 3).
- */
 export interface PreuveDocumentairePublic {
   id: string;
-  nom_document: string;
-  annee: number;
-  nombre_pages_total: number;
-  page_debut: number;
-  page_fin: number;
-  pdf_extrait_genere: string;
+  document_name: string;
+  year: number;
+  total_pages: number;
+  page_start: number;
+  page_end: number;
+  excerpt_pdf_path: string;
 }
 
-export type NiveauConfiance = typeof NiveauConfiance[keyof typeof NiveauConfiance];
-
-
-export const NiveauConfiance = {
-  ELEVE: 'ELEVE',
-  MOYEN: 'MOYEN',
-  FAIBLE: 'FAIBLE',
-} as const;
-
-/**
- * Contrat JSON historique d'une CarbonEmission (docs/RENAME_PLAN.md §1, règle 3).
- */
 export interface DonneeCarboneDetail {
   id: string;
   scope: number;
-  categorie_ges: string | null;
-  valeur_tonnes_co2e: number;
-  annee: number;
-  methode: MethodeDonnee;
-  score_qualite_pcaf: number | null;
-  preuve: PreuveDocumentairePublic;
-  valeur_brute: string | null;
+  ghg_category: string | null;
+  tonnes_co2e: number;
+  year: number;
+  method: DataMethod;
+  pcaf_data_quality: number | null;
+  proof: PreuveDocumentairePublic;
+  raw_value: string | null;
   section: string | null;
-  citation_source: string | null;
-  annee_valeur: number | null;
-  confiance: NiveauConfiance | null;
+  proof_text: string | null;
+  value_year: number | null;
+  confidence: ConfidenceLevel | null;
 }
 
 export interface DonneesCarboneAgregees {
@@ -766,24 +761,24 @@ export const ReportStatus = {
  */
 export interface EntrepriseAdmin {
   id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
+  name: string;
+  sector: string;
+  country: string;
   logo: string | null;
   description: string | null;
-  site_officiel: string | null;
-  actif: boolean;
-  statut: CompanyStatus;
-  montant_minimum_investissement: number | null;
-  devise_montant_minimum: DevisePosition | null;
-  date_publication: string | null;
+  website: string | null;
+  active: boolean;
+  status: CompanyStatus;
+  minimum_investment_amount: number | null;
+  minimum_investment_currency: Currency | null;
+  published_at: string | null;
   isin?: string | null;
   lei?: string | null;
   ticker?: string | null;
-  utilisateur_id: string | null;
-  nombre_rapports: number;
-  dernier_statut_rapport: ReportStatus | null;
-  dernier_rapport_id: string | null;
+  owner_user_id: string | null;
+  report_count: number;
+  latest_report_status: ReportStatus | null;
+  latest_report_id: string | null;
 }
 
 /**
@@ -792,13 +787,13 @@ export interface EntrepriseAdmin {
  */
 export interface EntrepriseAvecScoreAdmin {
   id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
-  score_global: number | null;
-  score_environnement: number | null;
-  score_social: number | null;
-  score_gouvernance: number | null;
+  name: string;
+  sector: string;
+  country: string;
+  global_score: number | null;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
 }
 
 /**
@@ -808,12 +803,12 @@ export interface EntrepriseAvecScoreAdmin {
  * lecture défensive.
  */
 export interface ScoreEntreprisePublic {
-  valeur_globale: number | null;
-  score_environnement: number | null;
-  score_social: number | null;
-  score_gouvernance: number | null;
-  taux_couverture?: number | null;
-  configuration_version: number | null;
+  global_score: number | null;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
+  coverage_rate?: number | null;
+  config_version: number | null;
 }
 
 export type Pillar = typeof Pillar[keyof typeof Pillar];
@@ -827,17 +822,17 @@ export const Pillar = {
 
 export interface IndicateurESGDetail {
   id: string;
-  pilier: Pillar;
-  code: string;
-  valeur: number;
-  unite: string;
-  methode: MethodeDonnee;
-  preuve: PreuveDocumentairePublic;
-  valeur_brute: string | null;
+  pillar: Pillar;
+  metric_code: string;
+  value: number;
+  unit: string;
+  method: DataMethod;
+  proof: PreuveDocumentairePublic;
+  raw_value: string | null;
   section: string | null;
-  citation_source: string | null;
-  annee_valeur: number | null;
-  confiance: NiveauConfiance | null;
+  proof_text: string | null;
+  value_year: number | null;
+  confidence: ConfidenceLevel | null;
 }
 
 /**
@@ -847,50 +842,50 @@ export interface IndicateurESGDetail {
  */
 export interface EntrepriseDetailInvestisseur {
   id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
+  name: string;
+  sector: string;
+  country: string;
   logo: string | null;
   description: string | null;
-  site_officiel: string | null;
-  actif: boolean;
-  statut: CompanyStatus;
-  montant_minimum_investissement: number | null;
-  devise_montant_minimum: DevisePosition | null;
-  date_publication: string | null;
+  website: string | null;
+  active: boolean;
+  status: CompanyStatus;
+  minimum_investment_amount: number | null;
+  minimum_investment_currency: Currency | null;
+  published_at: string | null;
   isin?: string | null;
   lei?: string | null;
   ticker?: string | null;
   score: ScoreEntreprisePublic;
-  carbone: DonneesCarboneAgregees;
-  montant_minimum_par_devise: Partial<Record<DevisePosition, number>> | null;
-  indicateurs: IndicateurESGDetail[];
-  donnees_carbone: DonneeCarboneDetail[];
-  couverture: CouvertureResume;
-  rapport_id?: string | null;
+  carbon: DonneesCarboneAgregees;
+  minimum_amount_by_currency: Partial<Record<Currency, number>> | null;
+  metrics: IndicateurESGDetail[];
+  carbon_data: DonneeCarboneDetail[];
+  coverage: CouvertureResume;
+  report_id?: string | null;
 }
 
 export interface EntreprisePerimetrePublic {
   id: string;
-  entreprise_id: string;
-  entreprise_nom: string;
-  dernier_rapport_id: string | null;
-  date_ajout: string;
+  company_id: string;
+  company_name: string;
+  latest_report_id: string | null;
+  added_at: string;
 }
 
 export interface EntreprisePublic {
   id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
+  name: string;
+  sector: string;
+  country: string;
   logo: string | null;
   description: string | null;
-  site_officiel: string | null;
-  actif: boolean;
-  statut: CompanyStatus;
-  montant_minimum_investissement: number | null;
-  devise_montant_minimum: DevisePosition | null;
-  date_publication: string | null;
+  website: string | null;
+  active: boolean;
+  status: CompanyStatus;
+  minimum_investment_amount: number | null;
+  minimum_investment_currency: Currency | null;
+  published_at: string | null;
   isin?: string | null;
   lei?: string | null;
   ticker?: string | null;
@@ -905,23 +900,23 @@ export interface EntreprisePublic {
  */
 export interface EntreprisePublieePublic {
   id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
+  name: string;
+  sector: string;
+  country: string;
   logo: string | null;
   description: string | null;
-  site_officiel: string | null;
-  actif: boolean;
-  statut: CompanyStatus;
-  montant_minimum_investissement: number | null;
-  devise_montant_minimum: DevisePosition | null;
-  date_publication: string | null;
+  website: string | null;
+  active: boolean;
+  status: CompanyStatus;
+  minimum_investment_amount: number | null;
+  minimum_investment_currency: Currency | null;
+  published_at: string | null;
   isin?: string | null;
   lei?: string | null;
   ticker?: string | null;
   score: ScoreEntreprisePublic;
-  carbone: DonneesCarboneAgregees;
-  montant_minimum_par_devise: Partial<Record<DevisePosition, number>> | null;
+  carbon: DonneesCarboneAgregees;
+  minimum_amount_by_currency: Partial<Record<Currency, number>> | null;
 }
 
 /**
@@ -930,11 +925,11 @@ export interface EntreprisePublieePublic {
  */
 export interface EntrepriseSommaire {
   id: string;
-  nom: string;
-  secteur: string;
-  pays: string;
+  name: string;
+  sector: string;
+  country: string;
   logo: string | null;
-  actif: boolean;
+  active: boolean;
 }
 
 export type EtatPosition = typeof EtatPosition[keyof typeof EtatPosition];
@@ -959,7 +954,7 @@ export const ExtractionStatus = {
 } as const;
 
 export interface FermerPositionRequest {
-  date_fin?: string | null;
+  end_date?: string | null;
 }
 
 export type ValidationErrorCtx = { [key: string]: unknown };
@@ -988,15 +983,15 @@ export const IdentifierType = {
 } as const;
 
 /**
- * Corps de POST /company/rapports/import-url (CanalDepot.AUTOMATIQUE). entreprise_id n'est
+ * Corps de POST /company/rapports/import-url (SubmissionChannel.AUTOMATIQUE). entreprise_id n'est
  * lu que pour un appelant Administrateur -- un appelant Entreprise est toujours rattaché à sa
  * propre entreprise (voir app/company/router.py), un entreprise_id fourni par lui est ignoré.
  */
 export interface ImporterRapportParURLRequest {
   url: string;
-  type: TypeRapport;
-  annee_reporting: number;
-  entreprise_id?: string | null;
+  type: ReportType;
+  fiscal_year: number;
+  company_id?: string | null;
 }
 
 /**
@@ -1004,12 +999,12 @@ export interface ImporterRapportParURLRequest {
  * app/institution/analyses.py::_consommer_quota_export au fil des exports réels.
  */
 export interface InstitutionProfilPublic {
-  quota_export: number;
+  export_quota: number;
 }
 
 export interface InviterChercheurRequest {
-  chercheur_id: string;
-  conditions_collaboration?: string | null;
+  researcher_id: string;
+  collaboration_terms?: string | null;
 }
 
 /**
@@ -1018,14 +1013,14 @@ export interface InviterChercheurRequest {
  */
 export interface JournalAuditPublic {
   id: string;
-  acteur_id: string | null;
+  actor_id: string | null;
   action: string;
-  type_ressource: string;
-  id_ressource: string | null;
-  date: string;
-  resultat: string;
-  ancienne_valeur: string | null;
-  nouvelle_valeur: string | null;
+  resource_type: string;
+  resource_id: string | null;
+  occurred_at: string;
+  result: string;
+  old_value: string | null;
+  new_value: string | null;
   correlation_id: string | null;
 }
 
@@ -1057,9 +1052,9 @@ export interface MetricContribution {
 }
 
 export interface ModifierAnalyseRequest {
-  titre: string;
-  contenu: string;
-  entreprise_ids: string[];
+  title: string;
+  content: string;
+  company_ids: string[];
 }
 
 /**
@@ -1072,13 +1067,13 @@ export interface ModifierAnalyseRequest {
  * les deux ensemble, jamais un montant minimum sans sa devise (voir app/company/models.py).
  */
 export interface ModifierEntrepriseAdminRequest {
-  nom: string;
-  secteur: string;
-  pays: string;
+  name: string;
+  sector: string;
+  country: string;
   description?: string | null;
-  site_officiel?: string | null;
-  montant_minimum_investissement?: number | string | null;
-  devise_montant_minimum?: DevisePosition | null;
+  website?: string | null;
+  minimum_investment_amount?: number | string | null;
+  minimum_investment_currency?: Currency | null;
 }
 
 /**
@@ -1087,11 +1082,11 @@ export interface ModifierEntrepriseAdminRequest {
  * seule une fermeture puis une nouvelle position permet de changer de cible.
  */
 export interface ModifierPositionRequest {
-  montant: number | string;
-  devise: DevisePosition;
-  type_duree: TypeDureeInvestissement;
-  date_debut: string;
-  date_fin?: string | null;
+  amount: number | string;
+  currency: Currency;
+  duration_type: DurationType;
+  start_date: string;
+  end_date?: string | null;
 }
 
 /**
@@ -1104,18 +1099,18 @@ export interface ModifierPositionRequest {
  * session volée ne suffit jamais à détourner le compte.
  */
 export interface ModifierProfilRequest {
-  nom: string;
+  name: string;
   email: string;
-  mot_de_passe_actuel?: string | null;
+  current_password?: string | null;
 }
 
 export interface NotificationPublic {
   id: string;
   type: string;
   message: string;
-  id_ressource: string | null;
-  date_envoi: string;
-  lu: boolean;
+  resource_id: string | null;
+  sent_at: string;
+  read: boolean;
 }
 
 export interface PageAnalyseAdmin {
@@ -1189,12 +1184,12 @@ export interface PageNotificationPublic {
  */
 export interface PortefeuilleAdmin {
   id: string;
-  nom: string;
-  investisseur_email: string;
-  devise_reference: DevisePosition;
-  nombre_positions: number;
-  montant_total: number;
-  date_creation: string;
+  name: string;
+  investor_email: string;
+  reference_currency: Currency;
+  position_count: number;
+  total_amount: number;
+  created_at: string;
 }
 
 export interface PagePortefeuilleAdmin {
@@ -1207,17 +1202,17 @@ export interface PagePortefeuilleAdmin {
 
 export interface PortefeuilleResume {
   id: string;
-  nom: string;
-  devise_reference: DevisePosition;
-  montant_total: number;
-  nombre_positions: number;
-  score_esg_agrege: number | null;
-  score_environnement_agrege: number | null;
-  score_social_agrege: number | null;
-  score_gouvernance_agrege: number | null;
-  couverture_esg: number;
-  date_creation: string;
-  archive: boolean;
+  name: string;
+  reference_currency: Currency;
+  total_amount: number;
+  position_count: number;
+  aggregated_esg_score: number | null;
+  aggregated_environmental_score: number | null;
+  aggregated_social_score: number | null;
+  aggregated_governance_score: number | null;
+  esg_coverage: number;
+  created_at: string;
+  archived: boolean;
 }
 
 export interface PagePortefeuilleResume {
@@ -1228,10 +1223,10 @@ export interface PagePortefeuilleResume {
   pages: number;
 }
 
-export type StatutProjet = typeof StatutProjet[keyof typeof StatutProjet];
+export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
 
 
-export const StatutProjet = {
+export const ProjectStatus = {
   OUVERT: 'OUVERT',
   CLOTURE: 'CLOTURE',
 } as const;
@@ -1242,13 +1237,13 @@ export const StatutProjet = {
  */
 export interface ProjetAdmin {
   id: string;
-  nom: string;
-  statut: StatutProjet;
+  name: string;
+  status: ProjectStatus;
   institution_email: string;
-  nombre_chercheurs: number;
-  date_creation: string;
-  date_limite: string | null;
-  date_cloture: string | null;
+  researcher_count: number;
+  created_at: string;
+  deadline: string | null;
+  closed_at: string | null;
 }
 
 export interface PageProjetAdmin {
@@ -1259,23 +1254,31 @@ export interface PageProjetAdmin {
   pages: number;
 }
 
+export type SubmissionChannel = typeof SubmissionChannel[keyof typeof SubmissionChannel];
+
+
+export const SubmissionChannel = {
+  AUTOMATIQUE: 'AUTOMATIQUE',
+  ENTREPRISE: 'ENTREPRISE',
+} as const;
+
 export interface RapportESGPublic {
   id: string;
-  entreprise_id: string;
-  type: TypeRapport;
-  canal: CanalDepot;
-  date_creation: string;
-  date_depot: string | null;
-  statut: ReportStatus;
-  statut_extraction: ExtractionStatus;
-  fichier_source: string | null;
-  nom_fichier_origine: string | null;
-  annee_reporting: number | null;
-  extraction_terminee_le: string | null;
-  extraction_erreur: string | null;
-  tentatives_extraction: number;
+  company_id: string;
+  type: ReportType;
+  channel: SubmissionChannel;
+  created_at: string;
+  submitted_at: string | null;
+  status: ReportStatus;
+  extraction_status: ExtractionStatus;
+  source_file: string | null;
+  original_filename: string | null;
+  fiscal_year: number | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
+  extraction_attempts: number;
   version: number;
-  rapport_precedent_id: string | null;
+  previous_report_id: string | null;
 }
 
 export interface PageRapportESGPublic {
@@ -1289,7 +1292,7 @@ export interface PageRapportESGPublic {
 export interface ReportResponse {
   id: string;
   company_id: string;
-  report_type: TypeRapport;
+  report_type: ReportType;
   fiscal_year: number | null;
   status: ReportStatus;
   extraction_status: ExtractionStatus;
@@ -1312,13 +1315,13 @@ export interface PageReportResponse {
 export interface UtilisateurPublic {
   id: string;
   email: string;
-  nom: string | null;
+  name: string | null;
   avatar: string | null;
   role: Role;
-  date_creation: string;
-  actif: boolean;
-  date_activation: string | null;
-  email_en_attente?: string | null;
+  created_at: string;
+  active: boolean;
+  activated_at: string | null;
+  pending_email?: string | null;
 }
 
 export interface PageUtilisateurPublic {
@@ -1330,9 +1333,9 @@ export interface PageUtilisateurPublic {
 }
 
 export interface TrancheScorePublic {
-  borne_min: number;
-  borne_max: number;
-  nombre_entreprises: number;
+  lower_bound: number;
+  upper_bound: number;
+  company_count: number;
 }
 
 /**
@@ -1340,12 +1343,12 @@ export interface TrancheScorePublic {
  * entreprise du périmètre n'a de valeur exploitable pour ce pilier, jamais 0.
  */
 export interface PerformanceESGAdmin {
-  score_global_moyen: number | null;
-  score_environnement_moyen: number | null;
-  score_social_moyen: number | null;
-  score_gouvernance_moyen: number | null;
-  entreprises_avec_score: number;
-  entreprises_perimetre: number;
+  average_global_score: number | null;
+  average_environmental_score: number | null;
+  average_social_score: number | null;
+  average_governance_score: number | null;
+  companies_with_score: number;
+  companies_in_scope: number;
   distribution: TrancheScorePublic[];
 }
 
@@ -1356,41 +1359,41 @@ export interface PillarContribution {
 
 export interface PositionDetail {
   id: string;
-  portefeuille_id: string;
-  entreprise: EntrepriseSommaire | null;
-  identifiant?: string | null;
-  type_identifiant?: IdentifierType | null;
-  statut_rapprochement?: MatchStatus;
-  montant_investi: number;
-  devise: DevisePosition;
-  montant_converti: number;
-  taux_change_utilise: number | null;
-  poids: number;
-  type_duree: TypeDureeInvestissement;
-  date_debut: string;
-  date_fin: string | null;
-  etat: EtatPosition;
+  portfolio_id: string;
+  company: EntrepriseSommaire | null;
+  identifier?: string | null;
+  identifier_type?: IdentifierType | null;
+  match_status?: MatchStatus;
+  outstanding_amount: number;
+  currency: Currency;
+  converted_amount: number;
+  fx_rate_used: number | null;
+  weight: number;
+  duration_type: DurationType;
+  start_date: string;
+  end_date: string | null;
+  state: EtatPosition;
   score: ScoreEntreprisePublic;
-  date_publication_utilisee: string | null;
-  preuves_disponibles: boolean;
+  published_at_used: string | null;
+  evidence_available: boolean;
 }
 
 export interface PortefeuilleDetail {
   id: string;
-  nom: string;
-  devise_reference: DevisePosition;
-  montant_total: number;
-  nombre_positions: number;
-  score_esg_agrege: number | null;
-  score_environnement_agrege: number | null;
-  score_social_agrege: number | null;
-  score_gouvernance_agrege: number | null;
-  couverture_esg: number;
-  date_creation: string;
-  archive: boolean;
-  nombre_positions_planifiees: number;
-  nombre_positions_actives: number;
-  nombre_positions_cloturees: number;
+  name: string;
+  reference_currency: Currency;
+  total_amount: number;
+  position_count: number;
+  aggregated_esg_score: number | null;
+  aggregated_environmental_score: number | null;
+  aggregated_social_score: number | null;
+  aggregated_governance_score: number | null;
+  esg_coverage: number;
+  created_at: string;
+  archived: boolean;
+  planned_position_count: number;
+  active_position_count: number;
+  closed_position_count: number;
   positions: PositionDetail[];
 }
 
@@ -1423,7 +1426,7 @@ export interface PositionCarbon {
  */
 export interface PortfolioCarbon {
   portfolio_id: string;
-  currency: DevisePosition;
+  currency: Currency;
   total_value: number;
   financed_emissions_scope_1_2: number | null;
   financed_emissions_scope_3: number | null;
@@ -1451,46 +1454,46 @@ export interface PortfolioImportResult {
 
 export interface ProjetAffecte {
   id: string;
-  nom: string;
+  name: string;
   description: string | null;
-  objectif: string | null;
-  date_debut: string | null;
-  date_fin_prevue: string | null;
-  date_limite: string | null;
-  statut: StatutProjet;
+  objective: string | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  deadline: string | null;
+  status: ProjectStatus;
   institution_email: string;
 }
 
 export interface ProjetDetail {
   id: string;
   institution_id: string;
-  nom: string;
+  name: string;
   description: string | null;
-  objectif: string | null;
-  date_debut: string | null;
-  date_fin_prevue: string | null;
-  date_limite: string | null;
-  statut: StatutProjet;
-  date_creation: string;
-  date_cloture: string | null;
-  affectations: AffectationPublic[];
+  objective: string | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  deadline: string | null;
+  status: ProjectStatus;
+  created_at: string;
+  closed_at: string | null;
+  assignments: AffectationPublic[];
   analyses: AnalyseResume[];
-  perimetre: EntreprisePerimetrePublic[];
+  companies: EntreprisePerimetrePublic[];
   documents: DocumentProjetPublic[];
 }
 
 export interface ProjetPublic {
   id: string;
   institution_id: string;
-  nom: string;
+  name: string;
   description: string | null;
-  objectif: string | null;
-  date_debut: string | null;
-  date_fin_prevue: string | null;
-  date_limite: string | null;
-  statut: StatutProjet;
-  date_creation: string;
-  date_cloture: string | null;
+  objective: string | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  deadline: string | null;
+  status: ProjectStatus;
+  created_at: string;
+  closed_at: string | null;
 }
 
 /**
@@ -1499,65 +1502,56 @@ export interface ProjetPublic {
  * app/ingestion/schemas.py::RapportESGDetail pour la distinction explicite).
  */
 export interface ScoreESGPublic {
-  valeur_globale: number;
-  score_environnement: number | null;
-  score_social: number | null;
-  score_gouvernance: number | null;
-  taux_couverture: number | null;
-  configuration_version: number;
+  global_score: number;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
+  coverage_rate: number | null;
+  config_version: number;
 }
 
 /**
  * Étend RapportESGPublic avec les données extraites. Ne contient JAMAIS l'avis de l'auditeur
- * (app/audit/schemas.py::AvisAudit*) — l'auditeur_id ne doit jamais pouvoir fuiter vers une
+ * (app/audit/schemas.py::AuditOpinion*) — l'auditeur_id ne doit jamais pouvoir fuiter vers une
  * réponse Entreprise par accident de composition de schéma, pas seulement par discipline.
  */
 export interface RapportESGDetail {
   id: string;
-  entreprise_id: string;
-  type: TypeRapport;
-  canal: CanalDepot;
-  date_creation: string;
-  date_depot: string | null;
-  statut: ReportStatus;
-  statut_extraction: ExtractionStatus;
-  fichier_source: string | null;
-  nom_fichier_origine: string | null;
-  annee_reporting: number | null;
-  extraction_terminee_le: string | null;
-  extraction_erreur: string | null;
-  tentatives_extraction: number;
+  company_id: string;
+  type: ReportType;
+  channel: SubmissionChannel;
+  created_at: string;
+  submitted_at: string | null;
+  status: ReportStatus;
+  extraction_status: ExtractionStatus;
+  source_file: string | null;
+  original_filename: string | null;
+  fiscal_year: number | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
+  extraction_attempts: number;
   version: number;
-  rapport_precedent_id: string | null;
-  indicateurs: IndicateurESGDetail[];
-  donnees_carbone: DonneeCarboneDetail[];
-  score_global_declare: number | null;
-  score_global_declare_preuve: PreuveDocumentairePublic | null;
-  score_officiel?: ScoreESGPublic | null;
-  readonly couverture: CouvertureResume;
+  previous_report_id: string | null;
+  metrics: IndicateurESGDetail[];
+  carbon_data: DonneeCarboneDetail[];
+  declared_global_score: number | null;
+  declared_global_score_proof: PreuveDocumentairePublic | null;
+  official_score?: ScoreESGPublic | null;
+  readonly coverage: CouvertureResume;
 }
-
-export type StatutRattachement = typeof StatutRattachement[keyof typeof StatutRattachement];
-
-
-export const StatutRattachement = {
-  EN_ATTENTE: 'EN_ATTENTE',
-  ACCEPTE: 'ACCEPTE',
-  REFUSE: 'REFUSE',
-} as const;
 
 export interface RattachementPublic {
   id: string;
-  chercheur_id: string;
-  chercheur_email: string;
-  chercheur_nom: string | null;
+  researcher_id: string;
+  researcher_email: string;
+  researcher_name: string | null;
   institution_id: string;
   institution_email: string;
-  institution_nom: string | null;
-  statut: StatutRattachement;
-  date_invitation: string;
-  date_reponse: string | null;
-  conditions_collaboration: string | null;
+  institution_name: string | null;
+  status: AffiliationStatus;
+  invited_at: string;
+  responded_at: string | null;
+  collaboration_terms: string | null;
 }
 
 export interface SkippedLine {
@@ -1586,16 +1580,16 @@ export interface ReinitialiserMotDePasseRequest {
      * @minLength 12
      * @maxLength 72
      */
-  nouveau_mot_de_passe: string;
+  new_password: string;
 }
 
 export interface RenommerPortefeuilleRequest {
-  nom: string;
+  name: string;
 }
 
 export interface RepartitionSecteur {
-  secteur: string;
-  montant_usd: number;
+  sector: string;
+  amount_usd: number;
 }
 
 /**
@@ -1607,7 +1601,7 @@ export interface RepartitionSecteur {
 export interface ReportCreateRequest {
   /** @minimum 2000 */
   fiscal_year: number;
-  report_type: TypeRapport;
+  report_type: ReportType;
   company_id?: string | null;
 }
 
@@ -1628,19 +1622,19 @@ export interface ScoreExplanation {
 }
 
 /**
- * Réponse de POST /admin/rapports/{id}/recalculer-score : le contrat JSON historique (la
- * route renvoyait la ligne de table, docs/RENAME_PLAN.md §1 règle 3), plus la couverture.
+ * Réponse de POST /admin/rapports/{id}/recalculer-score : les colonnes du Score recalculé,
+ * dont la couverture.
  */
 export interface ScoreRecalculeAdmin {
   id: string;
-  rapport_id: string;
-  configuration_id: string;
-  valeur_globale: number;
-  score_environnement: number | null;
-  score_social: number | null;
-  score_gouvernance: number | null;
-  taux_couverture: number | null;
-  date_calcul: string;
+  report_id: string;
+  config_id: string;
+  global_score: number;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
+  coverage_rate: number | null;
+  computed_at: string;
 }
 
 /**
@@ -1650,47 +1644,47 @@ export interface ScoreRecalculeAdmin {
  * couverture est sous le minimum de la méthodologie (tâche 3.1).
  */
 export interface ScoreVerificationAdmin {
-  calculable: boolean;
-  taux_couverture?: number | null;
-  couverture_minimale?: number | null;
+  computable: boolean;
+  coverage_rate?: number | null;
+  min_coverage?: number | null;
 }
 
 export interface SoumettreAvisRequest {
-  decision: DecisionAudit;
-  commentaire?: string | null;
+  decision: AuditDecision;
+  comment?: string | null;
 }
 
 /**
  * Indicateurs agrégés du tableau de bord Administrateur (voir app/admin/dashboard.py).
  */
 export interface TableauDeBordAdmin {
-  entreprises_inscrites: number;
-  rapports_soumis: number;
-  rapports_valides: number;
-  rapports_rejetes: number;
-  entreprises_publiees: number;
-  audits_en_retard: number;
-  rapports_a_affecter: number;
-  decisions_a_rendre: number;
-  demandes_republication: number;
-  utilisateurs_en_attente: number;
-  rapports_echec_extraction: number;
-  rapports_orphelins: number;
-  administrateurs_actifs: number;
-  auditeurs_actifs: number;
-  investisseurs_actifs: number;
-  chercheurs_actifs: number;
-  institutions_actives: number;
+  registered_companies: number;
+  submitted_reports: number;
+  validated_reports: number;
+  rejected_reports: number;
+  published_companies: number;
+  overdue_audits: number;
+  reports_to_assign: number;
+  pending_decisions: number;
+  republication_requests: number;
+  pending_users: number;
+  failed_extraction_reports: number;
+  orphan_reports: number;
+  active_admins: number;
+  active_auditors: number;
+  active_investors: number;
+  active_researchers: number;
+  active_institutions: number;
 }
 
 export interface TableauDeBordInvestisseur {
-  nombre_portefeuilles: number;
-  nombre_entreprises_publiees: number;
-  taux_couverture_esg_plateforme: number;
-  nombre_nouvelles_publications_suivies: number;
-  repartition_secteur: RepartitionSecteur[];
-  publications_recentes: EntreprisePublieePublic[];
-  entreprises_suivies_suspendues: EntrepriseSommaire[];
+  portfolio_count: number;
+  published_company_count: number;
+  platform_esg_coverage_rate: number;
+  new_followed_publication_count: number;
+  sector_breakdown: RepartitionSecteur[];
+  recent_publications: EntreprisePublieePublic[];
+  suspended_followed_companies: EntrepriseSommaire[];
 }
 
 /**
@@ -1701,10 +1695,10 @@ export interface TableauDeBordInvestisseur {
 export interface UtilisateurCree {
   id: string;
   email: string;
-  nom: string;
+  name: string;
   role: Role;
-  date_creation: string;
-  actif: boolean;
+  created_at: string;
+  active: boolean;
 }
 
 /**
@@ -1714,7 +1708,7 @@ export interface UtilisateurCree {
  * chose que "ce mot de passe est-il le bon" (voir app/auth/router.py::verifier_mon_mot_de_passe).
  */
 export interface VerifierMotDePasseRequest {
-  mot_de_passe: string;
+  password: string;
 }
 
 export type ListMyNotificationsParams = {
@@ -1893,7 +1887,7 @@ page_size?: number;
 };
 
 export type ListAnalysesAdminParams = {
-statut?: StatutAnalyse | null;
+statut?: AnalysisStatus | null;
 /**
  * @minimum 1
  */
@@ -1906,7 +1900,7 @@ page_size?: number;
 };
 
 export type ListProjectsAdminParams = {
-statut?: StatutProjet | null;
+statut?: ProjectStatus | null;
 /**
  * @minimum 1
  */
@@ -1921,7 +1915,7 @@ page_size?: number;
 export type ListReportsParams = {
 fiscal_year?: number | null;
 status?: ReportStatus | null;
-report_type?: TypeRapport | null;
+report_type?: ReportType | null;
 company_id?: string | null;
 /**
  * @minimum 1
@@ -1971,7 +1965,7 @@ entreprise_ids: string[];
 };
 
 export type ListMyResearchersParams = {
-statut?: StatutRattachement | null;
+statut?: AffiliationStatus | null;
 };
 
 export type ListPublishedCompaniesForInstitutionParams = {
@@ -1983,6 +1977,6 @@ page_size?: number;
 };
 
 export type ListMyAnalysesForInstitutionParams = {
-statut?: StatutAnalyse | null;
+statut?: AnalysisStatus | null;
 };
 

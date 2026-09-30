@@ -117,7 +117,7 @@ def activer_compte(session: Session, jeton_clair: str, nouveau_mot_de_passe: str
     user.activated_at = utcnow()
     session.add(entree)
     session.add(user)
-    auditer(session, user.id, "activation_compte", "Utilisateur", user.id, "succes")
+    auditer(session, user.id, "account_activated", "User", user.id, "success")
     session.commit()
     session.refresh(user)
     return user

@@ -49,7 +49,7 @@ export type ChangerMotDePasseForm = z.infer<typeof changerMotDePasseFormSchema>;
  * de passe actuel et ne prend effet qu'après confirmation du lien envoyé à la nouvelle adresse
  * (app/auth/email_change.py) : le composant n'exige motDePasseActuel que dans ce cas. */
 export const modifierProfilFormSchema = z.object({
-  nom: z.string().min(1, "Le nom est requis."),
+  name: z.string().min(1, "Le nom est requis."),
   email: z.string().min(1, "L'adresse e-mail est requise").email("Adresse e-mail invalide"),
   motDePasseActuel: z.string().optional(),
 });

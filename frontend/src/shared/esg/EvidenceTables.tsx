@@ -9,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 
 function libellePreuve(preuve: PreuveDocumentairePublic): string {
-  return preuve.page_debut === preuve.page_fin
-    ? `Rapport ${preuve.annee} — page ${preuve.page_debut}`
-    : `Rapport ${preuve.annee} — pages ${preuve.page_debut}-${preuve.page_fin}`;
+  return preuve.page_start === preuve.page_end
+    ? `Rapport ${preuve.year} — page ${preuve.page_start}`
+    : `Rapport ${preuve.year} — pages ${preuve.page_start}-${preuve.page_end}`;
 }
 
 /** Aperçu fluide de l'extrait PDF (une page, généré à l'ingestion — voir
@@ -85,14 +85,14 @@ function debutsDeGroupe(piliers: string[]): Map<number, number> {
  * app/ingestion/completeness.py) : "12/23 indicateurs communiqués" plutôt que de faire deviner
  * l'absence à partir de ce qui n'apparaît simplement pas dans le tableau. */
 function CouvertureNote({ couverture }: { couverture: CouvertureResume }) {
-  if (couverture.total_cibles === 0) return null;
+  if (couverture.total_targets === 0) return null;
   return (
     <p className="mb-3 text-sm text-brand-grey">
-      {couverture.trouves}/{couverture.total_cibles} indicateurs cibles communiqués par
+      {couverture.found}/{couverture.total_targets} indicateurs cibles communiqués par
       l'entreprise.
-      {couverture.codes_manquants.length > 0 ? (
+      {couverture.missing_codes.length > 0 ? (
         <span className="block text-xs">
-          Non communiqués : {couverture.codes_manquants.join(", ")}
+          Non communiqués : {couverture.missing_codes.join(", ")}
         </span>
       ) : null}
     </p>
@@ -108,7 +108,7 @@ export function IndicatorsTable({
   couverture?: CouvertureResume;
   construireUrlPreuve: (preuveId: string) => string;
 }) {
-  const groupesPilier = debutsDeGroupe(indicateurs.map((i) => i.pilier));
+  const groupesPilier = debutsDeGroupe(indicateurs.map((i) => i.pillar));
 
   return (
     <Card>
@@ -138,17 +138,17 @@ export function IndicatorsTable({
                         className="py-2 pr-4 align-middle font-medium text-brand-blue"
                         rowSpan={groupesPilier.get(i)}
                       >
-                        {indicateur.pilier}
+                        {indicateur.pillar}
                       </td>
                     ) : null}
-                    <td className="py-2 pr-4">{indicateur.code}</td>
+                    <td className="py-2 pr-4">{indicateur.metric_code}</td>
                     <td className="py-2 pr-4">
-                      {indicateur.valeur} {indicateur.unite}
+                      {indicateur.value} {indicateur.unit}
                     </td>
                     <td className="py-2">
                       <PreuveLien
-                        preuve={indicateur.preuve}
-                        url={construireUrlPreuve(indicateur.preuve.id)}
+                        preuve={indicateur.proof}
+                        url={construireUrlPreuve(indicateur.proof.id)}
                       />
                     </td>
                   </tr>
@@ -192,11 +192,11 @@ export function CarbonTable({
                   <tr key={donnee.id} className="border-b last:border-0">
                     <td className="py-2 pr-4">
                       Scope {donnee.scope}
-                      {donnee.categorie_ges ? ` — ${donnee.categorie_ges}` : ""}
+                      {donnee.ghg_category ? ` — ${donnee.ghg_category}` : ""}
                     </td>
-                    <td className="py-2 pr-4">{donnee.valeur_tonnes_co2e.toLocaleString("fr-FR")} tCO2e</td>
+                    <td className="py-2 pr-4">{donnee.tonnes_co2e.toLocaleString("fr-FR")} tCO2e</td>
                     <td className="py-2">
-                      <PreuveLien preuve={donnee.preuve} url={construireUrlPreuve(donnee.preuve.id)} />
+                      <PreuveLien preuve={donnee.proof} url={construireUrlPreuve(donnee.proof.id)} />
                     </td>
                   </tr>
                 ))}

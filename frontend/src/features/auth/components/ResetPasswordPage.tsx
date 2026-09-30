@@ -27,12 +27,12 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 type TokenPasswordMutation = UseMutationResult<
   void,
   ApiError,
-  { token: string; nouveau_mot_de_passe: string }
+  { token: string; new_password: string }
 >;
 
 interface Textes {
   eyebrow: string;
-  titre: string;
+  title: string;
   titreFait: string;
   description: string;
   descriptionFaite: string;
@@ -68,7 +68,7 @@ function TokenPasswordPage({ mutation, textes }: { mutation: TokenPasswordMutati
     if (mutation.isPending || invalidLink) return;
     setServerError(null);
     mutation.mutate(
-      { token, nouveau_mot_de_passe: values.nouveauMotDePasse },
+      { token, new_password: values.nouveauMotDePasse },
       {
         onSuccess: () => {
           form.reset();
@@ -96,7 +96,7 @@ function TokenPasswordPage({ mutation, textes }: { mutation: TokenPasswordMutati
   return (
     <AuthLayout
       eyebrow={textes.eyebrow}
-      title={done ? textes.titreFait : textes.titre}
+      title={done ? textes.titreFait : textes.title}
       description={done ? textes.descriptionFaite : textes.description}
     >
       {done ? (
@@ -193,7 +193,7 @@ export function ResetPasswordPage() {
       mutation={useResetPassword()}
       textes={{
         eyebrow: "UN NOUVEAU DÉPART",
-        titre: "Nouveau mot de passe",
+        title: "Nouveau mot de passe",
         titreFait: "Votre accès est rétabli",
         description: "Choisissez un mot de passe personnel pour sécuriser votre compte.",
         descriptionFaite:
@@ -224,7 +224,7 @@ export function ActivateAccountPage() {
       mutation={useActivateAccount()}
       textes={{
         eyebrow: "BIENVENUE",
-        titre: "Activez votre compte",
+        title: "Activez votre compte",
         titreFait: "Votre compte est activé",
         description: "Choisissez le mot de passe qui protégera votre compte GreenFinance-Scorer.",
         descriptionFaite: "Vous pouvez maintenant vous connecter à votre espace.",

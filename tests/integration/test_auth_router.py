@@ -20,7 +20,7 @@ from app.core import storage
 from app.core.database import utcnow
 from app.core.email import EmailDeliveryError
 from app.core.enums import Role
-from app.core.models import JournalAudit
+from app.core.models import AuditLogEntry
 from app.main import app
 
 client = TestClient(app, base_url="https://testserver")
@@ -141,14 +141,14 @@ def test_modifier_mon_profil_change_le_nom_immediatement_jamais_le_role(session)
 
     response = authed_client.patch(
         "/api/v1/auth/me",
-        json={"nom": "Nouveau Nom", "email": user.email, "role": Role.ADMIN.value},
+        json={"name": "Nouveau Nom", "email": user.email, "role": Role.ADMIN.value},
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"] == "Nouveau Nom"
+    assert body["name"] == "Nouveau Nom"
     assert body["email"] == user.email
-    assert body["email_en_attente"] is None
+    assert body["pending_email"] is None
     assert body["role"] == Role.RESEARCHER.value
 
 
@@ -157,10 +157,10 @@ def test_changer_email_exige_le_mot_de_passe_actuel(session) -> None:
     authed_client = _client_connecte(user, "s3cret-pass")
     nouvel_email = f"nouveau-{uuid.uuid4()}@example.com"
 
-    sans = authed_client.patch("/api/v1/auth/me", json={"nom": "N", "email": nouvel_email})
+    sans = authed_client.patch("/api/v1/auth/me", json={"name": "N", "email": nouvel_email})
     faux = authed_client.patch(
         "/api/v1/auth/me",
-        json={"nom": "N", "email": nouvel_email, "mot_de_passe_actuel": "mauvais-pass"},
+        json={"name": "N", "email": nouvel_email, "current_password": "mauvais-pass"},
     )
 
     assert sans.status_code == 422
@@ -182,13 +182,13 @@ def test_changer_email_nest_applique_quapres_confirmation_par_la_nouvelle_adress
 
     demande = authed_client.patch(
         "/api/v1/auth/me",
-        json={"nom": "N", "email": nouvel_email, "mot_de_passe_actuel": "s3cret-pass"},
+        json={"name": "N", "email": nouvel_email, "current_password": "s3cret-pass"},
     )
 
     # Demande seulement : l'identifiant de connexion ne change pas encore.
     assert demande.status_code == 200
     assert demande.json()["email"] == ancien_email
-    assert demande.json()["email_en_attente"] == nouvel_email.lower()
+    assert demande.json()["pending_email"] == nouvel_email.lower()
     destinataires = [appel.kwargs["recipient"] for appel in _mock_password_reset_delivery.call_args_list]
     assert destinataires == [nouvel_email.lower(), ancien_email]
     entree = session.exec(
@@ -206,12 +206,12 @@ def test_changer_email_nest_applique_quapres_confirmation_par_la_nouvelle_adress
     assert rejeu.status_code == 422
     assert rejeu.json()["error"]["code"] == "jeton_invalide"
     journal = session.exec(
-        select(JournalAudit).where(
-            JournalAudit.action == "modification_email", JournalAudit.id_ressource == user.id
+        select(AuditLogEntry).where(
+            AuditLogEntry.action == "email_changed", AuditLogEntry.resource_id == user.id
         )
     ).one()
-    assert journal.ancienne_valeur == ancien_email
-    assert journal.nouvelle_valeur == nouvel_email.lower()
+    assert journal.old_value == ancien_email
+    assert journal.new_value == nouvel_email.lower()
 
 
 def test_modifier_mon_profil_avec_un_email_deja_utilise_est_refuse(session) -> None:
@@ -221,7 +221,7 @@ def test_modifier_mon_profil_avec_un_email_deja_utilise_est_refuse(session) -> N
 
     response = authed_client.patch(
         "/api/v1/auth/me",
-        json={"nom": "Un Nom", "email": autre.email.upper(), "mot_de_passe_actuel": "s3cret-pass"},
+        json={"name": "Un Nom", "email": autre.email.upper(), "current_password": "s3cret-pass"},
     )
 
     assert response.status_code == 422
@@ -235,7 +235,7 @@ def test_modifier_mon_profil_avec_un_email_invalide_est_refuse(session) -> None:
     authed_client.headers.update({CSRF_HEADER_NAME: authed_client.cookies[CSRF_COOKIE_NAME]})
 
     response = authed_client.patch(
-        "/api/v1/auth/me", json={"nom": "Un Nom", "email": "pas-un-email"}
+        "/api/v1/auth/me", json={"name": "Un Nom", "email": "pas-un-email"}
     )
 
     assert response.status_code == 422
@@ -308,13 +308,13 @@ def test_verifier_mon_mot_de_passe_valide_ou_invalide(session) -> None:
     authed_client.headers.update({CSRF_HEADER_NAME: authed_client.cookies[CSRF_COOKIE_NAME]})
 
     invalide = authed_client.post(
-        "/api/v1/auth/verifier-mot-de-passe", json={"mot_de_passe": "mauvais-mot-de-passe"}
+        "/api/v1/auth/verifier-mot-de-passe", json={"password": "mauvais-mot-de-passe"}
     )
     assert invalide.status_code == 401
     assert invalide.json()["error"]["code"] == "invalid_credentials"
 
     valide = authed_client.post(
-        "/api/v1/auth/verifier-mot-de-passe", json={"mot_de_passe": "s3cret-pass"}
+        "/api/v1/auth/verifier-mot-de-passe", json={"password": "s3cret-pass"}
     )
     assert valide.status_code == 204
 
@@ -388,17 +388,17 @@ def test_login_success_failure_and_logout_are_all_journalised(session) -> None:
     authed_client.post("/api/v1/auth/logout")
 
     entrees = session.exec(
-        select(JournalAudit)
-        .where(JournalAudit.acteur_id == user.id)
-        .order_by(col(JournalAudit.date))
+        select(AuditLogEntry)
+        .where(AuditLogEntry.actor_id == user.id)
+        .order_by(col(AuditLogEntry.occurred_at))
     ).all()
-    actions_et_resultats = [(e.action, e.resultat) for e in entrees]
-    assert ("connexion", "echec") in actions_et_resultats
-    assert ("connexion", "succes") in actions_et_resultats
-    assert ("deconnexion", "succes") in actions_et_resultats
+    actions_et_resultats = [(e.action, e.result) for e in entrees]
+    assert ("login", "failure") in actions_et_resultats
+    assert ("login", "success") in actions_et_resultats
+    assert ("logout", "success") in actions_et_resultats
     for entree in entrees:
-        assert "s3cret-pass" not in (entree.ancienne_valeur or "")
-        assert "s3cret-pass" not in (entree.nouvelle_valeur or "")
+        assert "s3cret-pass" not in (entree.old_value or "")
+        assert "s3cret-pass" not in (entree.new_value or "")
 
 
 def test_logout_revokes_a_stolen_copy_of_the_cookie(session) -> None:
@@ -430,7 +430,7 @@ def test_change_password_then_old_cookie_is_rejected_but_new_session_works(sessi
 
     change_response = authed_client.post(
         "/api/v1/auth/changer-mot-de-passe",
-        json={"mot_de_passe_actuel": "s3cret-pass", "nouveau_mot_de_passe": "nouveau-secret-2"},
+        json={"current_password": "s3cret-pass", "new_password": "nouveau-secret-2"},
     )
     assert change_response.status_code == 200
 
@@ -461,7 +461,7 @@ def test_change_password_with_wrong_current_password_is_rejected(session) -> Non
 
     response = authed_client.post(
         "/api/v1/auth/changer-mot-de-passe",
-        json={"mot_de_passe_actuel": "mauvais-mot-de-passe", "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"current_password": "mauvais-mot-de-passe", "new_password": "peu-importe-2"},
     )
 
     assert response.status_code == 401
@@ -580,11 +580,11 @@ def test_mot_de_passe_oublie_invalide_le_lien_precedent(session, monkeypatch) ->
 
     reponse_premier = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": premier_jeton, "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"token": premier_jeton, "new_password": "peu-importe-2"},
     )
     reponse_second = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": second_jeton, "nouveau_mot_de_passe": "nouveau-secret-3"},
+        json={"token": second_jeton, "new_password": "nouveau-secret-3"},
     )
 
     assert reponse_premier.status_code == 422
@@ -625,7 +625,7 @@ def test_reinitialiser_mot_de_passe_change_le_mot_de_passe_et_revoque_les_sessio
 
     response = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "nouveau-secret-2"},
+        json={"token": jeton, "new_password": "nouveau-secret-2"},
     )
 
     assert response.status_code == 204
@@ -655,13 +655,13 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_deja_utilise_est_refuse(sessio
     _client_public().post("/api/v1/auth/mot-de-passe-oublie", json={"email": user.email})
     premiere = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "nouveau-secret-2"},
+        json={"token": jeton, "new_password": "nouveau-secret-2"},
     )
     assert premiere.status_code == 204
 
     rejouee = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "encore-un-autre-3"},
+        json={"token": jeton, "new_password": "encore-un-autre-3"},
     )
 
     assert rejouee.status_code == 422
@@ -684,7 +684,7 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_expire_est_refuse(session) -> 
 
     response = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"token": jeton, "new_password": "peu-importe-2"},
     )
 
     assert response.status_code == 422
@@ -694,7 +694,7 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_expire_est_refuse(session) -> 
 def test_reinitialiser_mot_de_passe_avec_un_jeton_inconnu_est_refuse() -> None:
     response = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": "un-jeton-jamais-emis", "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"token": "un-jeton-jamais-emis", "new_password": "peu-importe-2"},
     )
 
     assert response.status_code == 422
@@ -800,7 +800,7 @@ def test_changer_mot_de_passe_applique_la_regle_12_a_72_octets(session, nouveau)
 
     response = authed_client.post(
         "/api/v1/auth/changer-mot-de-passe",
-        json={"mot_de_passe_actuel": "s3cret-pass", "nouveau_mot_de_passe": nouveau},
+        json={"current_password": "s3cret-pass", "new_password": nouveau},
     )
 
     assert response.status_code == 422
@@ -816,13 +816,13 @@ def test_changer_mot_de_passe_est_limite_comme_la_connexion(session) -> None:
         for _ in range(MAX_ATTEMPTS):
             echec = authed_client.post(
                 "/api/v1/auth/changer-mot-de-passe",
-                json={"mot_de_passe_actuel": "mauvais", "nouveau_mot_de_passe": "nouveau-secret-12"},
+                json={"current_password": "mauvais", "new_password": "nouveau-secret-12"},
             )
             assert echec.status_code == 401
 
         bloque = authed_client.post(
             "/api/v1/auth/changer-mot-de-passe",
-            json={"mot_de_passe_actuel": "s3cret-pass", "nouveau_mot_de_passe": "nouveau-secret-12"},
+            json={"current_password": "s3cret-pass", "new_password": "nouveau-secret-12"},
         )
         assert bloque.status_code == 429
     finally:

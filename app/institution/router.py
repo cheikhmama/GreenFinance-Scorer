@@ -11,18 +11,18 @@ from fastapi import APIRouter, Depends, Response
 from fastapi.responses import FileResponse
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution, InstitutionProfil, User
+from app.auth.models import InstitutionProfile, ResearcherAffiliation, User
 from app.auth.permissions import require_role
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role, StatutAnalyse, StatutRattachement
+from app.core.enums import AffiliationStatus, AnalysisStatus, Role
 from app.core.schemas import Page
 from app.institution import analyses, chercheurs, projets
 from app.institution.models import (
-    AffectationProjet,
-    Projet,
-    ProjetDocument,
-    ProjetEntreprise,
+    Project,
+    ProjectAssignment,
+    ProjectCompany,
+    ProjectDocument,
 )
 from app.institution.schemas import (
     AffectationPublic,
@@ -45,48 +45,48 @@ from app.institution.schemas import (
 from app.investor import entreprises as entreprises_publiees
 from app.investor.schemas import EntrepriseDetailInvestisseur, EntreprisePublieePublic
 from app.researcher.analyses import lister_entreprise_ids
-from app.researcher.models import Analyse
+from app.researcher.models import Analysis
 from app.researcher.schemas import AnalyseDetail, AnalysePublic
 
 router = APIRouter(tags=["institution"])
 
 
 def rattachement_public(
-    session: Session, rattachement: ChercheurInstitution
+    session: Session, rattachement: ResearcherAffiliation
 ) -> RattachementPublic:
-    """Dénormalise l'e-mail/nom du Chercheur ET de l'Institution — ChercheurInstitution ne porte
+    """Dénormalise l'e-mail/nom du Chercheur ET de l'Institution — ResearcherAffiliation ne porte
     que chercheur_id/institution_id, jamais de jointure ORM directe vers Utilisateur (voir
     app/auth/models.py). Réutilisé par app/researcher/router.py pour la même relation vue côté
     Chercheur (qui a symétriquement besoin de savoir quelle institution l'a invité)."""
-    chercheur = session.get(User, rattachement.chercheur_id)
+    chercheur = session.get(User, rattachement.researcher_id)
     institution = session.get(User, rattachement.institution_id)
     return RattachementPublic(
         id=rattachement.id,
-        chercheur_id=rattachement.chercheur_id,
-        chercheur_email=chercheur.email if chercheur else "",
-        chercheur_nom=chercheur.name if chercheur else None,
+        researcher_id=rattachement.researcher_id,
+        researcher_email=chercheur.email if chercheur else "",
+        researcher_name=chercheur.name if chercheur else None,
         institution_id=rattachement.institution_id,
         institution_email=institution.email if institution else "",
-        institution_nom=institution.name if institution else None,
-        statut=rattachement.statut,
-        date_invitation=rattachement.date_invitation,
-        date_reponse=rattachement.date_reponse,
-        conditions_collaboration=rattachement.conditions_collaboration,
+        institution_name=institution.name if institution else None,
+        status=rattachement.status,
+        invited_at=rattachement.invited_at,
+        responded_at=rattachement.responded_at,
+        collaboration_terms=rattachement.collaboration_terms,
     )
 
 
 def entreprise_perimetre_public(
-    session: Session, lien: ProjetEntreprise
+    session: Session, lien: ProjectCompany
 ) -> EntreprisePerimetrePublic:
     """dernier_rapport_id est le seul rapport qu'ajouter_document acceptera pour cette entreprise
     (voir app/institution/projets.py::ajouter_document) — jamais déduit côté frontend."""
-    rapport = entreprises_publiees.dernier_rapport_valide(session, lien.entreprise_id)
+    rapport = entreprises_publiees.dernier_rapport_valide(session, lien.company_id)
     return EntreprisePerimetrePublic(
         id=lien.id,
-        entreprise_id=lien.entreprise_id,
-        entreprise_nom=lien.entreprise.name,
-        dernier_rapport_id=rapport.id if rapport else None,
-        date_ajout=lien.date_ajout,
+        company_id=lien.company_id,
+        company_name=lien.company.name,
+        latest_report_id=rapport.id if rapport else None,
+        added_at=lien.added_at,
     )
 
 
@@ -99,7 +99,7 @@ def entreprise_perimetre_public(
 def consulter_mon_profil_route(
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
-) -> InstitutionProfil:
+) -> InstitutionProfile:
     return analyses.consulter_mon_profil(session, current_user.id)
 
 
@@ -129,7 +129,7 @@ def inviter_chercheur_route(
     session: Session = Depends(get_session),
 ) -> RattachementPublic:
     rattachement = chercheurs.inviter_chercheur(
-        session, current_user.id, payload.chercheur_id, payload.conditions_collaboration
+        session, current_user.id, payload.researcher_id, payload.collaboration_terms
     )
     return rattachement_public(session, rattachement)
 
@@ -141,7 +141,7 @@ def inviter_chercheur_route(
     summary="Lister mes rattachements chercheurs (invités, acceptés, refusés)",
 )
 def lister_mes_chercheurs_route(
-    statut: StatutRattachement | None = None,
+    statut: AffiliationStatus | None = None,
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[RattachementPublic]:
@@ -229,16 +229,16 @@ def creer_projet_route(
     payload: CreerProjetRequest,
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
-) -> Projet:
+) -> Project:
     return projets.creer_projet(
         session,
         current_user.id,
-        payload.nom,
+        payload.name,
         payload.description,
-        payload.objectif,
-        payload.date_debut,
-        payload.date_fin_prevue,
-        payload.date_limite,
+        payload.objective,
+        payload.start_date,
+        payload.planned_end_date,
+        payload.deadline,
     )
 
 
@@ -251,69 +251,69 @@ def creer_projet_route(
 def lister_mes_projets_route(
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
-) -> list[Projet]:
+) -> list[Project]:
     return projets.lister_mes_projets(session, current_user.id)
 
 
-def _projet_detail(session: Session, projet: Projet) -> ProjetDetail:
+def _projet_detail(session: Session, projet: Project) -> ProjetDetail:
     affectations_db = session.exec(
-        select(AffectationProjet).where(col(AffectationProjet.projet_id) == projet.id)
+        select(ProjectAssignment).where(col(ProjectAssignment.project_id) == projet.id)
     ).all()
     affectations_out = []
     for affectation in affectations_db:
-        chercheur = session.get(User, affectation.chercheur_id)
+        chercheur = session.get(User, affectation.researcher_id)
         affectations_out.append(
             AffectationPublic(
                 id=affectation.id,
-                chercheur_id=affectation.chercheur_id,
-                chercheur_email=chercheur.email if chercheur else "",
-                date_affectation=affectation.date_affectation,
+                researcher_id=affectation.researcher_id,
+                researcher_email=chercheur.email if chercheur else "",
+                assigned_at=affectation.assigned_at,
             )
         )
 
     analyses_db = session.exec(
-        select(Analyse).where(col(Analyse.projet_id) == projet.id)
+        select(Analysis).where(col(Analysis.project_id) == projet.id)
     ).all()
     analyses_out = [
         AnalyseResume(
             id=a.id,
-            chercheur_id=a.chercheur_id,
-            titre=a.titre,
-            statut=a.statut,
+            researcher_id=a.researcher_id,
+            title=a.title,
+            status=a.status,
             version=a.version,
-            date_creation=a.date_creation,
-            date_soumission=a.date_soumission,
+            created_at=a.created_at,
+            submitted_at=a.submitted_at,
         )
         for a in analyses_db
     ]
 
     perimetre_db = session.exec(
-        select(ProjetEntreprise).where(col(ProjetEntreprise.projet_id) == projet.id)
+        select(ProjectCompany).where(col(ProjectCompany.project_id) == projet.id)
     ).all()
     perimetre_out = [
         entreprise_perimetre_public(session, lien) for lien in perimetre_db
     ]
 
     documents_db = session.exec(
-        select(ProjetDocument).where(col(ProjetDocument.projet_id) == projet.id)
+        select(ProjectDocument).where(col(ProjectDocument.project_id) == projet.id)
     ).all()
     documents_out = [
         DocumentProjetPublic(
             id=document.id,
-            rapport_id=document.rapport_id,
-            entreprise_id=document.rapport.company_id,
-            entreprise_nom=document.rapport.company.name,
-            annee_reporting=document.rapport.fiscal_year,
-            date_ajout=document.date_ajout,
+            report_id=document.report_id,
+            company_id=document.report.company_id,
+            company_name=document.report.company.name,
+            fiscal_year=document.report.fiscal_year,
+            added_at=document.added_at,
         )
         for document in documents_db
     ]
 
     return ProjetDetail(
         **ProjetPublic.model_validate(projet).model_dump(),
-        affectations=affectations_out,
+        assignments=affectations_out,
         analyses=analyses_out,
-        perimetre=perimetre_out,
+        companies=perimetre_out,
         documents=documents_out,
     )
 
@@ -347,14 +347,14 @@ def affecter_chercheur_route(
     session: Session = Depends(get_session),
 ) -> AffectationPublic:
     affectation = projets.affecter_chercheur(
-        session, current_user.id, projet_id, payload.chercheur_id
+        session, current_user.id, projet_id, payload.researcher_id
     )
-    chercheur = session.get(User, payload.chercheur_id)
+    chercheur = session.get(User, payload.researcher_id)
     return AffectationPublic(
         id=affectation.id,
-        chercheur_id=affectation.chercheur_id,
-        chercheur_email=chercheur.email if chercheur else "",
-        date_affectation=affectation.date_affectation,
+        researcher_id=affectation.researcher_id,
+        researcher_email=chercheur.email if chercheur else "",
+        assigned_at=affectation.assigned_at,
     )
 
 
@@ -368,7 +368,7 @@ def cloturer_projet_route(
     projet_id: uuid.UUID,
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
-) -> Projet:
+) -> Project:
     return projets.cloturer_projet(session, current_user.id, projet_id)
 
 
@@ -386,7 +386,7 @@ def ajouter_entreprise_perimetre_route(
     session: Session = Depends(get_session),
 ) -> EntreprisePerimetrePublic:
     lien = projets.ajouter_entreprise_perimetre(
-        session, current_user.id, projet_id, payload.entreprise_id
+        session, current_user.id, projet_id, payload.company_id
     )
     return entreprise_perimetre_public(session, lien)
 
@@ -420,15 +420,15 @@ def ajouter_document_route(
     session: Session = Depends(get_session),
 ) -> DocumentProjetPublic:
     document = projets.ajouter_document(
-        session, current_user.id, projet_id, payload.rapport_id
+        session, current_user.id, projet_id, payload.report_id
     )
     return DocumentProjetPublic(
         id=document.id,
-        rapport_id=document.rapport_id,
-        entreprise_id=document.rapport.company_id,
-        entreprise_nom=document.rapport.company.name,
-        annee_reporting=document.rapport.fiscal_year,
-        date_ajout=document.date_ajout,
+        report_id=document.report_id,
+        company_id=document.report.company_id,
+        company_name=document.report.company.name,
+        fiscal_year=document.report.fiscal_year,
+        added_at=document.added_at,
     )
 
 
@@ -447,11 +447,11 @@ def lister_documents_route(
     return [
         DocumentProjetPublic(
             id=document.id,
-            rapport_id=document.rapport_id,
-            entreprise_id=document.rapport.company_id,
-            entreprise_nom=document.rapport.company.name,
-            annee_reporting=document.rapport.fiscal_year,
-            date_ajout=document.date_ajout,
+            report_id=document.report_id,
+            company_id=document.report.company_id,
+            company_name=document.report.company.name,
+            fiscal_year=document.report.fiscal_year,
+            added_at=document.added_at,
         )
         for document in documents
     ]
@@ -464,25 +464,25 @@ def lister_documents_route(
     summary="Lister mes analyses reçues, tous projets confondus",
 )
 def lister_mes_analyses_route(
-    statut: StatutAnalyse | None = None,
+    statut: AnalysisStatus | None = None,
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
 ) -> list[AnalyseInstitutionPublic]:
     mes_analyses = analyses.lister_mes_analyses(session, current_user.id, statut=statut)
     resultat = []
     for analyse in mes_analyses:
-        projet = session.get(Projet, analyse.projet_id)
+        projet = session.get(Project, analyse.project_id)
         resultat.append(
             AnalyseInstitutionPublic(
                 id=analyse.id,
-                chercheur_id=analyse.chercheur_id,
-                titre=analyse.titre,
-                statut=analyse.statut,
+                researcher_id=analyse.researcher_id,
+                title=analyse.title,
+                status=analyse.status,
                 version=analyse.version,
-                date_creation=analyse.date_creation,
-                date_soumission=analyse.date_soumission,
-                projet_id=analyse.projet_id,
-                projet_nom=projet.nom if projet else "",
+                created_at=analyse.created_at,
+                submitted_at=analyse.submitted_at,
+                project_id=analyse.project_id,
+                project_name=projet.name if projet else "",
             )
         )
     return resultat
@@ -502,7 +502,7 @@ def consulter_analyse_route(
     analyse = analyses.analyse_de_institution(session, current_user.id, analyse_id)
     return AnalyseDetail(
         **AnalysePublic.model_validate(analyse).model_dump(),
-        entreprise_ids=lister_entreprise_ids(session, analyse.id),
+        company_ids=lister_entreprise_ids(session, analyse.id),
     )
 
 
@@ -519,7 +519,7 @@ def valider_analyse_route(
     session: Session = Depends(get_session),
 ):
     return analyses.valider_analyse(
-        session, current_user.id, analyse_id, payload.commentaire
+        session, current_user.id, analyse_id, payload.comment
     )
 
 
@@ -536,7 +536,7 @@ def demander_correction_route(
     session: Session = Depends(get_session),
 ):
     return analyses.demander_correction(
-        session, current_user.id, analyse_id, payload.commentaire
+        session, current_user.id, analyse_id, payload.comment
     )
 
 
@@ -550,7 +550,7 @@ def historique_analyse_route(
     analyse_id: uuid.UUID,
     current_user: User = Depends(require_role(Role.INSTITUTION)),
     session: Session = Depends(get_session),
-) -> list[Analyse]:
+) -> list[Analysis]:
     return analyses.historique_analyse(session, current_user.id, analyse_id)
 
 

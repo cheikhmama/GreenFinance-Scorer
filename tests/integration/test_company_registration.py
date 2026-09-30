@@ -110,7 +110,7 @@ def test_inscription_cree_une_entreprise_en_attente_sans_mot_de_passe(session, _
     ]
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == admin.id, Notification.id_ressource == entreprise.id
+            Notification.user_id == admin.id, Notification.resource_id == entreprise.id
         )
     ).one()
     assert notification.type == "ENTREPRISE_INSCRITE"
@@ -212,5 +212,5 @@ def test_une_inscription_en_attente_ne_se_contourne_pas_par_les_actions_admin(se
     assert reactiver.json()["error"]["code"] == "transition_invalide"
     assert renvoyer.status_code == 422
     assert renvoyer.json()["error"]["code"] == "inscription_non_validee"
-    assert detail.json()["statut"] == CompanyStatus.PENDING_ONBOARDING.value
-    assert detail.json()["actif"] is False
+    assert detail.json()["status"] == CompanyStatus.PENDING_ONBOARDING.value
+    assert detail.json()["active"] is False

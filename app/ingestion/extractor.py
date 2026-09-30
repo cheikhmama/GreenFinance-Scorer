@@ -43,7 +43,7 @@ from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import ExtractionStatus, MethodeDonnee, Pillar, Role
+from app.core.enums import DataMethod, ExtractionStatus, Pillar, Role
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
 from app.ingestion.completeness import calculer_couverture
@@ -671,7 +671,7 @@ def run_extraction_pipeline(
             etape = "persistance_echouee"
             # Purge des données dérivées d'une extraction précédente sur ce même rapport, pour que
             # run_extraction_pipeline soit rejouable (ex. après élargissement d'INDICATEURS_CIBLES)
-            # sans dupliquer les lignes. Ne touche jamais ESGReport (le PDF déposé) ni AvisAudit —
+            # sans dupliquer les lignes. Ne touche jamais ESGReport (le PDF déposé) ni AuditOpinion —
             # seules les données automatiques, best-effort et remplaçables sont concernées.
             # Evidence n'a pas de rapport_id direct (liée uniquement via le preuve_id des
             # lignes ci-dessous, et son fichier est stocké sous preuves/{rapport_id}/page_N.pdf,
@@ -762,8 +762,8 @@ def run_extraction_pipeline(
                             ghg_category=cible.categorie_ges,
                             tonnes_co2e=indicateur.valeur,
                             year=annee_reporting,
-                            method=MethodeDonnee.RAPPORTEE,
-                            pcaf_data_quality=qualite_donnee_pcaf(MethodeDonnee.RAPPORTEE),
+                            method=DataMethod.RAPPORTEE,
+                            pcaf_data_quality=qualite_donnee_pcaf(DataMethod.RAPPORTEE),
                             proof_id=preuve.id,
                             raw_value=indicateur.valeur_brute,
                             section=indicateur.section,
@@ -781,7 +781,7 @@ def run_extraction_pipeline(
                             metric_code=cible.code,
                             value=indicateur.valeur,
                             unit=indicateur.unite or "",
-                            method=MethodeDonnee.RAPPORTEE,
+                            method=DataMethod.RAPPORTEE,
                             proof_id=preuve.id,
                             raw_value=indicateur.valeur_brute,
                             section=indicateur.section,

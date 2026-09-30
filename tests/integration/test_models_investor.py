@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import DevisePosition, Role, TypeDureeInvestissement
+from app.core.enums import Currency, DurationType, Role
 from app.investor.models import Portfolio, PortfolioPosition
 
 
@@ -35,7 +35,7 @@ def _entreprise(session, **kwargs) -> Company:
 
 def _portefeuille(session, investisseur_id: uuid.UUID) -> Portfolio:
     portefeuille = Portfolio(
-        user_id=investisseur_id, name="Portefeuille vert", reference_currency=DevisePosition.USD
+        user_id=investisseur_id, name="Portefeuille vert", reference_currency=Currency.USD
     )
     session.add(portefeuille)
     session.flush()
@@ -47,9 +47,9 @@ def _base_position(portefeuille_id: uuid.UUID, entreprise_id: uuid.UUID, **kwarg
         "portfolio_id": portefeuille_id,
         "company_id": entreprise_id,
         "outstanding_amount": 1000.0,
-        "currency": DevisePosition.USD,
+        "currency": Currency.USD,
         "converted_amount": 1000.0,
-        "duration_type": TypeDureeInvestissement.OUVERTE,
+        "duration_type": DurationType.OUVERTE,
         "start_date": utcnow(),
     }
     defaults.update(kwargs)
@@ -80,7 +80,7 @@ def test_position_fixe_date_fin_plus_dun_an_rejetee(session) -> None:
     data = _base_position(
         portefeuille.id,
         entreprise.id,
-        duration_type=TypeDureeInvestissement.FIXE,
+        duration_type=DurationType.FIXE,
         start_date=debut,
         end_date=debut + timedelta(days=400),
     )
@@ -98,7 +98,7 @@ def test_position_fixe_date_debut_dans_le_passe_rejetee(session) -> None:
     data = _base_position(
         portefeuille.id,
         entreprise.id,
-        duration_type=TypeDureeInvestissement.FIXE,
+        duration_type=DurationType.FIXE,
         start_date=debut,
         end_date=debut + timedelta(days=30),
     )
@@ -116,7 +116,7 @@ def test_position_fixe_valide_est_acceptee(session) -> None:
     data = _base_position(
         portefeuille.id,
         entreprise.id,
-        duration_type=TypeDureeInvestissement.FIXE,
+        duration_type=DurationType.FIXE,
         start_date=debut,
         end_date=debut + timedelta(days=180),
     )

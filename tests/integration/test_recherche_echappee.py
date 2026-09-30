@@ -39,7 +39,7 @@ def test_joker_saisi_ne_renvoie_que_les_correspondances_litterales(session) -> N
     def noms(recherche: str) -> set[str]:
         reponse = investisseur.get("/api/v1/investor/entreprises", params={"recherche": recherche})
         assert reponse.status_code == 200
-        return {e["nom"] for e in reponse.json()["items"]}
+        return {e["name"] for e in reponse.json()["items"]}
 
     # Sans échappement, « 100% » aurait aussi trouvé « 1000… » et « _x » aurait trouvé « ax ».
     assert noms(f"100% {marqueur}") == {litterale.name}

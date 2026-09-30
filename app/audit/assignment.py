@@ -12,7 +12,7 @@ import structlog
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.models import User
 from app.core.config import get_settings
 from app.core.database import utcnow
@@ -84,7 +84,7 @@ def statistiques_charge_globale(session: Session) -> tuple[int, int]:
         .select_from(ESGReport)
         .where(col(ESGReport.status) == ReportStatus.PENDING_AUDIT)
     ).one()
-    avis_rendus = session.exec(select(func.count()).select_from(AvisAudit)).one()
+    avis_rendus = session.exec(select(func.count()).select_from(AuditOpinion)).one()
     return dossiers_affectes, avis_rendus
 
 
@@ -140,8 +140,8 @@ def lister_charge_auditeurs(
         ).one()
         avis_rendus = session.exec(
             select(func.count())
-            .select_from(AvisAudit)
-            .where(col(AvisAudit.auditeur_id) == auditeur.id)
+            .select_from(AuditOpinion)
+            .where(col(AuditOpinion.auditor_id) == auditeur.id)
         ).one()
         resultats.append((auditeur, dossiers_affectes, dossiers_en_retard, avis_rendus))
     return resultats, total

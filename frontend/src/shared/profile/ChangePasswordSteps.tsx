@@ -86,7 +86,7 @@ export function ChangePasswordSteps({
 
   function onVerifier(values: VerifierMotDePasseForm) {
     verifyPassword.mutate(
-      { mot_de_passe: values.motDePasseActuel },
+      { password: values.motDePasseActuel },
       {
         onSuccess: () => {
           setMotDePasseVerifie(values.motDePasseActuel);
@@ -106,7 +106,7 @@ export function ChangePasswordSteps({
 
   function onEnregistrerNouveau(values: NouveauMotDePasseForm) {
     changePassword.mutate(
-      { mot_de_passe_actuel: motDePasseVerifie, nouveau_mot_de_passe: values.nouveauMotDePasse },
+      { current_password: motDePasseVerifie, new_password: values.nouveauMotDePasse },
       {
         onSuccess: () => setEtape("succes"),
         onError: (error) => {

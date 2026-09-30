@@ -23,7 +23,13 @@ from sqlmodel import Session, col, func, select
 from app.auth.models import User
 from app.company.models import Company
 from app.company.rapports import deposer_fichier, verifier_entreprise_active
-from app.core.enums import CanalDepot, ExtractionStatus, ReportStatus, Role, TypeRapport
+from app.core.enums import (
+    ExtractionStatus,
+    ReportStatus,
+    ReportType,
+    Role,
+    SubmissionChannel,
+)
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
 from app.ingestion.models import ESGReport
 from app.reporting.schemas import ReportCreateRequest
@@ -97,7 +103,7 @@ def ouvrir(session: Session, user: User, demande: ReportCreateRequest) -> ESGRep
     brouillon = ESGReport(
         company_id=entreprise.id,
         type=demande.report_type,
-        channel=CanalDepot.ENTREPRISE,
+        channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=demande.fiscal_year,
         status=ReportStatus.DRAFT,
         extraction_status=ExtractionStatus.NOT_STARTED,
@@ -123,7 +129,7 @@ def lister(
     *,
     fiscal_year: int | None,
     status: ReportStatus | None,
-    report_type: TypeRapport | None,
+    report_type: ReportType | None,
     company_id: uuid.UUID | None,
     page: int,
     page_size: int,

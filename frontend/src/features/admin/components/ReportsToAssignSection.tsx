@@ -62,7 +62,7 @@ function LigneAffectation({
     if (!auditeurId) return;
     setError(null);
     assign.mutate(
-      { auditeur_id: auditeurId },
+      { auditor_id: auditeurId },
       {
         onError: (err) => {
           setError(err instanceof ApiError ? err.message : "Échec de l'affectation.");

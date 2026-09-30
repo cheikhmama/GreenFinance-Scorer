@@ -14,7 +14,7 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.auth.activation import envoyer_lien_activation
-from app.auth.models import InstitutionProfil, User
+from app.auth.models import InstitutionProfile, User
 from app.auth.revocation import revoke_all_sessions
 from app.company.models import Company
 from app.core.audit import auditer
@@ -124,9 +124,9 @@ def creer_utilisateur(
         champs_manquants = {
             champ: "Ce champ est requis pour créer une Entreprise."
             for champ, valeur in {
-                "nom_entreprise": nom_entreprise,
-                "secteur": secteur,
-                "pays": pays,
+                "company_name": nom_entreprise,
+                "sector": secteur,
+                "country": pays,
             }.items()
             if not valeur
         }
@@ -167,11 +167,11 @@ def creer_utilisateur(
         session.add(entreprise)
     elif role == Role.INSTITUTION:
         # Sans ce profil, aucun export n'est possible (app/institution/analyses.py exige un
-        # InstitutionProfil pour décrémenter quota_export) — même raisonnement que le profil
+        # InstitutionProfile pour décrémenter quota_export) — même raisonnement que le profil
         # Entreprise ci-dessus : créé dans le même geste, jamais après coup.
-        session.add(InstitutionProfil(utilisateur_id=utilisateur.id, quota_export=_QUOTA_EXPORT_INITIAL))
+        session.add(InstitutionProfile(user_id=utilisateur.id, export_quota=_QUOTA_EXPORT_INITIAL))
 
-    auditer(session, acteur_id, "creation_compte", "Utilisateur", utilisateur.id, "succes")
+    auditer(session, acteur_id, "account_created", "User", utilisateur.id, "success")
     session.commit()
     session.refresh(utilisateur)
     return utilisateur
@@ -201,7 +201,7 @@ def renvoyer_lien_activation(
         )
 
     envoyer_lien_activation(session, utilisateur, background_tasks)
-    auditer(session, acteur_id, "renvoi_lien_activation", "Utilisateur", utilisateur.id, "succes")
+    auditer(session, acteur_id, "activation_link_resent", "User", utilisateur.id, "success")
     session.commit()
 
 
@@ -215,12 +215,12 @@ def desactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uui
     auditer(
         session,
         acteur_id,
-        "desactivation_compte",
-        "Utilisateur",
+        "account_deactivated",
+        "User",
         cible_id,
-        "succes",
-        ancienne_valeur="actif",
-        nouvelle_valeur="inactif",
+        "success",
+        old_value="active",
+        new_value="inactive",
     )
     session.commit()
     session.refresh(utilisateur)
@@ -240,12 +240,12 @@ def reactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid
     auditer(
         session,
         acteur_id,
-        "reactivation_compte",
-        "Utilisateur",
+        "account_reactivated",
+        "User",
         cible_id,
-        "succes",
-        ancienne_valeur="inactif",
-        nouvelle_valeur="actif",
+        "success",
+        old_value="inactive",
+        new_value="active",
     )
     session.commit()
     session.refresh(utilisateur)

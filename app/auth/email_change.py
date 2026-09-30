@@ -145,7 +145,7 @@ def demander_changement_email(
             expires_at=utcnow() + TOKEN_TTL,
         )
     )
-    auditer(session, user.id, "demande_changement_email", "Utilisateur", user.id, "succes")
+    auditer(session, user.id, "email_change_requested", "User", user.id, "success")
     session.commit()
 
     background_tasks.add_task(_envoyer_lien, nouvel_email, jeton_clair)
@@ -177,12 +177,12 @@ def confirmer_changement_email(session: Session, jeton_clair: str) -> User:
     auditer(
         session,
         user.id,
-        "modification_email",
-        "Utilisateur",
+        "email_changed",
+        "User",
         user.id,
-        "succes",
-        ancienne_valeur=ancien_email,
-        nouvelle_valeur=entree.new_email,
+        "success",
+        old_value=ancien_email,
+        new_value=entree.new_email,
     )
     session.commit()
     session.refresh(user)

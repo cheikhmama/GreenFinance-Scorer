@@ -28,12 +28,12 @@ function reponse401(code: string) {
 const UTILISATEUR = {
   id: "1",
   email: "a@example.com",
-  nom: "A",
+  name: "A",
   avatar: null,
   role: "INVESTOR",
-  date_creation: "2026-01-01T00:00:00",
-  actif: true,
-  date_activation: null,
+  created_at: "2026-01-01T00:00:00",
+  active: true,
+  activated_at: null,
 };
 
 describe("session perdue", () => {

@@ -16,19 +16,19 @@ from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DevisePosition,
+    AnalysisStatus,
+    Currency,
+    ProjectStatus,
     ReportStatus,
+    ReportType,
     Role,
-    StatutAnalyse,
-    StatutProjet,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.ingestion.models import ESGReport
-from app.institution.models import Projet
+from app.institution.models import Project
 from app.investor.models import Portfolio
 from app.main import app
-from app.researcher.models import Analyse
+from app.researcher.models import Analysis
 from app.scoring.engine import obtenir_configuration_reference
 from app.scoring.models import Score
 
@@ -64,12 +64,12 @@ def test_apercu_acteurs_renvoie_les_quatre_blocs(session) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"auditeurs", "investisseurs", "chercheurs", "institutions"}
-    assert set(body["auditeurs"]) == {"dossiers_affectes", "avis_rendus"}
-    assert set(body["investisseurs"]) == {
-        "portefeuilles_non_archives",
-        "positions_declarees",
-        "entreprises_distinctes",
+    assert set(body) == {"auditors", "investors", "researchers", "institutions"}
+    assert set(body["auditors"]) == {"assigned_reports", "opinions_submitted"}
+    assert set(body["investors"]) == {
+        "active_portfolios",
+        "declared_positions",
+        "distinct_companies",
     }
 
 
@@ -82,11 +82,11 @@ def test_performance_esg_a_une_couverture_coherente(session) -> None:
     assert response.status_code == 200
     body = response.json()
     # Jamais plus d'entreprises avec un score que d'entreprises dans le périmètre.
-    assert body["entreprises_avec_score"] <= body["entreprises_perimetre"]
+    assert body["companies_with_score"] <= body["companies_in_scope"]
     assert len(body["distribution"]) == 5
     # La couverture ne fabrique jamais une moyenne sans substance.
-    if body["entreprises_avec_score"] == 0:
-        assert body["score_global_moyen"] is None
+    if body["companies_with_score"] == 0:
+        assert body["average_global_score"] is None
 
 
 def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
@@ -109,8 +109,8 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
 
     rapport = ESGReport(
         company_id=entreprise_avec_score.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
@@ -137,9 +137,9 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
 
     assert response.status_code == 200
     par_id = {item["id"]: item for item in response.json()["items"]}
-    assert par_id[str(entreprise_sans_score.id)]["score_global"] is None
-    assert par_id[str(entreprise_avec_score.id)]["score_global"] == 72.0
-    assert par_id[str(entreprise_avec_score.id)]["score_social"] is None
+    assert par_id[str(entreprise_sans_score.id)]["global_score"] is None
+    assert par_id[str(entreprise_avec_score.id)]["global_score"] == 72.0
+    assert par_id[str(entreprise_avec_score.id)]["social_score"] is None
 
 
 def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
@@ -151,8 +151,8 @@ def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
     session.add(
         ESGReport(
             company_id=entreprise.id,
-            type=TypeRapport.RAPPORT_ESG,
-            channel=CanalDepot.ENTREPRISE,
+            type=ReportType.RAPPORT_ESG,
+            channel=SubmissionChannel.ENTREPRISE,
             status=ReportStatus.PENDING_AUDIT,
             source_file="rapports/test/dummy.pdf",
             auditor_id=auditeur.id,
@@ -170,8 +170,8 @@ def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
-    assert items[0]["dossiers_affectes"] == 1
-    assert items[0]["dossiers_en_retard"] == 0
+    assert items[0]["assigned_reports"] == 1
+    assert items[0]["overdue_reports"] == 0
 
 
 def test_portefeuilles_admin_liste_un_portefeuille_non_archive(session) -> None:
@@ -180,7 +180,7 @@ def test_portefeuilles_admin_liste_un_portefeuille_non_archive(session) -> None:
     marqueur = f"portefeuille-{uuid.uuid4()}"
     session.add(
         Portfolio(
-            user_id=investisseur.id, name=marqueur, reference_currency=DevisePosition.EUR
+            user_id=investisseur.id, name=marqueur, reference_currency=Currency.EUR
         )
     )
     session.commit()
@@ -193,15 +193,15 @@ def test_portefeuilles_admin_liste_un_portefeuille_non_archive(session) -> None:
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
-    assert items[0]["investisseur_email"] == investisseur.email
-    assert items[0]["nombre_positions"] == 0
+    assert items[0]["investor_email"] == investisseur.email
+    assert items[0]["position_count"] == 0
 
 
 def test_projets_admin_filtre_par_statut(session) -> None:
     admin = _create_utilisateur(session, Role.ADMIN)
     institution = _create_utilisateur(session, Role.INSTITUTION)
     marqueur = f"projet-{uuid.uuid4()}"
-    session.add(Projet(institution_id=institution.id, nom=marqueur, statut=StatutProjet.OUVERT))
+    session.add(Project(institution_id=institution.id, name=marqueur, status=ProjectStatus.OUVERT))
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -210,7 +210,7 @@ def test_projets_admin_filtre_par_statut(session) -> None:
     )
 
     assert response.status_code == 200
-    noms = [item["nom"] for item in response.json()["items"]]
+    noms = [item["name"] for item in response.json()["items"]]
     assert marqueur in noms
 
 
@@ -219,16 +219,16 @@ def test_analyses_admin_filtre_par_statut(session) -> None:
     institution = _create_utilisateur(session, Role.INSTITUTION)
     chercheur = _create_utilisateur(session, Role.RESEARCHER)
     marqueur = f"analyse-{uuid.uuid4()}"
-    projet = Projet(institution_id=institution.id, nom=f"Projet {marqueur}")
+    projet = Project(institution_id=institution.id, name=f"Projet {marqueur}")
     session.add(projet)
     session.commit()
     session.add(
-        Analyse(
-            projet_id=projet.id,
-            chercheur_id=chercheur.id,
-            titre=marqueur,
-            contenu="contenu de test",
-            statut=StatutAnalyse.SOUMISE,
+        Analysis(
+            project_id=projet.id,
+            researcher_id=chercheur.id,
+            title=marqueur,
+            content="contenu de test",
+            status=AnalysisStatus.SOUMISE,
         )
     )
     session.commit()
@@ -239,5 +239,5 @@ def test_analyses_admin_filtre_par_statut(session) -> None:
     )
 
     assert response.status_code == 200
-    titres = [item["titre"] for item in response.json()["items"]]
+    titres = [item["title"] for item in response.json()["items"]]
     assert marqueur in titres

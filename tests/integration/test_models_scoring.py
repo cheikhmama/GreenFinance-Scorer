@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, Role, TypeRapport
+from app.core.enums import ReportType, Role, SubmissionChannel
 from app.ingestion.models import ESGReport
 from app.scoring.models import Score, ScoringConfig
 
@@ -29,8 +29,8 @@ def _rapport(session) -> ESGReport:
     session.flush()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.AUTOMATIQUE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
         submitted_at=utcnow(),
     )
@@ -99,7 +99,7 @@ def test_rapport_accepte_plusieurs_scores_un_par_configuration(session) -> None:
 
 
 @pytest.mark.parametrize(
-    "champ", ["valeur_globale", "score_environnement", "score_social", "score_gouvernance"]
+    "champ", ["global_score", "environmental_score", "social_score", "governance_score"]
 )
 @pytest.mark.parametrize("valeur_invalide", [-0.5, 100.5])
 def test_score_hors_bornes_rejete_en_base(session, champ: str, valeur_invalide: float) -> None:
@@ -114,10 +114,10 @@ def test_score_hors_bornes_rejete_en_base(session, champ: str, valeur_invalide: 
     session.flush()
 
     valeurs = {
-        "valeur_globale": 50.0,
-        "score_environnement": 50.0,
-        "score_social": 50.0,
-        "score_gouvernance": 50.0,
+        "global_score": 50.0,
+        "environmental_score": 50.0,
+        "social_score": 50.0,
+        "governance_score": 50.0,
     }
     valeurs[champ] = valeur_invalide
     session.add(

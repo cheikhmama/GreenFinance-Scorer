@@ -19,19 +19,19 @@ from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DecisionAudit,
-    DevisePosition,
-    MethodeDonnee,
+    AuditDecision,
+    Currency,
+    DataMethod,
+    DurationType,
     Pillar,
+    ReportType,
     Role,
-    TypeDureeInvestissement,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
@@ -69,8 +69,8 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     # --- ESGReport -------------------------------------------------------
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.AUTOMATIQUE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
         submitted_at=utcnow(),
     )
@@ -98,7 +98,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         metric_code="GHG-SCOPE1",
         value=123.4,
         unit="tCO2e",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
     donnee_carbone = CarbonEmission(
@@ -106,7 +106,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         scope=1,
         tonnes_co2e=123.4,
         year=2025,
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         pcaf_data_quality=3,
         proof_id=preuve.id,
     )
@@ -173,7 +173,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     # --- Portefeuille + positions (USD converti, FIXE, OUVERTE) -----------
     investisseur = _utilisateur(session, Role.INVESTOR)
     portefeuille = Portfolio(
-        user_id=investisseur.id, name="Portefeuille vert", reference_currency=DevisePosition.USD
+        user_id=investisseur.id, name="Portefeuille vert", reference_currency=Currency.USD
     )
     session.add(portefeuille)
     session.flush()
@@ -187,10 +187,10 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
             "portfolio_id": portefeuille.id,
             "company_id": entreprise.id,
             "outstanding_amount": Decimal(1000),
-            "currency": DevisePosition.USD,
+            "currency": Currency.USD,
             "fx_rate_used": Decimal("0.92"),
             "converted_amount": Decimal(920),
-            "duration_type": TypeDureeInvestissement.OUVERTE,
+            "duration_type": DurationType.OUVERTE,
             "start_date": utcnow(),
         }
     )
@@ -199,9 +199,9 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
             "portfolio_id": portefeuille.id,
             "company_id": entreprise.id,
             "outstanding_amount": 2000.0,
-            "currency": DevisePosition.MRU,
+            "currency": Currency.MRU,
             "converted_amount": 52.0,
-            "duration_type": TypeDureeInvestissement.FIXE,
+            "duration_type": DurationType.FIXE,
             "start_date": debut_fixe,
             "end_date": debut_fixe + timedelta(days=180),
         }
@@ -211,9 +211,9 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
             "portfolio_id": portefeuille.id,
             "company_id": entreprise.id,
             "outstanding_amount": 750.0,
-            "currency": DevisePosition.EUR,
+            "currency": Currency.EUR,
             "converted_amount": 750.0,
-            "duration_type": TypeDureeInvestissement.OUVERTE,
+            "duration_type": DurationType.OUVERTE,
             "start_date": utcnow(),
         }
     )
@@ -234,25 +234,25 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         assert position.company is not None and position.company.id == entreprise.id
         assert position in entreprise.positions
 
-    # --- AvisAudit ----------------------------------------------------
+    # --- AuditOpinion ----------------------------------------------------
     auditeur = _utilisateur(session, Role.AUDITOR)
-    avis = AvisAudit(
-        rapport_id=rapport.id,
-        auditeur_id=auditeur.id,
-        decision=DecisionAudit.RECOMMANDE_VALIDATION,
-        commentaire="Données cohérentes avec le rapport annuel.",
+    avis = AuditOpinion(
+        report_id=rapport.id,
+        auditor_id=auditeur.id,
+        decision=AuditDecision.RECOMMANDE_VALIDATION,
+        comment="Données cohérentes avec le rapport annuel.",
     )
     session.add(avis)
     session.flush()
 
-    assert avis.rapport.id == rapport.id
+    assert avis.report.id == rapport.id
     assert avis in rapport.audit_opinions
-    assert avis.auditeur.id == auditeur.id
+    assert avis.auditor.id == auditeur.id
     assert avis in auditeur.audit_opinions
 
     # --- Notification (entité transverse, hors diagramme de classes) ------
     notification = Notification(
-        utilisateur_id=investisseur.id,
+        user_id=investisseur.id,
         message="Un nouveau rapport est disponible pour une entreprise de votre portefeuille.",
         type="RAPPORT_DISPONIBLE",
     )
@@ -260,7 +260,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.flush()
 
     assert notification in investisseur.notifications
-    assert notification.utilisateur.id == investisseur.id
+    assert notification.user.id == investisseur.id
 
 
 def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
@@ -269,8 +269,8 @@ def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
     session.flush()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.AUTOMATIQUE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
         submitted_at=utcnow(),
     )
@@ -292,7 +292,7 @@ def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
         metric_code="effectif_total",
         value=1200.0,
         unit="",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
     session.add(indicateur)
@@ -309,7 +309,7 @@ def test_un_seul_indicateur_par_code_et_par_rapport(session) -> None:
             metric_code=indicateur.metric_code,
             value=1300.0,
             unit="",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=indicateur.proof_id,
         )
     )

@@ -8,9 +8,9 @@ from sqlmodel import col, select
 
 from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, ReportStatus, Role, TypeRapport
+from app.core.enums import ReportStatus, ReportType, Role, SubmissionChannel
 from app.ingestion.models import ESGReport
-from app.institution.models import AffectationProjet, Projet, ProjetEntreprise
+from app.institution.models import Project, ProjectAssignment, ProjectCompany
 from app.researcher.models import ReferenceDatasetRow
 from app.scoring.engine import obtenir_configuration_reference
 from app.scoring.models import Score
@@ -36,7 +36,7 @@ def _entreprise(session, global_score: float, *, isin=None, lei=None, publiee=Tr
     session.add(entreprise)
     session.flush()
     rapport = ESGReport(
-        company_id=entreprise.id, type=TypeRapport.RAPPORT_ESG, channel=CanalDepot.ENTREPRISE,
+        company_id=entreprise.id, type=ReportType.RAPPORT_ESG, channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.VALIDATED, source_file="rapports/x.pdf", submitted_at=utcnow(),
     )
     session.add(rapport)
@@ -54,11 +54,11 @@ def _entreprise(session, global_score: float, *, isin=None, lei=None, publiee=Tr
 def _chercheur_avec_perimetre(session, entreprises: list[Company]):
     institution = _create_utilisateur(session, Role.INSTITUTION)
     chercheur = _create_utilisateur(session, Role.RESEARCHER)
-    projet = Projet(institution_id=institution.id, nom="Validation")
+    projet = Project(institution_id=institution.id, name="Validation")
     session.add(projet)
     session.flush()
-    session.add(AffectationProjet(projet_id=projet.id, chercheur_id=chercheur.id))
-    session.add_all(ProjetEntreprise(projet_id=projet.id, entreprise_id=e.id) for e in entreprises)
+    session.add(ProjectAssignment(project_id=projet.id, researcher_id=chercheur.id))
+    session.add_all(ProjectCompany(project_id=projet.id, company_id=e.id) for e in entreprises)
     session.commit()
     return chercheur
 

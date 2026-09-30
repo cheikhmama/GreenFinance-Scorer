@@ -183,7 +183,7 @@ def test_tache_planifiee_echoue_les_bloquees_et_redepose_les_jobs_perdus(session
     assert _relire(session, en_cours.id).extraction_status == ExtractionStatus.RUNNING
     assert ("extract_report", (perdu.id, 2022), f"extract:{perdu.id}", "arq:extraction") in redis.jobs
     notifications = session.exec(
-        select(Notification).where(Notification.utilisateur_id == proprietaire.id)
+        select(Notification).where(Notification.user_id == proprietaire.id)
     ).all()
     assert any(n.type == "RAPPORT_EXTRACTION_ECHOUEE" for n in notifications)
 
@@ -232,7 +232,7 @@ def test_validation_programme_la_synthese_et_relance_programme_l_extraction(
     relance = admin.post(f"/api/v1/admin/rapports/{en_echec.id}/relancer-extraction")
     refus = admin.post(f"/api/v1/admin/rapports/{en_cours.id}/relancer-extraction")
 
-    assert valide.status_code == 200 and valide.json()["statut"] == ReportStatus.VALIDATED.value
+    assert valide.status_code == 200 and valide.json()["status"] == ReportStatus.VALIDATED.value
     assert relance.status_code == 200
     # Une extraction encore RUNNING n'est plus relancée à la main : la tâche planifiée la passe
     # d'abord en échec (`delai_depasse`).

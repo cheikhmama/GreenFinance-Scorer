@@ -2,7 +2,7 @@ import uuid
 
 from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, MethodeDonnee, Pillar, TypeRapport
+from app.core.enums import DataMethod, Pillar, ReportType, SubmissionChannel
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
@@ -32,8 +32,8 @@ def _rapport(session) -> ESGReport:
     session.flush()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/synthese-dummy.pdf",
         fiscal_year=2025,
         submitted_at=utcnow(),
@@ -87,7 +87,7 @@ def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
         metric_code="femmes_effectif_pourcentage",
         value=30.0,
         unit="%",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
     reel.proof = preuve
@@ -97,7 +97,7 @@ def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
         metric_code="score_social_declare",
         value=70.0,
         unit="",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
     declare.proof = preuve
@@ -119,7 +119,7 @@ def test_section_declare_par_lentreprise_isole_les_codes_auto_declares(session) 
         metric_code="score_social_declare",
         value=70.0,
         unit="",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
 
@@ -142,7 +142,7 @@ def test_section_carbone_signale_explicitement_la_non_integration_au_score(sessi
         scope=1,
         tonnes_co2e=1200.5,
         year=2025,
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         pcaf_data_quality=3,
         proof_id=preuve.id,
     )
@@ -164,7 +164,7 @@ def test_generer_rapport_synthese_produit_un_pdf_valide(session) -> None:
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -174,7 +174,7 @@ def test_generer_rapport_synthese_produit_un_pdf_valide(session) -> None:
             scope=1,
             tonnes_co2e=500.0,
             year=2025,
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             pcaf_data_quality=3,
             proof_id=preuve.id,
         )

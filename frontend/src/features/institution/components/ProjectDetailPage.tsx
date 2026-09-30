@@ -44,20 +44,20 @@ export function ProjectDetailPage() {
   if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
   if (isError || !projet) return <p className="text-destructive">Projet introuvable.</p>;
 
-  const dejaAffectes = new Set(projet.affectations.map((a) => a.chercheur_id));
-  const candidats = (chercheursAcceptes ?? []).filter((r) => !dejaAffectes.has(r.chercheur_id));
-  const documentesIds = new Set(projet.documents.map((d) => d.entreprise_id));
+  const dejaAffectes = new Set(projet.assignments.map((a) => a.researcher_id));
+  const candidats = (chercheursAcceptes ?? []).filter((r) => !dejaAffectes.has(r.researcher_id));
+  const documentesIds = new Set(projet.documents.map((d) => d.company_id));
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Institution"
-        title={projet.nom}
-        description={projet.objectif ?? projet.description ?? "Aucune description."}
+        title={projet.name}
+        description={projet.objective ?? projet.description ?? "Aucune description."}
         action={
           <div className="flex items-center gap-2">
-            <Badge variant={variantStatutProjet(projet.statut)}>{libelleStatutProjet(projet.statut)}</Badge>
-            {projet.statut === "OUVERT" ? (
+            <Badge variant={variantStatutProjet(projet.status)}>{libelleStatutProjet(projet.status)}</Badge>
+            {projet.status === "OUVERT" ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -80,15 +80,15 @@ export function ProjectDetailPage() {
       />
       {erreur ? <p className="text-sm text-destructive">{erreur}</p> : null}
 
-      {projet.date_debut || projet.date_fin_prevue || projet.date_limite ? (
+      {projet.start_date || projet.planned_end_date || projet.deadline ? (
         <Card>
           <CardContent className="flex flex-wrap gap-6 text-sm">
-            {projet.date_debut ? <Champ label="Début" valeur={formatDate(projet.date_debut)} /> : null}
-            {projet.date_fin_prevue ? (
-              <Champ label="Fin prévue" valeur={formatDate(projet.date_fin_prevue)} />
+            {projet.start_date ? <Champ label="Début" valeur={formatDate(projet.start_date)} /> : null}
+            {projet.planned_end_date ? (
+              <Champ label="Fin prévue" valeur={formatDate(projet.planned_end_date)} />
             ) : null}
-            {projet.date_limite ? (
-              <Champ label="Date limite" valeur={formatDate(projet.date_limite)} />
+            {projet.deadline ? (
+              <Champ label="Date limite" valeur={formatDate(projet.deadline)} />
             ) : null}
           </CardContent>
         </Card>
@@ -100,7 +100,7 @@ export function ProjectDetailPage() {
             <UserPlus className="size-4" />
             Chercheurs affectés
           </CardTitle>
-          {projet.statut === "OUVERT" && candidats.length > 0 ? (
+          {projet.status === "OUVERT" && candidats.length > 0 ? (
             <div className="flex items-center gap-2">
               <Select
                 value={chercheurASelectionner}
@@ -109,8 +109,8 @@ export function ProjectDetailPage() {
               >
                 <option value="">Sélectionner un chercheur accepté...</option>
                 {candidats.map((rattachement) => (
-                  <option key={rattachement.chercheur_id} value={rattachement.chercheur_id}>
-                    {rattachement.chercheur_nom ?? rattachement.chercheur_email}
+                  <option key={rattachement.researcher_id} value={rattachement.researcher_id}>
+                    {rattachement.researcher_name ?? rattachement.researcher_email}
                   </option>
                 ))}
               </Select>
@@ -119,7 +119,7 @@ export function ProjectDetailPage() {
                 disabled={!chercheurASelectionner || assigner.isPending}
                 onClick={() =>
                   assigner.mutate(
-                    { chercheur_id: chercheurASelectionner },
+                    { researcher_id: chercheurASelectionner },
                     {
                       onSuccess: () => setChercheurASelectionner(""),
                       onError: (error) =>
@@ -134,14 +134,14 @@ export function ProjectDetailPage() {
           ) : null}
         </CardHeader>
         <CardContent className="space-y-2">
-          {projet.affectations.length === 0 ? (
+          {projet.assignments.length === 0 ? (
             <EmptyState icon={UserPlus} message="Aucun chercheur affecté pour l'instant." />
           ) : (
-            projet.affectations.map((affectation) => (
+            projet.assignments.map((affectation) => (
               <div key={affectation.id} className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
-                <InitialsAvatar nom={affectation.chercheur_email} size="sm" />
-                <span className="flex-1 font-medium text-brand-blue">{affectation.chercheur_email}</span>
-                <span className="text-brand-grey">depuis le {formatDate(affectation.date_affectation)}</span>
+                <InitialsAvatar nom={affectation.researcher_email} size="sm" />
+                <span className="flex-1 font-medium text-brand-blue">{affectation.researcher_email}</span>
+                <span className="text-brand-grey">depuis le {formatDate(affectation.assigned_at)}</span>
               </div>
             ))
           )}
@@ -152,9 +152,9 @@ export function ProjectDetailPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
             <Building2 className="size-4" />
-            Périmètre autorisé ({projet.perimetre.length})
+            Périmètre autorisé ({projet.companies.length})
           </CardTitle>
-          {projet.statut === "OUVERT" ? (
+          {projet.status === "OUVERT" ? (
             <Button size="sm" variant="outline" onClick={() => setPerimetreOuvert(true)}>
               Ajouter une entreprise
             </Button>
@@ -164,22 +164,22 @@ export function ProjectDetailPage() {
           <p className="text-xs text-brand-grey">
             Seules ces entreprises pourront être comparées dans une analyse de ce projet.
           </p>
-          {projet.perimetre.length === 0 ? (
+          {projet.companies.length === 0 ? (
             <EmptyState
               icon={Building2}
               message="Aucune entreprise n'est encore autorisée — les chercheurs affectés ne pourront créer aucune analyse tant que le périmètre est vide."
             />
           ) : (
-            projet.perimetre.map((entreprise) => (
+            projet.companies.map((entreprise) => (
               <div key={entreprise.id} className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
-                <CompanyAvatar nom={entreprise.entreprise_nom} logo={null} className="size-8" />
+                <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
                 <Link
-                  to={`/institution/entreprises/${entreprise.entreprise_id}`}
+                  to={`/institution/entreprises/${entreprise.company_id}`}
                   className="flex-1 font-medium text-brand-blue underline-offset-2 hover:underline"
                 >
-                  {entreprise.entreprise_nom}
+                  {entreprise.company_name}
                 </Link>
-                {documentesIds.has(entreprise.entreprise_id) ? (
+                {documentesIds.has(entreprise.company_id) ? (
                   <Badge variant="success">Document mis à disposition</Badge>
                 ) : (
                   <BoutonMettreADisposition projetId={projet.id} entreprise={entreprise} />
@@ -206,12 +206,12 @@ export function ProjectDetailPage() {
           ) : (
             projet.documents.map((document) => (
               <div key={document.id} className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
-                <CompanyAvatar nom={document.entreprise_nom} logo={null} className="size-8" />
-                <span className="flex-1 font-medium text-brand-blue">{document.entreprise_nom}</span>
-                {document.annee_reporting ? (
-                  <span className="text-brand-grey">{document.annee_reporting}</span>
+                <CompanyAvatar nom={document.company_name} logo={null} className="size-8" />
+                <span className="flex-1 font-medium text-brand-blue">{document.company_name}</span>
+                {document.fiscal_year ? (
+                  <span className="text-brand-grey">{document.fiscal_year}</span>
                 ) : null}
-                <span className="text-xs text-brand-grey">ajouté le {formatDate(document.date_ajout)}</span>
+                <span className="text-xs text-brand-grey">ajouté le {formatDate(document.added_at)}</span>
               </div>
             ))
           )}
@@ -233,10 +233,10 @@ export function ProjectDetailPage() {
                 className="flex items-center justify-between border-b py-2 text-sm last:border-0 hover:bg-muted"
               >
                 <span className="font-medium text-brand-blue">
-                  {analyse.titre} (v{analyse.version})
+                  {analyse.title} (v{analyse.version})
                 </span>
-                <Badge variant={variantStatutAnalyse(analyse.statut)}>
-                  {libelleStatutAnalyse(analyse.statut)}
+                <Badge variant={variantStatutAnalyse(analyse.status)}>
+                  {libelleStatutAnalyse(analyse.status)}
                 </Badge>
               </Link>
             ))
@@ -248,7 +248,7 @@ export function ProjectDetailPage() {
         projetId={projet.id}
         open={perimetreOuvert}
         onOpenChange={setPerimetreOuvert}
-        dejaDansLePerimetre={new Set(projet.perimetre.map((e) => e.entreprise_id))}
+        dejaDansLePerimetre={new Set(projet.companies.map((e) => e.company_id))}
       />
     </div>
   );
@@ -268,11 +268,11 @@ function BoutonMettreADisposition({
   entreprise,
 }: {
   projetId: string;
-  entreprise: { entreprise_id: string; dernier_rapport_id: string | null };
+  entreprise: { company_id: string; latest_report_id: string | null };
 }) {
   const ajouter = useAddDocument(projetId);
   const [erreur, setErreur] = useState<string | null>(null);
-  const rapportId = entreprise.dernier_rapport_id;
+  const rapportId = entreprise.latest_report_id;
 
   if (!rapportId) {
     return <span className="text-xs text-brand-grey">Aucun rapport publié à mettre à disposition.</span>;
@@ -287,7 +287,7 @@ function BoutonMettreADisposition({
         disabled={ajouter.isPending}
         onClick={() =>
           ajouter.mutate(
-            { rapport_id: rapportId },
+            { report_id: rapportId },
             {
               onError: (error) =>
                 setErreur(error instanceof ApiError ? error.message : "Échec de l'ajout."),
@@ -346,17 +346,17 @@ function SelectionEntrepriseDialog({
           <div className="max-h-72 space-y-1 overflow-y-auto">
             {entreprises.map((entreprise) => (
               <div key={entreprise.id} className="flex items-center gap-3 rounded-md border p-2">
-                <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-8" />
+                <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-brand-blue">{entreprise.nom}</p>
-                  <p className="truncate text-xs text-brand-grey">{entreprise.secteur}</p>
+                  <p className="truncate text-sm font-medium text-brand-blue">{entreprise.name}</p>
+                  <p className="truncate text-xs text-brand-grey">{entreprise.sector}</p>
                 </div>
                 <Button
                   size="sm"
                   disabled={ajouter.isPending}
                   onClick={() =>
                     ajouter.mutate(
-                      { entreprise_id: entreprise.id },
+                      { company_id: entreprise.id },
                       {
                         onError: (error) =>
                           setErreur(error instanceof ApiError ? error.message : "Échec de l'ajout."),

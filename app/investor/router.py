@@ -132,7 +132,7 @@ def creer_portefeuille_route(
     current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
-    portefeuille_cree = portfolio.creer_portefeuille(session, current_user.id, payload.nom)
+    portefeuille_cree = portfolio.creer_portefeuille(session, current_user.id, payload.name)
     return portfolio.resume_portefeuille(session, portefeuille_cree)
 
 
@@ -200,7 +200,7 @@ def renommer_portefeuille_route(
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
     portefeuille_renomme = portfolio.renommer_portefeuille(
-        session, current_user.id, portefeuille_id, payload.nom
+        session, current_user.id, portefeuille_id, payload.name
     )
     return portfolio.resume_portefeuille(session, portefeuille_renomme)
 
@@ -362,7 +362,7 @@ def fermer_position_route(
     session: Session = Depends(get_session),
 ) -> PositionDetail:
     position = portfolio.fermer_position(
-        session, current_user.id, portefeuille_id, position_id, payload.date_fin
+        session, current_user.id, portefeuille_id, position_id, payload.end_date
     )
     return portfolio.detail_position_du_portefeuille(session, position)
 

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from app.core.enums import DevisePosition
+from app.core.enums import Currency
 from app.core.exceptions import ValidationError
 
 CENTIME = Decimal("0.01")
@@ -28,7 +28,7 @@ def _charger_taux(chemin: str) -> dict[str, Decimal]:
     return {devise: Decimal(str(taux)) for devise, taux in contenu["taux_vers_usd"].items()}
 
 
-def _taux_vers_usd(devise: DevisePosition, chemin_taux: str) -> Decimal:
+def _taux_vers_usd(devise: Currency, chemin_taux: str) -> Decimal:
     """Une devise de l'énumération absente du fichier de taux est une erreur de saisie à signaler
     (422), jamais une KeyError qui remonterait en 500."""
     taux = _charger_taux(chemin_taux).get(devise.value)
@@ -41,7 +41,7 @@ def _taux_vers_usd(devise: DevisePosition, chemin_taux: str) -> Decimal:
 
 
 def convertir(
-    montant: Decimal, depuis: DevisePosition, vers: DevisePosition, chemin_taux: str
+    montant: Decimal, depuis: Currency, vers: Currency, chemin_taux: str
 ) -> tuple[Decimal, Decimal | None]:
     """Retourne (montant_converti, taux_change_utilise), en Decimal, le montant arrondi au centime.
 

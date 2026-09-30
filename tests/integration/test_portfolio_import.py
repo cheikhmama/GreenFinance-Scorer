@@ -92,9 +92,9 @@ def test_import_csv_rapproche_et_conserve_les_lignes_inconnues(session, investis
     assert sum(p.weight or 0 for p in positions.values()) == pytest.approx(1)
 
     detail = investisseur.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}").json()
-    non_rapprochees = [p for p in detail["positions"] if p["entreprise"] is None]
-    assert {p["statut_rapprochement"] for p in non_rapprochees} == {"UNMATCHED", "AMBIGUOUS"}
-    assert all(p["identifiant"] for p in non_rapprochees)
+    non_rapprochees = [p for p in detail["positions"] if p["company"] is None]
+    assert {p["match_status"] for p in non_rapprochees} == {"UNMATCHED", "AMBIGUOUS"}
+    assert all(p["identifier"] for p in non_rapprochees)
     export = investisseur.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}/export")
     assert export.status_code == 200
     assert f"[{ticker}]" in export.text

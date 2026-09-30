@@ -10,9 +10,9 @@ import uuid
 import structlog
 from sqlmodel import Session, col, select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.models import User
-from app.core.enums import DecisionAudit, ReportStatus, Role
+from app.core.enums import AuditDecision, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.ingestion.models import ESGReport
@@ -20,9 +20,9 @@ from app.ingestion.models import ESGReport
 logger = structlog.get_logger(__name__)
 
 _LIBELLES_DECISION = {
-    DecisionAudit.RECOMMANDE_VALIDATION: "recommande la validation",
-    DecisionAudit.RECOMMANDE_REJET: "recommande le rejet",
-    DecisionAudit.DEMANDE_CLARIFICATION: "demande une clarification",
+    AuditDecision.RECOMMANDE_VALIDATION: "recommande la validation",
+    AuditDecision.RECOMMANDE_REJET: "recommande le rejet",
+    AuditDecision.DEMANDE_CLARIFICATION: "demande une clarification",
 }
 
 
@@ -30,9 +30,9 @@ def soumettre_avis(
     session: Session,
     rapport_id: uuid.UUID,
     auditeur_id: uuid.UUID,
-    decision: DecisionAudit,
+    decision: AuditDecision,
     commentaire: str | None,
-) -> AvisAudit:
+) -> AuditOpinion:
     rapport = session.get(ESGReport, rapport_id)
     # Même règle de non-divulgation que company/router.py::consulter_rapport : un rapport
     # inexistant et un rapport affecté à un autre auditeur rendent la même erreur, jamais un 403
@@ -45,11 +45,11 @@ def soumettre_avis(
             "Un avis a déjà été soumis pour ce rapport.", code="avis_deja_soumis"
         )
 
-    avis = AvisAudit(
-        rapport_id=rapport_id,
-        auditeur_id=auditeur_id,
+    avis = AuditOpinion(
+        report_id=rapport_id,
+        auditor_id=auditeur_id,
         decision=decision,
-        commentaire=commentaire,
+        comment=commentaire,
     )
     session.add(avis)
 

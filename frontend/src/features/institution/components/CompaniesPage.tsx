@@ -59,14 +59,14 @@ export function CompaniesPage() {
                   to={`/institution/entreprises/${entreprise.id}`}
                   className="text-base font-semibold text-brand-blue underline-offset-2 hover:underline"
                 >
-                  {entreprise.nom}
+                  {entreprise.name}
                 </Link>
                 <p className="text-sm text-brand-grey">
-                  {entreprise.secteur} — {entreprise.pays}
+                  {entreprise.sector} — {entreprise.country}
                 </p>
               </div>
               <ScoreSummary score={entreprise.score} />
-              <CarbonSummary carbone={entreprise.carbone} />
+              <CarbonSummary carbone={entreprise.carbon} />
             </CardContent>
           </Card>
         ))}

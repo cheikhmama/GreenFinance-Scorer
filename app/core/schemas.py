@@ -2,7 +2,7 @@
 
 Contrairement à un schemas.py de module (entrées/sorties propres à un domaine, voir
 ARCHITECTURE.md §2), ce fichier porte les formes génériques réutilisables (pagination) et les
-schémas des entités transverses de app/core/models.py (Notification, JournalAudit) qui
+schémas des entités transverses de app/core/models.py (Notification, AuditLogEntry) qui
 n'appartiennent à aucun espace acteur en particulier.
 """
 
@@ -38,6 +38,6 @@ class NotificationPublic(BaseModel):
     id: uuid.UUID
     type: str
     message: str
-    id_ressource: uuid.UUID | None
-    date_envoi: datetime
-    lu: bool
+    resource_id: uuid.UUID | None
+    sent_at: datetime
+    read: bool

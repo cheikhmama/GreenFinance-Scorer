@@ -9,15 +9,15 @@ import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useMyAssignedProjects } from "../api";
 
 function formatPeriode(projet: {
-  date_debut: string | null;
-  date_fin_prevue: string | null;
-  date_limite: string | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  deadline: string | null;
 }): string | null {
   const morceaux: string[] = [];
-  if (projet.date_debut) morceaux.push(`Du ${new Date(projet.date_debut).toLocaleDateString("fr-FR")}`);
-  if (projet.date_fin_prevue) morceaux.push(`au ${new Date(projet.date_fin_prevue).toLocaleDateString("fr-FR")}`);
-  if (projet.date_limite) {
-    morceaux.push(`échéance : ${new Date(projet.date_limite).toLocaleDateString("fr-FR")}`);
+  if (projet.start_date) morceaux.push(`Du ${new Date(projet.start_date).toLocaleDateString("fr-FR")}`);
+  if (projet.planned_end_date) morceaux.push(`au ${new Date(projet.planned_end_date).toLocaleDateString("fr-FR")}`);
+  if (projet.deadline) {
+    morceaux.push(`échéance : ${new Date(projet.deadline).toLocaleDateString("fr-FR")}`);
   }
   return morceaux.length > 0 ? morceaux.join(" — ") : null;
 }
@@ -53,14 +53,14 @@ export function ProjetsPage() {
                 <CardContent className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-brand-blue">{projet.nom}</p>
+                      <p className="font-medium text-brand-blue">{projet.name}</p>
                       <p className="text-sm text-brand-grey">{projet.institution_email}</p>
                     </div>
-                    <Badge variant={variantStatutProjet(projet.statut)}>
-                      {libelleStatutProjet(projet.statut)}
+                    <Badge variant={variantStatutProjet(projet.status)}>
+                      {libelleStatutProjet(projet.status)}
                     </Badge>
                   </div>
-                  {projet.objectif ? <p className="text-sm text-brand-grey">{projet.objectif}</p> : null}
+                  {projet.objective ? <p className="text-sm text-brand-grey">{projet.objective}</p> : null}
                   {periode ? <p className="text-xs text-brand-grey">{periode}</p> : null}
                 </CardContent>
               </Card>

@@ -16,8 +16,8 @@ export function CompanyDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`${entreprise.secteur} — ${entreprise.pays}`}
-        title={entreprise.nom}
+        eyebrow={`${entreprise.sector} — ${entreprise.country}`}
+        title={entreprise.name}
         description={entreprise.description ?? "Fiche entreprise publiée."}
       />
 
@@ -30,13 +30,13 @@ export function CompanyDetailPage() {
         </CardContent>
       </Card>
 
-      {entreprise.rapport_id && entreprise.score.valeur_globale !== null ? (
+      {entreprise.report_id && entreprise.score.global_score !== null ? (
         <Card>
           <CardHeader>
             <CardTitle>D’où vient ce score ?</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScoreWaterfall rapportId={entreprise.rapport_id} />
+            <ScoreWaterfall rapportId={entreprise.report_id} />
           </CardContent>
         </Card>
       ) : null}
@@ -46,19 +46,19 @@ export function CompanyDetailPage() {
           <CardTitle>Émissions Scope 1/2/3</CardTitle>
         </CardHeader>
         <CardContent>
-          <CarbonSummary carbone={entreprise.carbone} />
+          <CarbonSummary carbone={entreprise.carbon} />
         </CardContent>
       </Card>
 
       <IndicatorsTable
-        indicateurs={entreprise.indicateurs}
-        couverture={entreprise.couverture}
+        indicateurs={entreprise.metrics}
+        couverture={entreprise.coverage}
         construireUrlPreuve={(preuveId) =>
           `/api/v1/researcher/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
         }
       />
       <CarbonTable
-        donneesCarbone={entreprise.donnees_carbone}
+        donneesCarbone={entreprise.carbon_data}
         construireUrlPreuve={(preuveId) =>
           `/api/v1/researcher/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
         }

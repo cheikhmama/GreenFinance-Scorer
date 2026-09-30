@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from sqlmodel import Session, col, select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.audit.opinion import soumettre_avis
 from app.audit.preuves import fichier_preuve
 from app.audit.schemas import AvisAuditAdmin, SoumettreAvisRequest
@@ -66,7 +66,7 @@ def consulter_dossier(
     if rapport is None or rapport.auditor_id != current_user.id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"score_officiel": score_public(session, rapport_id)})
+    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 
 @router.get(
@@ -93,12 +93,12 @@ def consulter_preuve_route(
 def lister_historique_route(
     current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
-) -> list[AvisAudit]:
+) -> list[AuditOpinion]:
     return list(
         session.exec(
-            select(AvisAudit)
-            .where(AvisAudit.auditeur_id == current_user.id)
-            .order_by(col(AvisAudit.date_avis).desc())
+            select(AuditOpinion)
+            .where(AuditOpinion.auditor_id == current_user.id)
+            .order_by(col(AuditOpinion.submitted_at).desc())
         ).all()
     )
 
@@ -115,7 +115,7 @@ def soumettre_avis_route(
     payload: SoumettreAvisRequest,
     current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
-) -> AvisAudit:
+) -> AuditOpinion:
     return soumettre_avis(
-        session, rapport_id, current_user.id, payload.decision, payload.commentaire
+        session, rapport_id, current_user.id, payload.decision, payload.comment
     )

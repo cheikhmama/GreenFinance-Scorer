@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { DevisePosition, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { Currency, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
 export { Role };
-export { DevisePosition };
-export const DEVISES = Object.values(DevisePosition);
+export { Currency };
+export const DEVISES = Object.values(Currency);
 
 /** Jamais ADMIN — même règle déjà validée côté prototype (docs/PROTOTYPE_FRONTEND.md) et
  * appliquée côté serveur (app/admin/utilisateurs.py::creer_utilisateur). */
@@ -32,16 +32,16 @@ export const creerUtilisateurSchema = z
     // pas, app/admin/utilisateurs.py::creer_utilisateur le déduit de la partie locale de l'e-mail
     // quand absent (compromis choisi sciemment). nom_entreprise (nom de l'Entreprise elle-même)
     // reste distinct et requis pour ce rôle uniquement.
-    nom_entreprise: z.string().optional(),
-    secteur: z.string().optional(),
-    pays: z.string().optional(),
+    company_name: z.string().optional(),
+    sector: z.string().optional(),
+    country: z.string().optional(),
   })
   .superRefine((values, ctx) => {
     if (values.role !== Role.ENTERPRISE) return;
     // Le profil Entreprise (nom_entreprise/secteur/pays) est requis dans le même geste que la
     // création du compte — voir app/admin/utilisateurs.py::creer_utilisateur, sans lui le compte
     // ne peut rien déposer (aucune Entreprise à laquelle le rattacher).
-    (["nom_entreprise", "secteur", "pays"] as const).forEach((champ) => {
+    (["company_name", "sector", "country"] as const).forEach((champ) => {
       if (!values[champ]?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -61,7 +61,7 @@ export const changerRoleSchema = z.object({
 export type ChangerRoleForm = z.infer<typeof changerRoleSchema>;
 
 export const decisionSchema = z.object({
-  commentaire: z.string().optional(),
+  comment: z.string().optional(),
 });
 
 export type DecisionForm = z.infer<typeof decisionSchema>;
@@ -73,24 +73,24 @@ export type DecisionForm = z.infer<typeof decisionSchema>;
  * ModifierEntrepriseAdminRequest), reproduite ici pour un message d'erreur immédiat. */
 export const modifierEntrepriseSchema = z
   .object({
-    nom: z.string().min(1, "Le nom est requis."),
-    secteur: z.string().min(1, "Le secteur est requis."),
-    pays: z.string().min(1, "Le pays est requis."),
+    name: z.string().min(1, "Le nom est requis."),
+    sector: z.string().min(1, "Le secteur est requis."),
+    country: z.string().min(1, "Le pays est requis."),
     description: z.string().optional(),
-    site_officiel: z.string().optional(),
+    website: z.string().optional(),
     impose_minimum: z.boolean(),
-    montant_minimum_investissement: z
+    minimum_investment_amount: z
       .number()
       .refine(auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES)
       .optional(),
-    devise_montant_minimum: z.enum(DevisePosition).optional(),
+    minimum_investment_currency: z.enum(Currency).optional(),
   })
   .superRefine((values, ctx) => {
     if (!values.impose_minimum) return;
-    if (values.montant_minimum_investissement === undefined || Number.isNaN(values.montant_minimum_investissement)) {
+    if (values.minimum_investment_amount === undefined || Number.isNaN(values.minimum_investment_amount)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["montant_minimum_investissement"],
+        path: ["minimum_investment_amount"],
         message: "Le montant est requis.",
       });
     }

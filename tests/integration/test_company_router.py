@@ -11,16 +11,16 @@ from app.company.models import Company
 from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
     CompanyStatus,
+    ConfidenceLevel,
+    DataMethod,
     ExtractionStatus,
-    MethodeDonnee,
-    NiveauConfiance,
+    MetricCoverageStatus,
     Pillar,
     ReportStatus,
+    ReportType,
     Role,
-    StatutCouvertureIndicateur,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
@@ -87,9 +87,9 @@ def test_consulter_mon_profil_retourne_la_fiche_entreprise(session) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"].startswith("Entreprise ")
-    assert body["secteur"] == "Technologies"
-    assert body["pays"] == "France"
+    assert body["name"].startswith("Entreprise ")
+    assert body["sector"] == "Technologies"
+    assert body["country"] == "France"
 
 
 def test_consulter_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(session) -> None:
@@ -109,13 +109,13 @@ def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, mon
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 201
-    assert response.json()["statut"] == ReportStatus.SUBMITTED.value
-    assert response.json()["statut_extraction"] == ExtractionStatus.QUEUED.value
-    assert response.json()["canal"] == CanalDepot.ENTREPRISE.value
+    assert response.json()["status"] == ReportStatus.SUBMITTED.value
+    assert response.json()["extraction_status"] == ExtractionStatus.QUEUED.value
+    assert response.json()["channel"] == SubmissionChannel.ENTREPRISE.value
 
 
 def test_deposer_rapport_notifie_lentreprise(session, monkeypatch) -> None:
@@ -125,23 +125,23 @@ def test_deposer_rapport_notifie_lentreprise(session, monkeypatch) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     rapport_id = uuid.UUID(response.json()["id"])
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == user.id, Notification.type == "RAPPORT_DEPOSE"
+            Notification.user_id == user.id, Notification.type == "RAPPORT_DEPOSE"
         )
     ).one()
-    assert notification.id_ressource == rapport_id
+    assert notification.resource_id == rapport_id
 
 
 def test_deposer_rapport_sans_authentification_est_rejete() -> None:
     response = client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 401
@@ -162,7 +162,7 @@ def test_deposer_rapport_avec_role_investisseur_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 403
@@ -178,7 +178,7 @@ def test_deposer_rapport_fichier_non_pdf_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.txt", b"pas un pdf", "text/plain")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -192,7 +192,7 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -210,7 +210,7 @@ def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatc
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -224,15 +224,15 @@ def test_lister_rapports_ne_montre_que_ceux_de_lentreprise_courante(session) -> 
     assert autre.company is not None
     mien = ESGReport(
         company_id=proprietaire.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/mien.pdf",
         submitted_at=utcnow(),
     )
     dautrui = ESGReport(
         company_id=autre.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dautrui.pdf",
         submitted_at=utcnow(),
     )
@@ -266,11 +266,11 @@ def test_deposer_rapport_genere_le_nom_de_stockage_cote_serveur(session, monkeyp
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("../../etc/passwd-mais-pdf.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 201
-    fichier_source = response.json()["fichier_source"]
+    fichier_source = response.json()["source_file"]
     assert "passwd" not in fichier_source
     assert fichier_source == f"rapports/{user.company.id}/{response.json()['id']}.pdf"
 
@@ -283,7 +283,7 @@ def test_deposer_rapport_fichier_trop_volumineux_est_rejete(session, monkeypatch
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -297,7 +297,7 @@ def test_deposer_rapport_fichier_vide_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", b"", "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -319,7 +319,7 @@ def test_deposer_rapport_pdf_chiffre_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", contenu_chiffre, "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -334,14 +334,14 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
     premier = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", contenu, "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
     assert premier.status_code == 201
 
     deuxieme = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("copie.pdf", contenu, "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert deuxieme.status_code == 422
@@ -353,8 +353,8 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
     assert user.company is not None
     original = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.REVISION_REQUESTED,
         source_file="rapports/test/original.pdf",
         submitted_at=utcnow(),
@@ -373,8 +373,8 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
     assert response.status_code == 201
     body = response.json()
     assert body["version"] == 2
-    assert body["rapport_precedent_id"] == str(original.id)
-    assert body["statut"] == ReportStatus.SUBMITTED.value
+    assert body["previous_report_id"] == str(original.id)
+    assert body["status"] == ReportStatus.SUBMITTED.value
     assert body["id"] != str(original.id)
 
     # L'original n'est jamais réécrit — il reste DEMANDE_CORRECTION indéfiniment (Phase 0).
@@ -388,8 +388,8 @@ def test_creer_correction_sur_un_rapport_pas_en_attente_est_rejetee(session) -> 
     assert user.company is not None
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.PENDING_DECISION,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
@@ -415,8 +415,8 @@ def test_creer_correction_sur_le_rapport_dune_autre_entreprise_est_404(session) 
     assert proprietaire.company is not None
     rapport = ESGReport(
         company_id=proprietaire.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.REVISION_REQUESTED,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
@@ -442,8 +442,8 @@ def test_consulter_rapport_dune_autre_entreprise_est_404(session) -> None:
     assert proprietaire.company is not None
     rapport = ESGReport(
         company_id=proprietaire.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -473,8 +473,8 @@ def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
     assert user.company is not None
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -487,7 +487,7 @@ def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == str(rapport.id)
-    assert response.json()["statut"] == ReportStatus.SUBMITTED.value
+    assert response.json()["status"] == ReportStatus.SUBMITTED.value
 
 
 def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(session, monkeypatch) -> None:
@@ -513,8 +513,8 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
     session.commit()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -597,8 +597,8 @@ def _rapport_a_extraire(session) -> ESGReport:
     session.commit()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -623,7 +623,7 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
                 page_source=3,
                 trouve=True,
                 valeur_brute="100 tCO2e",
-                confiance=NiveauConfiance.ELEVE,
+                confiance=ConfidenceLevel.ELEVE,
             ),
             IndicateurExtrait(
                 code="intensite_scope_1_2_marketbased",
@@ -656,7 +656,7 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
     assert donnees_carbone[0].scope == 1
     assert donnees_carbone[0].tonnes_co2e == 100.0
     assert donnees_carbone[0].raw_value == "100 tCO2e"
-    assert donnees_carbone[0].confidence == NiveauConfiance.ELEVE
+    assert donnees_carbone[0].confidence == ConfidenceLevel.ELEVE
     assert len(indicateurs) == 1
     assert indicateurs[0].metric_code == "intensite_scope_1_2_marketbased"
 
@@ -793,8 +793,8 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     session.commit()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -815,8 +815,8 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
         select(MetricCoverage).where(MetricCoverage.report_id == rapport.id)
     ).all()
     par_code = {c.metric_code: c for c in couvertures}
-    assert par_code["scope_1"].status == StatutCouvertureIndicateur.TROUVE
-    assert par_code["scope_3"].status == StatutCouvertureIndicateur.ABSENT_CONFIRME
+    assert par_code["scope_1"].status == MetricCoverageStatus.TROUVE
+    assert par_code["scope_3"].status == MetricCoverageStatus.ABSENT_CONFIRME
     assert len(couvertures) == len(extractor.INDICATEURS_CIBLES)
 
     # couverture_publique (app/investor/entreprises.py) lit désormais .statut au lieu de .trouve —
@@ -824,9 +824,9 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     # pas TROUVE (ABSENT_CONFIRME compte comme "manquant" au même titre que NON_TROUVE, voir
     # CouvertureResume.codes_manquants).
     resume = couverture_publique(session, rapport)
-    assert resume.total_cibles == len(extractor.INDICATEURS_CIBLES)
-    assert resume.trouves == len(extractor.INDICATEURS_CIBLES) - 1
-    assert resume.codes_manquants == ["scope_3"]
+    assert resume.total_targets == len(extractor.INDICATEURS_CIBLES)
+    assert resume.found == len(extractor.INDICATEURS_CIBLES) - 1
+    assert resume.missing_codes == ["scope_3"]
 
 
 def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> User:
@@ -855,14 +855,14 @@ def test_importer_rapport_par_url_entreprise_happy_path_marque_canal_automatique
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
     assert response.status_code == 201
-    assert response.json()["canal"] == CanalDepot.AUTOMATIQUE.value
-    assert response.json()["statut"] == ReportStatus.SUBMITTED.value
+    assert response.json()["channel"] == SubmissionChannel.AUTOMATIQUE.value
+    assert response.json()["status"] == ReportStatus.SUBMITTED.value
 
 
 def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
@@ -883,9 +883,9 @@ def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
-            "entreprise_id": str(autre.id),
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
+            "company_id": str(autre.id),
         },
     )
 
@@ -905,8 +905,8 @@ def test_importer_rapport_par_url_admin_sans_entreprise_id_est_rejete(session) -
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
@@ -922,9 +922,9 @@ def test_importer_rapport_par_url_admin_avec_entreprise_id_inconnu_est_404(sessi
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
-            "entreprise_id": str(uuid.uuid4()),
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
+            "company_id": str(uuid.uuid4()),
         },
     )
 
@@ -946,14 +946,14 @@ def test_importer_rapport_par_url_admin_happy_path(session, monkeypatch) -> None
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
-            "entreprise_id": str(cible.id),
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
+            "company_id": str(cible.id),
         },
     )
 
     assert response.status_code == 201
-    assert response.json()["canal"] == CanalDepot.AUTOMATIQUE.value
+    assert response.json()["channel"] == SubmissionChannel.AUTOMATIQUE.value
 
 
 def test_importer_rapport_par_url_avec_role_investisseur_est_rejete(session) -> None:
@@ -971,8 +971,8 @@ def test_importer_rapport_par_url_avec_role_investisseur_est_rejete(session) -> 
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
@@ -990,8 +990,8 @@ def test_importer_rapport_par_url_url_non_autorisee_propage_lerreur_de_validatio
         "/api/v1/company/rapports/import-url",
         json={
             "url": "http://169.254.169.254/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
@@ -1004,8 +1004,8 @@ def test_consulter_rapport_sans_score_officiel_le_renvoie_a_null(session) -> Non
     assert user.company is not None
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -1017,7 +1017,7 @@ def test_consulter_rapport_sans_score_officiel_le_renvoie_a_null(session) -> Non
     response = authed_client.get(f"/api/v1/company/rapports/{rapport.id}")
 
     assert response.status_code == 200
-    assert response.json()["score_officiel"] is None
+    assert response.json()["official_score"] is None
 
 
 def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_declare(
@@ -1029,8 +1029,8 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
     assert user.company is not None
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         declared_global_score=99.0,  # volontairement très différent du score officiel calculé
         submitted_at=utcnow(),
@@ -1054,7 +1054,7 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -1067,9 +1067,9 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
 
     assert response.status_code == 200
     corps = response.json()
-    assert corps["score_global_declare"] == 99.0
-    assert corps["score_officiel"] is not None
-    assert corps["score_officiel"]["valeur_globale"] != 99.0
+    assert corps["declared_global_score"] == 99.0
+    assert corps["official_score"] is not None
+    assert corps["official_score"]["global_score"] != 99.0
 
 
 def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> None:
@@ -1077,8 +1077,8 @@ def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> 
     assert proprietaire.company is not None
     rapport = ESGReport(
         company_id=proprietaire.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -1101,8 +1101,8 @@ def test_telecharger_rapport_original_propre_entreprise_retourne_le_pdf(session)
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de test original")
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file=chemin_relatif,
         submitted_at=utcnow(),
     )
@@ -1121,8 +1121,8 @@ def test_telecharger_rapport_synthese_non_generee_est_404_dedie(session) -> None
     assert user.company is not None
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -1143,8 +1143,8 @@ def test_telecharger_rapport_synthese_generee_retourne_le_pdf(session) -> None:
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de synthese")
     rapport = ESGReport(
         company_id=user.company.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         synthesis_report_path=chemin_relatif,
         submitted_at=utcnow(),

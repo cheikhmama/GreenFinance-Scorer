@@ -10,20 +10,20 @@ const fetchMock = vi.fn<typeof fetch>();
 
 const DOSSIER = {
   id: ID,
-  entreprise_id: ID,
+  company_id: ID,
   type: "RAPPORT_ESG",
-  canal: "ENTREPRISE",
-  date_creation: "2026-09-01T00:00:00",
-  date_depot: "2026-09-01T00:00:00",
-  statut: "PENDING_AUDIT",
-  statut_extraction: "DONE",
-  annee_reporting: 2025,
-  score_global_declare: null,
-  score_global_declare_preuve: null,
-  score_officiel: null,
-  indicateurs: [],
-  donnees_carbone: [],
-  couverture: { total_cibles: 0, trouves: 0, codes_manquants: [] },
+  channel: "ENTREPRISE",
+  created_at: "2026-09-01T00:00:00",
+  submitted_at: "2026-09-01T00:00:00",
+  status: "PENDING_AUDIT",
+  extraction_status: "DONE",
+  fiscal_year: 2025,
+  declared_global_score: null,
+  declared_global_score_proof: null,
+  official_score: null,
+  metrics: [],
+  carbon_data: [],
+  coverage: { total_targets: 0, found: 0, missing_codes: [] },
 };
 
 beforeEach(() => {
@@ -73,12 +73,12 @@ describe("Espace Auditeur — rendre un avis sur un dossier", () => {
     expect(envoi?.[0]).toBe(`/api/v1/audit/rapports/${ID}/avis`);
     expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({
       decision: "RECOMMANDE_REJET",
-      commentaire: "Scope 3 sans preuve.",
+      comment: "Scope 3 sans preuve.",
     });
   });
 
   it("n’offre plus le formulaire une fois l’avis rendu", async () => {
-    fetchMock.mockResolvedValue(Response.json({ ...DOSSIER, statut: "PENDING_DECISION" }));
+    fetchMock.mockResolvedValue(Response.json({ ...DOSSIER, status: "PENDING_DECISION" }));
     renderPage();
 
     expect(await screen.findByText("Avis déjà rendu")).toBeInTheDocument();

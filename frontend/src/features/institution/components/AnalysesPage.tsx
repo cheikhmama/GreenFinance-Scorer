@@ -13,12 +13,12 @@ import { useMyAnalysesForInstitution } from "../api";
  * attente de décision) remontent toujours en premier, c'est le seul tri qui compte ici. */
 export function AnalysesPage() {
   const { data: analyses, isLoading, isError } = useMyAnalysesForInstitution();
-  const aDecider = analyses?.filter((a) => a.statut === "SOUMISE").length ?? 0;
+  const aDecider = analyses?.filter((a) => a.status === "SOUMISE").length ?? 0;
 
   const triees = [...(analyses ?? [])].sort((a, b) => {
-    if (a.statut === "SOUMISE" && b.statut !== "SOUMISE") return -1;
-    if (a.statut !== "SOUMISE" && b.statut === "SOUMISE") return 1;
-    return b.date_creation.localeCompare(a.date_creation);
+    if (a.status === "SOUMISE" && b.status !== "SOUMISE") return -1;
+    if (a.status !== "SOUMISE" && b.status === "SOUMISE") return 1;
+    return b.created_at.localeCompare(a.created_at);
   });
 
   return (
@@ -50,13 +50,13 @@ export function AnalysesPage() {
             <Card className="h-full transition hover:border-brand-green hover:shadow-md">
               <CardContent className="space-y-2">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-brand-blue">{analyse.titre}</p>
-                  <Badge variant={variantStatutAnalyse(analyse.statut)}>
-                    {libelleStatutAnalyse(analyse.statut)}
+                  <p className="font-medium text-brand-blue">{analyse.title}</p>
+                  <Badge variant={variantStatutAnalyse(analyse.status)}>
+                    {libelleStatutAnalyse(analyse.status)}
                   </Badge>
                 </div>
                 <p className="text-sm text-brand-grey">
-                  {analyse.projet_nom} — version {analyse.version}
+                  {analyse.project_name} — version {analyse.version}
                 </p>
               </CardContent>
             </Card>

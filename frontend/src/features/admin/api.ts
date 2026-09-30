@@ -80,8 +80,8 @@ import type {
   ScoreRecalculeAdmin,
   ReportStatus,
   ScoreVerificationAdmin,
-  StatutAnalyse,
-  StatutProjet,
+  AnalysisStatus,
+  ProjectStatus,
   TableauDeBordAdmin,
   UtilisateurCree,
   UtilisateurPublic,
@@ -652,7 +652,7 @@ export function usePortfoliosAdmin(recherche = "") {
 /** Toutes les analyses Chercheur, filtrable par statut — détail derrière "Analyses par statut" de
  * l'onglet Chercheur/Institution (app/researcher/analyses.py::lister_analyses_admin). Une ligne =
  * une version précise, jamais fusionnée avec ses versions précédentes/suivantes. */
-export function useAnalysesAdmin(statut?: StatutAnalyse) {
+export function useAnalysesAdmin(statut?: AnalysisStatus) {
   return useInfiniteQuery<PageAnalyseAdmin, ApiError>({
     queryKey: [...ANALYSES_ADMIN_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>
@@ -664,7 +664,7 @@ export function useAnalysesAdmin(statut?: StatutAnalyse) {
 
 /** Tous les projets Institution, filtrable par statut — détail derrière "Projets ouverts/clôturés"
  * de l'onglet Institution (app/institution/projets.py::lister_projets_admin). */
-export function useProjectsAdmin(statut?: StatutProjet) {
+export function useProjectsAdmin(statut?: ProjectStatus) {
   return useInfiniteQuery<PageProjetAdmin, ApiError>({
     queryKey: [...PROJETS_ADMIN_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>

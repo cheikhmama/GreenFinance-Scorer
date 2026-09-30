@@ -30,7 +30,7 @@ from app.institution.schemas import (
 from app.investor import entreprises
 from app.investor.schemas import EntrepriseDetailInvestisseur, EntreprisePublieePublic
 from app.researcher import analyses, cross_validation, projets, rattachements
-from app.researcher.models import Analyse
+from app.researcher.models import Analysis
 from app.researcher.schemas import (
     AnalyseDetail,
     AnalysePublic,
@@ -187,13 +187,13 @@ def lister_mes_projets_route(
         resultat.append(
             ProjetAffecte(
                 id=projet.id,
-                nom=projet.nom,
+                name=projet.name,
                 description=projet.description,
-                objectif=projet.objectif,
-                date_debut=projet.date_debut,
-                date_fin_prevue=projet.date_fin_prevue,
-                date_limite=projet.date_limite,
-                statut=projet.statut,
+                objective=projet.objective,
+                start_date=projet.start_date,
+                planned_end_date=projet.planned_end_date,
+                deadline=projet.deadline,
+                status=projet.status,
                 institution_email=institution.email if institution else "",
             )
         )
@@ -230,20 +230,20 @@ def lister_documents_route(
     return [
         DocumentProjetPublic(
             id=document.id,
-            rapport_id=document.rapport_id,
-            entreprise_id=document.rapport.company_id,
-            entreprise_nom=document.rapport.company.name,
-            annee_reporting=document.rapport.fiscal_year,
-            date_ajout=document.date_ajout,
+            report_id=document.report_id,
+            company_id=document.report.company_id,
+            company_name=document.report.company.name,
+            fiscal_year=document.report.fiscal_year,
+            added_at=document.added_at,
         )
         for document in documents
     ]
 
 
-def _analyse_detail(session: Session, analyse: Analyse) -> AnalyseDetail:
+def _analyse_detail(session: Session, analyse: Analysis) -> AnalyseDetail:
     return AnalyseDetail(
         **AnalysePublic.model_validate(analyse).model_dump(),
-        entreprise_ids=analyses.lister_entreprise_ids(session, analyse.id),
+        company_ids=analyses.lister_entreprise_ids(session, analyse.id),
     )
 
 
@@ -261,7 +261,7 @@ def creer_analyse_route(
     session: Session = Depends(get_session),
 ) -> AnalyseDetail:
     analyse = analyses.creer_analyse(
-        session, current_user.id, projet_id, payload.titre, payload.contenu, payload.entreprise_ids
+        session, current_user.id, projet_id, payload.title, payload.content, payload.company_ids
     )
     return _analyse_detail(session, analyse)
 
@@ -275,15 +275,15 @@ def creer_analyse_route(
 def lister_mes_analyses_route(
     current_user: User = Depends(require_role(Role.RESEARCHER)),
     session: Session = Depends(get_session),
-) -> list[Analyse]:
+) -> list[Analysis]:
     return list(
-        session.exec(select(Analyse).where(col(Analyse.chercheur_id) == current_user.id)).all()
+        session.exec(select(Analysis).where(col(Analysis.researcher_id) == current_user.id)).all()
     )
 
 
-def _analyse_ou_404(session: Session, chercheur_id: uuid.UUID, analyse_id: uuid.UUID) -> Analyse:
-    analyse = session.get(Analyse, analyse_id)
-    if analyse is None or analyse.chercheur_id != chercheur_id:
+def _analyse_ou_404(session: Session, chercheur_id: uuid.UUID, analyse_id: uuid.UUID) -> Analysis:
+    analyse = session.get(Analysis, analyse_id)
+    if analyse is None or analyse.researcher_id != chercheur_id:
         raise NotFoundError("Analyse introuvable.", code="analyse_introuvable")
     return analyse
 
@@ -316,7 +316,7 @@ def modifier_analyse_route(
     session: Session = Depends(get_session),
 ) -> AnalyseDetail:
     analyse = analyses.modifier_analyse(
-        session, current_user.id, analyse_id, payload.titre, payload.contenu, payload.entreprise_ids
+        session, current_user.id, analyse_id, payload.title, payload.content, payload.company_ids
     )
     return _analyse_detail(session, analyse)
 
@@ -350,7 +350,7 @@ def corriger_analyse_route(
     session: Session = Depends(get_session),
 ) -> AnalyseDetail:
     nouvelle = analyses.corriger_analyse(
-        session, current_user.id, analyse_id, payload.titre, payload.contenu, payload.entreprise_ids
+        session, current_user.id, analyse_id, payload.title, payload.content, payload.company_ids
     )
     return _analyse_detail(session, nouvelle)
 
@@ -365,7 +365,7 @@ def historique_analyse_route(
     analyse_id: uuid.UUID,
     current_user: User = Depends(require_role(Role.RESEARCHER)),
     session: Session = Depends(get_session),
-) -> list[Analyse]:
+) -> list[Analysis]:
     return analyses.historique_analyse(session, current_user.id, analyse_id)
 
 

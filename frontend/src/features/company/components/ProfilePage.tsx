@@ -30,26 +30,26 @@ export function ProfilePage() {
           {entreprise ? (
             <>
               <div className="flex flex-wrap items-center gap-3">
-                <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-14" />
+                <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-14" />
                 <div>
-                  <p className="font-semibold text-brand-blue">{entreprise.nom}</p>
+                  <p className="font-semibold text-brand-blue">{entreprise.name}</p>
                   <p className="text-sm text-brand-grey">
-                    {entreprise.secteur} — {entreprise.pays}
+                    {entreprise.sector} — {entreprise.country}
                   </p>
                 </div>
                 <Badge
                   variant={
-                    entreprise.date_publication && entreprise.actif
+                    entreprise.published_at && entreprise.active
                       ? "success"
-                      : entreprise.date_publication && !entreprise.actif
+                      : entreprise.published_at && !entreprise.active
                         ? "destructive"
                         : "secondary"
                   }
                   className="ml-auto"
                 >
-                  {entreprise.date_publication
-                    ? entreprise.actif
-                      ? `Publiée le ${new Date(entreprise.date_publication).toLocaleDateString("fr-FR")}`
+                  {entreprise.published_at
+                    ? entreprise.active
+                      ? `Publiée le ${new Date(entreprise.published_at).toLocaleDateString("fr-FR")}`
                       : "Suspendue"
                     : "Non publiée"}
                 </Badge>
@@ -74,7 +74,7 @@ export function ProfilePage() {
                       Site officiel
                     </p>
                     <p className="truncate text-sm font-medium text-brand-blue">
-                      {entreprise.site_officiel ?? "Non renseigné"}
+                      {entreprise.website ?? "Non renseigné"}
                     </p>
                   </div>
                 </div>
@@ -85,11 +85,11 @@ export function ProfilePage() {
                       Montant minimum
                     </p>
                     <p className="text-sm font-medium text-brand-blue">
-                      {entreprise.montant_minimum_investissement !== null &&
-                      entreprise.devise_montant_minimum
+                      {entreprise.minimum_investment_amount !== null &&
+                      entreprise.minimum_investment_currency
                         ? formatMontant(
-                            entreprise.montant_minimum_investissement,
-                            entreprise.devise_montant_minimum,
+                            entreprise.minimum_investment_amount,
+                            entreprise.minimum_investment_currency,
                           )
                         : "Aucun minimum imposé"}
                     </p>

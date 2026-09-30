@@ -2,8 +2,8 @@
 
 Jamais réutilisés comme modèles de persistance (voir ARCHITECTURE.md §2).
 
-Contrat HTTP inchangé pendant le renommage anglais (docs/RENAME_PLAN.md §1, règle 3) : les champs
-JSON restent en français, CompanyContractMixin traduit explicitement une Company vers ce contrat.
+Contrat JSON en anglais depuis la tâche 4.7 (docs/RENAME_PLAN.md §3e) : les champs portent les
+noms des attributs de Company ; CompanyContractMixin n'ajoute que le booléen calculé `active`.
 """
 
 import uuid
@@ -15,26 +15,26 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.auth.schemas import EmailNormalise
 from app.company.identifiers import isin_valide, lei_valide
 from app.company.models import Company
-from app.core.enums import CompanyStatus, DevisePosition, TypeRapport
+from app.core.enums import CompanyStatus, Currency, ReportType
 
 
 def company_vers_contrat(company: Company) -> dict[str, Any]:
-    """Point unique de traduction Company -> champs JSON historiques. `actif` reste le booléen
-    exposé au frontend : vrai seulement pour une entreprise ACTIVE."""
+    """Point unique de passage Company -> contrat JSON. `active` est le booléen exposé au
+    frontend : vrai seulement pour une entreprise ACTIVE."""
     return {
         "id": company.id,
-        "nom": company.name,
-        "secteur": company.sector,
-        "pays": company.country,
+        "name": company.name,
+        "sector": company.sector,
+        "country": company.country,
         "logo": company.logo,
         "description": company.description,
-        "site_officiel": company.website,
-        "actif": company.status == CompanyStatus.ACTIVE,
-        "statut": company.status,
-        "montant_minimum_investissement": company.minimum_investment_amount,
-        "devise_montant_minimum": company.minimum_investment_currency,
-        "date_publication": company.published_at,
-        "utilisateur_id": company.owner_user_id,
+        "website": company.website,
+        "active": company.status == CompanyStatus.ACTIVE,
+        "status": company.status,
+        "minimum_investment_amount": company.minimum_investment_amount,
+        "minimum_investment_currency": company.minimum_investment_currency,
+        "published_at": company.published_at,
+        "owner_user_id": company.owner_user_id,
         "isin": company.isin,
         "lei": company.lei,
         "ticker": company.ticker,
@@ -43,7 +43,7 @@ def company_vers_contrat(company: Company) -> dict[str, Any]:
 
 class CompanyContractMixin(BaseModel):
     """À hériter par tout schéma de réponse validé depuis une Company (model_validate ou
-    response_model) : la validation part alors du contrat traduit, jamais des attributs anglais."""
+    response_model) : la validation part alors de company_vers_contrat."""
 
     @model_validator(mode="before")
     @classmethod
@@ -57,19 +57,19 @@ class EntreprisePublic(CompanyContractMixin):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    nom: str
-    secteur: str
-    pays: str
+    name: str
+    sector: str
+    country: str
     logo: str | None
     description: str | None
-    site_officiel: str | None
-    actif: bool
+    website: str | None
+    active: bool
     # Cycle de vie du compte (tâche 1.3) : distingue une entreprise en attente d'inscription
     # (PENDING_ONBOARDING) d'une entreprise suspendue — `actif` est faux dans les deux cas.
-    statut: CompanyStatus
-    montant_minimum_investissement: float | None
-    devise_montant_minimum: DevisePosition | None
-    date_publication: datetime | None
+    status: CompanyStatus
+    minimum_investment_amount: float | None
+    minimum_investment_currency: Currency | None
+    published_at: datetime | None
     # Identifiants de marché (tâches 1.3, 2.2) — donnée publique, clé de l'import de portefeuille.
     isin: str | None = None
     lei: str | None = None
@@ -77,14 +77,14 @@ class EntreprisePublic(CompanyContractMixin):
 
 
 class ImporterRapportParURLRequest(BaseModel):
-    """Corps de POST /company/rapports/import-url (CanalDepot.AUTOMATIQUE). entreprise_id n'est
+    """Corps de POST /company/rapports/import-url (SubmissionChannel.AUTOMATIQUE). entreprise_id n'est
     lu que pour un appelant Administrateur -- un appelant Entreprise est toujours rattaché à sa
     propre entreprise (voir app/company/router.py), un entreprise_id fourni par lui est ignoré."""
 
     url: str
-    type: TypeRapport
-    annee_reporting: int
-    entreprise_id: uuid.UUID | None = None
+    type: ReportType
+    fiscal_year: int
+    company_id: uuid.UUID | None = None
 
 
 def _une_seule_ligne(valeur: str) -> str:
@@ -96,7 +96,7 @@ def _une_seule_ligne(valeur: str) -> str:
 class CompanyRegistrationRequest(BaseModel):
     """POST /companies/register — inscription publique d'une entreprise (tâche 1.3, décision D5).
 
-    Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3) : nouvel endpoint, donc
+    Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3, tâche 1.3) : nouvel endpoint, donc
     directement dans les noms cibles. ISIN et LEI restent facultatifs (beaucoup d'entreprises non
     cotées n'en ont pas) mais, fournis, leur chiffre de contrôle est vérifié.
 

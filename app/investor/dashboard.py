@@ -13,7 +13,7 @@ from sqlmodel import Session, col, select
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, DevisePosition
+from app.core.enums import CompanyStatus, Currency
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
 from app.investor.models import Portfolio, PortfolioPosition
@@ -58,9 +58,9 @@ def construire_tableau_de_bord(
             session, entreprises_investisseur.dernier_rapport_valide(session, entreprise.id)
         )
         if (
-            score.score_environnement is not None
-            and score.score_social is not None
-            and score.score_gouvernance is not None
+            score.environmental_score is not None
+            and score.social_score is not None
+            and score.governance_score is not None
         ):
             nb_complets += 1
     taux_couverture_esg_plateforme = (
@@ -80,14 +80,14 @@ def construire_tableau_de_bord(
         assert entreprise_de_la_position is not None
         devise_portefeuille = devise_par_portefeuille[position.portfolio_id]
         montant_usd, _ = fx.convertir(
-            position.converted_amount, devise_portefeuille, DevisePosition.USD, chemin_taux
+            position.converted_amount, devise_portefeuille, Currency.USD, chemin_taux
         )
         repartition_usd[entreprise_de_la_position.sector] = (
             repartition_usd.get(entreprise_de_la_position.sector, 0.0) + float(montant_usd)
         )
 
     repartition_secteur = [
-        RepartitionSecteur(secteur=secteur, montant_usd=montant)
+        RepartitionSecteur(sector=secteur, amount_usd=montant)
         for secteur, montant in sorted(repartition_usd.items(), key=lambda item: item[1], reverse=True)
     ]
 
@@ -114,11 +114,11 @@ def construire_tableau_de_bord(
     ]
 
     return TableauDeBordInvestisseur(
-        nombre_portefeuilles=len(portefeuilles),
-        nombre_entreprises_publiees=len(entreprises_publiees),
-        taux_couverture_esg_plateforme=taux_couverture_esg_plateforme,
-        nombre_nouvelles_publications_suivies=nombre_nouvelles_publications_suivies,
-        repartition_secteur=repartition_secteur,
-        publications_recentes=publications_recentes,
-        entreprises_suivies_suspendues=entreprises_suivies_suspendues,
+        portfolio_count=len(portefeuilles),
+        published_company_count=len(entreprises_publiees),
+        platform_esg_coverage_rate=taux_couverture_esg_plateforme,
+        new_followed_publication_count=nombre_nouvelles_publications_suivies,
+        sector_breakdown=repartition_secteur,
+        recent_publications=publications_recentes,
+        suspended_followed_companies=entreprises_suivies_suspendues,
     )

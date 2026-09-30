@@ -90,7 +90,7 @@ def decider_inscription(
         entreprise.onboarded_by_id = acteur_id
         session.add(entreprise)
         envoyer_lien_activation(session, titulaire, background_tasks)
-        auditer(session, acteur_id, "validation_inscription", "Entreprise", entreprise.id, "succes")
+        auditer(session, acteur_id, "registration_approved", "Company", entreprise.id, "success")
         session.commit()
         logger.info("company_onboarded", company_id=str(entreprise.id))
         return CompanyOnboardingResult(
@@ -105,11 +105,11 @@ def decider_inscription(
     auditer(
         session,
         acteur_id,
-        "refus_inscription",
-        "Entreprise",
+        "registration_rejected",
+        "Company",
         entreprise.id,
-        "succes",
-        nouvelle_valeur=motif,
+        "success",
+        new_value=motif,
     )
     session.delete(entreprise)
     session.flush()  # l'entreprise d'abord : elle référence son titulaire

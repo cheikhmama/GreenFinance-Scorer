@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
-from app.core.enums import MethodeDonnee
+from app.core.enums import DataMethod
 
 MILLION = Decimal(1_000_000)
 
@@ -31,10 +31,10 @@ MILLION = Decimal(1_000_000)
 # données économiques, 5 moyennes sectorielles. L'extraction ne sait pas si les émissions
 # publiées ont fait l'objet d'une assurance externe : une valeur déclarée reste donc au score 2,
 # jamais promue à 1 sans cette information.
-QUALITE_PAR_METHODE: dict[MethodeDonnee, int] = {
-    MethodeDonnee.RAPPORTEE: 2,
-    MethodeDonnee.CALCULEE: 3,
-    MethodeDonnee.ESTIMEE: 4,
+QUALITE_PAR_METHODE: dict[DataMethod, int] = {
+    DataMethod.RAPPORTEE: 2,
+    DataMethod.CALCULEE: 3,
+    DataMethod.ESTIMEE: 4,
 }
 
 # Scope 2 : la base « market-based » reflète les achats d'énergie de l'entreprise (celle que PCAF
@@ -42,7 +42,7 @@ QUALITE_PAR_METHODE: dict[MethodeDonnee, int] = {
 PREFERENCE_SCOPE_2: tuple[str | None, ...] = ("market_based", None, "location_based")
 
 
-def qualite_donnee_pcaf(methode: MethodeDonnee) -> int:
+def qualite_donnee_pcaf(methode: DataMethod) -> int:
     return QUALITE_PAR_METHODE[methode]
 
 

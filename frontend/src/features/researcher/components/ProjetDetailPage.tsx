@@ -32,22 +32,22 @@ export function ProjetDetailPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow={projet.institution_email}
-        title={projet.nom}
-        description={projet.objectif ?? "Aucun objectif renseigné par l'institution."}
+        title={projet.name}
+        description={projet.objective ?? "Aucun objectif renseigné par l'institution."}
         action={
-          <Badge variant={variantStatutProjet(projet.statut)}>{libelleStatutProjet(projet.statut)}</Badge>
+          <Badge variant={variantStatutProjet(projet.status)}>{libelleStatutProjet(projet.status)}</Badge>
         }
       />
 
-      {projet.date_debut || projet.date_fin_prevue || projet.date_limite ? (
+      {projet.start_date || projet.planned_end_date || projet.deadline ? (
         <Card>
           <CardContent className="flex flex-wrap gap-6 text-sm">
-            {projet.date_debut ? <Champ label="Début" valeur={formatDate(projet.date_debut)} /> : null}
-            {projet.date_fin_prevue ? (
-              <Champ label="Fin prévue" valeur={formatDate(projet.date_fin_prevue)} />
+            {projet.start_date ? <Champ label="Début" valeur={formatDate(projet.start_date)} /> : null}
+            {projet.planned_end_date ? (
+              <Champ label="Fin prévue" valeur={formatDate(projet.planned_end_date)} />
             ) : null}
-            {projet.date_limite ? (
-              <Champ label="Date limite" valeur={formatDate(projet.date_limite)} />
+            {projet.deadline ? (
+              <Champ label="Date limite" valeur={formatDate(projet.deadline)} />
             ) : null}
           </CardContent>
         </Card>
@@ -71,11 +71,11 @@ export function ProjetDetailPage() {
           {perimetre?.map((entreprise) => (
             <Link
               key={entreprise.id}
-              to={`/researcher/entreprises/${entreprise.entreprise_id}`}
+              to={`/researcher/entreprises/${entreprise.company_id}`}
               className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
             >
-              <CompanyAvatar nom={entreprise.entreprise_nom} logo={null} className="size-8" />
-              <span className="font-medium text-brand-blue">{entreprise.entreprise_nom}</span>
+              <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
+              <span className="font-medium text-brand-blue">{entreprise.company_name}</span>
             </Link>
           ))}
         </CardContent>
@@ -96,13 +96,13 @@ export function ProjetDetailPage() {
           {documents?.map((document) => (
             <Link
               key={document.id}
-              to={`/researcher/entreprises/${document.entreprise_id}`}
+              to={`/researcher/entreprises/${document.company_id}`}
               className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
             >
-              <CompanyAvatar nom={document.entreprise_nom} logo={null} className="size-8" />
-              <span className="font-medium text-brand-blue">{document.entreprise_nom}</span>
-              {document.annee_reporting ? (
-                <span className="text-brand-grey"> — {document.annee_reporting}</span>
+              <CompanyAvatar nom={document.company_name} logo={null} className="size-8" />
+              <span className="font-medium text-brand-blue">{document.company_name}</span>
+              {document.fiscal_year ? (
+                <span className="text-brand-grey"> — {document.fiscal_year}</span>
               ) : null}
             </Link>
           ))}

@@ -34,7 +34,7 @@ export function ContactPage() {
   const contact = useSendContactMessage();
   const form = useForm<ContactForm>({
     resolver: zodResolver(contactFormSchema),
-    defaultValues: { nom: "", email: "", sujet: "", message: "" },
+    defaultValues: { name: "", email: "", subject: "", message: "" },
   });
 
   function onSubmit(values: ContactForm) {
@@ -87,7 +87,7 @@ export function ContactPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="nom"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Nom complet</FormLabel>
@@ -126,7 +126,7 @@ export function ContactPage() {
               </div>
               <FormField
                 control={form.control}
-                name="sujet"
+                name="subject"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sujet</FormLabel>

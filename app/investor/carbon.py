@@ -17,7 +17,7 @@ from sqlmodel import Session, col, select
 from app.carbon import pcaf
 from app.company.models import Company
 from app.core.config import get_settings
-from app.core.enums import DevisePosition
+from app.core.enums import Currency
 from app.ingestion.models import CarbonEmission
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
@@ -50,7 +50,7 @@ def _emissions(session: Session, entreprise_id: uuid.UUID) -> pcaf.EmissionsEntr
 
 
 def _convertir(
-    montant: Decimal | None, devise: DevisePosition | None, vers: DevisePosition, chemin_taux: str
+    montant: Decimal | None, devise: Currency | None, vers: Currency, chemin_taux: str
 ) -> Decimal | None:
     if montant is None or devise is None:
         return None

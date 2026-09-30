@@ -50,11 +50,11 @@ def send_contact_message(payload: ContactMessageRequest, request: Request) -> No
     try:
         envoyer_email_differe(
             recipient=get_settings().contact_to_email,
-            subject=f"[GreenFinance-Scorer] {payload.sujet}",
+            subject=f"[GreenFinance-Scorer] {payload.subject}",
             reply_to=str(payload.email),
             body=(
-                f"Nom : {payload.nom}\nE-mail : {payload.email}\n"
-                f"Sujet : {payload.sujet}\n\n{payload.message}\n"
+                f"Nom : {payload.name}\nE-mail : {payload.email}\n"
+                f"Sujet : {payload.subject}\n\n{payload.message}\n"
             ),
         )
     except EmailDeliveryError as exc:

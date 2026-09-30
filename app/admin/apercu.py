@@ -18,7 +18,7 @@ from sqlmodel import Session, col, func, select
 
 from app.audit.assignment import statistiques_charge_globale
 from app.company.models import Company
-from app.core.enums import StatutAnalyse
+from app.core.enums import AnalysisStatus
 from app.institution.projets import statistiques_admin as statistiques_institutions
 from app.investor.entreprises import dernier_rapport_valide
 from app.investor.portfolio import statistiques_admin as statistiques_investisseurs
@@ -198,11 +198,11 @@ def construire_apercu_acteurs(session: Session) -> ApercuActeurs:
         ),
         chercheurs=StatistiquesChercheurs(
             chercheurs_affectes_projets_ouverts=chercheurs_affectes,
-            analyses_brouillon=analyses_par_statut.get(StatutAnalyse.BROUILLON, 0),
-            analyses_soumises=analyses_par_statut.get(StatutAnalyse.SOUMISE, 0),
-            analyses_validees=analyses_par_statut.get(StatutAnalyse.VALIDEE, 0),
+            analyses_brouillon=analyses_par_statut.get(AnalysisStatus.BROUILLON, 0),
+            analyses_soumises=analyses_par_statut.get(AnalysisStatus.SOUMISE, 0),
+            analyses_validees=analyses_par_statut.get(AnalysisStatus.VALIDEE, 0),
             analyses_correction_demandee=analyses_par_statut.get(
-                StatutAnalyse.CORRECTION_DEMANDEE, 0
+                AnalysisStatus.CORRECTION_DEMANDEE, 0
             ),
         ),
         institutions=StatistiquesInstitutions(

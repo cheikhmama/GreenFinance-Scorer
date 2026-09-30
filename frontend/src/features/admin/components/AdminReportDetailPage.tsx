@@ -41,7 +41,7 @@ import {
 export function AdminReportDetailPage() {
   const { rapportId } = useParams<{ rapportId: string }>();
   const { data: rapport, isLoading, isError } = useAdminReport(rapportId ?? "");
-  const { data: entreprise } = useCompanyDetail(rapport?.entreprise_id ?? "");
+  const { data: entreprise } = useCompanyDetail(rapport?.company_id ?? "");
   const { data: avis } = useReportOpinions(rapportId ?? "");
   const { data: versions } = useReportVersions(rapportId ?? "");
 
@@ -75,7 +75,7 @@ export function AdminReportDetailPage() {
 
       <PageHeader
         eyebrow="Administration"
-        title={`Rapport ${rapport.type} — ${rapport.annee_reporting ?? "année inconnue"}`}
+        title={`Rapport ${rapport.type} — ${rapport.fiscal_year ?? "année inconnue"}`}
         description="Indicateurs extraits, données carbone, avis d'audit et décision."
         action={
           <Button asChild variant="outline">
@@ -96,17 +96,17 @@ export function AdminReportDetailPage() {
           {entreprise ? (
             <Link to={`/admin/entreprises/${entreprise.id}`} className="hover:opacity-80">
               <CompanyIdentity
-                nom={entreprise.nom}
+                nom={entreprise.name}
                 logo={entreprise.logo}
-                secteur={`${entreprise.secteur} — ${entreprise.pays}`}
+                secteur={`${entreprise.sector} — ${entreprise.country}`}
                 avatarClassName="size-12"
               />
             </Link>
           ) : (
             <span className="text-sm text-brand-grey">Entreprise…</span>
           )}
-          <Badge variant={variantStatutRapport(rapport.statut)}>
-            {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
+          <Badge variant={variantStatutRapport(rapport.status)}>
+            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
           </Badge>
         </CardContent>
       </Card>
@@ -128,8 +128,8 @@ export function AdminReportDetailPage() {
                   <p className="font-medium text-brand-blue">
                     {libelleDecisionAudit(item.decision)}
                   </p>
-                  {item.commentaire ? (
-                    <p className="text-sm text-brand-grey">{item.commentaire}</p>
+                  {item.comment ? (
+                    <p className="text-sm text-brand-grey">{item.comment}</p>
                   ) : null}
                 </li>
               ))}
@@ -146,20 +146,20 @@ export function AdminReportDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {rapport.score_global_declare !== null ? (
+          {rapport.declared_global_score !== null ? (
             <p className="mb-3 text-sm">
               Score ESG global auto-déclaré par l'entreprise :{" "}
-              <strong className="text-brand-blue">{rapport.score_global_declare}/100</strong>
-              {rapport.score_global_declare_preuve ? (
+              <strong className="text-brand-blue">{rapport.declared_global_score}/100</strong>
+              {rapport.declared_global_score_proof ? (
                 <span className="text-brand-grey">
                   {" "}
-                  — {rapport.score_global_declare_preuve.nom_document} — p.
-                  {rapport.score_global_declare_preuve.page_debut}
+                  — {rapport.declared_global_score_proof.document_name} — p.
+                  {rapport.declared_global_score_proof.page_start}
                 </span>
               ) : null}
             </p>
           ) : null}
-          {rapport.indicateurs.length === 0 ? (
+          {rapport.metrics.length === 0 ? (
             <EmptyState icon={FileText} message="Aucun indicateur extrait." />
           ) : (
             <Table>
@@ -172,15 +172,15 @@ export function AdminReportDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rapport.indicateurs.map((indicateur) => (
+                {rapport.metrics.map((indicateur) => (
                   <TableRow key={indicateur.id}>
-                    <TableCell>{indicateur.pilier}</TableCell>
-                    <TableCell>{indicateur.code}</TableCell>
+                    <TableCell>{indicateur.pillar}</TableCell>
+                    <TableCell>{indicateur.metric_code}</TableCell>
                     <TableCell>
-                      {indicateur.valeur} {indicateur.unite}
+                      {indicateur.value} {indicateur.unit}
                     </TableCell>
                     <TableCell className="text-brand-grey">
-                      {indicateur.preuve.nom_document} — p.{indicateur.preuve.page_debut}
+                      {indicateur.proof.document_name} — p.{indicateur.proof.page_start}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -198,7 +198,7 @@ export function AdminReportDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {rapport.donnees_carbone.length === 0 ? (
+          {rapport.carbon_data.length === 0 ? (
             <EmptyState icon={Cloud} message="Aucune donnée carbone extraite." />
           ) : (
             <Table>
@@ -213,17 +213,17 @@ export function AdminReportDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rapport.donnees_carbone.map((donnee) => (
+                {rapport.carbon_data.map((donnee) => (
                   <TableRow key={donnee.id}>
                     <TableCell>Scope {donnee.scope}</TableCell>
-                    <TableCell>{donnee.categorie_ges ?? "—"}</TableCell>
-                    <TableCell>{donnee.valeur_tonnes_co2e}</TableCell>
-                    <TableCell>{donnee.annee}</TableCell>
+                    <TableCell>{donnee.ghg_category ?? "—"}</TableCell>
+                    <TableCell>{donnee.tonnes_co2e}</TableCell>
+                    <TableCell>{donnee.year}</TableCell>
                     <TableCell>
-                      {donnee.score_qualite_pcaf != null ? `${donnee.score_qualite_pcaf}/5` : "—"}
+                      {donnee.pcaf_data_quality != null ? `${donnee.pcaf_data_quality}/5` : "—"}
                     </TableCell>
                     <TableCell className="text-brand-grey">
-                      {donnee.preuve.nom_document} — p.{donnee.preuve.page_debut}
+                      {donnee.proof.document_name} — p.{donnee.proof.page_start}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -253,7 +253,7 @@ export function AdminReportDetailPage() {
                       {version.id === rapport.id ? " (celle-ci)" : ""}
                     </p>
                     <p className="text-sm text-brand-grey">
-                      {libelleStatutRapport(version.statut, version.statut_extraction)} —{" "}
+                      {libelleStatutRapport(version.status, version.extraction_status)} —{" "}
                       {libelleDateRapport(version).toLowerCase()}
                     </p>
                   </div>
@@ -269,8 +269,8 @@ export function AdminReportDetailPage() {
         </CardContent>
       </Card>
 
-      {rapport.statut === "PENDING_DECISION" ? <FormulaireDecision rapportId={rapport.id} /> : null}
-      {rapport.statut === "VALIDATED" ? <RecalculerScoreSection rapportId={rapport.id} /> : null}
+      {rapport.status === "PENDING_DECISION" ? <FormulaireDecision rapportId={rapport.id} /> : null}
+      {rapport.status === "VALIDATED" ? <RecalculerScoreSection rapportId={rapport.id} /> : null}
     </div>
   );
 }
@@ -288,7 +288,7 @@ function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
       <Alert>
         <AlertTitle>Score recalculé</AlertTitle>
         <AlertDescription>
-          Valeur globale : {recalculer.data.valeur_globale}/100.
+          Valeur globale : {recalculer.data.global_score}/100.
         </AlertDescription>
       </Alert>
     );
@@ -351,7 +351,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
     });
     if (!confirme) return;
     setError(null);
-    reject.mutate({ commentaire: commentaire || null }, { onError: surErreur });
+    reject.mutate({ comment: commentaire || null }, { onError: surErreur });
   }
 
   if (succeeded) {
@@ -378,21 +378,21 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
-        {verificationScore?.calculable === false ? (
+        {verificationScore?.computable === false ? (
           <Alert variant="destructive">
             <AlertTitle>Score non calculable</AlertTitle>
             <AlertDescription>
-              {verificationScore.taux_couverture != null &&
-              verificationScore.couverture_minimale != null
-                ? `Couverture des indicateurs de ${formatPourcentage(verificationScore.taux_couverture * 100)}, sous le minimum de ${formatPourcentage(verificationScore.couverture_minimale * 100)} exigé par la méthodologie — valider échouera.`
+              {verificationScore.coverage_rate != null &&
+              verificationScore.min_coverage != null
+                ? `Couverture des indicateurs de ${formatPourcentage(verificationScore.coverage_rate * 100)}, sous le minimum de ${formatPourcentage(verificationScore.min_coverage * 100)} exigé par la méthodologie — valider échouera.`
                 : "Le vocabulaire d'indicateurs de ce rapport ne recoupe aucun indicateur de la méthodologie de référence — valider échouera tant que ce n'est pas résolu."}
             </AlertDescription>
           </Alert>
         ) : null}
-        {verificationScore?.calculable && verificationScore.taux_couverture != null ? (
+        {verificationScore?.computable && verificationScore.coverage_rate != null ? (
           <p className="text-sm text-brand-grey">
             Couverture des indicateurs de la méthodologie :{" "}
-            {formatPourcentage(verificationScore.taux_couverture * 100)}.
+            {formatPourcentage(verificationScore.coverage_rate * 100)}.
           </p>
         ) : null}
         <Textarea
@@ -405,7 +405,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
             disabled={pending}
             onClick={() => {
               setError(null);
-              validate.mutate({ commentaire: commentaire || null }, { onError: surErreur });
+              validate.mutate({ comment: commentaire || null }, { onError: surErreur });
             }}
           >
             Valider
@@ -416,7 +416,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
             onClick={() => {
               setError(null);
               requestCorrection.mutate(
-                { commentaire: commentaire || null },
+                { comment: commentaire || null },
                 { onError: surErreur },
               );
             }}

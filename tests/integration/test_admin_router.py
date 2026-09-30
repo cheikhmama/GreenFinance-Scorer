@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import col, select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.hashing import hash_password
 from app.auth.models import AccountActivationToken, User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
@@ -20,16 +20,16 @@ from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DecisionAudit,
+    AuditDecision,
+    DataMethod,
     ExtractionStatus,
-    MethodeDonnee,
     Pillar,
     ReportStatus,
+    ReportType,
     Role,
-    TypeRapport,
+    SubmissionChannel,
 )
-from app.core.models import JournalAudit, Notification
+from app.core.models import AuditLogEntry, Notification
 from app.ingestion.models import ESGMetric, ESGReport, Evidence
 from app.main import app
 from app.scoring.engine import obtenir_configuration_reference
@@ -89,8 +89,8 @@ def _create_entreprise_avec_utilisateur(session) -> tuple[Company, User]:
 def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> ESGReport:
     valeurs = {
         "company_id": entreprise_id,
-        "type": TypeRapport.RAPPORT_ESG,
-        "channel": CanalDepot.ENTREPRISE,
+        "type": ReportType.RAPPORT_ESG,
+        "channel": SubmissionChannel.ENTREPRISE,
         "status": ReportStatus.SUBMITTED,
         "submitted_at": utcnow(),
         "source_file": "rapports/test/dummy.pdf",
@@ -114,10 +114,10 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
         auditor_id=auditeur_id,
     )
     session.add(
-        AvisAudit(
-            rapport_id=rapport.id,
-            auditeur_id=auditeur_id,
-            decision=DecisionAudit.RECOMMANDE_VALIDATION,
+        AuditOpinion(
+            report_id=rapport.id,
+            auditor_id=auditeur_id,
+            decision=AuditDecision.RECOMMANDE_VALIDATION,
         )
     )
     # Au moins un ESGMetric (Phase 5 §9) : valider_rapport calcule désormais un score dans la
@@ -140,7 +140,7 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -277,14 +277,14 @@ def test_creer_utilisateur_envoie_un_lien_dactivation(session) -> None:
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": email_cible, "nom": "Nouvel Auditeur", "role": "AUDITOR"},
+        json={"email": email_cible, "name": "Nouvel Auditeur", "role": "AUDITOR"},
     )
 
     assert response.status_code == 201
     body = response.json()
     assert body["email"] == email_cible
     assert body["role"] == "AUDITOR"
-    assert body["actif"] is True
+    assert body["active"] is True
     assert "mot_de_passe_temporaire" not in body
 
     # Aucun mot de passe n'est généré — le compte reste inutilisable tant que le lien
@@ -313,7 +313,7 @@ def test_creer_utilisateur_sans_nom_le_deduit_de_lemail(session) -> None:
     )
 
     assert response.status_code == 201
-    assert response.json()["nom"] == email_cible.split("@")[0]
+    assert response.json()["name"] == email_cible.split("@")[0]
 
 
 def test_lister_utilisateurs_recherche_filtre_aussi_par_nom(session) -> None:
@@ -344,7 +344,7 @@ def test_creer_utilisateur_refuse_le_role_administrateur(session) -> None:
         "/api/v1/admin/utilisateurs",
         json={
             "email": f"nouvel-admin-{uuid.uuid4()}@example.com",
-            "nom": "Nouvel Admin",
+            "name": "Nouvel Admin",
             "role": "ADMIN",
         },
     )
@@ -360,7 +360,7 @@ def test_creer_utilisateur_refuse_un_email_deja_utilise(session) -> None:
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": existant.email, "nom": "Doublon", "role": "AUDITOR"},
+        json={"email": existant.email, "name": "Doublon", "role": "AUDITOR"},
     )
 
     assert response.status_code == 422
@@ -377,10 +377,10 @@ def test_creer_utilisateur_avec_role_entreprise_cree_le_profil_entreprise(sessio
         json={
             "email": email_cible,
             "role": "ENTERPRISE",
-            "nom": "Contact Acme",
-            "nom_entreprise": "Acme Corp",
-            "secteur": "Industrie",
-            "pays": "France",
+            "name": "Contact Acme",
+            "company_name": "Acme Corp",
+            "sector": "Industrie",
+            "country": "France",
         },
     )
 
@@ -414,7 +414,7 @@ def test_creer_utilisateur_role_entreprise_sans_profil_est_rejete(session) -> No
         "/api/v1/admin/utilisateurs",
         json={
             "email": f"sans-profil-{uuid.uuid4()}@example.com",
-            "nom": "Compte Sans Profil",
+            "name": "Compte Sans Profil",
             "role": "ENTERPRISE",
         },
     )
@@ -422,7 +422,7 @@ def test_creer_utilisateur_role_entreprise_sans_profil_est_rejete(session) -> No
     assert response.status_code == 422
     body = response.json()
     assert body["error"]["code"] == "profil_entreprise_requis"
-    assert set(body["error"]["fields"]) == {"nom_entreprise", "secteur", "pays"}
+    assert set(body["error"]["fields"]) == {"company_name", "sector", "country"}
 
 
 def test_creer_utilisateur_avec_role_entreprise_est_rejete(session) -> None:
@@ -431,7 +431,7 @@ def test_creer_utilisateur_avec_role_entreprise_est_rejete(session) -> None:
 
     response = authed_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": f"x-{uuid.uuid4()}@example.com", "nom": "X", "role": "AUDITOR"},
+        json={"email": f"x-{uuid.uuid4()}@example.com", "name": "X", "role": "AUDITOR"},
     )
 
     assert response.status_code == 403
@@ -447,7 +447,7 @@ def test_desactiver_utilisateur_revoque_ses_sessions_en_cours(session) -> None:
     response = admin_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/desactiver")
 
     assert response.status_code == 200
-    assert response.json()["actif"] is False
+    assert response.json()["active"] is False
     assert cible_client.get("/api/v1/auth/me").status_code == 401
 
 
@@ -469,16 +469,16 @@ def test_creation_et_desactivation_de_compte_sont_journalisees(session) -> None:
 
     admin_client.post(
         "/api/v1/admin/utilisateurs",
-        json={"email": f"journal-{uuid.uuid4()}@example.com", "nom": "Journal", "role": "AUDITOR"},
+        json={"email": f"journal-{uuid.uuid4()}@example.com", "name": "Journal", "role": "AUDITOR"},
     )
     admin_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/desactiver")
 
     entrees = session.exec(
-        select(JournalAudit).where(JournalAudit.acteur_id == admin.id)
+        select(AuditLogEntry).where(AuditLogEntry.actor_id == admin.id)
     ).all()
     actions = [e.action for e in entrees]
-    assert "creation_compte" in actions
-    assert "desactivation_compte" in actions
+    assert "account_created" in actions
+    assert "account_deactivated" in actions
 
 
 def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
@@ -520,14 +520,14 @@ def test_affecter_happy_path(session) -> None:
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
-        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditeur_id": str(auditeur.id)}
+        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditor_id": str(auditeur.id)}
     )
 
     assert response.status_code == 200
-    assert response.json()["statut"] == ReportStatus.PENDING_AUDIT.value
+    assert response.json()["status"] == ReportStatus.PENDING_AUDIT.value
 
     notifications = session.exec(
-        select(Notification).where(Notification.utilisateur_id == auditeur.id)
+        select(Notification).where(Notification.user_id == auditeur.id)
     ).all()
     assert len(notifications) == 1
 
@@ -540,7 +540,7 @@ def test_affecter_rapport_deja_affecte(session) -> None:
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
-        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditeur_id": str(auditeur.id)}
+        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditor_id": str(auditeur.id)}
     )
 
     assert response.status_code == 422
@@ -555,7 +555,7 @@ def test_affecter_extraction_non_terminee(session) -> None:
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
-        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditeur_id": str(auditeur.id)}
+        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditor_id": str(auditeur.id)}
     )
 
     assert response.status_code == 422
@@ -575,7 +575,7 @@ def test_affecter_auditeur_invalide(session) -> None:
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
-        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditeur_id": str(investisseur.id)}
+        f"/api/v1/admin/rapports/{rapport.id}/affecter", json={"auditor_id": str(investisseur.id)}
     )
 
     assert response.status_code == 422
@@ -592,16 +592,16 @@ def test_lister_rapports_en_validation_respecte_lordre_des_avis(session) -> None
 
     second = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
     avis_second = session.exec(
-        select(AvisAudit).where(AvisAudit.rapport_id == second.id)
+        select(AuditOpinion).where(AuditOpinion.report_id == second.id)
     ).first()
-    avis_second.date_avis = utcnow()
+    avis_second.submitted_at = utcnow()
     session.add(avis_second)
 
     premier = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
     avis_premier = session.exec(
-        select(AvisAudit).where(AvisAudit.rapport_id == premier.id)
+        select(AuditOpinion).where(AuditOpinion.report_id == premier.id)
     ).first()
-    avis_premier.date_avis = utcnow() - timedelta(hours=1)
+    avis_premier.submitted_at = utcnow() - timedelta(hours=1)
     session.add(avis_premier)
     session.commit()
 
@@ -623,13 +623,13 @@ def test_valider_happy_path(session) -> None:
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
-        f"/api/v1/admin/rapports/{rapport.id}/valider", json={"commentaire": "Conforme."}
+        f"/api/v1/admin/rapports/{rapport.id}/valider", json={"comment": "Conforme."}
     )
 
     assert response.status_code == 200
-    assert response.json()["statut"] == ReportStatus.VALIDATED.value
+    assert response.json()["status"] == ReportStatus.VALIDATED.value
     notifications = session.exec(
-        select(Notification).where(Notification.utilisateur_id == utilisateur_entreprise.id)
+        select(Notification).where(Notification.user_id == utilisateur_entreprise.id)
     ).all()
     assert any(n.type == "RAPPORT_VALIDE" for n in notifications)
     score = session.exec(select(Score).where(Score.report_id == rapport.id)).first()
@@ -649,7 +649,7 @@ def test_rejeter_happy_path(session) -> None:
     response = authed_client.post(f"/api/v1/admin/rapports/{rapport.id}/rejeter", json={})
 
     assert response.status_code == 200
-    assert response.json()["statut"] == ReportStatus.REJECTED.value
+    assert response.json()["status"] == ReportStatus.REJECTED.value
 
 
 def test_demander_correction_happy_path(session) -> None:
@@ -664,7 +664,7 @@ def test_demander_correction_happy_path(session) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["statut"] == ReportStatus.REVISION_REQUESTED.value
+    assert response.json()["status"] == ReportStatus.REVISION_REQUESTED.value
 
 
 def test_decision_avec_statut_invalide_est_rejetee(session) -> None:
@@ -694,8 +694,8 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
         auditor_id=auditeur.id,
     )
     session.add(
-        AvisAudit(
-            rapport_id=rapport.id, auditeur_id=auditeur.id, decision=DecisionAudit.RECOMMANDE_VALIDATION
+        AuditOpinion(
+            report_id=rapport.id, auditor_id=auditeur.id, decision=AuditDecision.RECOMMANDE_VALIDATION
         )
     )
     session.commit()
@@ -712,7 +712,7 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
 def test_decision_sans_avis_est_rejetee(session) -> None:
     admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    # EN_VALIDATION semé directement, sans AvisAudit -- état normalement inatteignable via l'API.
+    # EN_VALIDATION semé directement, sans AuditOpinion -- état normalement inatteignable via l'API.
     rapport = _create_rapport(session, entreprise.id, status=ReportStatus.PENDING_DECISION)
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -836,16 +836,16 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
 
     items = {item["id"]: item for item in response.json()["items"]}
     assert str(orpheline.id) in items
-    assert items[str(orpheline.id)]["utilisateur_id"] is None
-    assert items[str(orpheline.id)]["nombre_rapports"] == 0
-    assert items[str(orpheline.id)]["dernier_statut_rapport"] is None
-    assert items[str(orpheline.id)]["dernier_rapport_id"] is None
+    assert items[str(orpheline.id)]["owner_user_id"] is None
+    assert items[str(orpheline.id)]["report_count"] == 0
+    assert items[str(orpheline.id)]["latest_report_status"] is None
+    assert items[str(orpheline.id)]["latest_report_id"] is None
 
-    assert items[str(avec_compte.id)]["utilisateur_id"] == str(utilisateur.id)
-    assert items[str(avec_compte.id)]["nombre_rapports"] == 2
+    assert items[str(avec_compte.id)]["owner_user_id"] == str(utilisateur.id)
+    assert items[str(avec_compte.id)]["report_count"] == 2
     # Le plus récent des deux rapports (par date_depot), pas le premier créé.
-    assert items[str(avec_compte.id)]["dernier_statut_rapport"] == plus_recent.status.value
-    assert items[str(avec_compte.id)]["dernier_rapport_id"] == str(plus_recent.id)
+    assert items[str(avec_compte.id)]["latest_report_status"] == plus_recent.status.value
+    assert items[str(avec_compte.id)]["latest_report_id"] == str(plus_recent.id)
 
 
 _PNG_1X1 = base64.b64decode(
@@ -867,13 +867,13 @@ def test_consulter_entreprise_admin_retourne_le_detail_complet(session) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"] == entreprise.name
+    assert body["name"] == entreprise.name
     assert body["description"] == "Une description."
-    assert body["site_officiel"] == "https://exemple.test"
-    assert body["utilisateur_id"] == str(utilisateur.id)
-    assert body["nombre_rapports"] == 1
-    assert body["dernier_statut_rapport"] == ReportStatus.REJECTED.value
-    assert body["dernier_rapport_id"] == str(rapport.id)
+    assert body["website"] == "https://exemple.test"
+    assert body["owner_user_id"] == str(utilisateur.id)
+    assert body["report_count"] == 1
+    assert body["latest_report_status"] == ReportStatus.REJECTED.value
+    assert body["latest_report_id"] == str(rapport.id)
 
 
 def test_consulter_entreprise_admin_inconnue_est_404(session) -> None:
@@ -894,28 +894,28 @@ def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
     response = authed_client.patch(
         f"/api/v1/admin/entreprises/{entreprise.id}",
         json={
-            "nom": "Nouveau Nom",
-            "secteur": "Énergie",
-            "pays": "Mauritanie",
+            "name": "Nouveau Nom",
+            "sector": "Énergie",
+            "country": "Mauritanie",
             "description": "Description mise à jour.",
-            "site_officiel": "https://nouveau-site.test",
-            "montant_minimum_investissement": 1000.0,
-            "devise_montant_minimum": "USD",
+            "website": "https://nouveau-site.test",
+            "minimum_investment_amount": 1000.0,
+            "minimum_investment_currency": "USD",
         },
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"] == "Nouveau Nom"
-    assert body["secteur"] == "Énergie"
-    assert body["pays"] == "Mauritanie"
+    assert body["name"] == "Nouveau Nom"
+    assert body["sector"] == "Énergie"
+    assert body["country"] == "Mauritanie"
     assert body["description"] == "Description mise à jour."
-    assert body["site_officiel"] == "https://nouveau-site.test"
-    assert body["montant_minimum_investissement"] == 1000.0
-    assert body["devise_montant_minimum"] == "USD"
+    assert body["website"] == "https://nouveau-site.test"
+    assert body["minimum_investment_amount"] == 1000.0
+    assert body["minimum_investment_currency"] == "USD"
     # Réponse au même format que le détail -- pas de refetch nécessaire côté frontend.
-    assert "nombre_rapports" in body
-    assert "utilisateur_id" in body
+    assert "report_count" in body
+    assert "owner_user_id" in body
 
 
 def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
@@ -926,10 +926,10 @@ def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
     response = authed_client.patch(
         f"/api/v1/admin/entreprises/{entreprise.id}",
         json={
-            "nom": entreprise.name,
-            "secteur": entreprise.sector,
-            "pays": entreprise.country,
-            "montant_minimum_investissement": 1000.0,
+            "name": entreprise.name,
+            "sector": entreprise.sector,
+            "country": entreprise.country,
+            "minimum_investment_amount": 1000.0,
         },
     )
 
@@ -943,7 +943,7 @@ def test_modifier_entreprise_refuse_nom_vide(session) -> None:
 
     response = authed_client.patch(
         f"/api/v1/admin/entreprises/{entreprise.id}",
-        json={"nom": "   ", "secteur": entreprise.sector, "pays": entreprise.country},
+        json={"name": "   ", "sector": entreprise.sector, "country": entreprise.country},
     )
 
     assert response.status_code == 422
@@ -955,7 +955,7 @@ def test_modifier_entreprise_inconnue_est_404(session) -> None:
 
     response = authed_client.patch(
         f"/api/v1/admin/entreprises/{uuid.uuid4()}",
-        json={"nom": "X", "secteur": "Y", "pays": "Z"},
+        json={"name": "X", "sector": "Y", "country": "Z"},
     )
 
     assert response.status_code == 404
@@ -1029,13 +1029,13 @@ def test_publier_happy_path_et_idempotence(session) -> None:
     authed_client = _login(admin.email, "s3cret-pass")
     premiere = authed_client.post(f"/api/v1/admin/entreprises/{entreprise.id}/publier")
     assert premiere.status_code == 200
-    assert premiere.json()["date_publication"] is not None
+    assert premiere.json()["published_at"] is not None
 
     deuxieme = authed_client.post(f"/api/v1/admin/entreprises/{entreprise.id}/publier")
     assert deuxieme.status_code == 200
 
     notifications = session.exec(
-        select(Notification).where(Notification.utilisateur_id == utilisateur_entreprise.id)
+        select(Notification).where(Notification.user_id == utilisateur_entreprise.id)
     ).all()
     assert any(n.type == "ENTREPRISE_PUBLIEE" for n in notifications)
 
@@ -1135,18 +1135,18 @@ def test_reactiver_utilisateur_reactive_et_journalise(session) -> None:
     response = authed_client.post(f"/api/v1/admin/utilisateurs/{cible.id}/reactiver")
 
     assert response.status_code == 200
-    assert response.json()["actif"] is True
+    assert response.json()["active"] is True
 
     entree = session.exec(
-        select(JournalAudit).where(
-            JournalAudit.acteur_id == admin.id,
-            JournalAudit.action == "reactivation_compte",
-            JournalAudit.id_ressource == cible.id,
+        select(AuditLogEntry).where(
+            AuditLogEntry.actor_id == admin.id,
+            AuditLogEntry.action == "account_reactivated",
+            AuditLogEntry.resource_id == cible.id,
         )
     ).first()
     assert entree is not None
-    assert entree.ancienne_valeur == "inactif"
-    assert entree.nouvelle_valeur == "actif"
+    assert entree.old_value == "inactive"
+    assert entree.new_value == "active"
 
 
 def test_lister_utilisateurs_inclut_les_inactifs_seulement_si_demande(session) -> None:
@@ -1178,9 +1178,9 @@ def test_lister_journal_audit_concerne_id_couvre_acteur_et_cible(session) -> Non
     cible = _create_utilisateur(session, Role.AUDITOR)
 
     # cible agit elle-même (acteur_id=cible.id)
-    auditer(session, cible.id, "connexion", "Utilisateur", cible.id, "succes")
+    auditer(session, cible.id, "login", "User", cible.id, "success")
     # un autre admin agit SUR cible (id_ressource=cible.id)
-    auditer(session, autre_admin.id, "desactivation_compte", "Utilisateur", cible.id, "succes")
+    auditer(session, autre_admin.id, "account_deactivated", "User", cible.id, "success")
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1190,8 +1190,8 @@ def test_lister_journal_audit_concerne_id_couvre_acteur_et_cible(session) -> Non
 
     assert response.status_code == 200
     actions = {item["action"] for item in response.json()["items"]}
-    assert "connexion" in actions
-    assert "desactivation_compte" in actions
+    assert "login" in actions
+    assert "account_deactivated" in actions
 
 
 def test_suspendre_et_reactiver_entreprise(session) -> None:
@@ -1201,11 +1201,11 @@ def test_suspendre_et_reactiver_entreprise(session) -> None:
 
     suspension = authed_client.post(f"/api/v1/admin/entreprises/{entreprise.id}/suspendre")
     assert suspension.status_code == 200
-    assert suspension.json()["actif"] is False
+    assert suspension.json()["active"] is False
 
     reactivation = authed_client.post(f"/api/v1/admin/entreprises/{entreprise.id}/reactiver")
     assert reactivation.status_code == 200
-    assert reactivation.json()["actif"] is True
+    assert reactivation.json()["active"] is True
 
 
 def test_lister_rapports_entreprise_filtre_par_entreprise(session) -> None:
@@ -1228,8 +1228,8 @@ def test_lister_journal_audit_pagine_et_filtre_par_action(session) -> None:
     marqueur_action = f"action-test-{uuid.uuid4()}"
     autre_action = f"autre-action-{uuid.uuid4()}"
     for _ in range(3):
-        auditer(session, admin.id, marqueur_action, "Utilisateur", admin.id, "succes")
-    auditer(session, admin.id, autre_action, "Utilisateur", admin.id, "succes")
+        auditer(session, admin.id, marqueur_action, "User", admin.id, "success")
+    auditer(session, admin.id, autre_action, "User", admin.id, "success")
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -1264,10 +1264,10 @@ def test_dashboard_agrege_les_compteurs(session) -> None:
     _create_rapport(session, entreprise.id, status=ReportStatus.REJECTED)
 
     apres = _dashboard(authed_client)
-    assert apres["entreprises_inscrites"] - avant["entreprises_inscrites"] == 1
-    assert apres["rapports_soumis"] - avant["rapports_soumis"] == 2
-    assert apres["rapports_valides"] - avant["rapports_valides"] == 1
-    assert apres["rapports_rejetes"] - avant["rapports_rejetes"] == 1
+    assert apres["registered_companies"] - avant["registered_companies"] == 1
+    assert apres["submitted_reports"] - avant["submitted_reports"] == 2
+    assert apres["validated_reports"] - avant["validated_reports"] == 1
+    assert apres["rejected_reports"] - avant["rejected_reports"] == 1
 
 
 def test_audits_en_retard_respecte_le_sla(session) -> None:
@@ -1291,7 +1291,7 @@ def test_audits_en_retard_respecte_le_sla(session) -> None:
     )
     apres = _dashboard(authed_client)
 
-    assert apres["audits_en_retard"] - avant["audits_en_retard"] == 1
+    assert apres["overdue_audits"] - avant["overdue_audits"] == 1
 
 
 def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
@@ -1310,7 +1310,7 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
         submitted_at=utcnow() - timedelta(days=10),
     )
     apres_anterieur = _dashboard(authed_client)
-    assert apres_anterieur["demandes_republication"] - avant["demandes_republication"] == 0
+    assert apres_anterieur["republication_requests"] - avant["republication_requests"] == 0
 
     _create_rapport(
         session,
@@ -1319,7 +1319,7 @@ def test_demandes_republication_detecte_le_rapport_posterieur(session) -> None:
         submitted_at=utcnow() - timedelta(days=1),
     )
     apres_posterieur = _dashboard(authed_client)
-    assert apres_posterieur["demandes_republication"] - avant["demandes_republication"] == 1
+    assert apres_posterieur["republication_requests"] - avant["republication_requests"] == 1
 
 
 def test_lister_utilisateurs_filtre_par_en_attente_activation(session) -> None:
@@ -1441,7 +1441,7 @@ def test_verifier_score_calculable_route(session) -> None:
             metric_code="effectif_total",
             value=1200.0,
             unit="personnes",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -1451,13 +1451,13 @@ def test_verifier_score_calculable_route(session) -> None:
 
     reponse_calculable = authed_client.get(f"/api/v1/admin/rapports/{calculable.id}/score-verification")
     assert reponse_calculable.status_code == 200
-    assert reponse_calculable.json()["calculable"] is True
+    assert reponse_calculable.json()["computable"] is True
 
     reponse_non_calculable = authed_client.get(
         f"/api/v1/admin/rapports/{non_calculable.id}/score-verification"
     )
     assert reponse_non_calculable.status_code == 200
-    assert reponse_non_calculable.json()["calculable"] is False
+    assert reponse_non_calculable.json()["computable"] is False
 
 
 def test_recalculer_score_route(session) -> None:
@@ -1485,7 +1485,7 @@ def test_recalculer_score_route(session) -> None:
             metric_code="femmes_conseil_pourcentage",
             value=40.0,
             unit="%",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )
@@ -1495,7 +1495,7 @@ def test_recalculer_score_route(session) -> None:
 
     reponse = authed_client.post(f"/api/v1/admin/rapports/{sans_score.id}/recalculer-score")
     assert reponse.status_code == 200
-    assert reponse.json()["valeur_globale"] is not None
+    assert reponse.json()["global_score"] is not None
 
     deja_calcule = authed_client.post(f"/api/v1/admin/rapports/{sans_score.id}/recalculer-score")
     assert deja_calcule.status_code == 422
@@ -1549,8 +1549,8 @@ def test_premiere_validation_incalculable_sous_une_nouvelle_version_ne_valide_ri
         auditor_id=auditeur.id,
     )
     session.add(
-        AvisAudit(
-            rapport_id=rapport.id, auditeur_id=auditeur.id, decision=DecisionAudit.RECOMMANDE_VALIDATION
+        AuditOpinion(
+            report_id=rapport.id, auditor_id=auditeur.id, decision=AuditDecision.RECOMMANDE_VALIDATION
         )
     )
     session.commit()
@@ -1610,7 +1610,7 @@ def test_consulter_un_rapport_ou_son_score_ne_cree_aucune_configuration(
     verification = authed_client.get(f"/api/v1/admin/rapports/{rapport.id}/score-verification")
 
     assert detail.status_code == 200
-    assert detail.json()["score_officiel"] is None
+    assert detail.json()["official_score"] is None
     assert verification.status_code == 200
-    assert verification.json()["calculable"] is True
+    assert verification.json()["computable"] is True
     assert _references_de_version(session, version_de_reference_inedite) == []

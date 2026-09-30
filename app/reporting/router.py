@@ -10,7 +10,7 @@ from sqlmodel import Session
 from app.auth.models import User
 from app.company.upload_validation import TAILLE_MAX_OCTETS
 from app.core.dependencies import get_current_user, get_session
-from app.core.enums import ReportStatus, TypeRapport
+from app.core.enums import ReportStatus, ReportType
 from app.core.schemas import Page
 from app.reporting import sessions
 from app.reporting.schemas import ReportCreateRequest, ReportResponse
@@ -42,7 +42,7 @@ def open_report(
 def list_reports(
     fiscal_year: int | None = None,
     status: ReportStatus | None = None,
-    report_type: TypeRapport | None = None,
+    report_type: ReportType | None = None,
     company_id: uuid.UUID | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),

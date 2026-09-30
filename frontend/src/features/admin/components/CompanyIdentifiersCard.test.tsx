@@ -17,7 +17,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const entreprise = {
   id: ID,
-  nom: "Minière du Nord",
+  name: "Minière du Nord",
   isin: "FR0000120271",
   lei: null,
   ticker: "MDN",

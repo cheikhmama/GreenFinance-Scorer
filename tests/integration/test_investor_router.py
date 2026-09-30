@@ -10,13 +10,13 @@ from app.company.models import Company
 from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
     CompanyStatus,
-    DevisePosition,
-    MethodeDonnee,
+    Currency,
+    DataMethod,
     ReportStatus,
+    ReportType,
     Role,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.ingestion.models import (
     CarbonEmission,
@@ -70,7 +70,7 @@ def _entreprise_publiee(
         country=pays,
         status=CompanyStatus.ACTIVE if actif else CompanyStatus.SUSPENDED,
         minimum_investment_amount=montant_minimum,
-        minimum_investment_currency=DevisePosition.USD if montant_minimum is not None else None,
+        minimum_investment_currency=Currency.USD if montant_minimum is not None else None,
         published_at=utcnow(),
     )
     session.add(entreprise)
@@ -78,8 +78,8 @@ def _entreprise_publiee(
 
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
@@ -111,7 +111,7 @@ def _entreprise_publiee(
                 ghg_category=categorie,
                 tonnes_co2e=valeur,
                 year=2025,
-                method=MethodeDonnee.RAPPORTEE,
+                method=DataMethod.RAPPORTEE,
                 pcaf_data_quality=3,
                 proof_id=preuve.id,
             )
@@ -153,8 +153,8 @@ def test_lister_entreprises_ne_montre_que_les_publiees_avec_leur_score(session) 
     items = response.json()["items"]
     assert len(items) == 1
     assert items[0]["id"] == str(publiee.id)
-    assert items[0]["score"]["valeur_globale"] == 72.4
-    assert items[0]["carbone"]["scope_1"] == 100.0
+    assert items[0]["score"]["global_score"] == 72.4
+    assert items[0]["carbon"]["scope_1"] == 100.0
 
 
 def test_consulter_entreprise_publiee_retourne_indicateurs_et_carbone_avec_preuve(session) -> None:
@@ -165,8 +165,8 @@ def test_consulter_entreprise_publiee_retourne_indicateurs_et_carbone_avec_preuv
     response = authed.get(f"/api/v1/investor/entreprises/{publiee.id}")
     assert response.status_code == 200
     body = response.json()
-    assert len(body["donnees_carbone"]) == 4
-    assert body["donnees_carbone"][0]["preuve"]["pdf_extrait_genere"] == "preuves/test/page_1.pdf"
+    assert len(body["carbon_data"]) == 4
+    assert body["carbon_data"][0]["proof"]["excerpt_pdf_path"] == "preuves/test/page_1.pdf"
 
 
 def test_consulter_preuve_retourne_le_pdf_et_404_si_non_liee_a_lentreprise(session) -> None:
@@ -176,7 +176,7 @@ def test_consulter_preuve_retourne_le_pdf_et_404_si_non_liee_a_lentreprise(sessi
     authed = _login(investisseur.email)
 
     detail = authed.get(f"/api/v1/investor/entreprises/{publiee.id}")
-    preuve_id = detail.json()["donnees_carbone"][0]["preuve"]["id"]
+    preuve_id = detail.json()["carbon_data"][0]["proof"]["id"]
 
     reponse = authed.get(f"/api/v1/investor/entreprises/{publiee.id}/preuves/{preuve_id}/fichier")
     assert reponse.status_code == 200
@@ -210,10 +210,10 @@ def test_comparer_deux_entreprises_publiees(session) -> None:
 
     response = authed.get("/api/v1/investor/comparaison", params={"entreprise_ids": [str(a.id), str(b.id)]})
     assert response.status_code == 200
-    scores = {item["id"]: item["score"]["valeur_globale"] for item in response.json()}
+    scores = {item["id"]: item["score"]["global_score"] for item in response.json()}
     assert scores == {str(a.id): 60.0, str(b.id): 90.0}
     # Le détail comparable (indicateurs/carbone), pas seulement le score agrégé.
-    assert response.json()[0]["donnees_carbone"]
+    assert response.json()[0]["carbon_data"]
 
 
 def test_comparer_plus_de_quatre_entreprises_est_refuse(session) -> None:
@@ -233,7 +233,7 @@ def test_creer_portefeuille_puis_le_retrouver_dans_mes_portefeuilles(session) ->
     authed = _login(investisseur.email)
 
     creation = authed.post(
-        "/api/v1/investor/portefeuilles", json={"nom": "Portefeuille vert", "devise_reference": "EUR"}
+        "/api/v1/investor/portefeuilles", json={"name": "Portefeuille vert", "reference_currency": "EUR"}
     )
     assert creation.status_code == 201
     portefeuille_id = creation.json()["id"]
@@ -247,7 +247,7 @@ def _creer_portefeuille(authed: TestClient) -> str:
     """Toujours USD côté serveur désormais (voir app/investor/portfolio.py::creer_portefeuille) —
     plus de devise à la création, le formulaire n'a plus qu'un champ nom."""
     response = authed.post(
-        "/api/v1/investor/portefeuilles", json={"nom": f"Portefeuille {uuid.uuid4()}"}
+        "/api/v1/investor/portefeuilles", json={"name": f"Portefeuille {uuid.uuid4()}"}
     )
     assert response.status_code == 201
     return response.json()["id"]
@@ -262,11 +262,11 @@ def test_ajouter_position_sur_entreprise_non_publiee_est_refuse(session) -> None
     response = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(non_publiee.id),
-            "montant": 1000.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(non_publiee.id),
+            "amount": 1000.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
     assert response.status_code == 404
@@ -282,11 +282,11 @@ def test_ajouter_position_sur_entreprise_suspendue_est_refuse(session) -> None:
     response = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(suspendue.id),
-            "montant": 1000.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(suspendue.id),
+            "amount": 1000.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
     assert response.status_code == 422
@@ -302,11 +302,11 @@ def test_ajouter_position_sous_le_montant_minimum_est_refuse(session) -> None:
     response = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 100.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(cible.id),
+            "amount": 100.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
     assert response.status_code == 422
@@ -325,11 +325,11 @@ def test_ajouter_position_montant_negatif_ou_nul_est_refuse_proprement(session) 
         response = authed.post(
             f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
             json={
-                "entreprise_id": str(cible.id),
-                "montant": montant_invalide,
-                "devise": "EUR",
-                "type_duree": "OUVERTE",
-                "date_debut": utcnow().isoformat(),
+                "company_id": str(cible.id),
+                "amount": montant_invalide,
+                "currency": "EUR",
+                "duration_type": "OUVERTE",
+                "start_date": utcnow().isoformat(),
             },
         )
         assert response.status_code == 422
@@ -347,11 +347,11 @@ def test_ajouter_position_fixe_sans_date_fin_est_refuse_proprement(session) -> N
     response = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 1000.0,
-            "devise": "EUR",
-            "type_duree": "FIXE",
-            "date_debut": (utcnow() + timedelta(days=1)).isoformat(),
+            "company_id": str(cible.id),
+            "amount": 1000.0,
+            "currency": "EUR",
+            "duration_type": "FIXE",
+            "start_date": (utcnow() + timedelta(days=1)).isoformat(),
         },
     )
     assert response.status_code == 422
@@ -369,14 +369,14 @@ def test_ajouter_position_puis_consulter_le_portefeuille_calcule_le_score_agrege
         reponse = authed.post(
             f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
             json={
-                "entreprise_id": str(entreprise.id),
-                "montant": montant,
+                "company_id": str(entreprise.id),
+                "amount": montant,
                 # USD, comme le portefeuille (toujours USD à la création désormais) : aucune
                 # conversion, la somme brute reste 2000 (l'objet du test est l'agrégation du
                 # score, pas la conversion de devise).
-                "devise": "USD",
-                "type_duree": "OUVERTE",
-                "date_debut": utcnow().isoformat(),
+                "currency": "USD",
+                "duration_type": "OUVERTE",
+                "start_date": utcnow().isoformat(),
             },
         )
         assert reponse.status_code == 201
@@ -384,12 +384,12 @@ def test_ajouter_position_puis_consulter_le_portefeuille_calcule_le_score_agrege
     detail = authed.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}")
     assert detail.status_code == 200
     body = detail.json()
-    assert body["nombre_positions"] == 2
-    assert body["montant_total"] == 2000.0
+    assert body["position_count"] == 2
+    assert body["total_amount"] == 2000.0
     # (1000*60 + 1000*90) / 2000 = 75 ; score_social agrégé n'inclut QUE la position couverte (a).
-    assert body["score_esg_agrege"] == 75.0
-    assert body["score_social_agrege"] == 70.0
-    assert body["couverture_esg"] == 100.0
+    assert body["aggregated_esg_score"] == 75.0
+    assert body["aggregated_social_score"] == 70.0
+    assert body["esg_coverage"] == 100.0
 
 
 def test_ajouter_position_fermer_puis_lister_etats(session) -> None:
@@ -401,22 +401,22 @@ def test_ajouter_position_fermer_puis_lister_etats(session) -> None:
     ajout = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
     assert ajout.status_code == 201
     position_id = ajout.json()["id"]
-    assert ajout.json()["etat"] == "ACTIVE"
+    assert ajout.json()["state"] == "ACTIVE"
 
     fermeture = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions/{position_id}/fermer", json={}
     )
     assert fermeture.status_code == 200
-    assert fermeture.json()["etat"] == "CLOTUREE"
+    assert fermeture.json()["state"] == "CLOTUREE"
 
     double_fermeture = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions/{position_id}/fermer", json={}
@@ -439,11 +439,11 @@ def test_fermer_position_avec_date_fin_tz_aware_ne_leve_pas_erreur_interne(sessi
     ajout = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
     assert ajout.status_code == 201
@@ -452,10 +452,10 @@ def test_fermer_position_avec_date_fin_tz_aware_ne_leve_pas_erreur_interne(sessi
     date_fin_tz_aware = utcnow().isoformat() + "Z"
     fermeture = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions/{position_id}/fermer",
-        json={"date_fin": date_fin_tz_aware},
+        json={"end_date": date_fin_tz_aware},
     )
     assert fermeture.status_code == 200
-    assert fermeture.json()["etat"] == "CLOTUREE"
+    assert fermeture.json()["state"] == "CLOTUREE"
 
 
 def test_position_planifiee_modifiable_et_supprimable(session) -> None:
@@ -467,28 +467,28 @@ def test_position_planifiee_modifiable_et_supprimable(session) -> None:
     ajout = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": (utcnow() + timedelta(days=5)).isoformat(),
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": (utcnow() + timedelta(days=5)).isoformat(),
         },
     )
     assert ajout.status_code == 201
-    assert ajout.json()["etat"] == "PLANIFIEE"
+    assert ajout.json()["state"] == "PLANIFIEE"
     position_id = ajout.json()["id"]
 
     modification = authed.patch(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions/{position_id}",
         json={
-            "montant": 800.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": (utcnow() + timedelta(days=5)).isoformat(),
+            "amount": 800.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": (utcnow() + timedelta(days=5)).isoformat(),
         },
     )
     assert modification.status_code == 200
-    assert modification.json()["montant_investi"] == 800.0
+    assert modification.json()["outstanding_amount"] == 800.0
     nouvelle_position_id = modification.json()["id"]
 
     suppression = authed.delete(
@@ -497,7 +497,7 @@ def test_position_planifiee_modifiable_et_supprimable(session) -> None:
     assert suppression.status_code == 204
 
     detail = authed.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}")
-    assert detail.json()["nombre_positions"] == 0
+    assert detail.json()["position_count"] == 0
 
 
 def test_position_active_non_modifiable_ni_supprimable(session) -> None:
@@ -509,11 +509,11 @@ def test_position_active_non_modifiable_ni_supprimable(session) -> None:
     ajout = authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
     position_id = ajout.json()["id"]
@@ -534,11 +534,11 @@ def test_portefeuille_avec_positions_ne_peut_pas_etre_supprime_seulement_archive
     authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
 
@@ -548,11 +548,11 @@ def test_portefeuille_avec_positions_ne_peut_pas_etre_supprime_seulement_archive
 
     archivage = authed.post(f"/api/v1/investor/portefeuilles/{portefeuille_id}/archiver")
     assert archivage.status_code == 200
-    assert archivage.json()["archive"] is True
+    assert archivage.json()["archived"] is True
 
     restauration = authed.post(f"/api/v1/investor/portefeuilles/{portefeuille_id}/restaurer")
     assert restauration.status_code == 200
-    assert restauration.json()["archive"] is False
+    assert restauration.json()["archived"] is False
 
 
 def test_portefeuille_vide_est_supprimable(session) -> None:
@@ -572,12 +572,12 @@ def test_renommer_un_portefeuille_est_persiste(session) -> None:
     portefeuille_id = _creer_portefeuille(authed)
 
     renommage = authed.patch(
-        f"/api/v1/investor/portefeuilles/{portefeuille_id}", json={"nom": "Actions vertes 2026"}
+        f"/api/v1/investor/portefeuilles/{portefeuille_id}", json={"name": "Actions vertes 2026"}
     )
     relu = authed.get(f"/api/v1/investor/portefeuilles/{portefeuille_id}")
 
     assert renommage.status_code == 200
-    assert relu.json()["nom"] == "Actions vertes 2026"
+    assert relu.json()["name"] == "Actions vertes 2026"
 
 
 def test_investisseur_ne_voit_pas_le_portefeuille_dun_autre(session) -> None:
@@ -601,11 +601,11 @@ def test_tableau_de_bord_compte_portefeuilles_et_entreprises_suivies_suspendues(
     authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(suspendue.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(suspendue.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
 
@@ -617,8 +617,8 @@ def test_tableau_de_bord_compte_portefeuilles_et_entreprises_suivies_suspendues(
     dashboard = authed.get("/api/v1/investor/dashboard")
     assert dashboard.status_code == 200
     body = dashboard.json()
-    assert body["nombre_portefeuilles"] == 1
-    assert any(e["id"] == str(suspendue.id) for e in body["entreprises_suivies_suspendues"])
+    assert body["portfolio_count"] == 1
+    assert any(e["id"] == str(suspendue.id) for e in body["suspended_followed_companies"])
     # positions_principales a été retiré du Dashboard (section supprimée du frontend, voir
     # app/investor/schemas.py::TableauDeBordInvestisseur) — plus rien à vérifier ici à ce sujet.
 
@@ -632,11 +632,11 @@ def test_export_portefeuille_csv(session) -> None:
     authed.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(cible.id),
-            "montant": 500.0,
-            "devise": "EUR",
-            "type_duree": "OUVERTE",
-            "date_debut": utcnow().isoformat(),
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
         },
     )
 

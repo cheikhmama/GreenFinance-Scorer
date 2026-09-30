@@ -75,12 +75,12 @@ export function ReportAnomaliesSection() {
                 <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
                   <div>
                     <p className="text-sm font-medium text-brand-blue">
-                      {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
+                      {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
                     </p>
                     <p className="text-sm text-brand-grey">
-                      {libelleCauseExtraction(rapport.extraction_erreur)}
-                      {rapport.tentatives_extraction > 0
-                        ? ` — ${rapport.tentatives_extraction} tentative(s)`
+                      {libelleCauseExtraction(rapport.extraction_error)}
+                      {rapport.extraction_attempts > 0
+                        ? ` — ${rapport.extraction_attempts} tentative(s)`
                         : ""}
                     </p>
                   </div>
@@ -104,7 +104,7 @@ export function ReportAnomaliesSection() {
               {orphelins.map((rapport) => (
                 <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
                   <p className="text-sm font-medium text-brand-blue">
-                    {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
+                    {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
                   </p>
                   <Button asChild size="sm" variant="outline">
                     <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>

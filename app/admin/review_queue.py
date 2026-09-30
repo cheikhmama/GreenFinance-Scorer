@@ -16,12 +16,12 @@ from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, func, select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, DevisePosition, ExtractionStatus, ReportStatus
+from app.core.enums import CompanyStatus, Currency, ExtractionStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
@@ -50,9 +50,9 @@ def lister_rapports_en_validation(session: Session) -> list[ESGReport]:
     return list(
         session.exec(
             select(ESGReport)
-            .join(AvisAudit, col(AvisAudit.rapport_id) == ESGReport.id)
+            .join(AuditOpinion, col(AuditOpinion.report_id) == ESGReport.id)
             .where(ESGReport.status == ReportStatus.PENDING_DECISION)
-            .order_by(col(AvisAudit.date_avis))
+            .order_by(col(AuditOpinion.submitted_at))
         ).all()
     )
 
@@ -116,13 +116,13 @@ def relancer_extraction(session: Session, rapport_id: uuid.UUID) -> ESGReport:
 
 def lister_rapports_orphelins_en_validation(session: Session) -> list[ESGReport]:
     """Rapports PENDING_DECISION sans aucun avis d'audit associé — invisibles à la fois de
-    lister_rapports_en_validation (INNER JOIN sur AvisAudit) et de lister_rapports_a_affecter
+    lister_rapports_en_validation (INNER JOIN sur AuditOpinion) et de lister_rapports_a_affecter
     (mauvais statut) : un état orphelin permanent, sans file où l'Admin pourrait même le
     remarquer. Voir _rapport_en_validation ci-dessous, qui documente pourquoi cet état est
     aujourd'hui inatteignable via l'API seule (soumettre_avis crée toujours l'avis dans la même
     transaction que la transition PENDING_DECISION) — gardé en visibilité de défense, au cas où des
     données injectées hors parcours applicatif (ou un futur chemin de code) l'atteindraient."""
-    sous_requete_avec_avis = select(AvisAudit.rapport_id)
+    sous_requete_avec_avis = select(AuditOpinion.report_id)
     return list(
         session.exec(
             select(ESGReport).where(
@@ -217,11 +217,11 @@ def lister_entreprises_a_republier(
     return items, total
 
 
-def lister_avis(session: Session, rapport_id: uuid.UUID) -> list[AvisAudit]:
+def lister_avis(session: Session, rapport_id: uuid.UUID) -> list[AuditOpinion]:
     rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
-    return list(session.exec(select(AvisAudit).where(AvisAudit.rapport_id == rapport_id)).all())
+    return list(session.exec(select(AuditOpinion).where(AuditOpinion.report_id == rapport_id)).all())
 
 
 def lister_versions(session: Session, rapport_id: uuid.UUID) -> list[ESGReport]:
@@ -269,7 +269,7 @@ def _rapport_en_validation(session: Session, rapport_id: uuid.UUID) -> ESGReport
     # en PENDING_DECISION, et crée toujours l'avis dans la même transaction) — gardé en défense, et
     # testable en semant l'état directement en base.
     a_un_avis = session.exec(
-        select(AvisAudit.id).where(AvisAudit.rapport_id == rapport_id)
+        select(AuditOpinion.id).where(AuditOpinion.report_id == rapport_id)
     ).first()
     if a_un_avis is None:
         raise ValidationError(
@@ -527,8 +527,8 @@ def publier_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
 def suspendre_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
     """Bloque tout nouveau dépôt de rapport (app/company/rapports.py::_creer_rapport) — les
     rapports déjà déposés et leur historique restent inchangés, seule l'entreprise passe
-    SUSPENDED. Pas d'auditer() ici : JournalAudit reste scopé aux événements de compte/session
-    (voir app/core/models.py::JournalAudit), jamais aux entreprises — même choix que
+    SUSPENDED. Pas d'auditer() ici : AuditLogEntry reste scopé aux événements de compte/session
+    (voir app/core/models.py::AuditLogEntry), jamais aux entreprises — même choix que
     publier_entreprise ci-dessus (structlog + Notification)."""
     entreprise = session.get(Company, entreprise_id)
     if entreprise is None:
@@ -615,7 +615,7 @@ def modifier_entreprise_admin(
     description: str | None,
     site_officiel: str | None,
     montant_minimum_investissement: Decimal | None,
-    devise_montant_minimum: DevisePosition | None,
+    devise_montant_minimum: Currency | None,
 ) -> Company:
     """Remplace le profil complet d'une entreprise — jamais de logique métier dérivée ici,
     seulement l'affectation des champs fournis (voir ModifierEntrepriseAdminRequest pour la

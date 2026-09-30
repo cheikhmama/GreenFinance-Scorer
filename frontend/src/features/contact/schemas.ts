@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 export const contactFormSchema = z.object({
-  nom: z
+  name: z
     .string()
     .trim()
     .min(2, "Indiquez votre nom (2 caractères minimum).")
     .max(100, "Le nom ne doit pas dépasser 100 caractères."),
   email: z.string().trim().email("Indiquez une adresse e-mail valide."),
-  sujet: z
+  subject: z
     .string()
     .trim()
     .min(3, "Précisez le sujet de votre demande (3 caractères minimum).")

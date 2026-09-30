@@ -13,7 +13,7 @@ from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core.enums import CompanyStatus, Role
-from app.core.models import JournalAudit
+from app.core.models import AuditLogEntry
 from app.core.redis import get_redis_client
 from app.main import app
 from tests.integration.test_company_registration import URL as URL_INSCRIPTION
@@ -91,14 +91,14 @@ def test_parcours_complet_inscription_validation_activation_connexion(session, m
 
     activation = TestClient(app, base_url="https://testserver").post(
         "/api/v1/auth/activer-compte",
-        json={"token": jeton, "nouveau_mot_de_passe": "premier-secret-12"},
+        json={"token": jeton, "new_password": "premier-secret-12"},
     )
     assert activation.status_code == 204
 
     titulaire = _client_connecte(demande["contact_email"].lower(), "premier-secret-12")
     profil = titulaire.get("/api/v1/company/profil")
     assert profil.status_code == 200
-    assert profil.json()["statut"] == CompanyStatus.ACTIVE.value
+    assert profil.json()["status"] == CompanyStatus.ACTIVE.value
 
 
 def test_le_lien_dactivation_part_seulement_a_la_validation(session, _envoi_simule) -> None:
@@ -132,11 +132,11 @@ def test_refus_supprime_linscription_et_transmet_le_motif(session, _envoi_simule
     assert session.get(User, titulaire_id) is None
     assert "introuvable au registre" in _envoi_simule.call_args.kwargs["body"]
     trace = session.exec(
-        select(JournalAudit).where(
-            JournalAudit.action == "refus_inscription", JournalAudit.id_ressource == entreprise_id
+        select(AuditLogEntry).where(
+            AuditLogEntry.action == "registration_rejected", AuditLogEntry.resource_id == entreprise_id
         )
     ).one()
-    assert trace.nouvelle_valeur == "Entreprise introuvable au registre."
+    assert trace.new_value == "Entreprise introuvable au registre."
 
     # Le demandeur peut redéposer une demande avec la même adresse.
     nouvelle = TestClient(app, base_url="https://testserver").post(

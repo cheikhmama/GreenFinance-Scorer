@@ -3,9 +3,8 @@
 Jamais réutilisés comme modèles de persistance (voir ARCHITECTURE.md §2) —
 UtilisateurPublic en particulier n'expose jamais password_hash.
 
-Contrat HTTP inchangé pendant le renommage anglais (docs/RENAME_PLAN.md §1, règle 3) : les champs
-JSON restent en français, UserContractMixin traduit explicitement un User vers ce contrat.
-Exception assumée : les valeurs de `role` sont celles du Role anglais.
+Contrat JSON en anglais depuis la tâche 4.7 (docs/RENAME_PLAN.md §3e) : les champs portent les
+noms des attributs de User ; UserContractMixin n'ajoute que ce qui se calcule (l'URL d'avatar).
 """
 
 import uuid
@@ -61,23 +60,24 @@ class LoginRequest(BaseModel):
 
 
 def user_vers_contrat(user: User) -> dict[str, Any]:
-    """Point unique de traduction User -> champs JSON historiques (jamais password_hash)."""
+    """Point unique de passage User -> contrat JSON : liste blanche des champs exposés (jamais
+    password_hash) et URL d'avatar calculée."""
     return {
         "id": user.id,
         "email": user.email,
-        "nom": user.name,
+        "name": user.name,
         # URL du fichier (tâche 4.3), plus un data URI : même usage côté client (src d'image).
         "avatar": url_avatar(user),
         "role": user.role,
-        "date_creation": user.created_at,
-        "actif": user.active,
-        "date_activation": user.activated_at,
+        "created_at": user.created_at,
+        "active": user.active,
+        "activated_at": user.activated_at,
     }
 
 
 class UserContractMixin(BaseModel):
     """À hériter par tout schéma de réponse validé depuis un User (model_validate ou
-    response_model) : la validation part du contrat traduit, jamais des attributs anglais."""
+    response_model) : la validation part de la liste blanche user_vers_contrat."""
 
     @model_validator(mode="before")
     @classmethod
@@ -92,24 +92,24 @@ class UtilisateurPublic(UserContractMixin):
 
     id: uuid.UUID
     email: str
-    nom: str | None
+    name: str | None
     avatar: str | None
     role: Role
-    date_creation: datetime
-    actif: bool
+    created_at: datetime
+    active: bool
     # None tant que le compte n'a pas cliqué son lien d'activation (app/auth/activation.py) —
     # inatteignable pour /auth/me (un compte non activé ne peut pas ouvrir de session), utile
     # uniquement aux listes Administrateur qui parcourent des comptes autres que le sien.
-    date_activation: datetime | None
+    activated_at: datetime | None
     # Renseigné uniquement par PATCH /auth/me quand un changement d'e-mail vient d'être demandé :
     # l'adresse à laquelle le lien de confirmation a été envoyé. `email` reste l'ancienne adresse
     # tant que ce lien n'a pas été confirmé.
-    email_en_attente: str | None = None
+    pending_email: str | None = None
 
 
 class ChangerMotDePasseRequest(BaseModel):
-    mot_de_passe_actuel: str
-    nouveau_mot_de_passe: NouveauMotDePasse
+    current_password: str
+    new_password: NouveauMotDePasse
 
 
 class ModifierProfilRequest(BaseModel):
@@ -121,9 +121,9 @@ class ModifierProfilRequest(BaseModel):
     qu'à la confirmation du lien envoyé à la nouvelle adresse (app/auth/email_change.py) — une
     session volée ne suffit jamais à détourner le compte."""
 
-    nom: str
+    name: str
     email: EmailNormalise
-    mot_de_passe_actuel: str | None = None
+    current_password: str | None = None
 
 
 class ConfirmerChangementEmailRequest(BaseModel):
@@ -145,7 +145,7 @@ class ReinitialiserMotDePasseRequest(BaseModel):
     ci-dessus (app/auth/password_reset.py::TOKEN_TTL, 30 minutes, usage unique)."""
 
     token: str = Field(min_length=1, max_length=512)
-    nouveau_mot_de_passe: NouveauMotDePasse
+    new_password: NouveauMotDePasse
 
 
 class ActiverCompteRequest(BaseModel):
@@ -153,7 +153,7 @@ class ActiverCompteRequest(BaseModel):
     (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 7 jours, usage unique)."""
 
     token: str = Field(min_length=1, max_length=512)
-    nouveau_mot_de_passe: NouveauMotDePasse
+    new_password: NouveauMotDePasse
 
 
 class VerifierMotDePasseRequest(BaseModel):
@@ -162,4 +162,4 @@ class VerifierMotDePasseRequest(BaseModel):
     passe. Jamais de contenu retourné au-delà du statut HTTP : ni confirmer ni infirmer autre
     chose que "ce mot de passe est-il le bon" (voir app/auth/router.py::verifier_mon_mot_de_passe)."""
 
-    mot_de_passe: str
+    password: str

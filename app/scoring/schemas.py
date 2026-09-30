@@ -14,11 +14,11 @@ class ScoreESGPublic(BaseModel):
     personnalisé ni un score auto-déclaré par l'entreprise -- ces deux-là restent ailleurs (voir
     app/ingestion/schemas.py::RapportESGDetail pour la distinction explicite)."""
 
-    valeur_globale: float
-    score_environnement: float | None
-    score_social: float | None
-    score_gouvernance: float | None
+    global_score: float
+    environmental_score: float | None
+    social_score: float | None
+    governance_score: float | None
     # Part pondérée des indicateurs de la méthodologie présents dans le rapport (0-1, tâche 3.1) :
     # un score ne se lit jamais sans elle. Nulle pour un score calculé avant qu'elle soit stockée.
-    taux_couverture: float | None
-    configuration_version: int
+    coverage_rate: float | None
+    config_version: int

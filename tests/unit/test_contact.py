@@ -12,9 +12,9 @@ from app.core.email import EmailDeliveryError
 from app.core.exceptions import register_exception_handlers
 
 _PAYLOAD = {
-    "nom": "Aminata Diallo",
+    "name": "Aminata Diallo",
     "email": "aminata@example.com",
-    "sujet": "Accès à la plateforme",
+    "subject": "Accès à la plateforme",
     "message": "Bonjour, je souhaite en savoir plus sur la création de mon compte.",
 }
 
@@ -43,20 +43,20 @@ def test_public_message_is_sent_to_configured_team_with_reply_to(contact):
     sent = delivery.call_args.kwargs
     assert sent["recipient"] == "equipe@example.com"
     assert sent["reply_to"] == _PAYLOAD["email"]
-    assert _PAYLOAD["nom"] in sent["body"]
+    assert _PAYLOAD["name"] in sent["body"]
     assert _PAYLOAD["message"] in sent["body"]
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("nom", " "),
-        ("nom", "x" * 101),
+        ("name", " "),
+        ("name", "x" * 101),
         ("email", "invalid"),
         ("email", "a@example.com\r\nBcc: b@example.com"),
-        ("sujet", "a"),
-        ("sujet", "x" * 151),
-        ("sujet", "Sujet\r\nBcc: b@example.com"),
+        ("subject", "a"),
+        ("subject", "x" * 151),
+        ("subject", "Sujet\r\nBcc: b@example.com"),
         ("message", "trop court"),
         ("message", "x" * 5001),
     ],

@@ -166,7 +166,7 @@ export function UsersSection() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="text-brand-blue">{utilisateur.email}</span>
-                        {!utilisateur.actif ? (
+                        {!utilisateur.active ? (
                           <Badge variant="secondary">désactivé</Badge>
                         ) : null}
                       </div>
@@ -179,7 +179,7 @@ export function UsersSection() {
                       </Button>
                     </TableCell>
                     <TableCell>
-                      {utilisateur.actif ? (
+                      {utilisateur.active ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -245,7 +245,7 @@ function FormulaireCreation({
 
   const form = useForm<CreerUtilisateurForm>({
     resolver: zodResolver(creerUtilisateurSchema),
-    defaultValues: { email: "", role: roleAffiche, nom_entreprise: "", secteur: "", pays: "" },
+    defaultValues: { email: "", role: roleAffiche, company_name: "", sector: "", country: "" },
   });
   const roleSaisi = form.watch("role");
 
@@ -255,7 +255,7 @@ function FormulaireCreation({
     createUser.mutate(values, {
       onSuccess: (utilisateur) => {
         setCompteCree(utilisateur.email);
-        form.reset({ email: "", role: roleAffiche, nom_entreprise: "", secteur: "", pays: "" });
+        form.reset({ email: "", role: roleAffiche, company_name: "", sector: "", country: "" });
       },
       onError: (error) => {
         setServerError(error instanceof ApiError ? error.message : "Échec de la création.");
@@ -325,7 +325,7 @@ function FormulaireCreation({
           <div className="grid gap-4 border-t pt-4 sm:grid-cols-3">
             <FormField
               control={form.control}
-              name="nom_entreprise"
+              name="company_name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nom de l'entreprise</FormLabel>
@@ -338,7 +338,7 @@ function FormulaireCreation({
             />
             <FormField
               control={form.control}
-              name="secteur"
+              name="sector"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Secteur</FormLabel>
@@ -351,7 +351,7 @@ function FormulaireCreation({
             />
             <FormField
               control={form.control}
-              name="pays"
+              name="country"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Pays</FormLabel>

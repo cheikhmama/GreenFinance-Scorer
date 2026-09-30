@@ -8,25 +8,25 @@ from sqlmodel import Session, col, select
 
 from app.core.exceptions import NotFoundError
 from app.institution.models import (
-    AffectationProjet,
-    Projet,
-    ProjetDocument,
-    ProjetEntreprise,
+    Project,
+    ProjectAssignment,
+    ProjectCompany,
+    ProjectDocument,
 )
 
 
-def lister_mes_projets(session: Session, chercheur_id: uuid.UUID) -> list[Projet]:
-    projet_ids = select(AffectationProjet.projet_id).where(
-        AffectationProjet.chercheur_id == chercheur_id
+def lister_mes_projets(session: Session, chercheur_id: uuid.UUID) -> list[Project]:
+    projet_ids = select(ProjectAssignment.project_id).where(
+        ProjectAssignment.researcher_id == chercheur_id
     )
-    return list(session.exec(select(Projet).where(col(Projet.id).in_(projet_ids))).all())
+    return list(session.exec(select(Project).where(col(Project.id).in_(projet_ids))).all())
 
 
 def _verifier_affectation(session: Session, chercheur_id: uuid.UUID, projet_id: uuid.UUID) -> None:
     affectation = session.exec(
-        select(AffectationProjet).where(
-            AffectationProjet.projet_id == projet_id,
-            AffectationProjet.chercheur_id == chercheur_id,
+        select(ProjectAssignment).where(
+            ProjectAssignment.project_id == projet_id,
+            ProjectAssignment.researcher_id == chercheur_id,
         )
     ).first()
     if affectation is None:
@@ -37,10 +37,10 @@ def _verifier_affectation(session: Session, chercheur_id: uuid.UUID, projet_id: 
 
 def lister_perimetre(
     session: Session, chercheur_id: uuid.UUID, projet_id: uuid.UUID
-) -> list[ProjetEntreprise]:
+) -> list[ProjectCompany]:
     _verifier_affectation(session, chercheur_id, projet_id)
     return list(
-        session.exec(select(ProjetEntreprise).where(ProjetEntreprise.projet_id == projet_id)).all()
+        session.exec(select(ProjectCompany).where(ProjectCompany.project_id == projet_id)).all()
     )
 
 
@@ -52,20 +52,20 @@ def entreprises_perimetre_chercheur(session: Session, chercheur_id: uuid.UUID) -
     /researcher/entreprises(/{id}), /researcher/comparaison et le fichier de preuve associé
     (app/researcher/router.py) — jamais pour /researcher/projets/{id}/perimetre, qui reste
     volontairement scopé à un seul projet à la fois."""
-    projet_ids = select(AffectationProjet.projet_id).where(
-        AffectationProjet.chercheur_id == chercheur_id
+    projet_ids = select(ProjectAssignment.project_id).where(
+        ProjectAssignment.researcher_id == chercheur_id
     )
     return set(
         session.exec(
-            select(ProjetEntreprise.entreprise_id).where(col(ProjetEntreprise.projet_id).in_(projet_ids))
+            select(ProjectCompany.company_id).where(col(ProjectCompany.project_id).in_(projet_ids))
         ).all()
     )
 
 
 def lister_documents(
     session: Session, chercheur_id: uuid.UUID, projet_id: uuid.UUID
-) -> list[ProjetDocument]:
+) -> list[ProjectDocument]:
     _verifier_affectation(session, chercheur_id, projet_id)
     return list(
-        session.exec(select(ProjetDocument).where(ProjetDocument.projet_id == projet_id)).all()
+        session.exec(select(ProjectDocument).where(ProjectDocument.project_id == projet_id)).all()
     )

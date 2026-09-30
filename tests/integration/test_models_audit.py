@@ -3,17 +3,17 @@ import uuid
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.models import User
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DecisionAudit,
-    MethodeDonnee,
+    AuditDecision,
+    DataMethod,
     Pillar,
+    ReportType,
     Role,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
@@ -41,8 +41,8 @@ def _rapport_avec_indicateur(session) -> tuple[ESGReport, ESGMetric]:
     session.flush()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.AUTOMATIQUE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
         source_file="s3://bucket/rapport.pdf",
         submitted_at=utcnow(),
     )
@@ -64,7 +64,7 @@ def _rapport_avec_indicateur(session) -> tuple[ESGReport, ESGMetric]:
         metric_code="GOV-01",
         value=1.0,
         unit="ratio",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
     session.add(indicateur)
@@ -76,18 +76,18 @@ def test_creation_avis_audit(session) -> None:
     rapport, _ = _rapport_avec_indicateur(session)
     auditeur = _utilisateur(session, Role.AUDITOR)
 
-    avis = AvisAudit(
-        rapport_id=rapport.id,
-        auditeur_id=auditeur.id,
-        decision=DecisionAudit.RECOMMANDE_VALIDATION,
-        commentaire="Données cohérentes avec le rapport annuel.",
+    avis = AuditOpinion(
+        report_id=rapport.id,
+        auditor_id=auditeur.id,
+        decision=AuditDecision.RECOMMANDE_VALIDATION,
+        comment="Données cohérentes avec le rapport annuel.",
     )
     session.add(avis)
     session.flush()
 
     assert avis.id is not None
-    assert avis.rapport.id == rapport.id
-    assert avis.auditeur.id == auditeur.id
+    assert avis.report.id == rapport.id
+    assert avis.auditor.id == auditeur.id
     assert avis in rapport.audit_opinions
     assert avis in auditeur.audit_opinions
 
@@ -131,7 +131,7 @@ def test_creation_notification(session) -> None:
     utilisateur = _utilisateur(session, Role.ENTERPRISE)
 
     notification = Notification(
-        utilisateur_id=utilisateur.id,
+        user_id=utilisateur.id,
         message="Votre rapport a été validé.",
         type="RAPPORT_VALIDE",
     )
@@ -139,5 +139,5 @@ def test_creation_notification(session) -> None:
     session.flush()
 
     assert notification.id is not None
-    assert notification.lu is False
+    assert notification.read is False
     assert notification in utilisateur.notifications

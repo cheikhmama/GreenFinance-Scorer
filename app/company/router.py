@@ -33,7 +33,7 @@ from app.company.schemas import (
 )
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role, TypeRapport
+from app.core.enums import ReportType, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
@@ -109,7 +109,7 @@ def lister_rapports_route(
 def deposer_rapport_route(
     background_tasks: BackgroundTasks,
     fichier: UploadFile,
-    type: TypeRapport = Form(...),
+    type: ReportType = Form(...),
     annee_reporting: int = Form(...),
     current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
@@ -144,14 +144,14 @@ def importer_rapport_par_url_route(
         # confiance à un client pour désigner une entreprise autre que la sienne.
         entreprise_id = _entreprise_id(current_user)
     else:
-        if payload.entreprise_id is None:
+        if payload.company_id is None:
             raise ValidationError(
                 "entreprise_id est requis pour un import déclenché par un administrateur.",
                 code="entreprise_id_requis",
             )
-        if session.get(Company, payload.entreprise_id) is None:
+        if session.get(Company, payload.company_id) is None:
             raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-        entreprise_id = payload.entreprise_id
+        entreprise_id = payload.company_id
 
     enforce_url_import_rate_limit(entreprise_id)
     return importer_rapport_par_url(
@@ -160,7 +160,7 @@ def importer_rapport_par_url_route(
         entreprise_id,
         payload.url,
         payload.type,
-        payload.annee_reporting,
+        payload.fiscal_year,
     )
 
 
@@ -204,7 +204,7 @@ def consulter_rapport(
 ) -> RapportESGDetail:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"score_officiel": score_public(session, rapport_id)})
+    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 
 @router.get(

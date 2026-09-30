@@ -71,9 +71,9 @@ describe("ContactPage", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          nom: "Amina Diallo",
+          name: "Amina Diallo",
           email: "amina@example.com",
-          sujet: "Accès à mon espace",
+          subject: "Accès à mon espace",
           message,
         }),
       }),

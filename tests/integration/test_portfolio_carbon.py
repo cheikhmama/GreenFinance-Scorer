@@ -109,11 +109,11 @@ def test_empreinte_carbone_du_portefeuille(session, admin, investisseur) -> None
     investisseur.post(
         f"/api/v1/investor/portefeuilles/{portefeuille_id}/positions",
         json={
-            "entreprise_id": str(a.id),
-            "montant": 5000,
-            "devise": "USD",
-            "type_duree": "OUVERTE",
-            "date_debut": (utcnow() + timedelta(days=1)).isoformat(),
+            "company_id": str(a.id),
+            "amount": 5000,
+            "currency": "USD",
+            "duration_type": "OUVERTE",
+            "start_date": (utcnow() + timedelta(days=1)).isoformat(),
         },
     ).raise_for_status()
 

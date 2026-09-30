@@ -10,7 +10,7 @@ from app.auth.models import User
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, MethodeDonnee, Pillar, Role, TypeRapport
+from app.core.enums import DataMethod, Pillar, ReportType, Role, SubmissionChannel
 from app.core.exceptions import ValidationError
 from app.ingestion.models import ESGMetric, ESGReport, Evidence
 from app.scoring.engine import (
@@ -31,8 +31,8 @@ def _rapport(session) -> ESGReport:
     session.flush()
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
     )
@@ -63,7 +63,7 @@ def _ajouter_indicateur(session, rapport_id: uuid.UUID, preuve_id: uuid.UUID, pi
             metric_code=code,
             value=valeur,
             unit="x",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve_id,
         )
     )
@@ -284,7 +284,7 @@ def test_couverture_stockee_sur_le_score_et_le_rapport(session) -> None:
     assert rapport.config_hash == configuration.content_hash
     assert rapport.official_score == pytest.approx(score.global_score)
     public = score_public(session, rapport.id)
-    assert public is not None and public.taux_couverture == pytest.approx(attendue)
+    assert public is not None and public.coverage_rate == pytest.approx(attendue)
 
 
 def test_couverture_sous_le_minimum_bloque_le_score(session, tmp_path, monkeypatch) -> None:

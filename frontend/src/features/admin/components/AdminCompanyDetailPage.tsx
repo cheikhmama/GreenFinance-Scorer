@@ -134,7 +134,7 @@ export function AdminCompanyDetailPage() {
   const suspend = useSuspendCompany();
   const reactivate = useReactivateCompany();
   const publish = usePublishCompany();
-  const validate = useValidateReport(entreprise?.dernier_rapport_id ?? "");
+  const validate = useValidateReport(entreprise?.latest_report_id ?? "");
   const confirm = useConfirm();
   const [serverError, setServerError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -143,14 +143,14 @@ export function AdminCompanyDetailPage() {
     resolver: zodResolver(modifierEntrepriseSchema),
     values: entreprise
       ? {
-          nom: entreprise.nom,
-          secteur: entreprise.secteur,
-          pays: entreprise.pays,
+          name: entreprise.name,
+          sector: entreprise.sector,
+          country: entreprise.country,
           description: entreprise.description ?? "",
-          site_officiel: entreprise.site_officiel ?? "",
-          impose_minimum: entreprise.montant_minimum_investissement != null,
-          montant_minimum_investissement: entreprise.montant_minimum_investissement ?? undefined,
-          devise_montant_minimum: entreprise.devise_montant_minimum ?? DEVISES[0],
+          website: entreprise.website ?? "",
+          impose_minimum: entreprise.minimum_investment_amount != null,
+          minimum_investment_amount: entreprise.minimum_investment_amount ?? undefined,
+          minimum_investment_currency: entreprise.minimum_investment_currency ?? DEVISES[0],
         }
       : undefined,
   });
@@ -167,7 +167,7 @@ export function AdminCompanyDetailPage() {
   }
   if (isError || !entreprise) return <p className="text-destructive">Entreprise introuvable.</p>;
 
-  const nomEntreprise = entreprise.nom;
+  const nomEntreprise = entreprise.name;
 
   async function suspendre() {
     const confirme = await confirm({
@@ -186,15 +186,15 @@ export function AdminCompanyDetailPage() {
     setServerError(null);
     updateProfile.mutate(
       {
-        nom: values.nom,
-        secteur: values.secteur,
-        pays: values.pays,
+        name: values.name,
+        sector: values.sector,
+        country: values.country,
         description: values.description || null,
-        site_officiel: values.site_officiel || null,
-        montant_minimum_investissement: values.impose_minimum
-          ? (values.montant_minimum_investissement ?? null)
+        website: values.website || null,
+        minimum_investment_amount: values.impose_minimum
+          ? (values.minimum_investment_amount ?? null)
           : null,
-        devise_montant_minimum: values.impose_minimum ? (values.devise_montant_minimum ?? null) : null,
+        minimum_investment_currency: values.impose_minimum ? (values.minimum_investment_currency ?? null) : null,
       },
       {
         onError: (error) => {
@@ -208,15 +208,15 @@ export function AdminCompanyDetailPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Administration"
-        title={entreprise.nom}
+        title={entreprise.name}
         description="Profil complet de l'entreprise, tel que présenté à l'Investisseur une fois publiée."
       />
       <Link to="/admin/entreprises" className="text-sm text-brand-green underline underline-offset-2">
         ← Entreprises
       </Link>
 
-      {entreprise.statut === "PENDING_ONBOARDING" ? (
-        <OnboardingPanel entrepriseId={entrepriseId} nom={entreprise.nom} />
+      {entreprise.status === "PENDING_ONBOARDING" ? (
+        <OnboardingPanel entrepriseId={entrepriseId} nom={entreprise.name} />
       ) : null}
 
       <Card>
@@ -225,21 +225,21 @@ export function AdminCompanyDetailPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-            <LogoEditor entrepriseId={entrepriseId} nom={entreprise.nom} logo={entreprise.logo} />
+            <LogoEditor entrepriseId={entrepriseId} nom={entreprise.name} logo={entreprise.logo} />
             <div className="flex flex-col items-center gap-1.5 sm:items-start">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <Badge variant={VARIANTE_STATUT[entreprise.statut]}>
-                  {LIBELLE_STATUT[entreprise.statut]}
+                <Badge variant={VARIANTE_STATUT[entreprise.status]}>
+                  {LIBELLE_STATUT[entreprise.status]}
                 </Badge>
-                <Badge variant={entreprise.date_publication ? "success" : "outline"}>
-                  {entreprise.date_publication ? "Publiée" : "Non publiée"}
+                <Badge variant={entreprise.published_at ? "success" : "outline"}>
+                  {entreprise.published_at ? "Publiée" : "Non publiée"}
                 </Badge>
-                <Badge variant={entreprise.utilisateur_id ? "success" : "outline"}>
-                  {entreprise.utilisateur_id ? "Compte lié" : "Sans compte"}
+                <Badge variant={entreprise.owner_user_id ? "success" : "outline"}>
+                  {entreprise.owner_user_id ? "Compte lié" : "Sans compte"}
                 </Badge>
-                {entreprise.dernier_statut_rapport ? (
-                  <Badge variant={variantStatutRapport(entreprise.dernier_statut_rapport)}>
-                    {libelleStatutRapport(entreprise.dernier_statut_rapport)}
+                {entreprise.latest_report_status ? (
+                  <Badge variant={variantStatutRapport(entreprise.latest_report_status)}>
+                    {libelleStatutRapport(entreprise.latest_report_status)}
                   </Badge>
                 ) : (
                   <Badge variant="secondary">Aucun rapport</Badge>
@@ -247,29 +247,29 @@ export function AdminCompanyDetailPage() {
               </div>
               <Button asChild size="sm" variant="link" className="h-auto p-0">
                 <Link to={`/admin/entreprises/${entrepriseId}/rapports`}>
-                  {entreprise.nombre_rapports} rapport{entreprise.nombre_rapports > 1 ? "s" : ""} déposé
-                  {entreprise.nombre_rapports > 1 ? "s" : ""}
+                  {entreprise.report_count} rapport{entreprise.report_count > 1 ? "s" : ""} déposé
+                  {entreprise.report_count > 1 ? "s" : ""}
                 </Link>
               </Button>
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2 sm:shrink-0 sm:justify-end">
-            {entreprise.dernier_rapport_id ? (
+            {entreprise.latest_report_id ? (
               <Button asChild size="sm" variant="outline">
-                <Link to={`/admin/rapports/${entreprise.dernier_rapport_id}`}>
+                <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>
                   <FileText className="size-4" />
                   Voir le rapport
                 </Link>
               </Button>
             ) : null}
-            {entreprise.dernier_statut_rapport === "PENDING_DECISION" && entreprise.dernier_rapport_id ? (
+            {entreprise.latest_report_status === "PENDING_DECISION" && entreprise.latest_report_id ? (
               <Button
                 size="sm"
                 disabled={validate.isPending}
                 onClick={() => {
                   setActionError(null);
                   validate.mutate(
-                    { commentaire: null },
+                    { comment: null },
                     {
                       onError: (err) =>
                         setActionError(err instanceof ApiError ? err.message : "Échec de la validation."),
@@ -281,7 +281,7 @@ export function AdminCompanyDetailPage() {
                 Valider
               </Button>
             ) : null}
-            {!entreprise.date_publication ? (
+            {!entreprise.published_at ? (
               <Button
                 size="sm"
                 disabled={publish.isPending}
@@ -297,12 +297,12 @@ export function AdminCompanyDetailPage() {
               </Button>
             ) : null}
             {/* Voir AllCompaniesSection : jamais d'action de statut sur une inscription en attente. */}
-            {entreprise.statut === "ACTIVE" ? (
+            {entreprise.status === "ACTIVE" ? (
               <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
                 Suspendre
               </Button>
             ) : null}
-            {entreprise.statut === "SUSPENDED" ? (
+            {entreprise.status === "SUSPENDED" ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -340,7 +340,7 @@ export function AdminCompanyDetailPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <FormField
                   control={form.control}
-                  name="nom"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Nom</FormLabel>
@@ -353,7 +353,7 @@ export function AdminCompanyDetailPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="secteur"
+                  name="sector"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Secteur</FormLabel>
@@ -366,7 +366,7 @@ export function AdminCompanyDetailPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="pays"
+                  name="country"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Pays</FormLabel>
@@ -395,7 +395,7 @@ export function AdminCompanyDetailPage() {
 
               <FormField
                 control={form.control}
-                name="site_officiel"
+                name="website"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Site officiel</FormLabel>
@@ -428,7 +428,7 @@ export function AdminCompanyDetailPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
                       control={form.control}
-                      name="montant_minimum_investissement"
+                      name="minimum_investment_amount"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Montant minimum</FormLabel>
@@ -448,7 +448,7 @@ export function AdminCompanyDetailPage() {
                     />
                     <FormField
                       control={form.control}
-                      name="devise_montant_minimum"
+                      name="minimum_investment_currency"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Devise</FormLabel>

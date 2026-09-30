@@ -2,8 +2,9 @@
 
 > **Status: PROPOSED TARGET.** State machines and lifecycles for the redesign described in
 > [`docs/ARCHITECTURE.md`](ARCHITECTURE.md). Each workflow notes what exists today and what
-> changes. Names follow the target English domain model; the current French equivalents are
-> listed where they differ.
+> changes. Names follow the English domain model — tables, classes and JSON fields use them since
+> task 4.7; French equivalents are listed where URL paths, query parameters or enum values still
+> differ.
 
 Conventions used below:
 - **Actor** — the role allowed to trigger the transition. Any other role gets `403`; a user of

@@ -16,10 +16,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.carbon.pcaf import CarbonExclusionReason
 from app.company.schemas import CompanyContractMixin, EntreprisePublic
 from app.core.enums import (
-    DevisePosition,
+    Currency,
+    DurationType,
     IdentifierType,
     MatchStatus,
-    TypeDureeInvestissement,
 )
 from app.ingestion.schemas import (
     CouvertureResume,
@@ -53,12 +53,12 @@ class ScoreEntreprisePublic(BaseModel):
     jamais pour une entreprise publiée (publier_entreprise l'exige), mais reste possible en
     lecture défensive."""
 
-    valeur_globale: float | None
-    score_environnement: float | None
-    score_social: float | None
-    score_gouvernance: float | None
-    taux_couverture: float | None = None  # 0-1, voir app/scoring/schemas.py::ScoreESGPublic
-    configuration_version: int | None
+    global_score: float | None
+    environmental_score: float | None
+    social_score: float | None
+    governance_score: float | None
+    coverage_rate: float | None = None  # 0-1, voir app/scoring/schemas.py::ScoreESGPublic
+    config_version: int | None
 
 
 class DonneesCarboneAgregees(BaseModel):
@@ -76,8 +76,8 @@ class EntreprisePublieePublic(EntreprisePublic):
     valeur de la devise déjà choisie pour la position, jamais de conversion côté client."""
 
     score: ScoreEntreprisePublic
-    carbone: DonneesCarboneAgregees
-    montant_minimum_par_devise: dict[DevisePosition, float] | None
+    carbon: DonneesCarboneAgregees
+    minimum_amount_by_currency: dict[Currency, float] | None
 
 
 class EntrepriseDetailInvestisseur(EntreprisePublieePublic):
@@ -85,35 +85,35 @@ class EntrepriseDetailInvestisseur(EntreprisePublieePublic):
     portant sa preuve documentaire) — c'est ici que l'Investisseur vérifie une source, pas
     seulement le score agrégé."""
 
-    indicateurs: list[IndicateurESGDetail]
-    donnees_carbone: list[DonneeCarboneDetail]
-    couverture: CouvertureResume
+    metrics: list[IndicateurESGDetail]
+    carbon_data: list[DonneeCarboneDetail]
+    coverage: CouvertureResume
     # Le rapport publié affiché (tâche 3.2) : clé de GET /reports/{id}/score-explanation.
-    rapport_id: uuid.UUID | None = None
+    report_id: uuid.UUID | None = None
 
 
 class CreerPortefeuilleRequest(BaseModel):
-    nom: str
+    name: str
 
 
 class RenommerPortefeuilleRequest(BaseModel):
-    nom: str
+    name: str
 
 
 class AjouterPositionRequest(BaseModel):
-    entreprise_id: uuid.UUID
+    company_id: uuid.UUID
     # gt=0, jamais seulement le CheckConstraint SQL ("montant_investi > 0", voir
     # app/investor/models.py) : sans cette validation ici, un montant négatif ou nul remonterait
     # comme une IntegrityError Postgres non rattrapée (500) plutôt qu'un 422 propre. Decimal au
     # centime près (tâche 2.3) : un montant à plus de deux décimales est refusé, jamais arrondi
     # en silence.
-    montant: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
-    devise: DevisePosition
-    type_duree: TypeDureeInvestissement
-    date_debut: datetime
-    date_fin: datetime | None = None
+    amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
+    currency: Currency
+    duration_type: DurationType
+    start_date: datetime
+    end_date: datetime | None = None
 
-    @field_validator("date_debut", "date_fin")
+    @field_validator("start_date", "end_date")
     @classmethod
     def _normaliser_dates(cls, valeur: datetime | None) -> datetime | None:
         return _vers_naif_utc(valeur) if valeur is not None else None
@@ -124,22 +124,22 @@ class ModifierPositionRequest(BaseModel):
     app/investor/portfolio.py) — l'entreprise concernée n'est jamais modifiable après création,
     seule une fermeture puis une nouvelle position permet de changer de cible."""
 
-    montant: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
-    devise: DevisePosition
-    type_duree: TypeDureeInvestissement
-    date_debut: datetime
-    date_fin: datetime | None = None
+    amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
+    currency: Currency
+    duration_type: DurationType
+    start_date: datetime
+    end_date: datetime | None = None
 
-    @field_validator("date_debut", "date_fin")
+    @field_validator("start_date", "end_date")
     @classmethod
     def _normaliser_dates(cls, valeur: datetime | None) -> datetime | None:
         return _vers_naif_utc(valeur) if valeur is not None else None
 
 
 class FermerPositionRequest(BaseModel):
-    date_fin: datetime | None = None
+    end_date: datetime | None = None
 
-    @field_validator("date_fin")
+    @field_validator("end_date")
     @classmethod
     def _normaliser_date_fin(cls, valeur: datetime | None) -> datetime | None:
         return _vers_naif_utc(valeur) if valeur is not None else None
@@ -152,71 +152,71 @@ class EntrepriseSommaire(CompanyContractMixin):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    nom: str
-    secteur: str
-    pays: str
+    name: str
+    sector: str
+    country: str
     logo: str | None
-    actif: bool
+    active: bool
 
 
 class PositionDetail(BaseModel):
     id: uuid.UUID
-    portefeuille_id: uuid.UUID
+    portfolio_id: uuid.UUID
     # Nulle pour une ligne importée qu'aucune entreprise publiée ne reconnaît (tâche 2.2) : elle
     # reste listée avec son identifiant d'origine et statut_rapprochement.
-    entreprise: EntrepriseSommaire | None
-    identifiant: str | None = None
-    type_identifiant: IdentifierType | None = None
-    statut_rapprochement: MatchStatus = MatchStatus.MATCHED
-    montant_investi: float
-    devise: DevisePosition
-    montant_converti: float
-    taux_change_utilise: float | None
-    poids: float
-    type_duree: TypeDureeInvestissement
-    date_debut: datetime
-    date_fin: datetime | None
-    etat: EtatPosition
+    company: EntrepriseSommaire | None
+    identifier: str | None = None
+    identifier_type: IdentifierType | None = None
+    match_status: MatchStatus = MatchStatus.MATCHED
+    outstanding_amount: float
+    currency: Currency
+    converted_amount: float
+    fx_rate_used: float | None
+    weight: float
+    duration_type: DurationType
+    start_date: datetime
+    end_date: datetime | None
+    state: EtatPosition
     score: ScoreEntreprisePublic
-    date_publication_utilisee: datetime | None
-    preuves_disponibles: bool
+    published_at_used: datetime | None
+    evidence_available: bool
 
 
 class PortefeuilleResume(BaseModel):
     id: uuid.UUID
-    nom: str
-    devise_reference: DevisePosition
-    montant_total: float
-    nombre_positions: int
-    score_esg_agrege: float | None
-    score_environnement_agrege: float | None
-    score_social_agrege: float | None
-    score_gouvernance_agrege: float | None
-    couverture_esg: float
-    date_creation: datetime
-    archive: bool
+    name: str
+    reference_currency: Currency
+    total_amount: float
+    position_count: int
+    aggregated_esg_score: float | None
+    aggregated_environmental_score: float | None
+    aggregated_social_score: float | None
+    aggregated_governance_score: float | None
+    esg_coverage: float
+    created_at: datetime
+    archived: bool
 
 
 class PortefeuilleDetail(PortefeuilleResume):
-    nombre_positions_planifiees: int
-    nombre_positions_actives: int
-    nombre_positions_cloturees: int
+    planned_position_count: int
+    active_position_count: int
+    closed_position_count: int
     positions: list[PositionDetail]
 
 
 class RepartitionSecteur(BaseModel):
-    secteur: str
-    montant_usd: float
+    sector: str
+    amount_usd: float
 
 
 class TableauDeBordInvestisseur(BaseModel):
-    nombre_portefeuilles: int
-    nombre_entreprises_publiees: int
-    taux_couverture_esg_plateforme: float
-    nombre_nouvelles_publications_suivies: int
-    repartition_secteur: list[RepartitionSecteur]
-    publications_recentes: list[EntreprisePublieePublic]
-    entreprises_suivies_suspendues: list[EntrepriseSommaire]
+    portfolio_count: int
+    published_company_count: int
+    platform_esg_coverage_rate: float
+    new_followed_publication_count: int
+    sector_breakdown: list[RepartitionSecteur]
+    recent_publications: list[EntreprisePublieePublic]
+    suspended_followed_companies: list[EntrepriseSommaire]
 
 
 class PortfolioImportResult(BaseModel):
@@ -257,7 +257,7 @@ class PortfolioCarbon(BaseModel):
     aucune position ne le permet."""
 
     portfolio_id: uuid.UUID
-    currency: DevisePosition
+    currency: Currency
     total_value: float
     financed_emissions_scope_1_2: float | None
     financed_emissions_scope_3: float | None

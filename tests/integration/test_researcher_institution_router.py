@@ -5,11 +5,11 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from app.auth.hashing import hash_password
-from app.auth.models import InstitutionProfil, User
+from app.auth.models import InstitutionProfile, User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import CanalDepot, ReportStatus, Role, TypeRapport
+from app.core.enums import ReportStatus, ReportType, Role, SubmissionChannel
 from app.core.models import Notification
 from app.ingestion.models import ESGReport
 from app.main import app
@@ -37,7 +37,7 @@ def _create_utilisateur(
 def _create_institution(session, *, quota_export: int = 10) -> User:
     institution = _create_utilisateur(session, Role.INSTITUTION)
     session.add(
-        InstitutionProfil(utilisateur_id=institution.id, quota_export=quota_export)
+        InstitutionProfile(user_id=institution.id, export_quota=quota_export)
     )
     session.commit()
     return institution
@@ -59,8 +59,8 @@ def _entreprise_publiee(session, *, score_global: float = 70.0, nom: str | None 
 
     rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy.pdf",
         submitted_at=utcnow(),
@@ -89,7 +89,7 @@ def _ajouter_perimetre(
 ) -> None:
     reponse = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/perimetre",
-        json={"entreprise_id": str(entreprise_id)},
+        json={"company_id": str(entreprise_id)},
     )
     assert reponse.status_code == 201, reponse.json()
 
@@ -118,10 +118,10 @@ def test_inviter_chercheur_puis_disponibles_ne_le_montre_plus(session) -> None:
 
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     assert invitation.status_code == 201
-    assert invitation.json()["statut"] == "EN_ATTENTE"
+    assert invitation.json()["status"] == "EN_ATTENTE"
 
     disponibles_apres = institution_authed.get(
         "/api/v1/institution/chercheurs/disponibles"
@@ -136,12 +136,12 @@ def test_inviter_chercheur_puis_acceptation_notifient_les_deux_parties(session) 
 
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     ).json()
 
     invitation_notif = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == chercheur.id,
+            Notification.user_id == chercheur.id,
             Notification.type == "RATTACHEMENT_INVITATION",
         )
     ).one()
@@ -154,7 +154,7 @@ def test_inviter_chercheur_puis_acceptation_notifient_les_deux_parties(session) 
 
     acceptation_notif = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == institution.id,
+            Notification.user_id == institution.id,
             Notification.type == "RATTACHEMENT_ACCEPTE",
         )
     ).one()
@@ -167,13 +167,13 @@ def test_chercheur_accepte_invitation(session) -> None:
     institution_authed = _login(institution.email)
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     ).json()
 
     chercheur_authed = _login(chercheur.email)
     mes_rattachements = chercheur_authed.get("/api/v1/researcher/rattachements").json()
     assert any(
-        r["id"] == invitation["id"] and r["statut"] == "EN_ATTENTE"
+        r["id"] == invitation["id"] and r["status"] == "EN_ATTENTE"
         for r in mes_rattachements
     )
 
@@ -181,7 +181,7 @@ def test_chercheur_accepte_invitation(session) -> None:
         f"/api/v1/researcher/rattachements/{invitation['id']}/accepter"
     )
     assert acceptation.status_code == 200
-    assert acceptation.json()["statut"] == "ACCEPTE"
+    assert acceptation.json()["status"] == "ACCEPTE"
 
     double_reponse = chercheur_authed.post(
         f"/api/v1/researcher/rattachements/{invitation['id']}/refuser"
@@ -196,29 +196,29 @@ def test_chercheur_refuse_puis_institution_peut_reinviter(session) -> None:
     institution_authed = _login(institution.email)
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     ).json()
 
     chercheur_authed = _login(chercheur.email)
     refus = chercheur_authed.post(
         f"/api/v1/researcher/rattachements/{invitation['id']}/refuser"
     )
-    assert refus.json()["statut"] == "REFUSE"
+    assert refus.json()["status"] == "REFUSE"
 
     reinvitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     assert reinvitation.status_code == 201
     assert reinvitation.json()["id"] == invitation["id"]  # même ligne, pas de doublon
-    assert reinvitation.json()["statut"] == "EN_ATTENTE"
+    assert reinvitation.json()["status"] == "EN_ATTENTE"
 
 
 def _accepter_rattachement(
     institution_authed, chercheur_authed, chercheur_id: str
 ) -> None:
     invitation = institution_authed.post(
-        "/api/v1/institution/chercheurs/inviter", json={"chercheur_id": chercheur_id}
+        "/api/v1/institution/chercheurs/inviter", json={"researcher_id": chercheur_id}
     ).json()
     chercheur_authed.post(
         f"/api/v1/researcher/rattachements/{invitation['id']}/accepter"
@@ -231,16 +231,16 @@ def test_affecter_chercheur_non_accepte_est_refuse(session) -> None:
     institution_authed = _login(institution.email)
     institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
 
     affectation = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     assert affectation.status_code == 422
     assert affectation.json()["error"]["code"] == "rattachement_requis"
@@ -256,11 +256,11 @@ def test_workflow_complet_analyse_validee(session) -> None:
 
     projet_id = institution_authed.post(
         "/api/v1/institution/projets",
-        json={"nom": "Projet vert", "description": "Analyse ESG mines"},
+        json={"name": "Projet vert", "description": "Analyse ESG mines"},
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
 
@@ -270,33 +270,33 @@ def test_workflow_complet_analyse_validee(session) -> None:
     creation = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "Analyse initiale",
-            "contenu": "Comparaison ESG.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "Analyse initiale",
+            "content": "Comparaison ESG.",
+            "company_ids": [str(entreprise.id)],
         },
     )
     assert creation.status_code == 201
     analyse_id = creation.json()["id"]
-    assert creation.json()["statut"] == "BROUILLON"
+    assert creation.json()["status"] == "BROUILLON"
 
     soumission = chercheur_authed.post(
         f"/api/v1/researcher/analyses/{analyse_id}/soumettre"
     )
     assert soumission.status_code == 200
-    assert soumission.json()["statut"] == "SOUMISE"
+    assert soumission.json()["status"] == "SOUMISE"
 
     detail_institution = institution_authed.get(
         f"/api/v1/institution/analyses/{analyse_id}"
     )
     assert detail_institution.status_code == 200
-    assert detail_institution.json()["entreprise_ids"] == [str(entreprise.id)]
+    assert detail_institution.json()["company_ids"] == [str(entreprise.id)]
 
     validation = institution_authed.post(
         f"/api/v1/institution/analyses/{analyse_id}/valider",
-        json={"commentaire": "Bon travail."},
+        json={"comment": "Bon travail."},
     )
     assert validation.status_code == 200
-    assert validation.json()["statut"] == "VALIDEE"
+    assert validation.json()["status"] == "VALIDEE"
 
     double_decision = institution_authed.post(
         f"/api/v1/institution/analyses/{analyse_id}/valider", json={}
@@ -314,47 +314,47 @@ def test_workflow_correction_cree_une_nouvelle_version(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
     analyse_id = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "V1",
-            "contenu": "Premier jet.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V1",
+            "content": "Premier jet.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
     chercheur_authed.post(f"/api/v1/researcher/analyses/{analyse_id}/soumettre")
 
     correction_demandee = institution_authed.post(
         f"/api/v1/institution/analyses/{analyse_id}/demander-correction",
-        json={"commentaire": "Manque le pilier social."},
+        json={"comment": "Manque le pilier social."},
     )
     assert correction_demandee.status_code == 200
-    assert correction_demandee.json()["statut"] == "CORRECTION_DEMANDEE"
+    assert correction_demandee.json()["status"] == "CORRECTION_DEMANDEE"
 
     correction = chercheur_authed.post(
         f"/api/v1/researcher/analyses/{analyse_id}/corriger",
         json={
-            "titre": "V2",
-            "contenu": "Ajout du pilier social.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V2",
+            "content": "Ajout du pilier social.",
+            "company_ids": [str(entreprise.id)],
         },
     )
     assert correction.status_code == 201
     assert correction.json()["version"] == 2
-    assert correction.json()["analyse_precedente_id"] == analyse_id
-    assert correction.json()["statut"] == "BROUILLON"
+    assert correction.json()["previous_analysis_id"] == analyse_id
+    assert correction.json()["status"] == "BROUILLON"
 
     # L'ancienne version reste consultable, inchangée (CORRECTION_DEMANDEE, jamais réécrite).
     ancienne = chercheur_authed.get(f"/api/v1/researcher/analyses/{analyse_id}")
-    assert ancienne.json()["statut"] == "CORRECTION_DEMANDEE"
-    assert ancienne.json()["titre"] == "V1"
+    assert ancienne.json()["status"] == "CORRECTION_DEMANDEE"
+    assert ancienne.json()["title"] == "V1"
 
 
 def test_cloturer_projet_bloque_nouvelle_affectation(session) -> None:
@@ -365,17 +365,17 @@ def test_cloturer_projet_bloque_nouvelle_affectation(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     cloture = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/cloturer"
     )
     assert cloture.status_code == 200
-    assert cloture.json()["statut"] == "CLOTURE"
+    assert cloture.json()["status"] == "CLOTURE"
 
     affectation = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     assert affectation.status_code == 422
     assert affectation.json()["error"]["code"] == "projet_cloture"
@@ -390,19 +390,19 @@ def test_export_analyse_decremente_le_quota_et_bloque_a_zero(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
     analyse_id = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "V1",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V1",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
     chercheur_authed.post(f"/api/v1/researcher/analyses/{analyse_id}/soumettre")
@@ -423,7 +423,7 @@ def test_export_analyse_decremente_le_quota_et_bloque_a_zero(session) -> None:
     # profil — jamais seulement déductible en observant les erreurs 422 d'un futur export.
     profil = institution_authed.get("/api/v1/institution/profil")
     assert profil.status_code == 200
-    assert profil.json()["quota_export"] == 0
+    assert profil.json()["export_quota"] == 0
 
 
 def test_chercheur_ne_peut_pas_creer_analyse_sur_projet_non_affecte(session) -> None:
@@ -434,15 +434,15 @@ def test_chercheur_ne_peut_pas_creer_analyse_sur_projet_non_affecte(session) -> 
     chercheur_authed = _login(chercheur.email)
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
 
     creation = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "V1",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V1",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     )
     assert creation.status_code == 404
@@ -458,20 +458,20 @@ def test_creer_analyse_refuse_entreprise_hors_perimetre(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     # Jamais ajoutée au périmètre du projet, bien que publiée et évaluée.
 
     creation = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "V1",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V1",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     )
     assert creation.status_code == 422
@@ -489,12 +489,12 @@ def test_ajouter_entreprise_perimetre_refuse_entreprise_non_publiee(session) -> 
     session.refresh(entreprise_non_publiee)
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
 
     reponse = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/perimetre",
-        json={"entreprise_id": str(entreprise_non_publiee.id)},
+        json={"company_id": str(entreprise_non_publiee.id)},
     )
     assert reponse.status_code == 422
     assert reponse.json()["error"]["code"] == "entreprise_non_publiee"
@@ -514,13 +514,13 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
     )
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
 
     # Hors périmètre : refusé avant même de regarder le rapport.
     hors_perimetre = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/documents",
-        json={"rapport_id": str(ancien_rapport_id)},
+        json={"report_id": str(ancien_rapport_id)},
     )
     assert hors_perimetre.status_code == 422
     assert hors_perimetre.json()["error"]["code"] == "entreprise_hors_perimetre"
@@ -531,8 +531,8 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
     # l'ancien rapport reste littéralement VALIDE en base mais n'est plus le rapport publié.
     nouveau_rapport = ESGReport(
         company_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.ENTREPRISE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/dummy-v2.pdf",
         submitted_at=utcnow() + timedelta(days=1),
@@ -551,17 +551,17 @@ def test_ajouter_document_refuse_hors_perimetre_et_rapport_perime(session) -> No
 
     perime = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/documents",
-        json={"rapport_id": str(ancien_rapport_id)},
+        json={"report_id": str(ancien_rapport_id)},
     )
     assert perime.status_code == 422
     assert perime.json()["error"]["code"] == "rapport_non_publie"
 
     courant = institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/documents",
-        json={"rapport_id": str(nouveau_rapport.id)},
+        json={"report_id": str(nouveau_rapport.id)},
     )
     assert courant.status_code == 201
-    assert courant.json()["rapport_id"] == str(nouveau_rapport.id)
+    assert courant.json()["report_id"] == str(nouveau_rapport.id)
 
 
 def test_decisions_analyse_notifient_le_chercheur(session) -> None:
@@ -573,57 +573,57 @@ def test_decisions_analyse_notifient_le_chercheur(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
 
     analyse_id = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "V1",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V1",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
     chercheur_authed.post(f"/api/v1/researcher/analyses/{analyse_id}/soumettre")
 
     institution_authed.post(
         f"/api/v1/institution/analyses/{analyse_id}/demander-correction",
-        json={"commentaire": "Manque le pilier social."},
+        json={"comment": "Manque le pilier social."},
     )
     correction_notif = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == chercheur.id,
+            Notification.user_id == chercheur.id,
             Notification.type == "ANALYSE_CORRECTION_DEMANDEE",
         )
     ).one()
     assert "Manque le pilier social." in correction_notif.message
-    assert str(analyse_id) == str(correction_notif.id_ressource)
+    assert str(analyse_id) == str(correction_notif.resource_id)
 
     correction_id = chercheur_authed.post(
         f"/api/v1/researcher/analyses/{analyse_id}/corriger",
         json={
-            "titre": "V2",
-            "contenu": "Contenu corrigé.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "V2",
+            "content": "Contenu corrigé.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
     chercheur_authed.post(f"/api/v1/researcher/analyses/{correction_id}/soumettre")
     institution_authed.post(
         f"/api/v1/institution/analyses/{correction_id}/valider",
-        json={"commentaire": "Très bien."},
+        json={"comment": "Très bien."},
     )
     validation_notif = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == chercheur.id,
+            Notification.user_id == chercheur.id,
             Notification.type == "ANALYSE_VALIDEE",
         )
     ).one()
-    assert str(correction_id) == str(validation_notif.id_ressource)
+    assert str(correction_id) == str(validation_notif.resource_id)
 
     # Historique complet, depuis n'importe quelle version de la chaîne.
     historique_depuis_v1 = chercheur_authed.get(
@@ -636,8 +636,8 @@ def test_decisions_analyse_notifient_le_chercheur(session) -> None:
     assert [a["id"] for a in historique_depuis_v1.json()] == [
         a["id"] for a in historique_depuis_v2.json()
     ]
-    assert historique_depuis_v1.json()[0]["statut"] == "CORRECTION_DEMANDEE"
-    assert historique_depuis_v1.json()[1]["statut"] == "VALIDEE"
+    assert historique_depuis_v1.json()[0]["status"] == "CORRECTION_DEMANDEE"
+    assert historique_depuis_v1.json()[1]["status"] == "VALIDEE"
 
 
 def test_creer_projet_refuse_dates_incoherentes(session) -> None:
@@ -648,9 +648,9 @@ def test_creer_projet_refuse_dates_incoherentes(session) -> None:
     periode_inversee = institution_authed.post(
         "/api/v1/institution/projets",
         json={
-            "nom": "Projet vert",
-            "date_debut": debut.isoformat(),
-            "date_fin_prevue": (debut - timedelta(days=1)).isoformat(),
+            "name": "Projet vert",
+            "start_date": debut.isoformat(),
+            "planned_end_date": (debut - timedelta(days=1)).isoformat(),
         },
     )
     assert periode_inversee.status_code == 422
@@ -659,9 +659,9 @@ def test_creer_projet_refuse_dates_incoherentes(session) -> None:
     limite_avant_debut = institution_authed.post(
         "/api/v1/institution/projets",
         json={
-            "nom": "Projet vert",
-            "date_debut": debut.isoformat(),
-            "date_limite": (debut - timedelta(days=1)).isoformat(),
+            "name": "Projet vert",
+            "start_date": debut.isoformat(),
+            "deadline": (debut - timedelta(days=1)).isoformat(),
         },
     )
     assert limite_avant_debut.status_code == 422
@@ -676,18 +676,18 @@ def test_inviter_chercheur_persiste_les_conditions_de_collaboration(session) -> 
     invitation = institution_authed.post(
         "/api/v1/institution/chercheurs/inviter",
         json={
-            "chercheur_id": str(chercheur.id),
-            "conditions_collaboration": "Analyse ESG du secteur minier, 3 mois, résultats confidentiels.",
+            "researcher_id": str(chercheur.id),
+            "collaboration_terms": "Analyse ESG du secteur minier, 3 mois, résultats confidentiels.",
         },
     )
     assert invitation.status_code == 201
-    assert invitation.json()["conditions_collaboration"] == (
+    assert invitation.json()["collaboration_terms"] == (
         "Analyse ESG du secteur minier, 3 mois, résultats confidentiels."
     )
 
     chercheur_authed = _login(chercheur.email)
     mes_rattachements = chercheur_authed.get("/api/v1/researcher/rattachements").json()
-    assert mes_rattachements[0]["conditions_collaboration"] == (
+    assert mes_rattachements[0]["collaboration_terms"] == (
         "Analyse ESG du secteur minier, 3 mois, résultats confidentiels."
     )
 
@@ -700,21 +700,21 @@ def test_affecter_chercheur_notifie_le_chercheur(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
 
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == chercheur.id,
+            Notification.user_id == chercheur.id,
             Notification.type == "PROJET_AFFECTATION",
         )
     ).one()
     assert "Projet vert" in notification.message
-    assert str(notification.id_ressource) == projet_id
+    assert str(notification.resource_id) == projet_id
 
 
 def test_soumettre_analyse_notifie_institution(session) -> None:
@@ -726,32 +726,32 @@ def test_soumettre_analyse_notifie_institution(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet vert"}
+        "/api/v1/institution/projets", json={"name": "Projet vert"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
 
     analyse_id = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_id}/analyses",
         json={
-            "titre": "Analyse ESG",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "Analyse ESG",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
     chercheur_authed.post(f"/api/v1/researcher/analyses/{analyse_id}/soumettre")
 
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == institution.id,
+            Notification.user_id == institution.id,
             Notification.type == "ANALYSE_SOUMISE",
         )
     ).one()
     assert "Analyse ESG" in notification.message
-    assert str(notification.id_ressource) == analyse_id
+    assert str(notification.resource_id) == analyse_id
 
 
 def test_lister_mes_analyses_toutes_projets_confondus(session) -> None:
@@ -763,24 +763,24 @@ def test_lister_mes_analyses_toutes_projets_confondus(session) -> None:
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_a = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet A"}
+        "/api/v1/institution/projets", json={"name": "Projet A"}
     ).json()["id"]
     projet_b = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet B"}
+        "/api/v1/institution/projets", json={"name": "Projet B"}
     ).json()["id"]
     for projet_id in (projet_a, projet_b):
         institution_authed.post(
             f"/api/v1/institution/projets/{projet_id}/affecter",
-            json={"chercheur_id": str(chercheur.id)},
+            json={"researcher_id": str(chercheur.id)},
         )
         _ajouter_perimetre(institution_authed, projet_id, entreprise.id)
 
     analyse_a = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_a}/analyses",
         json={
-            "titre": "Analyse A",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "Analyse A",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
     chercheur_authed.post(f"/api/v1/researcher/analyses/{analyse_a}/soumettre")
@@ -792,9 +792,9 @@ def test_lister_mes_analyses_toutes_projets_confondus(session) -> None:
     analyse_b = chercheur_authed.post(
         f"/api/v1/researcher/projets/{projet_b}/analyses",
         json={
-            "titre": "Analyse B",
-            "contenu": "Contenu.",
-            "entreprise_ids": [str(entreprise.id)],
+            "title": "Analyse B",
+            "content": "Contenu.",
+            "company_ids": [str(entreprise.id)],
         },
     ).json()["id"]
 
@@ -802,9 +802,9 @@ def test_lister_mes_analyses_toutes_projets_confondus(session) -> None:
     assert toutes.status_code == 200
     par_id = {a["id"]: a for a in toutes.json()}
     assert set(par_id) == {analyse_a}
-    assert par_id[analyse_a]["projet_id"] == projet_a
-    assert par_id[analyse_a]["projet_nom"] == "Projet A"
-    assert par_id[analyse_a]["statut"] == "SOUMISE"
+    assert par_id[analyse_a]["project_id"] == projet_a
+    assert par_id[analyse_a]["project_name"] == "Projet A"
+    assert par_id[analyse_a]["status"] == "SOUMISE"
 
     seulement_soumises = institution_authed.get(
         "/api/v1/institution/analyses", params={"statut": "SOUMISE"}
@@ -832,11 +832,11 @@ def test_chercheur_ne_voit_que_les_entreprises_du_perimetre_de_ses_projets(sessi
     _accepter_rattachement(institution_authed, chercheur_authed, str(chercheur.id))
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet"}
+        "/api/v1/institution/projets", json={"name": "Project"}
     ).json()["id"]
     institution_authed.post(
         f"/api/v1/institution/projets/{projet_id}/affecter",
-        json={"chercheur_id": str(chercheur.id)},
+        json={"researcher_id": str(chercheur.id)},
     )
     _ajouter_perimetre(institution_authed, projet_id, dans_le_perimetre.id)
 
@@ -870,7 +870,7 @@ def test_institution_ne_consulte_le_detail_dune_entreprise_que_dans_son_propre_p
     institution_authed = _login(institution.email)
 
     projet_id = institution_authed.post(
-        "/api/v1/institution/projets", json={"nom": "Projet"}
+        "/api/v1/institution/projets", json={"name": "Project"}
     ).json()["id"]
     _ajouter_perimetre(institution_authed, projet_id, dans_le_perimetre.id)
 

@@ -75,11 +75,11 @@ export function AllReportsSection() {
             {rapports.map((rapport) => (
               <li key={rapport.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="flex items-center gap-2">
-                  <Badge variant={variantStatutRapport(rapport.statut)}>
-                    {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
+                  <Badge variant={variantStatutRapport(rapport.status)}>
+                    {libelleStatutRapport(rapport.status, rapport.extraction_status)}
                   </Badge>
                   <span className="text-brand-blue">
-                    {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
+                    {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
                   </span>
                 </div>
                 <Button asChild size="sm" variant="outline">

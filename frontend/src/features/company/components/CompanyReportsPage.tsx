@@ -53,16 +53,16 @@ export function CompanyReportsPage() {
                     <tr key={rapport.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         <div className="flex flex-col gap-1">
-                          <Badge variant={variantStatutRapport(rapport.statut)}>
-                            {libelleStatutRapport(rapport.statut, rapport.statut_extraction)}
+                          <Badge variant={variantStatutRapport(rapport.status)}>
+                            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
                           </Badge>
                           {/* Une relance d'extraction peut échouer sur un rapport déjà avancé
                               dans le workflow (PENDING_AUDIT et au-delà) — le message n'est
                               actionnable que tant que le rapport est encore SUBMITTED, jamais
                               après. */}
-                          {rapport.extraction_erreur &&
-                          rapport.statut === "SUBMITTED" &&
-                          rapport.statut_extraction === "FAILED" ? (
+                          {rapport.extraction_error &&
+                          rapport.status === "SUBMITTED" &&
+                          rapport.extraction_status === "FAILED" ? (
                             <span className="text-xs text-destructive">
                               Échec d'extraction récupérable — nouvelle version possible.
                             </span>
@@ -70,10 +70,10 @@ export function CompanyReportsPage() {
                         </div>
                       </td>
                       <td className="py-2 pr-4">{rapport.type}</td>
-                      <td className="py-2 pr-4">{rapport.annee_reporting ?? "—"}</td>
+                      <td className="py-2 pr-4">{rapport.fiscal_year ?? "—"}</td>
                       <td className="py-2 pr-4">
-                        {rapport.date_depot
-                          ? new Date(rapport.date_depot).toLocaleDateString("fr-FR")
+                        {rapport.submitted_at
+                          ? new Date(rapport.submitted_at).toLocaleDateString("fr-FR")
                           : "Brouillon"}
                       </td>
                       <td className="py-2 pr-4">v{rapport.version}</td>

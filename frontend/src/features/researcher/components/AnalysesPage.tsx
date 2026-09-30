@@ -26,8 +26,8 @@ export function AnalysesPage() {
   const { data: analyses, isLoading, isError } = useMyAnalyses();
   const { data: projets } = useMyAssignedProjects();
   const [creationOuverte, setCreationOuverte] = useState(false);
-  const projetsOuverts = projets?.filter((p) => p.statut === "OUVERT") ?? [];
-  const nomProjet = (projetId: string) => projets?.find((p) => p.id === projetId)?.nom ?? "—";
+  const projetsOuverts = projets?.filter((p) => p.status === "OUVERT") ?? [];
+  const nomProjet = (projetId: string) => projets?.find((p) => p.id === projetId)?.name ?? "—";
 
   return (
     <div className="space-y-6">
@@ -70,13 +70,13 @@ export function AnalysesPage() {
             <Card className="h-full transition hover:border-brand-green hover:shadow-md">
               <CardContent className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-brand-blue">{analyse.titre}</p>
+                  <p className="font-medium text-brand-blue">{analyse.title}</p>
                   <p className="text-sm text-brand-grey">
-                    {nomProjet(analyse.projet_id)} — version {analyse.version}
+                    {nomProjet(analyse.project_id)} — version {analyse.version}
                   </p>
                 </div>
-                <Badge variant={variantStatutAnalyse(analyse.statut)}>
-                  {libelleStatutAnalyse(analyse.statut)}
+                <Badge variant={variantStatutAnalyse(analyse.status)}>
+                  {libelleStatutAnalyse(analyse.status)}
                 </Badge>
               </CardContent>
             </Card>
@@ -103,7 +103,7 @@ function CompaniesPicker({
   const [recherche, setRecherche] = useState("");
   const { data: perimetre, isLoading } = useProjectScope(projetId);
   const entreprises = (perimetre ?? []).filter((entreprise) =>
-    entreprise.entreprise_nom.toLowerCase().includes(recherche.toLowerCase()),
+    entreprise.company_name.toLowerCase().includes(recherche.toLowerCase()),
   );
 
   function toggle(id: string) {
@@ -127,13 +127,13 @@ function CompaniesPicker({
       />
       <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
         {entreprises.map((entreprise) => (
-          <label key={entreprise.entreprise_id} className="flex items-center gap-2 text-sm">
+          <label key={entreprise.company_id} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={selectedIds.includes(entreprise.entreprise_id)}
-              onChange={() => toggle(entreprise.entreprise_id)}
+              checked={selectedIds.includes(entreprise.company_id)}
+              onChange={() => toggle(entreprise.company_id)}
             />
-            {entreprise.entreprise_nom}
+            {entreprise.company_name}
           </label>
         ))}
         {!isLoading && entreprises.length === 0 ? (
@@ -148,7 +148,7 @@ function FormulaireAnalyse({
   projets,
   onDone,
 }: {
-  projets: { id: string; nom: string }[];
+  projets: { id: string; name: string }[];
   onDone: () => void;
 }) {
   const [projetId, setProjetId] = useState(projets[0]?.id ?? "");
@@ -156,7 +156,7 @@ function FormulaireAnalyse({
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<AnalyseForm>({
     resolver: zodResolver(analyseFormSchema),
-    defaultValues: { titre: "", contenu: "", entreprise_ids: [] },
+    defaultValues: { title: "", content: "", company_ids: [] },
   });
 
   function onSubmit(values: AnalyseForm) {
@@ -190,12 +190,12 @@ function FormulaireAnalyse({
               // Le périmètre autorisé diffère par projet — on vide la sélection plutôt que de
               // laisser une entreprise hors périmètre s'y attarder après le changement.
               setProjetId(event.target.value);
-              form.setValue("entreprise_ids", []);
+              form.setValue("company_ids", []);
             }}
           >
             {projets.map((projet) => (
               <option key={projet.id} value={projet.id}>
-                {projet.nom}
+                {projet.name}
               </option>
             ))}
           </Select>
@@ -203,7 +203,7 @@ function FormulaireAnalyse({
 
         <FormField
           control={form.control}
-          name="titre"
+          name="title"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Titre</FormLabel>
@@ -216,7 +216,7 @@ function FormulaireAnalyse({
         />
         <FormField
           control={form.control}
-          name="contenu"
+          name="content"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Contenu de l'analyse</FormLabel>
@@ -229,7 +229,7 @@ function FormulaireAnalyse({
         />
         <FormField
           control={form.control}
-          name="entreprise_ids"
+          name="company_ids"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Entreprises comparées</FormLabel>

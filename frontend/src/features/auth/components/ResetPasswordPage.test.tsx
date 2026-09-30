@@ -101,7 +101,7 @@ describe("ResetPasswordPage", () => {
       "/api/v1/auth/reinitialiser-mot-de-passe",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ token: TOKEN, nouveau_mot_de_passe: "nouveau-secret" }),
+        body: JSON.stringify({ token: TOKEN, new_password: "nouveau-secret" }),
       }),
     );
     // setSearchParams (retrait du jeton) s'applique après le rendu du message de succès : attendre

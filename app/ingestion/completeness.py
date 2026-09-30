@@ -6,14 +6,14 @@ Persiste, pour CHAQUE code de INDICATEURS_CIBLES, ce que le LLM d'extraction a r
   - transparence à l'écran : une donnée absente doit être signalée comme telle, jamais laissée
     silencieusement invisible (décision produit, voir la conversation qui a motivé ce module) ;
   - diagnostic de couverture sémantique : distinguer TROUVE / NON_TROUVE / ABSENT_CONFIRME (voir
-    StatutCouvertureIndicateur, app/core/enums.py), utile pour juger si la sélection adaptative de
+    MetricCoverageStatus, app/core/enums.py), utile pour juger si la sélection adaptative de
     pages (app/ingestion/extractor.py) fait manquer des indicateurs sur un rapport de plusieurs
     centaines de pages.
 """
 
 import uuid
 
-from app.core.enums import StatutCouvertureIndicateur
+from app.core.enums import MetricCoverageStatus
 from app.ingestion.models import MetricCoverage
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
@@ -59,11 +59,11 @@ def calculer_couverture(
         extrait = extraits_par_code.get(code)
         trouve = bool(extrait and extrait.trouve and extrait.valeur is not None)
         if trouve:
-            statut = StatutCouvertureIndicateur.TROUVE
+            statut = MetricCoverageStatus.TROUVE
         elif _absence_confirmee(extrait, recherche_exhaustive_par_code.get(code, False)):
-            statut = StatutCouvertureIndicateur.ABSENT_CONFIRME
+            statut = MetricCoverageStatus.ABSENT_CONFIRME
         else:
-            statut = StatutCouvertureIndicateur.NON_TROUVE
+            statut = MetricCoverageStatus.NON_TROUVE
         couvertures.append(
             MetricCoverage(
                 report_id=rapport_id,

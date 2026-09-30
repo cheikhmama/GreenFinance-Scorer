@@ -9,9 +9,9 @@ import uuid
 
 from sqlmodel import Session, col, select
 
-from app.auth.models import ChercheurInstitution, User
+from app.auth.models import ResearcherAffiliation, User
 from app.core.database import utcnow
-from app.core.enums import Role, StatutRattachement
+from app.core.enums import AffiliationStatus, Role
 from app.core.exceptions import ValidationError
 from app.core.notifications import notifier
 
@@ -20,8 +20,8 @@ def lister_chercheurs_disponibles(session: Session, institution_id: uuid.UUID) -
     """Comptes CHERCHEUR actifs jamais encore invités par cette institution — un rattachement
     REFUSE se réinvite via inviter_chercheur (qui remet le même enregistrement à EN_ATTENTE),
     pas via cette liste."""
-    deja_rattaches = select(ChercheurInstitution.chercheur_id).where(
-        ChercheurInstitution.institution_id == institution_id
+    deja_rattaches = select(ResearcherAffiliation.researcher_id).where(
+        ResearcherAffiliation.institution_id == institution_id
     )
     return list(
         session.exec(
@@ -50,37 +50,37 @@ def inviter_chercheur(
     institution_id: uuid.UUID,
     chercheur_id: uuid.UUID,
     conditions_collaboration: str | None = None,
-) -> ChercheurInstitution:
+) -> ResearcherAffiliation:
     chercheur = session.get(User, chercheur_id)
     if chercheur is None or chercheur.role != Role.RESEARCHER or not chercheur.active:
         raise ValidationError("Chercheur invalide.", code="chercheur_invalide")
 
     existant = session.exec(
-        select(ChercheurInstitution).where(
-            ChercheurInstitution.institution_id == institution_id,
-            ChercheurInstitution.chercheur_id == chercheur_id,
+        select(ResearcherAffiliation).where(
+            ResearcherAffiliation.institution_id == institution_id,
+            ResearcherAffiliation.researcher_id == chercheur_id,
         )
     ).first()
     if existant is not None:
-        if existant.statut != StatutRattachement.REFUSE:
+        if existant.status != AffiliationStatus.REFUSE:
             raise ValidationError(
                 "Ce chercheur est déjà invité ou rattaché.", code="rattachement_existant"
             )
         # Réinvitation après un refus : même ligne, jamais un doublon (voir uq_chercheur_institution).
-        existant.statut = StatutRattachement.EN_ATTENTE
-        existant.date_invitation = utcnow()
-        existant.date_reponse = None
-        existant.conditions_collaboration = conditions_collaboration
+        existant.status = AffiliationStatus.EN_ATTENTE
+        existant.invited_at = utcnow()
+        existant.responded_at = None
+        existant.collaboration_terms = conditions_collaboration
         session.add(existant)
         _notifier_invitation(session, institution_id, chercheur_id)
         session.commit()
         session.refresh(existant)
         return existant
 
-    rattachement = ChercheurInstitution(
+    rattachement = ResearcherAffiliation(
         institution_id=institution_id,
-        chercheur_id=chercheur_id,
-        conditions_collaboration=conditions_collaboration,
+        researcher_id=chercheur_id,
+        collaboration_terms=conditions_collaboration,
     )
     session.add(rattachement)
     _notifier_invitation(session, institution_id, chercheur_id)
@@ -90,9 +90,9 @@ def inviter_chercheur(
 
 
 def lister_mes_chercheurs(
-    session: Session, institution_id: uuid.UUID, *, statut: StatutRattachement | None = None
-) -> list[ChercheurInstitution]:
-    filtres = [col(ChercheurInstitution.institution_id) == institution_id]
+    session: Session, institution_id: uuid.UUID, *, statut: AffiliationStatus | None = None
+) -> list[ResearcherAffiliation]:
+    filtres = [col(ResearcherAffiliation.institution_id) == institution_id]
     if statut is not None:
-        filtres.append(col(ChercheurInstitution.statut) == statut)
-    return list(session.exec(select(ChercheurInstitution).where(*filtres)).all())
+        filtres.append(col(ResearcherAffiliation.status) == statut)
+    return list(session.exec(select(ResearcherAffiliation).where(*filtres)).all())

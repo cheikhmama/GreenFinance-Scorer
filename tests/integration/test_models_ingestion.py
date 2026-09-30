@@ -7,12 +7,12 @@ from sqlalchemy.exc import IntegrityError
 from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
+    DataMethod,
     ExtractionStatus,
-    MethodeDonnee,
     Pillar,
     ReportStatus,
-    TypeRapport,
+    ReportType,
+    SubmissionChannel,
 )
 from app.ingestion.models import (
     CarbonEmission,
@@ -34,8 +34,8 @@ def _entreprise(session, **kwargs) -> Company:
 def _rapport(entreprise_id: uuid.UUID, **kwargs) -> ESGReport:
     defaults = {
         "company_id": entreprise_id,
-        "type": TypeRapport.RAPPORT_ESG,
-        "channel": CanalDepot.AUTOMATIQUE,
+        "type": ReportType.RAPPORT_ESG,
+        "channel": SubmissionChannel.AUTOMATIQUE,
         "source_file": "s3://bucket/rapport.pdf",
         "submitted_at": utcnow(),
     }
@@ -62,8 +62,8 @@ def test_entreprise_id_obligatoire(session) -> None:
     # construction : la contrainte NOT NULL s'applique au flush, côté base.
     rapport = ESGReport(
         company_id=None,  # type: ignore[arg-type]
-        type=TypeRapport.RAPPORT_ESG,
-        channel=CanalDepot.AUTOMATIQUE,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
         source_file="x",
         submitted_at=utcnow(),
     )
@@ -118,7 +118,7 @@ def test_indicateur_et_donnee_carbone_lies_au_meme_rapport(session) -> None:
         metric_code="GHG-SCOPE1",
         value=123.4,
         unit="tCO2e",
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         proof_id=preuve.id,
     )
     donnee_carbone = CarbonEmission(
@@ -126,7 +126,7 @@ def test_indicateur_et_donnee_carbone_lies_au_meme_rapport(session) -> None:
         scope=1,
         tonnes_co2e=123.4,
         year=2025,
-        method=MethodeDonnee.RAPPORTEE,
+        method=DataMethod.RAPPORTEE,
         pcaf_data_quality=3,
         proof_id=preuve.id,
     )
@@ -161,7 +161,7 @@ def test_score_qualite_pcaf_hors_bornes_rejete(session, score_invalide: int) -> 
                 "scope": 1,
                 "tonnes_co2e": 1.0,
                 "year": 2025,
-                "method": MethodeDonnee.RAPPORTEE,
+                "method": DataMethod.RAPPORTEE,
                 "pcaf_data_quality": score_invalide,
                 "proof_id": preuve.id,
             }
@@ -186,7 +186,7 @@ def test_scope_hors_bornes_rejete_en_base(session, scope_invalide: int) -> None:
             scope=scope_invalide,
             tonnes_co2e=1.0,
             year=2025,
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             pcaf_data_quality=3,
             proof_id=preuve.id,
         )
@@ -209,7 +209,7 @@ def test_valeur_tonnes_co2e_negative_rejetee_en_base(session) -> None:
             scope=1,
             tonnes_co2e=-0.01,
             year=2025,
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             pcaf_data_quality=3,
             proof_id=preuve.id,
         )
@@ -235,7 +235,7 @@ def test_score_qualite_pcaf_hors_bornes_rejete_en_base(session, pcaf_invalide: i
             scope=1,
             tonnes_co2e=1.0,
             year=2025,
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             pcaf_data_quality=pcaf_invalide,
             proof_id=preuve.id,
         )
@@ -286,7 +286,7 @@ def test_suppression_rapport_reference_echoue_proprement(session) -> None:
             metric_code="EMP-01",
             value=1.0,
             unit="ratio",
-            method=MethodeDonnee.RAPPORTEE,
+            method=DataMethod.RAPPORTEE,
             proof_id=preuve.id,
         )
     )

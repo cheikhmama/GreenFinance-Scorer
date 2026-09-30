@@ -29,10 +29,10 @@ from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
 from app.core.enums import (
-    DevisePosition,
+    Currency,
+    DurationType,
     IdentifierType,
     MatchStatus,
-    TypeDureeInvestissement,
     sa_enum_column,
 )
 
@@ -49,7 +49,7 @@ class Portfolio(SQLModel, table=True):
     # revu avec ce module). L'application ne supprime jamais un compte, elle le désactive.
     user_id: uuid.UUID = Field(foreign_key="users.id", ondelete="CASCADE", index=True)
     name: str
-    reference_currency: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
+    reference_currency: Currency = Field(sa_column=sa_enum_column(Currency))
     created_at: datetime = Field(default_factory=utcnow)
     # Jamais de suppression d'un portefeuille ayant déjà eu une position (voir
     # app/investor/portfolio.py) — l'archivage est la seule façon de le retirer de la vue "Mes
@@ -99,7 +99,7 @@ class PortfolioPosition(SQLModel, table=True):
     # Montant tel que saisi par l'investisseur, dans la devise ci-dessous — requis par PCAF
     # (facteur d'attribution = montant / EVIC, docs/WORKFLOWS.md §2.4).
     outstanding_amount: Decimal = Field(sa_column=Column(Numeric(20, 2), nullable=False))
-    currency: DevisePosition = Field(sa_column=sa_enum_column(DevisePosition))
+    currency: Currency = Field(sa_column=sa_enum_column(Currency))
     # Nul si aucune conversion n'était nécessaire (currency == devise de référence du
     # portefeuille) ; sinon figé à la valeur en vigueur au moment de la création.
     fx_rate_used: Decimal | None = Field(
@@ -112,8 +112,8 @@ class PortfolioPosition(SQLModel, table=True):
     # Poids déclaré à l'import (tâche 2.2), dans ]0, 1]. Nul pour une position saisie par montant :
     # le poids est alors dérivé des montants à l'affichage.
     weight: Decimal | None = Field(default=None, sa_column=Column(Numeric(11, 10), nullable=True))
-    duration_type: TypeDureeInvestissement = Field(
-        sa_column=sa_enum_column(TypeDureeInvestissement)
+    duration_type: DurationType = Field(
+        sa_column=sa_enum_column(DurationType)
     )
     start_date: datetime
     # Obligatoire et validée à la création si FIXE ; nulle à la création si OUVERTE,
@@ -125,7 +125,7 @@ class PortfolioPosition(SQLModel, table=True):
 
     @model_validator(mode="after")
     def _valider_regles_duree(self) -> "PortfolioPosition":
-        if self.duration_type == TypeDureeInvestissement.FIXE:
+        if self.duration_type == DurationType.FIXE:
             if self.end_date is None:
                 raise ValueError("end_date est obligatoire pour une position à durée FIXE")
             if self.start_date.date() < utcnow().date():
@@ -143,7 +143,7 @@ class PortfolioPosition(SQLModel, table=True):
                 )
             if self.end_date <= self.start_date:
                 raise ValueError("end_date doit être postérieure à start_date")
-        elif self.duration_type == TypeDureeInvestissement.OUVERTE:
+        elif self.duration_type == DurationType.OUVERTE:
             if self.end_date is None and self.start_date.date() < utcnow().date():
                 # Comparaison au jour près, même raison que la branche FIXE ci-dessus. La règle
                 # "start_date >= aujourd'hui" ne s'applique qu'à la création (end_date encore

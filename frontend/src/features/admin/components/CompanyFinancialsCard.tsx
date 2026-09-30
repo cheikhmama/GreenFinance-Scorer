@@ -3,7 +3,7 @@ import { ApiError } from "@/shared/api/errors";
 import {
   type CompanyFinancials,
   type CompanyFinancialsRequest,
-  DevisePosition,
+  Currency,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -15,7 +15,7 @@ import { Select } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useCompanyFinancials, useUpdateCompanyFinancials } from "../api";
 
-const DEVISES = Object.values(DevisePosition);
+const DEVISES = Object.values(Currency);
 
 type Valeurs = {
   revenue: string;
@@ -103,10 +103,10 @@ function FormulaireFinancier({
 
     const payload: CompanyFinancialsRequest = {
       revenue: revenue as number | null,
-      revenue_currency: revenue === null ? null : (valeurs.revenue_currency as DevisePosition),
+      revenue_currency: revenue === null ? null : (valeurs.revenue_currency as Currency),
       enterprise_value: enterpriseValue as number | null,
       enterprise_value_currency:
-        enterpriseValue === null ? null : (valeurs.enterprise_value_currency as DevisePosition),
+        enterpriseValue === null ? null : (valeurs.enterprise_value_currency as Currency),
       enterprise_value_as_of: valeurs.enterprise_value_as_of || null,
     };
     mutation.mutate(payload, { onSuccess: (resultat) => setValeurs(depuisServeur(resultat)) });
