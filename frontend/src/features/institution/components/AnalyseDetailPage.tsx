@@ -22,8 +22,8 @@ import {
 export function AnalyseDetailPage() {
   const { analyseId = "" } = useParams();
   const { data: analyse, isLoading, isError } = useAnalysisDetailForInstitution(analyseId);
-  const valider = useApproveAnalysis(analyseId, analyse?.projet_id ?? "");
-  const demanderCorrection = useRequestAnalysisCorrection(analyseId, analyse?.projet_id ?? "");
+  const valider = useApproveAnalysis(analyseId, analyse?.project_id ?? "");
+  const demanderCorrection = useRequestAnalysisCorrection(analyseId, analyse?.project_id ?? "");
   const [commentaire, setCommentaire] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [exportEnCours, setExportEnCours] = useState(false);
@@ -31,8 +31,8 @@ export function AnalyseDetailPage() {
   if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
   if (isError || !analyse) return <p className="text-destructive">Analyse introuvable.</p>;
 
-  const enAttenteDeDecision = analyse.statut === "SOUMISE";
-  const decidee = analyse.statut === "VALIDEE" || analyse.statut === "CORRECTION_DEMANDEE";
+  const enAttenteDeDecision = analyse.status === "SOUMISE";
+  const decidee = analyse.status === "VALIDEE" || analyse.status === "CORRECTION_DEMANDEE";
   const enCours = valider.isPending || demanderCorrection.isPending;
 
   async function lancerExport() {
@@ -40,7 +40,7 @@ export function AnalyseDetailPage() {
     setErreur(null);
     setExportEnCours(true);
     try {
-      await exportAnalysisFile(analyse.id, analyse.titre);
+      await exportAnalysisFile(analyse.id, analyse.title);
     } catch (error) {
       setErreur(error instanceof ApiError ? error.message : "Échec de l'export.");
     } finally {
@@ -52,17 +52,17 @@ export function AnalyseDetailPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow={`Version ${analyse.version}`}
-        title={analyse.titre}
-        description={`${analyse.entreprise_ids.length} entreprise(s) comparée(s).`}
-        action={<Badge variant={variantStatutAnalyse(analyse.statut)}>{libelleStatutAnalyse(analyse.statut)}</Badge>}
+        title={analyse.title}
+        description={`${analyse.company_ids.length} entreprise(s) comparée(s).`}
+        action={<Badge variant={variantStatutAnalyse(analyse.status)}>{libelleStatutAnalyse(analyse.status)}</Badge>}
       />
 
       <HistoriqueVersions analyseId={analyse.id} versionActuelle={analyse.version} />
 
-      {analyse.commentaire_institution ? (
+      {analyse.institution_comment ? (
         <Alert>
           <AlertTitle>Votre dernier commentaire</AlertTitle>
-          <AlertDescription>{analyse.commentaire_institution}</AlertDescription>
+          <AlertDescription>{analyse.institution_comment}</AlertDescription>
         </Alert>
       ) : null}
       {erreur ? <p className="text-sm text-destructive">{erreur}</p> : null}
@@ -75,7 +75,7 @@ export function AnalyseDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {analyse.entreprise_ids.map((entrepriseId) => (
+          {analyse.company_ids.map((entrepriseId) => (
             <EntrepriseComparee key={entrepriseId} entrepriseId={entrepriseId} />
           ))}
         </CardContent>
@@ -85,7 +85,7 @@ export function AnalyseDetailPage() {
         <CardHeader>
           <CardTitle className="text-base text-brand-blue">Contenu</CardTitle>
         </CardHeader>
-        <CardContent className="whitespace-pre-wrap text-sm text-brand-grey">{analyse.contenu}</CardContent>
+        <CardContent className="whitespace-pre-wrap text-sm text-brand-grey">{analyse.content}</CardContent>
       </Card>
 
       {enAttenteDeDecision ? (
@@ -105,7 +105,7 @@ export function AnalyseDetailPage() {
                 disabled={enCours}
                 onClick={() =>
                   valider.mutate(
-                    { commentaire: commentaire || undefined },
+                    { comment: commentaire || undefined },
                     {
                       onError: (error) =>
                         setErreur(error instanceof ApiError ? error.message : "Échec de la validation."),
@@ -120,7 +120,7 @@ export function AnalyseDetailPage() {
                 disabled={enCours || commentaire.trim().length === 0}
                 onClick={() =>
                   demanderCorrection.mutate(
-                    { commentaire },
+                    { comment: commentaire },
                     {
                       onError: (error) =>
                         setErreur(error instanceof ApiError ? error.message : "Échec de la demande de correction."),
@@ -156,10 +156,10 @@ function EntrepriseComparee({ entrepriseId }: { entrepriseId: string }) {
       to={`/institution/entreprises/${entrepriseId}`}
       className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
     >
-      <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-8" />
+      <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-brand-blue">{entreprise.nom}</p>
-        <p className="truncate text-xs text-brand-grey">{entreprise.secteur}</p>
+        <p className="truncate font-medium text-brand-blue">{entreprise.name}</p>
+        <p className="truncate text-xs text-brand-grey">{entreprise.sector}</p>
       </div>
     </Link>
   );
@@ -199,8 +199,8 @@ function HistoriqueVersions({
               ) : null}
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={variantStatutAnalyse(version.statut)}>
-                {libelleStatutAnalyse(version.statut)}
+              <Badge variant={variantStatutAnalyse(version.status)}>
+                {libelleStatutAnalyse(version.status)}
               </Badge>
               {version.id !== analyseId ? (
                 <Link

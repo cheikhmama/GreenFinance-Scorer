@@ -11,7 +11,7 @@ import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
 import { useSubmitReport } from "../api";
-import { type DeposerRapportForm, deposerRapportSchema, TYPES_RAPPORT, type TypeRapport } from "../schemas";
+import { type DeposerRapportForm, deposerRapportSchema, TYPES_RAPPORT, type ReportType } from "../schemas";
 
 const ANNEE_COURANTE = new Date().getFullYear();
 
@@ -30,10 +30,10 @@ export function CompanyDepositPage() {
 
   function onSubmit(values: DeposerRapportForm) {
     setServerError(null);
-    // Le <select> n'offre que les valeurs de TYPES_RAPPORT (dérivées de TypeRapport lui-même) —
+    // Le <select> n'offre que les valeurs de TYPES_RAPPORT (dérivées de ReportType lui-même) —
     // cast sûr, zod ne valide ce champ qu'en chaîne non vide pour rester simple côté schéma.
     submitReport.mutate(
-      { ...values, type: values.type as TypeRapport },
+      { ...values, type: values.type as ReportType },
       {
         onSuccess: () => navigate("/company/rapports"),
         onError: (error) => {

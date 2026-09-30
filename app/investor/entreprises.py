@@ -1,26 +1,28 @@
 """Consultation des entreprises publiées par l'Investisseur — lecture seule, jamais de saisie.
 
-Projette le dernier rapport VALIDE d'une entreprise publiée vers les schémas Investisseur
+Projette le dernier rapport VALIDATED d'une entreprise publiée vers les schémas Investisseur
 (app/investor/schemas.py) ; app/ingestion/models.py et app/scoring/models.py restent l'unique
 source de vérité, jamais dupliquée ici.
 """
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, col, func, select
 
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.company.schemas import EntreprisePublic
 from app.core.config import get_settings
-from app.core.enums import DevisePosition, StatutCouvertureIndicateur, StatutRapport
+from app.core.enums import Currency, MetricCoverageStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.recherche import contient
 from app.ingestion.models import (
-    CouvertureIndicateur,
-    DonneeCarbone,
-    IndicateurESG,
-    PreuveDocumentaire,
-    RapportESG,
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
+    MetricCoverage,
 )
 from app.ingestion.schemas import CouvertureResume
 from app.investor import fx
@@ -31,72 +33,73 @@ from app.investor.schemas import (
     ScoreEntreprisePublic,
 )
 
-_COUVERTURE_VIDE = CouvertureResume(total_cibles=0, trouves=0, codes_manquants=[])
+_COUVERTURE_VIDE = CouvertureResume(total_targets=0, found=0, missing_codes=[])
 
 
-def couverture_publique(session: Session, rapport: RapportESG | None) -> CouvertureResume:
+def couverture_publique(session: Session, rapport: ESGReport | None) -> CouvertureResume:
     """Même donnée que RapportESGDetail.couverture (app/ingestion/schemas.py), reconstruite ici
     car EntrepriseDetailInvestisseur s'assemble manuellement (jamais via from_attributes sur
     l'ORM, voir consulter_entreprise_publiee) plutôt que par un computed_field."""
     if rapport is None:
         return _COUVERTURE_VIDE
     couvertures = session.exec(
-        select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport.id)
+        select(MetricCoverage).where(MetricCoverage.report_id == rapport.id)
     ).all()
     return CouvertureResume(
-        total_cibles=len(couvertures),
-        trouves=sum(1 for c in couvertures if c.statut == StatutCouvertureIndicateur.TROUVE),
-        codes_manquants=[
-            c.code for c in couvertures if c.statut != StatutCouvertureIndicateur.TROUVE
+        total_targets=len(couvertures),
+        found=sum(1 for c in couvertures if c.status == MetricCoverageStatus.TROUVE),
+        missing_codes=[
+            c.metric_code for c in couvertures if c.status != MetricCoverageStatus.TROUVE
         ],
     )
 from app.scoring.engine import score_officiel
-from app.scoring.models import ConfigurationPonderation
+from app.scoring.models import ScoringConfig
 
 _SCORE_VIDE = ScoreEntreprisePublic(
-    valeur_globale=None,
-    score_environnement=None,
-    score_social=None,
-    score_gouvernance=None,
-    configuration_version=None,
+    global_score=None,
+    environmental_score=None,
+    social_score=None,
+    governance_score=None,
+    config_version=None,
 )
 _CARBONE_VIDE = DonneesCarboneAgregees(
     scope_1=None, scope_2_market_based=None, scope_2_location_based=None, scope_3=None
 )
 
 
-def dernier_rapport_valide(session: Session, entreprise_id: uuid.UUID) -> RapportESG | None:
-    """La publication (Entreprise.date_publication) ne pointe pas explicitement vers un rapport
-    précis — c'est toujours le RapportESG VALIDE le plus récent qui fait foi, cohérent avec la
+def dernier_rapport_valide(session: Session, entreprise_id: uuid.UUID) -> ESGReport | None:
+    """La publication (Company.published_at) ne pointe pas explicitement vers un rapport
+    précis — c'est toujours le ESGReport VALIDATED le plus récent qui fait foi, cohérent avec la
     republication (app/admin/dashboard.py::demandes_republication)."""
     return session.exec(
-        select(RapportESG)
-        .where(RapportESG.entreprise_id == entreprise_id, RapportESG.statut == StatutRapport.VALIDE)
-        .order_by(col(RapportESG.date_depot).desc())
+        select(ESGReport)
+        .where(ESGReport.company_id == entreprise_id, ESGReport.status == ReportStatus.VALIDATED)
+        .order_by(col(ESGReport.submitted_at).desc())
     ).first()
 
 
-def score_public(session: Session, rapport: RapportESG | None) -> ScoreEntreprisePublic:
+def score_public(session: Session, rapport: ESGReport | None) -> ScoreEntreprisePublic:
     if rapport is None:
         return _SCORE_VIDE
     score = score_officiel(session, rapport.id)
     if score is None:
         return _SCORE_VIDE
-    configuration = session.get(ConfigurationPonderation, score.configuration_id)
+    configuration = session.get(ScoringConfig, score.config_id)
     return ScoreEntreprisePublic(
-        valeur_globale=score.valeur_globale,
-        score_environnement=score.score_environnement,
-        score_social=score.score_social,
-        score_gouvernance=score.score_gouvernance,
-        configuration_version=configuration.version if configuration else None,
+        global_score=score.global_score,
+        environmental_score=score.environmental_score,
+        social_score=score.social_score,
+        governance_score=score.governance_score,
+        coverage_rate=score.coverage_rate,
+        config_version=configuration.version if configuration else None,
     )
 
 
-def carbone_agrege(session: Session, rapport: RapportESG | None) -> DonneesCarboneAgregees:
+def carbone_agrege(session: Session, rapport: ESGReport | None) -> DonneesCarboneAgregees:
     if rapport is None:
         return _CARBONE_VIDE
-    donnees = session.exec(select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport.id)).all()
-    par_cle = {(d.scope, d.categorie_ges): d.valeur_tonnes_co2e for d in donnees}
+    donnees = session.exec(select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)).all()
+    par_cle = {(d.scope, d.ghg_category): d.tonnes_co2e for d in donnees}
     return DonneesCarboneAgregees(
         scope_1=par_cle.get((1, None)),
         scope_2_market_based=par_cle.get((2, "market_based")),
@@ -106,33 +109,33 @@ def carbone_agrege(session: Session, rapport: RapportESG | None) -> DonneesCarbo
 
 
 def montant_minimum_par_devise(
-    entreprise: Entreprise, chemin_taux: str
-) -> dict[DevisePosition, float] | None:
+    entreprise: Company, chemin_taux: str
+) -> dict[Currency, Decimal] | None:
     """None si l'entreprise n'impose aucun minimum — jamais une carte à 3 zéros qui laisserait
     croire à un minimum réel de 0. Sinon, converti dans les 3 devises depuis
-    Entreprise.devise_montant_minimum (toujours renseignée de pair, voir
+    Company.minimum_investment_currency (toujours renseignée de pair, voir
     app/company/models.py) avec la même logique FX que app/investor/portfolio.py."""
-    if entreprise.montant_minimum_investissement is None:
+    if entreprise.minimum_investment_amount is None:
         return None
-    assert entreprise.devise_montant_minimum is not None
+    assert entreprise.minimum_investment_currency is not None
     return {
         devise: fx.convertir(
-            entreprise.montant_minimum_investissement,
-            entreprise.devise_montant_minimum,
+            entreprise.minimum_investment_amount,
+            entreprise.minimum_investment_currency,
             devise,
             chemin_taux,
         )[0]
-        for devise in DevisePosition
+        for devise in Currency
     }
 
 
-def entreprise_publiee_publique(session: Session, entreprise: Entreprise) -> EntreprisePublieePublic:
+def entreprise_publiee_publique(session: Session, entreprise: Company) -> EntreprisePublieePublic:
     rapport = dernier_rapport_valide(session, entreprise.id)
     return EntreprisePublieePublic(
         **EntreprisePublic.model_validate(entreprise).model_dump(),
         score=score_public(session, rapport),
-        carbone=carbone_agrege(session, rapport),
-        montant_minimum_par_devise=montant_minimum_par_devise(
+        carbon=carbone_agrege(session, rapport),
+        minimum_amount_by_currency=montant_minimum_par_devise(
             entreprise, get_settings().fx_rates_path
         ),
     )
@@ -152,22 +155,21 @@ def lister_entreprises_publiees(
     voir app/researcher/router.py et app/institution/router.py) — None (par défaut, cas
     Investisseur) laisse le catalogue complet inchangé. Un ensemble vide renvoie une page vide,
     jamais tout le catalogue par accident."""
-    filtres: list[ColumnElement[bool]] = [col(Entreprise.date_publication).is_not(None)]
+    filtres: list[ColumnElement[bool]] = [col(Company.published_at).is_not(None)]
     if perimetre_autorise is not None:
-        filtres.append(col(Entreprise.id).in_(perimetre_autorise))
+        filtres.append(col(Company.id).in_(perimetre_autorise))
     if secteur:
-        filtres.append(col(Entreprise.secteur) == secteur)
+        filtres.append(col(Company.sector) == secteur)
     if pays:
-        filtres.append(col(Entreprise.pays) == pays)
+        filtres.append(col(Company.country) == pays)
     if recherche:
-        motif = f"%{recherche}%"
-        filtres.append(or_(col(Entreprise.nom).ilike(motif), col(Entreprise.secteur).ilike(motif)))
+        filtres.append(contient(recherche, Company.name, Company.sector))
 
-    total = session.exec(select(func.count()).select_from(Entreprise).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(Company).where(*filtres)).one()
     items = session.exec(
-        select(Entreprise)
+        select(Company)
         .where(*filtres)
-        .order_by(col(Entreprise.nom))
+        .order_by(col(Company.name))
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -180,10 +182,10 @@ def consulter_entreprise_publiee(
     *,
     perimetre_autorise: set[uuid.UUID] | None = None,
 ) -> EntrepriseDetailInvestisseur:
-    entreprise = session.get(Entreprise, entreprise_id)
+    entreprise = session.get(Company, entreprise_id)
     if (
         entreprise is None
-        or entreprise.date_publication is None
+        or entreprise.published_at is None
         or (perimetre_autorise is not None and entreprise_id not in perimetre_autorise)
     ):
         # Même code dans les trois cas — entreprise inconnue, pas encore publiée, ou hors du
@@ -200,25 +202,26 @@ def consulter_entreprise_publiee(
         # contiguës, jamais dans un ordre d'insertion arbitraire (voir EvidenceTables.tsx).
         indicateurs = list(
             session.exec(
-                select(IndicateurESG)
-                .where(IndicateurESG.rapport_id == rapport.id)
-                .order_by(col(IndicateurESG.pilier), col(IndicateurESG.code))
+                select(ESGMetric)
+                .where(ESGMetric.report_id == rapport.id)
+                .order_by(col(ESGMetric.pillar), col(ESGMetric.metric_code))
             ).all()
         )
         donnees_carbone = list(
             session.exec(
-                select(DonneeCarbone)
-                .where(DonneeCarbone.rapport_id == rapport.id)
-                .order_by(col(DonneeCarbone.scope), col(DonneeCarbone.categorie_ges))
+                select(CarbonEmission)
+                .where(CarbonEmission.report_id == rapport.id)
+                .order_by(col(CarbonEmission.scope), col(CarbonEmission.ghg_category))
             ).all()
         )
 
     base = entreprise_publiee_publique(session, entreprise)
     return EntrepriseDetailInvestisseur(
         **base.model_dump(),
-        indicateurs=indicateurs,
-        donnees_carbone=donnees_carbone,
-        couverture=couverture_publique(session, rapport),
+        metrics=indicateurs,
+        carbon_data=donnees_carbone,
+        coverage=couverture_publique(session, rapport),
+        report_id=rapport.id if rapport else None,
     )
 
 
@@ -230,13 +233,13 @@ def fichier_preuve(
     perimetre_autorise: set[uuid.UUID] | None = None,
 ) -> str:
     """Chemin de stockage du mini-PDF (une page) prouvant un indicateur ou une donnée carbone —
-    jamais un simple session.get(PreuveDocumentaire, preuve_id) : sans vérifier que cette preuve
-    appartient bien au rapport VALIDE actuellement publié de CETTE entreprise, un UUID de preuve
+    jamais un simple session.get(Evidence, preuve_id) : sans vérifier que cette preuve
+    appartient bien au rapport VALIDATED actuellement publié de CETTE entreprise, un UUID de preuve
     deviné donnerait accès à l'extrait d'un rapport non publié ou d'une autre entreprise."""
-    entreprise = session.get(Entreprise, entreprise_id)
+    entreprise = session.get(Company, entreprise_id)
     if (
         entreprise is None
-        or entreprise.date_publication is None
+        or entreprise.published_at is None
         or (perimetre_autorise is not None and entreprise_id not in perimetre_autorise)
     ):
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
@@ -244,14 +247,14 @@ def fichier_preuve(
     rapport = dernier_rapport_valide(session, entreprise_id)
     appartient_au_rapport = rapport is not None and (
         session.exec(
-            select(IndicateurESG.id).where(
-                IndicateurESG.preuve_id == preuve_id, IndicateurESG.rapport_id == rapport.id
+            select(ESGMetric.id).where(
+                ESGMetric.proof_id == preuve_id, ESGMetric.report_id == rapport.id
             )
         ).first()
         is not None
         or session.exec(
-            select(DonneeCarbone.id).where(
-                DonneeCarbone.preuve_id == preuve_id, DonneeCarbone.rapport_id == rapport.id
+            select(CarbonEmission.id).where(
+                CarbonEmission.proof_id == preuve_id, CarbonEmission.report_id == rapport.id
             )
         ).first()
         is not None
@@ -259,9 +262,9 @@ def fichier_preuve(
     if not appartient_au_rapport:
         raise NotFoundError("Preuve introuvable.", code="preuve_introuvable")
 
-    preuve = session.get(PreuveDocumentaire, preuve_id)
+    preuve = session.get(Evidence, preuve_id)
     assert preuve is not None  # invariant : la requête ci-dessus vient de la trouver par FK
-    return preuve.pdf_extrait_genere
+    return preuve.excerpt_pdf_path
 
 
 _MAX_ENTREPRISES_COMPARAISON = 4

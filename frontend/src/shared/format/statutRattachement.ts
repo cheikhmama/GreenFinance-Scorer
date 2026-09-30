@@ -1,13 +1,13 @@
-import type { StatutRattachement } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { AffiliationStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-const LIBELLES: Record<StatutRattachement, string> = {
+const LIBELLES: Record<AffiliationStatus, string> = {
   EN_ATTENTE: "En attente",
   ACCEPTE: "Accepté",
   REFUSE: "Refusé",
 };
 
 const VARIANTES: Record<
-  StatutRattachement,
+  AffiliationStatus,
   "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
 > = {
   EN_ATTENTE: "warning",
@@ -15,10 +15,10 @@ const VARIANTES: Record<
   REFUSE: "destructive",
 };
 
-export function libelleStatutRattachement(statut: StatutRattachement): string {
+export function libelleStatutRattachement(statut: AffiliationStatus): string {
   return LIBELLES[statut];
 }
 
-export function variantStatutRattachement(statut: StatutRattachement) {
+export function variantStatutRattachement(statut: AffiliationStatus) {
   return VARIANTES[statut];
 }

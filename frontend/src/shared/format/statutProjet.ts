@@ -1,22 +1,22 @@
-import type { StatutProjet } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { ProjectStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-const LIBELLES: Record<StatutProjet, string> = {
+const LIBELLES: Record<ProjectStatus, string> = {
   OUVERT: "Ouvert",
   CLOTURE: "Clôturé",
 };
 
 const VARIANTES: Record<
-  StatutProjet,
+  ProjectStatus,
   "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
 > = {
   OUVERT: "success",
   CLOTURE: "secondary",
 };
 
-export function libelleStatutProjet(statut: StatutProjet): string {
+export function libelleStatutProjet(statut: ProjectStatus): string {
   return LIBELLES[statut];
 }
 
-export function variantStatutProjet(statut: StatutProjet) {
+export function variantStatutProjet(statut: ProjectStatus) {
   return VARIANTES[statut];
 }

@@ -331,7 +331,7 @@ function AuditHistory({
 export function AuditPrototypePage({ section }: { section: string }) {
   const { companies, previewUserId, reports, showToast, updateReport, users } = usePrototype();
   const auditorName =
-    users.find((user) => user.id === previewUserId && user.role === "AUDITEUR")?.name ??
+    users.find((user) => user.id === previewUserId && user.role === "AUDITOR")?.name ??
     "Lucas Bernard";
   const assignedReports = reports.filter((report) => report.auditor === auditorName);
   const activeReports = assignedReports.filter(isActionable);

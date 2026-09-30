@@ -72,18 +72,18 @@ export function CompaniesPage() {
             <Card className="h-full transition group-hover:border-brand-green group-hover:shadow-md">
               <CardContent className="flex h-full flex-col gap-3">
                 <div className="flex items-start gap-3">
-                  <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-14 shrink-0" />
+                  <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-14 shrink-0" />
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-brand-blue">{entreprise.nom}</p>
+                    <p className="truncate font-semibold text-brand-blue">{entreprise.name}</p>
                     <Badge variant="secondary" className="mt-1">
-                      {entreprise.secteur}
+                      {entreprise.sector}
                     </Badge>
                   </div>
                 </div>
 
                 <p className="flex items-center gap-1.5 text-sm text-brand-grey">
                   <MapPin className="size-3.5 shrink-0" />
-                  {entreprise.pays}
+                  {entreprise.country}
                 </p>
 
                 {entreprise.description ? (
@@ -91,16 +91,16 @@ export function CompaniesPage() {
                 ) : null}
 
                 <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
-                  {entreprise.site_officiel ? (
+                  {entreprise.website ? (
                     <span className="flex min-w-0 items-center gap-1">
                       <Globe className="size-3.5 shrink-0" />
-                      <span className="truncate">{entreprise.site_officiel}</span>
+                      <span className="truncate">{entreprise.website}</span>
                     </span>
                   ) : null}
-                  {entreprise.date_publication ? (
+                  {entreprise.published_at ? (
                     <span className="ml-auto flex shrink-0 items-center gap-1">
                       <Calendar className="size-3.5 shrink-0" />
-                      Publiée le {new Date(entreprise.date_publication).toLocaleDateString("fr-FR")}
+                      Publiée le {new Date(entreprise.published_at).toLocaleDateString("fr-FR")}
                     </span>
                   ) : null}
                 </div>

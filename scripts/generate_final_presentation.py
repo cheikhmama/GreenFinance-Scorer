@@ -14,7 +14,6 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
-
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs"
 ASSET_DIR = OUT_DIR / "presentation_assets"
@@ -518,7 +517,7 @@ def slide_06(prs: Presentation) -> tuple[str, str, str]:
 
     actors = [
         (0.85, 1.95, "AD", "Administrateur", "organise", PURPLE, PURPLE_LIGHT),
-        (0.85, 4.55, "EN", "Entreprise", "déclare", GREEN, MINT),
+        (0.85, 4.55, "EN", "Company", "déclare", GREEN, MINT),
         (4.05, 5.3, "AU", "Auditeur", "vérifie", TEAL, TEAL_LIGHT),
         (8.72, 5.3, "IN", "Investisseur", "décide", AMBER, AMBER_LIGHT),
         (9.58, 1.95, "CH", "Chercheur", "analyse", EMERALD, MINT),
@@ -553,11 +552,11 @@ def slide_07(prs: Presentation) -> tuple[str, str, str]:
     slide = new_slide(prs, WHITE)
     add_header(slide, "PARTIE 02", "ANALYSE FONCTIONNELLE — Workflow principal", "Traitement, audit, correction, validation et publication.", title_size=23)
     steps = [
-        ("Entreprise", "1", "Déposer", "PDF + métadonnées", GREEN, MINT),
+        ("Company", "1", "Déposer", "PDF + métadonnées", GREEN, MINT),
         ("Système", "2", "Analyser", "OCR + extraction", TEAL, TEAL_LIGHT),
         ("Admin", "3", "Affecter", "Choisir un auditeur", PURPLE, PURPLE_LIGHT),
         ("Auditeur", "4", "Vérifier", "Valeurs + preuves", BLUE, "#EAF0F5"),
-        ("Entreprise", "5", "Corriger", "Nouvelle version", GREEN, MINT),
+        ("Company", "5", "Corriger", "Nouvelle version", GREEN, MINT),
         ("Admin", "6", "Publier", "Données validées", AMBER, AMBER_LIGHT),
     ]
     x = 0.65
@@ -596,7 +595,7 @@ def slide_08(prs: Presentation) -> tuple[str, str, str]:
     slide = new_slide(prs)
     add_header(slide, "PARTIE 02", "ANALYSE FONCTIONNELLE — Fonctionnalités principales", "Principaux usages des données ESG validées.", title_size=23)
     cards = [
-        ("company-results.png", "Entreprise", "Résultats, Scope 1–3 et preuves", GREEN),
+        ("company-results.png", "Company", "Résultats, Scope 1–3 et preuves", GREEN),
         ("investor-compare.png", "Investisseur", "Comparer et préparer une décision", AMBER),
         ("researcher-analyses.png", "Recherche & Institution", "Analyser, rattacher et exporter", TEAL),
     ]
@@ -687,7 +686,7 @@ def slide_10(prs: Presentation) -> tuple[str, str, str]:
     add_text(slide, 3.15, 3.14, 8.8, 0.34, "FastAPI /api/v1 · Pydantic · authentification et permissions", size=13, color=WHITE, bold=True)
 
     add_arrow(slide, 6.43, 3.8, 0.48, 0.25, color="#9FCAB9")
-    domains = ["Auth", "Ingestion", "Audit", "Scoring", "Carbone", "Portefeuille"]
+    domains = ["Auth", "Ingestion", "Audit", "Scoring", "Carbone", "Portfolio"]
     x = 0.85
     for idx, domain in enumerate(domains):
         accent = GREEN if idx < 4 else AMBER

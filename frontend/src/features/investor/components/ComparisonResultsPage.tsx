@@ -77,11 +77,11 @@ export function ComparisonResultsPage() {
               >
                 <CardContent className="space-y-2 px-5">
                   <div className="flex items-center gap-2">
-                    <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-8" />
-                    <p className="truncate font-medium text-brand-blue">{entreprise.nom}</p>
+                    <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
+                    <p className="truncate font-medium text-brand-blue">{entreprise.name}</p>
                   </div>
-                  <Badge variant={variantScore(entreprise.score.valeur_globale)}>
-                    Score global : {formatScore(entreprise.score.valeur_globale)}
+                  <Badge variant={variantScore(entreprise.score.global_score)}>
+                    Score global : {formatScore(entreprise.score.global_score)}
                   </Badge>
                 </CardContent>
               </Card>
@@ -109,9 +109,9 @@ function EsgRadarChart({ entreprises }: { entreprises: EntrepriseDetailInvestiss
   const centre = taille / 2;
   const rayon = taille / 2 - 40;
   const axes = [
-    { cle: "score_environnement" as const, label: "E" },
-    { cle: "score_social" as const, label: "S" },
-    { cle: "score_gouvernance" as const, label: "G" },
+    { cle: "environmental_score" as const, label: "E" },
+    { cle: "social_score" as const, label: "S" },
+    { cle: "governance_score" as const, label: "G" },
   ];
 
   function point(valeur: number, index: number): [number, number] {
@@ -179,7 +179,7 @@ function EsgRadarChart({ entreprises }: { entreprises: EntrepriseDetailInvestiss
               style={{ backgroundColor: COULEURS[index] }}
               aria-hidden="true"
             />
-            {entreprise.nom}
+            {entreprise.name}
           </li>
         ))}
       </ul>
@@ -190,21 +190,21 @@ function EsgRadarChart({ entreprises }: { entreprises: EntrepriseDetailInvestiss
 interface LigneComparaison {
   categorie: string;
   libelle: string;
-  valeurs: Map<string, { valeur: number; unite: string; annee: number; methode: string } | null>;
+  valeurs: Map<string, { value: number; unit: string; year: number; method: string } | null>;
 }
 
 function construireLignesIndicateurs(entreprises: EntrepriseDetailInvestisseur[]): LigneComparaison[] {
-  const parCode = new Map<string, { pilier: string; parEntreprise: Map<string, IndicateurESGDetail> }>();
+  const parCode = new Map<string, { pillar: string; parEntreprise: Map<string, IndicateurESGDetail> }>();
   for (const entreprise of entreprises) {
-    for (const indicateur of entreprise.indicateurs) {
-      if (!parCode.has(indicateur.code)) {
-        parCode.set(indicateur.code, { pilier: indicateur.pilier, parEntreprise: new Map() });
+    for (const indicateur of entreprise.metrics) {
+      if (!parCode.has(indicateur.metric_code)) {
+        parCode.set(indicateur.metric_code, { pillar: indicateur.pillar, parEntreprise: new Map() });
       }
-      parCode.get(indicateur.code)?.parEntreprise.set(entreprise.id, indicateur);
+      parCode.get(indicateur.metric_code)?.parEntreprise.set(entreprise.id, indicateur);
     }
   }
-  return Array.from(parCode.entries()).map(([code, { pilier, parEntreprise }]) => ({
-    categorie: libellePilier(pilier),
+  return Array.from(parCode.entries()).map(([code, { pillar, parEntreprise }]) => ({
+    categorie: libellePilier(pillar),
     libelle: code,
     valeurs: new Map(
       entreprises.map((entreprise) => {
@@ -213,10 +213,10 @@ function construireLignesIndicateurs(entreprises: EntrepriseDetailInvestisseur[]
           entreprise.id,
           indicateur
             ? {
-                valeur: indicateur.valeur,
-                unite: indicateur.unite,
-                annee: indicateur.preuve.annee,
-                methode: indicateur.methode,
+                value: indicateur.value,
+                unit: indicateur.unit,
+                year: indicateur.proof.year,
+                method: indicateur.method,
               }
             : null,
         ];
@@ -228,9 +228,9 @@ function construireLignesIndicateurs(entreprises: EntrepriseDetailInvestisseur[]
 function construireLignesCarbone(entreprises: EntrepriseDetailInvestisseur[]): LigneComparaison[] {
   const parCle = new Map<string, { libelle: string; parEntreprise: Map<string, DonneeCarboneDetail> }>();
   for (const entreprise of entreprises) {
-    for (const donnee of entreprise.donnees_carbone) {
-      const cle = `${donnee.scope}-${donnee.categorie_ges ?? ""}`;
-      const libelle = `Scope ${donnee.scope}${donnee.categorie_ges ? ` — ${donnee.categorie_ges}` : ""}`;
+    for (const donnee of entreprise.carbon_data) {
+      const cle = `${donnee.scope}-${donnee.ghg_category ?? ""}`;
+      const libelle = `Scope ${donnee.scope}${donnee.ghg_category ? ` — ${donnee.ghg_category}` : ""}`;
       if (!parCle.has(cle)) parCle.set(cle, { libelle, parEntreprise: new Map() });
       parCle.get(cle)?.parEntreprise.set(entreprise.id, donnee);
     }
@@ -245,10 +245,10 @@ function construireLignesCarbone(entreprises: EntrepriseDetailInvestisseur[]): L
           entreprise.id,
           donnee
             ? {
-                valeur: donnee.valeur_tonnes_co2e,
-                unite: "tCO2e",
-                annee: donnee.annee,
-                methode: donnee.methode,
+                value: donnee.tonnes_co2e,
+                unit: "tCO2e",
+                year: donnee.year,
+                method: donnee.method,
               }
             : null,
         ] as const;
@@ -258,14 +258,14 @@ function construireLignesCarbone(entreprises: EntrepriseDetailInvestisseur[]): L
 }
 
 function estComparable(
-  valeurs: Map<string, { valeur: number; unite: string; annee: number; methode: string } | null>,
+  valeurs: Map<string, { value: number; unit: string; year: number; method: string } | null>,
 ): boolean {
   const presentes = Array.from(valeurs.values()).filter((v) => v !== null);
   if (presentes.length < 2) return false;
   const [reference, ...reste] = presentes;
   return reste.every(
     (v) =>
-      v?.unite === reference?.unite && v?.annee === reference?.annee && v?.methode === reference?.methode,
+      v?.unit === reference?.unit && v?.year === reference?.year && v?.method === reference?.method,
   );
 }
 
@@ -277,12 +277,12 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
       valeurs: new Map(
         entreprises.map((entreprise) => [
           entreprise.id,
-          entreprise.montant_minimum_investissement !== null && entreprise.devise_montant_minimum
+          entreprise.minimum_investment_amount !== null && entreprise.minimum_investment_currency
             ? {
-                valeur: entreprise.montant_minimum_investissement,
-                unite: entreprise.devise_montant_minimum,
-                annee: 0,
-                methode: "",
+                value: entreprise.minimum_investment_amount,
+                unit: entreprise.minimum_investment_currency,
+                year: 0,
+                method: "",
               }
             : null,
         ]),
@@ -316,7 +316,7 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
                 <th className="py-2 pr-4 font-medium">Indicateur</th>
                 {entreprises.map((entreprise) => (
                   <th key={entreprise.id} className="py-2 pr-4 font-medium text-brand-blue">
-                    {entreprise.nom}
+                    {entreprise.name}
                   </th>
                 ))}
               </tr>
@@ -338,9 +338,9 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
                       const comparable = estComparable(ligne.valeurs);
                       const valeursPresentes = Array.from(ligne.valeurs.values()).filter(
                         (v) => v !== null,
-                      ) as { valeur: number; unite: string; annee: number; methode: string }[];
-                      const max = comparable ? Math.max(...valeursPresentes.map((v) => v.valeur)) : null;
-                      const min = comparable ? Math.min(...valeursPresentes.map((v) => v.valeur)) : null;
+                      ) as { value: number; unit: string; year: number; method: string }[];
+                      const max = comparable ? Math.max(...valeursPresentes.map((v) => v.value)) : null;
+                      const min = comparable ? Math.min(...valeursPresentes.map((v) => v.value)) : null;
                       return (
                         <tr key={`${categorie}-${ligne.libelle}`} className="border-b last:border-0">
                           <td className="py-2 pr-4 text-brand-grey">{ligne.libelle}</td>
@@ -354,17 +354,17 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
                               );
                             }
                             const estExtreme =
-                              comparable && (cellule.valeur === max || cellule.valeur === min);
+                              comparable && (cellule.value === max || cellule.value === min);
                             return (
                               <td
                                 key={entreprise.id}
                                 className={`py-2 pr-4 ${estExtreme ? "font-semibold text-brand-blue" : ""}`}
                               >
-                                {cellule.valeur.toLocaleString("fr-FR")} {cellule.unite}
-                                {cellule.annee > 0 ? (
+                                {cellule.value.toLocaleString("fr-FR")} {cellule.unit}
+                                {cellule.year > 0 ? (
                                   <span className="ml-1 text-xs text-brand-grey">
-                                    ({cellule.annee}
-                                    {cellule.methode ? `, ${libelleMethode(cellule.methode)}` : ""})
+                                    ({cellule.year}
+                                    {cellule.method ? `, ${libelleMethode(cellule.method)}` : ""})
                                   </span>
                                 ) : null}
                               </td>

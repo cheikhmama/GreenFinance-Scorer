@@ -34,6 +34,17 @@ def test_hote_manquant_est_rejete() -> None:
         ("interne.test", "192.168.1.10"),
         ("interne.test", "172.16.0.1"),
         ("multicast.test", "224.0.0.1"),
+        # Tâche 4.3 : ni privées ni « réservées » au sens de l'ancienne liste noire, jamais
+        # globales pour autant — acceptées avant le passage à `not is_global`.
+        ("cgnat.test", "100.64.0.1"),
+        ("doc.test", "192.0.2.10"),
+        ("bench.test", "198.18.0.1"),
+        ("zero.test", "0.0.0.0"),
+        ("mappee.test", "::ffff:127.0.0.1"),
+        ("mappee.test", "::ffff:10.0.0.5"),
+        ("sixtofour.test", "2002:a00:5::1"),  # 6to4 embarquant 10.0.0.5
+        ("loopback6.test", "::1"),
+        ("ula.test", "fd00::1"),
     ],
 )
 def test_adresse_non_routable_est_rejetee(monkeypatch, hote: str, adresse: str) -> None:
@@ -187,3 +198,46 @@ def test_statut_http_non_200_est_rejete(monkeypatch) -> None:
     with pytest.raises(ValidationError) as exc_info:
         telecharger_pdf_depuis_url("https://exemple-public.test/rapport.pdf")
     assert exc_info.value.code == "telechargement_echoue"
+
+
+def test_ipv6_publique_est_acceptee(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.company.url_fetch.socket.getaddrinfo",
+        lambda *_a, **_k: [(None, None, None, None, ("2606:4700::6810:84e5", 443, 0, 0))],
+    )
+    _valider_url_cible("https://exemple-public.test/rapport.pdf")  # ne lève pas
+
+
+def test_echeance_totale_coupe_un_serveur_qui_envoie_au_compte_gouttes(monkeypatch) -> None:
+    """Chaque morceau arrive sous le délai de lecture, mais l'ensemble dépasse l'échéance totale :
+    le téléchargement est interrompu (tâche 4.3)."""
+    monkeypatch.setattr(
+        "app.company.url_fetch.socket.getaddrinfo",
+        lambda *_a, **_k: [(None, None, None, None, ("93.184.216.34", 443))],
+    )
+    horloge = {"t": 1000.0}
+    monkeypatch.setattr("app.company.url_fetch.time.monotonic", lambda: horloge["t"])
+
+    class _GoutteAGoutte:
+        is_redirect = False
+        status_code = 200
+        headers: ClassVar[dict] = {}
+
+        def iter_bytes(self):
+            while True:
+                horloge["t"] += 20  # 20 s par octet : sous le délai de lecture de 30 s
+                yield b"x"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+    monkeypatch.setattr(httpx, "stream", lambda *_a, **_k: _GoutteAGoutte())
+
+    with pytest.raises(ValidationError) as exc_info:
+        telecharger_pdf_depuis_url("https://exemple-public.test/rapport.pdf")
+    assert exc_info.value.code == "telechargement_delai_depasse"
+    assert horloge["t"] <= 1000.0 + 60 + 20  # coupé au premier morceau après l'échéance
+

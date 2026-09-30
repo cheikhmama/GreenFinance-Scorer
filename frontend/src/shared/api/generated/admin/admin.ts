@@ -9,6 +9,12 @@ import type {
   ApercuActeursAdmin,
   AvisAuditAdmin,
   BodyUploadCompanyLogo,
+  CompanyFinancials,
+  CompanyFinancialsRequest,
+  CompanyIdentifiers,
+  CompanyIdentifiersRequest,
+  CompanyOnboardingRequest,
+  CompanyOnboardingResult,
   CreerUtilisateurRequest,
   DecisionAdminRequest,
   EntrepriseAdmin,
@@ -38,7 +44,7 @@ import type {
   PerformanceESGAdmin,
   RapportESGDetail,
   RapportESGPublic,
-  ScoreESG,
+  ScoreRecalculeAdmin,
   ScoreVerificationAdmin,
   TableauDeBordAdmin,
   UtilisateurCree,
@@ -300,29 +306,6 @@ export const listFailedExtractionReports = async ( options?: RequestInit): Promi
 );}
 
 
-export const getListStuckExtractionReportsUrl = () => {
-
-
-
-
-  return `/admin/rapports/extraction-bloquee`
-}
-
-/**
- * @summary Lister les rapports dont l'extraction semble interrompue (aucune erreur, aucune fin)
- */
-export const listStuckExtractionReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
-
-  return apiFetch<RapportESGPublic[]>(getListStuckExtractionReportsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
 export const getRetryExtractionUrl = (rapportId: string,) => {
 
 
@@ -486,9 +469,9 @@ export const getRecalculateReportScoreUrl = (rapportId: string,) => {
 /**
  * @summary Recalculer le score d'un rapport validé qui en est dépourvu (état incohérent)
  */
-export const recalculateReportScore = async (rapportId: string, options?: RequestInit): Promise<ScoreESG> => {
+export const recalculateReportScore = async (rapportId: string, options?: RequestInit): Promise<ScoreRecalculeAdmin> => {
 
-  return apiFetch<ScoreESG>(getRecalculateReportScoreUrl(rapportId),
+  return apiFetch<ScoreRecalculeAdmin>(getRecalculateReportScoreUrl(rapportId),
   {
     ...options,
     method: 'POST'
@@ -796,6 +779,66 @@ export const listCompaniesWithScore = async (params?: ListCompaniesWithScorePara
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getUpdateCompanyIdentifiersUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/identifiers`
+}
+
+/**
+ * @summary Renseigner l'ISIN, le LEI ou le ticker d'une entreprise
+ */
+export const updateCompanyIdentifiers = async (companyId: string,
+    companyIdentifiersRequest: CompanyIdentifiersRequest, options?: RequestInit): Promise<CompanyIdentifiers> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<CompanyIdentifiers>(getUpdateCompanyIdentifiersUrl(companyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyIdentifiersRequest)
+  }
+);}
+
+
+export const getOnboardCompanyUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/onboard`
+}
+
+/**
+ * @summary Valider ou refuser l'inscription d'une entreprise
+ */
+export const onboardCompany = async (companyId: string,
+    companyOnboardingRequest: CompanyOnboardingRequest, options?: RequestInit): Promise<CompanyOnboardingResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<CompanyOnboardingResult>(getOnboardCompanyUrl(companyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyOnboardingRequest)
   }
 );}
 
@@ -1179,6 +1222,59 @@ export const listProjectsAdmin = async (params?: ListProjectsAdminParams, option
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getGetCompanyFinancialsUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/financials`
+}
+
+/**
+ * @summary Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)
+ */
+export const getCompanyFinancials = async (companyId: string, options?: RequestInit): Promise<CompanyFinancials> => {
+
+  return apiFetch<CompanyFinancials>(getGetCompanyFinancialsUrl(companyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getUpdateCompanyFinancialsUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/financials`
+}
+
+/**
+ * @summary Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)
+ */
+export const updateCompanyFinancials = async (companyId: string,
+    companyFinancialsRequest: CompanyFinancialsRequest, options?: RequestInit): Promise<CompanyFinancials> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<CompanyFinancials>(getUpdateCompanyFinancialsUrl(companyId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(companyFinancialsRequest)
   }
 );}
 

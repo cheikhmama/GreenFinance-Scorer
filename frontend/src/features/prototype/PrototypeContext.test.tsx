@@ -32,7 +32,7 @@ function PrototypeStateHarness() {
           createUser({
             name: "Fatou Ahmed",
             email: "fatou@prototype.test",
-            role: "INVESTISSEUR",
+            role: "INVESTOR",
             organization: "Impact Démo",
           })
         }

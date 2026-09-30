@@ -4,12 +4,14 @@ import {
   getCompanyReport,
   getMyCompanyProfile,
   listCompanyReports,
+  registerCompany,
   submitCompanyReport,
   submitCompanyReportCorrection,
 } from "@/shared/api/generated/company/company";
 import type {
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
+  CompanyRegistrationRequest,
   EntreprisePublic,
   RapportESGDetail,
   RapportESGPublic,
@@ -67,5 +69,14 @@ export function useSubmitCorrection(rapportId: string) {
       queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: reportQueryKey(rapportId) });
     },
+  });
+}
+
+/** POST /companies/register — public. Réponse 202 identique que la demande aboutisse ou non
+ * (app/company/registration.py) : le demandeur est informé par e-mail. */
+export function useRegisterCompany() {
+  return useMutation<unknown, ApiError, CompanyRegistrationRequest>({
+    mutationFn: (payload) => registerCompany(payload),
+    retry: false,
   });
 }

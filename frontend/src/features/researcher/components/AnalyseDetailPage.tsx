@@ -30,24 +30,24 @@ export function AnalyseDetailPage() {
   if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
   if (isError || !analyse) return <p className="text-destructive">Analyse introuvable.</p>;
 
-  const modifiable = analyse.statut === "BROUILLON";
-  const corrigible = analyse.statut === "CORRECTION_DEMANDEE";
+  const modifiable = analyse.status === "BROUILLON";
+  const corrigible = analyse.status === "CORRECTION_DEMANDEE";
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow={`Version ${analyse.version}`}
-        title={analyse.titre}
+        title={analyse.title}
         description="Analyse comparative sur des entreprises publiées."
-        action={<Badge variant={variantStatutAnalyse(analyse.statut)}>{libelleStatutAnalyse(analyse.statut)}</Badge>}
+        action={<Badge variant={variantStatutAnalyse(analyse.status)}>{libelleStatutAnalyse(analyse.status)}</Badge>}
       />
 
       <HistoriqueVersions analyseId={analyse.id} versionActuelle={analyse.version} />
 
-      {analyse.commentaire_institution ? (
+      {analyse.institution_comment ? (
         <Alert>
           <AlertTitle>Commentaire de l'institution</AlertTitle>
-          <AlertDescription>{analyse.commentaire_institution}</AlertDescription>
+          <AlertDescription>{analyse.institution_comment}</AlertDescription>
         </Alert>
       ) : null}
       {erreur ? <p className="text-sm text-destructive">{erreur}</p> : null}
@@ -60,7 +60,7 @@ export function AnalyseDetailPage() {
             <CardTitle className="text-base text-brand-blue">Contenu</CardTitle>
           </CardHeader>
           <CardContent className="whitespace-pre-wrap text-sm text-brand-grey">
-            {analyse.contenu}
+            {analyse.content}
           </CardContent>
         </Card>
       )}
@@ -116,8 +116,8 @@ function HistoriqueVersions({
               ) : null}
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={variantStatutAnalyse(version.statut)}>
-                {libelleStatutAnalyse(version.statut)}
+              <Badge variant={variantStatutAnalyse(version.status)}>
+                {libelleStatutAnalyse(version.status)}
               </Badge>
               {version.id !== analyseId ? (
                 <Link
@@ -139,7 +139,7 @@ function FormulaireAnalyse({
   analyse,
   mode,
 }: {
-  analyse: { id: string; titre: string; contenu: string; entreprise_ids: string[] };
+  analyse: { id: string; title: string; content: string; company_ids: string[] };
   mode: "modifier" | "corriger";
 }) {
   const update = useUpdateAnalysis(analyse.id);
@@ -148,9 +148,9 @@ function FormulaireAnalyse({
   const form = useForm<AnalyseForm>({
     resolver: zodResolver(analyseFormSchema),
     defaultValues: {
-      titre: analyse.titre,
-      contenu: analyse.contenu,
-      entreprise_ids: analyse.entreprise_ids,
+      title: analyse.title,
+      content: analyse.content,
+      company_ids: analyse.company_ids,
     },
   });
 
@@ -178,7 +178,7 @@ function FormulaireAnalyse({
         ) : null}
         <FormField
           control={form.control}
-          name="titre"
+          name="title"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Titre</FormLabel>
@@ -191,7 +191,7 @@ function FormulaireAnalyse({
         />
         <FormField
           control={form.control}
-          name="contenu"
+          name="content"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Contenu</FormLabel>

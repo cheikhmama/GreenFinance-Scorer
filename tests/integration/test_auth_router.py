@@ -1,22 +1,26 @@
 import base64
 import uuid
+from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
 import redis
 import structlog
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 
+from app.auth.email_change import _hash_token as _hash_jeton_email
 from app.auth.hashing import hash_password, verify_password
-from app.auth.models import ReinitialisationMotDePasse, Utilisateur
+from app.auth.models import EmailChangeRequest, PasswordResetToken, User
 from app.auth.password_reset import _hash_token
-from app.auth.rate_limit import MAX_ATTEMPTS, clear_login_attempts
+from app.auth.rate_limit import MAX_ATTEMPTS, MAX_ATTEMPTS_PAR_IP, clear_login_attempts
 from app.auth.tokens import COOKIE_NAME, CSRF_COOKIE_NAME, CSRF_HEADER_NAME
+from app.core import storage
 from app.core.database import utcnow
 from app.core.email import EmailDeliveryError
 from app.core.enums import Role
-from app.core.models import JournalAudit
+from app.core.models import AuditLogEntry
 from app.main import app
 
 client = TestClient(app, base_url="https://testserver")
@@ -27,16 +31,18 @@ def _mock_password_reset_delivery(monkeypatch):
     """Aucune suite de test ne doit contacter un vrai relais SMTP."""
     monkeypatch.setattr("app.auth.password_reset.ensure_email_configured", lambda: None)
     delivery = Mock()
-    monkeypatch.setattr("app.auth.password_reset.send_email", delivery)
+    monkeypatch.setattr("app.auth.password_reset.envoyer_email_differe", delivery)
+    monkeypatch.setattr("app.auth.email_change.ensure_email_configured", lambda: None)
+    monkeypatch.setattr("app.auth.email_change.envoyer_email_differe", delivery)
     return delivery
 
 
-def _create_utilisateur(session, *, password: str, role: Role = Role.INVESTISSEUR, actif: bool = True) -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, *, password: str, role: Role = Role.INVESTOR, actif: bool = True) -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=actif,
+        active=actif,
     )
     session.add(user)
     session.commit()
@@ -101,7 +107,7 @@ def test_me_without_a_session_cookie_is_rejected() -> None:
 
 
 def test_login_then_me_returns_the_same_user(session) -> None:
-    user = _create_utilisateur(session, password="s3cret-pass", role=Role.AUDITEUR)
+    user = _create_utilisateur(session, password="s3cret-pass", role=Role.AUDITOR)
     authed_client = TestClient(app, base_url="https://testserver")
 
     login_response = authed_client.post(
@@ -113,46 +119,109 @@ def test_login_then_me_returns_the_same_user(session) -> None:
 
     assert me_response.status_code == 200
     assert me_response.json()["id"] == str(user.id)
-    assert me_response.json()["role"] == Role.AUDITEUR.value
+    assert me_response.json()["role"] == Role.AUDITOR.value
 
 
-def test_modifier_mon_profil_change_le_nom_et_lemail_jamais_le_role(session) -> None:
-    user = _create_utilisateur(session, password="s3cret-pass", role=Role.CHERCHEUR)
+def _client_connecte(user: User, password: str) -> TestClient:
     authed_client = TestClient(app, base_url="https://testserver")
-    authed_client.post("/api/v1/auth/login", json={"email": user.email, "password": "s3cret-pass"})
+    authed_client.post("/api/v1/auth/login", json={"email": user.email, "password": password})
     authed_client.headers.update({CSRF_HEADER_NAME: authed_client.cookies[CSRF_COOKIE_NAME]})
-    nouvel_email = f"nouveau-{uuid.uuid4()}@example.com"
+    return authed_client
+
+
+def _fixer_le_prochain_jeton_email(monkeypatch) -> str:
+    jeton = f"jeton-email-{uuid.uuid4()}"
+    monkeypatch.setattr("app.auth.email_change.secrets.token_urlsafe", lambda _n: jeton)
+    return jeton
+
+
+def test_modifier_mon_profil_change_le_nom_immediatement_jamais_le_role(session) -> None:
+    user = _create_utilisateur(session, password="s3cret-pass", role=Role.RESEARCHER)
+    authed_client = _client_connecte(user, "s3cret-pass")
 
     response = authed_client.patch(
         "/api/v1/auth/me",
-        json={"nom": "Nouveau Nom", "email": nouvel_email, "role": Role.ADMINISTRATEUR.value},
+        json={"name": "Nouveau Nom", "email": user.email, "role": Role.ADMIN.value},
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"] == "Nouveau Nom"
-    assert body["email"] == nouvel_email
-    assert body["role"] == Role.CHERCHEUR.value
+    assert body["name"] == "Nouveau Nom"
+    assert body["email"] == user.email
+    assert body["pending_email"] is None
+    assert body["role"] == Role.RESEARCHER.value
 
+
+def test_changer_email_exige_le_mot_de_passe_actuel(session) -> None:
+    user = _create_utilisateur(session, password="s3cret-pass")
+    authed_client = _client_connecte(user, "s3cret-pass")
+    nouvel_email = f"nouveau-{uuid.uuid4()}@example.com"
+
+    sans = authed_client.patch("/api/v1/auth/me", json={"name": "N", "email": nouvel_email})
+    faux = authed_client.patch(
+        "/api/v1/auth/me",
+        json={"name": "N", "email": nouvel_email, "current_password": "mauvais-pass"},
+    )
+
+    assert sans.status_code == 422
+    assert sans.json()["error"]["code"] == "mot_de_passe_requis"
+    assert faux.status_code == 401
+    clear_login_attempts(user.email)
+    session.refresh(user)
+    assert user.email != nouvel_email
+
+
+def test_changer_email_nest_applique_quapres_confirmation_par_la_nouvelle_adresse(
+    session, monkeypatch, _mock_password_reset_delivery
+) -> None:
+    user = _create_utilisateur(session, password="s3cret-pass")
+    ancien_email = user.email
+    authed_client = _client_connecte(user, "s3cret-pass")
+    jeton = _fixer_le_prochain_jeton_email(monkeypatch)
+    nouvel_email = f"Nouveau-{uuid.uuid4()}@Example.COM"
+
+    demande = authed_client.patch(
+        "/api/v1/auth/me",
+        json={"name": "N", "email": nouvel_email, "current_password": "s3cret-pass"},
+    )
+
+    # Demande seulement : l'identifiant de connexion ne change pas encore.
+    assert demande.status_code == 200
+    assert demande.json()["email"] == ancien_email
+    assert demande.json()["pending_email"] == nouvel_email.lower()
+    destinataires = [appel.kwargs["recipient"] for appel in _mock_password_reset_delivery.call_args_list]
+    assert destinataires == [nouvel_email.lower(), ancien_email]
     entree = session.exec(
-        select(JournalAudit).where(
-            JournalAudit.action == "modification_email",
-            JournalAudit.id_ressource == user.id,
+        select(EmailChangeRequest).where(EmailChangeRequest.user_id == user.id)
+    ).one()
+    assert entree.token_hash == _hash_jeton_email(jeton)
+
+    confirmation = _client_public().post(
+        "/api/v1/auth/confirmer-changement-email", json={"token": jeton}
+    )
+    rejeu = _client_public().post("/api/v1/auth/confirmer-changement-email", json={"token": jeton})
+
+    assert confirmation.status_code == 200
+    assert confirmation.json()["email"] == nouvel_email.lower()
+    assert rejeu.status_code == 422
+    assert rejeu.json()["error"]["code"] == "jeton_invalide"
+    journal = session.exec(
+        select(AuditLogEntry).where(
+            AuditLogEntry.action == "email_changed", AuditLogEntry.resource_id == user.id
         )
     ).one()
-    assert entree.ancienne_valeur == user.email
-    assert entree.nouvelle_valeur == nouvel_email
+    assert journal.old_value == ancien_email
+    assert journal.new_value == nouvel_email.lower()
 
 
 def test_modifier_mon_profil_avec_un_email_deja_utilise_est_refuse(session) -> None:
     autre = _create_utilisateur(session, password="autre-pass")
     user = _create_utilisateur(session, password="s3cret-pass")
-    authed_client = TestClient(app, base_url="https://testserver")
-    authed_client.post("/api/v1/auth/login", json={"email": user.email, "password": "s3cret-pass"})
-    authed_client.headers.update({CSRF_HEADER_NAME: authed_client.cookies[CSRF_COOKIE_NAME]})
+    authed_client = _client_connecte(user, "s3cret-pass")
 
     response = authed_client.patch(
-        "/api/v1/auth/me", json={"nom": "Un Nom", "email": autre.email}
+        "/api/v1/auth/me",
+        json={"name": "Un Nom", "email": autre.email.upper(), "current_password": "s3cret-pass"},
     )
 
     assert response.status_code == 422
@@ -166,7 +235,7 @@ def test_modifier_mon_profil_avec_un_email_invalide_est_refuse(session) -> None:
     authed_client.headers.update({CSRF_HEADER_NAME: authed_client.cookies[CSRF_COOKIE_NAME]})
 
     response = authed_client.patch(
-        "/api/v1/auth/me", json={"nom": "Un Nom", "email": "pas-un-email"}
+        "/api/v1/auth/me", json={"name": "Un Nom", "email": "pas-un-email"}
     )
 
     assert response.status_code == 422
@@ -187,11 +256,34 @@ def test_televerser_puis_supprimer_mon_avatar(session) -> None:
         "/api/v1/auth/me/avatar", files={"fichier": ("avatar.png", _PNG_1X1, "image/png")}
     )
     assert upload.status_code == 200
-    assert upload.json()["avatar"].startswith("data:image/png;base64,")
+    # Tâche 4.3 : une URL vers le fichier, plus un data URI stocké dans la ligne utilisateur.
+    url = upload.json()["avatar"]
+    assert url.startswith(f"/api/v1/auth/avatars/{user.id}/") and url.endswith(".png")
+    image = authed_client.get(url)
+    assert image.status_code == 200
+    assert image.content == _PNG_1X1
+    assert image.headers["content-type"] == "image/png"
+    assert "immutable" in image.headers["cache-control"]
+    fichier = storage.resolve_path(f"avatars/{user.id}/{url.rsplit('/', 1)[1]}")
+    assert fichier.is_file()
+
+    # Un nouvel envoi change l'URL ; l'ancienne ne sert plus rien et son fichier disparaît.
+    remplacement = authed_client.post(
+        "/api/v1/auth/me/avatar", files={"fichier": ("avatar.png", _PNG_1X1, "image/png")}
+    )
+    assert remplacement.json()["avatar"] != url
+    assert authed_client.get(url).status_code == 404
+    assert not fichier.exists()
+    # Jamais un fichier arbitraire : seul le nom enregistré sur la ligne est servi.
+    assert authed_client.get(f"/api/v1/auth/avatars/{user.id}/..%2F..%2F.env").status_code == 404
+    assert TestClient(app, base_url="https://testserver").get(
+        remplacement.json()["avatar"]
+    ).status_code == 401
 
     delete = authed_client.delete("/api/v1/auth/me/avatar")
     assert delete.status_code == 200
     assert delete.json()["avatar"] is None
+    assert authed_client.get(remplacement.json()["avatar"]).status_code == 404
 
 
 def test_televerser_avatar_non_image_est_refuse_proprement(session) -> None:
@@ -216,13 +308,13 @@ def test_verifier_mon_mot_de_passe_valide_ou_invalide(session) -> None:
     authed_client.headers.update({CSRF_HEADER_NAME: authed_client.cookies[CSRF_COOKIE_NAME]})
 
     invalide = authed_client.post(
-        "/api/v1/auth/verifier-mot-de-passe", json={"mot_de_passe": "mauvais-mot-de-passe"}
+        "/api/v1/auth/verifier-mot-de-passe", json={"password": "mauvais-mot-de-passe"}
     )
     assert invalide.status_code == 401
     assert invalide.json()["error"]["code"] == "invalid_credentials"
 
     valide = authed_client.post(
-        "/api/v1/auth/verifier-mot-de-passe", json={"mot_de_passe": "s3cret-pass"}
+        "/api/v1/auth/verifier-mot-de-passe", json={"password": "s3cret-pass"}
     )
     assert valide.status_code == 204
 
@@ -296,17 +388,17 @@ def test_login_success_failure_and_logout_are_all_journalised(session) -> None:
     authed_client.post("/api/v1/auth/logout")
 
     entrees = session.exec(
-        select(JournalAudit)
-        .where(JournalAudit.acteur_id == user.id)
-        .order_by(col(JournalAudit.date))
+        select(AuditLogEntry)
+        .where(AuditLogEntry.actor_id == user.id)
+        .order_by(col(AuditLogEntry.occurred_at))
     ).all()
-    actions_et_resultats = [(e.action, e.resultat) for e in entrees]
-    assert ("connexion", "echec") in actions_et_resultats
-    assert ("connexion", "succes") in actions_et_resultats
-    assert ("deconnexion", "succes") in actions_et_resultats
+    actions_et_resultats = [(e.action, e.result) for e in entrees]
+    assert ("login", "failure") in actions_et_resultats
+    assert ("login", "success") in actions_et_resultats
+    assert ("logout", "success") in actions_et_resultats
     for entree in entrees:
-        assert "s3cret-pass" not in (entree.ancienne_valeur or "")
-        assert "s3cret-pass" not in (entree.nouvelle_valeur or "")
+        assert "s3cret-pass" not in (entree.old_value or "")
+        assert "s3cret-pass" not in (entree.new_value or "")
 
 
 def test_logout_revokes_a_stolen_copy_of_the_cookie(session) -> None:
@@ -338,7 +430,7 @@ def test_change_password_then_old_cookie_is_rejected_but_new_session_works(sessi
 
     change_response = authed_client.post(
         "/api/v1/auth/changer-mot-de-passe",
-        json={"mot_de_passe_actuel": "s3cret-pass", "nouveau_mot_de_passe": "nouveau-secret-2"},
+        json={"current_password": "s3cret-pass", "new_password": "nouveau-secret-2"},
     )
     assert change_response.status_code == 200
 
@@ -369,7 +461,7 @@ def test_change_password_with_wrong_current_password_is_rejected(session) -> Non
 
     response = authed_client.post(
         "/api/v1/auth/changer-mot-de-passe",
-        json={"mot_de_passe_actuel": "mauvais-mot-de-passe", "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"current_password": "mauvais-mot-de-passe", "new_password": "peu-importe-2"},
     )
 
     assert response.status_code == 401
@@ -451,13 +543,13 @@ def test_mot_de_passe_oublie_cree_un_jeton_pour_un_compte_actif(session, monkeyp
     _client_public().post("/api/v1/auth/mot-de-passe-oublie", json={"email": user.email})
 
     entree = session.exec(
-        select(ReinitialisationMotDePasse).where(
-            ReinitialisationMotDePasse.utilisateur_id == user.id
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id
         )
     ).one()
-    assert entree.jeton_hache == _hash_token(jeton)
-    assert entree.utilise_le is None
-    assert entree.date_expiration > utcnow()
+    assert entree.token_hash == _hash_token(jeton)
+    assert entree.used_at is None
+    assert entree.expires_at > utcnow()
 
 
 def test_mot_de_passe_oublie_ne_cree_rien_pour_un_compte_desactive(session, monkeypatch) -> None:
@@ -469,8 +561,8 @@ def test_mot_de_passe_oublie_ne_cree_rien_pour_un_compte_desactive(session, monk
     assert response.status_code == 204
     assert (
         session.exec(
-            select(ReinitialisationMotDePasse).where(
-                ReinitialisationMotDePasse.utilisateur_id == user.id
+            select(PasswordResetToken).where(
+                PasswordResetToken.user_id == user.id
             )
         ).first()
         is None
@@ -488,11 +580,11 @@ def test_mot_de_passe_oublie_invalide_le_lien_precedent(session, monkeypatch) ->
 
     reponse_premier = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": premier_jeton, "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"token": premier_jeton, "new_password": "peu-importe-2"},
     )
     reponse_second = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": second_jeton, "nouveau_mot_de_passe": "nouveau-secret-3"},
+        json={"token": second_jeton, "new_password": "nouveau-secret-3"},
     )
 
     assert reponse_premier.status_code == 422
@@ -533,14 +625,14 @@ def test_reinitialiser_mot_de_passe_change_le_mot_de_passe_et_revoque_les_sessio
 
     response = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "nouveau-secret-2"},
+        json={"token": jeton, "new_password": "nouveau-secret-2"},
     )
 
     assert response.status_code == 204
     session.refresh(user)
-    assert user.mot_de_passe_hache is not None
-    assert verify_password("nouveau-secret-2", user.mot_de_passe_hache)
-    assert not verify_password("ancien-secret", user.mot_de_passe_hache)
+    assert user.password_hash is not None
+    assert verify_password("nouveau-secret-2", user.password_hash)
+    assert not verify_password("ancien-secret", user.password_hash)
 
     # L'ancienne session, ouverte avant la réinitialisation, est révoquée.
     stale_client = TestClient(app, base_url="https://testserver")
@@ -563,13 +655,13 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_deja_utilise_est_refuse(sessio
     _client_public().post("/api/v1/auth/mot-de-passe-oublie", json={"email": user.email})
     premiere = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "nouveau-secret-2"},
+        json={"token": jeton, "new_password": "nouveau-secret-2"},
     )
     assert premiere.status_code == 204
 
     rejouee = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "encore-un-autre-3"},
+        json={"token": jeton, "new_password": "encore-un-autre-3"},
     )
 
     assert rejouee.status_code == 422
@@ -580,17 +672,19 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_expire_est_refuse(session) -> 
     user = _create_utilisateur(session, password="ancien-secret")
     jeton = f"jeton-expire-{uuid.uuid4()}"
     session.add(
-        ReinitialisationMotDePasse(
-            utilisateur_id=user.id,
-            jeton_hache=_hash_token(jeton),
-            date_expiration=utcnow(),
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=_hash_token(jeton),
+            # Nettement dans le passé : expires_at=utcnow() pouvait tomber sur le même tic d'horloge
+            # que la vérification (expires_at < utcnow()) et passer pour encore valide.
+            expires_at=utcnow() - timedelta(minutes=1),
         )
     )
     session.commit()
 
     response = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": jeton, "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"token": jeton, "new_password": "peu-importe-2"},
     )
 
     assert response.status_code == 422
@@ -600,7 +694,7 @@ def test_reinitialiser_mot_de_passe_avec_un_jeton_expire_est_refuse(session) -> 
 def test_reinitialiser_mot_de_passe_avec_un_jeton_inconnu_est_refuse() -> None:
     response = _client_public().post(
         "/api/v1/auth/reinitialiser-mot-de-passe",
-        json={"token": "un-jeton-jamais-emis", "nouveau_mot_de_passe": "peu-importe-2"},
+        json={"token": "un-jeton-jamais-emis", "new_password": "peu-importe-2"},
     )
 
     assert response.status_code == 422
@@ -675,7 +769,78 @@ def test_password_reset_without_smtp_returns_503_for_every_address(session, monk
     assert known.json()["error"]["code"] == unknown.json()["error"]["code"] == "service_unavailable"
     assert known.json()["error"]["message"] == unknown.json()["error"]["message"]
     assert session.exec(
-        select(ReinitialisationMotDePasse).where(
-            ReinitialisationMotDePasse.utilisateur_id == user.id
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id
         )
     ).first() is None
+
+
+def test_connexion_insensible_a_la_casse_de_lemail(session) -> None:
+    user = _create_utilisateur(session, password="s3cret-pass")
+
+    response = _client_public().post(
+        "/api/v1/auth/login", json={"email": f"  {user.email.upper()} ", "password": "s3cret-pass"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == user.email
+
+
+def test_un_email_en_majuscules_ne_peut_jamais_etre_stocke(session) -> None:
+    session.add(User(email=f"Majuscules-{uuid.uuid4()}@Example.com", role=Role.INVESTOR))
+    with pytest.raises(IntegrityError, match="ck_users_email_lowercase"):
+        session.commit()
+    session.rollback()
+
+
+@pytest.mark.parametrize("nouveau", ["court-11car", "x" * 73, "é" * 37])
+def test_changer_mot_de_passe_applique_la_regle_12_a_72_octets(session, nouveau) -> None:
+    user = _create_utilisateur(session, password="s3cret-pass")
+    authed_client = _client_connecte(user, "s3cret-pass")
+
+    response = authed_client.post(
+        "/api/v1/auth/changer-mot-de-passe",
+        json={"current_password": "s3cret-pass", "new_password": nouveau},
+    )
+
+    assert response.status_code == 422
+    session.refresh(user)
+    assert user.password_hash is not None
+    assert verify_password("s3cret-pass", user.password_hash)
+
+
+def test_changer_mot_de_passe_est_limite_comme_la_connexion(session) -> None:
+    user = _create_utilisateur(session, password="s3cret-pass")
+    authed_client = _client_connecte(user, "s3cret-pass")
+    try:
+        for _ in range(MAX_ATTEMPTS):
+            echec = authed_client.post(
+                "/api/v1/auth/changer-mot-de-passe",
+                json={"current_password": "mauvais", "new_password": "nouveau-secret-12"},
+            )
+            assert echec.status_code == 401
+
+        bloque = authed_client.post(
+            "/api/v1/auth/changer-mot-de-passe",
+            json={"current_password": "s3cret-pass", "new_password": "nouveau-secret-12"},
+        )
+        assert bloque.status_code == 429
+    finally:
+        clear_login_attempts(user.email)
+
+
+def test_connexion_limitee_par_ip_meme_sur_des_comptes_differents(session) -> None:
+    """Pulvérisation d'un mot de passe sur de nombreux comptes : chaque compte reste sous sa
+    propre limite, c'est le compteur par IP qui bloque."""
+    for _ in range(MAX_ATTEMPTS_PAR_IP):
+        echec = _client_public().post(
+            "/api/v1/auth/login",
+            json={"email": f"inconnu-{uuid.uuid4()}@example.com", "password": "Printemps2026!"},
+        )
+        assert echec.status_code == 401
+
+    user = _create_utilisateur(session, password="s3cret-pass")
+    bloque = _client_public().post(
+        "/api/v1/auth/login", json={"email": user.email, "password": "s3cret-pass"}
+    )
+    assert bloque.status_code == 429

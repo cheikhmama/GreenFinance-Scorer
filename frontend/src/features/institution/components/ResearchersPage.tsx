@@ -53,15 +53,15 @@ export function ResearchersPage() {
                 className="flex items-center justify-between gap-3 rounded-lg border p-3"
               >
                 <div className="flex items-center gap-3">
-                  <InitialsAvatar nom={chercheur.nom ?? chercheur.email} size="sm" />
+                  <InitialsAvatar nom={chercheur.name ?? chercheur.email} size="sm" />
                   <div>
-                    <p className="text-sm font-medium text-brand-blue">{chercheur.nom ?? chercheur.email}</p>
+                    <p className="text-sm font-medium text-brand-blue">{chercheur.name ?? chercheur.email}</p>
                     <p className="text-xs text-brand-grey">{chercheur.email}</p>
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => setInviteCible({ id: chercheur.id, label: chercheur.nom ?? chercheur.email })}
+                  onClick={() => setInviteCible({ id: chercheur.id, label: chercheur.name ?? chercheur.email })}
                 >
                   Inviter
                 </Button>
@@ -87,23 +87,23 @@ export function ResearchersPage() {
             <div key={rattachement.id} className="space-y-2 border-b py-3 text-sm last:border-0">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <InitialsAvatar nom={rattachement.chercheur_nom ?? rattachement.chercheur_email} size="sm" />
+                  <InitialsAvatar nom={rattachement.researcher_name ?? rattachement.researcher_email} size="sm" />
                   <div>
                     <p className="font-medium text-brand-blue">
-                      {rattachement.chercheur_nom ?? rattachement.chercheur_email}
+                      {rattachement.researcher_name ?? rattachement.researcher_email}
                     </p>
                     <p className="text-xs text-brand-grey">
-                      Invité le {new Date(rattachement.date_invitation).toLocaleDateString("fr-FR")}
+                      Invité le {new Date(rattachement.invited_at).toLocaleDateString("fr-FR")}
                     </p>
                   </div>
                 </div>
-                <Badge variant={variantStatutRattachement(rattachement.statut)}>
-                  {libelleStatutRattachement(rattachement.statut)}
+                <Badge variant={variantStatutRattachement(rattachement.status)}>
+                  {libelleStatutRattachement(rattachement.status)}
                 </Badge>
               </div>
-              {rattachement.conditions_collaboration ? (
+              {rattachement.collaboration_terms ? (
                 <p className="rounded-md border-l-4 border-brand-green bg-brand-green-light/40 p-2 text-xs text-brand-blue">
-                  {rattachement.conditions_collaboration}
+                  {rattachement.collaboration_terms}
                 </p>
               ) : null}
             </div>
@@ -132,16 +132,16 @@ function DialogueInvitation({
   const inviter = useInviteResearcher();
   const form = useForm<InviterChercheurForm>({
     resolver: zodResolver(inviterChercheurSchema),
-    defaultValues: { conditions_collaboration: "" },
+    defaultValues: { collaboration_terms: "" },
   });
 
   function onSubmit(values: InviterChercheurForm) {
     if (!cible) return;
     inviter.mutate(
-      { chercheur_id: cible.id, conditions_collaboration: values.conditions_collaboration || null },
+      { researcher_id: cible.id, collaboration_terms: values.collaboration_terms || null },
       {
         onSuccess: () => {
-          form.reset({ conditions_collaboration: "" });
+          form.reset({ collaboration_terms: "" });
           onClose();
         },
         onError: (error) => onError(error instanceof ApiError ? error.message : "Échec de l'invitation."),
@@ -159,7 +159,7 @@ function DialogueInvitation({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <FormField
               control={form.control}
-              name="conditions_collaboration"
+              name="collaboration_terms"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Conditions de collaboration (optionnel)</FormLabel>

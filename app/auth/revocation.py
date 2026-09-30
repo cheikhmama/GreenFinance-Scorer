@@ -22,7 +22,7 @@ import redis
 import structlog
 
 from app.core.exceptions import ServiceUnavailableError
-from app.core.redis import get_redis_client
+from app.core.redis import get_redis_client, incrementer, lire_entier
 
 logger = structlog.get_logger(__name__)
 
@@ -48,8 +48,8 @@ def _guarded(operation: str, call: Callable[[], T]) -> T:
 def current_generation(user_id: uuid.UUID) -> int:
     """Génération en vigueur pour cet utilisateur — 0 si jamais révoqué. À intégrer dans le
     jeton d'accès à sa création (voir app/auth/router.py::_ouvrir_session)."""
-    valeur = _guarded("get", lambda: get_redis_client().get(_key(user_id)))
-    return int(valeur) if valeur is not None else 0
+    valeur = _guarded("get", lambda: lire_entier(get_redis_client(), _key(user_id)))
+    return valeur if valeur is not None else 0
 
 
 def revoke_all_sessions(user_id: uuid.UUID) -> int:
@@ -60,7 +60,7 @@ def revoke_all_sessions(user_id: uuid.UUID) -> int:
     appel (changement de mot de passe/rôle), l'utiliser directement comme génération du nouveau
     jeton — jamais considérée comme révoquée par sa propre révocation, la comparaison portant
     sur une génération strictement inférieure, jamais égale."""
-    return _guarded("incr", lambda: get_redis_client().incr(_key(user_id)))
+    return _guarded("incr", lambda: incrementer(get_redis_client(), _key(user_id)))
 
 
 def is_session_revoked(user_id: uuid.UUID, token_generation: int) -> bool:

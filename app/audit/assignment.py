@@ -12,55 +12,56 @@ import structlog
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
-from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
+from app.audit.models import AuditOpinion
+from app.auth.models import User
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import Role, StatutRapport
+from app.core.enums import ExtractionStatus, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
-from app.ingestion.models import RapportESG
+from app.core.recherche import contient
+from app.ingestion.models import ESGReport
 
 logger = structlog.get_logger(__name__)
 
 
-def affecter_auditeur(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid.UUID) -> RapportESG:
-    rapport = session.get(RapportESG, rapport_id)
+def affecter_auditeur(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid.UUID) -> ESGReport:
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
-    if rapport.statut != StatutRapport.EN_EXTRACTION:
+    if rapport.status != ReportStatus.SUBMITTED:
         raise ValidationError(
             "Ce rapport n'est pas en attente d'affectation.", code="rapport_deja_affecte"
         )
-    if rapport.extraction_terminee_le is None:
+    if rapport.extraction_status != ExtractionStatus.DONE:
         raise ValidationError(
             "L'extraction de ce rapport n'est pas terminée.", code="extraction_non_terminee"
         )
 
-    auditeur = session.get(Utilisateur, auditeur_id)
-    if auditeur is None or auditeur.role != Role.AUDITEUR or not auditeur.actif:
+    auditeur = session.get(User, auditeur_id)
+    if auditeur is None or auditeur.role != Role.AUDITOR or not auditeur.active:
         raise ValidationError("Auditeur invalide.", code="auditeur_invalide")
 
-    rapport.auditeur_id = auditeur.id
-    rapport.statut = StatutRapport.AFFECTE_AUDITEUR
-    rapport.date_affectation = utcnow()
+    rapport.auditor_id = auditeur.id
+    rapport.status = ReportStatus.PENDING_AUDIT
+    rapport.assigned_at = utcnow()
     session.add(rapport)
 
     notifier(
         session,
         auditeur.id,
         "RAPPORT_AFFECTE_AUDITEUR",
-        f"Un rapport {rapport.type.value} ({rapport.annee_reporting}) de {rapport.entreprise.nom} "
+        f"Un rapport {rapport.type.value} ({rapport.fiscal_year}) de {rapport.company.name} "
         "vous a été affecté pour audit.",
         id_ressource=rapport.id,
     )
-    if rapport.entreprise.utilisateur_id is not None:
+    if rapport.company.owner_user_id is not None:
         notifier(
             session,
-            rapport.entreprise.utilisateur_id,
+            rapport.company.owner_user_id,
             "RAPPORT_AFFECTE_ENTREPRISE",
-            f"Votre rapport {rapport.type.value} ({rapport.annee_reporting}) a été affecté à un "
+            f"Votre rapport {rapport.type.value} ({rapport.fiscal_year}) a été affecté à un "
             "auditeur.",
             id_ressource=rapport.id,
         )
@@ -80,10 +81,10 @@ def statistiques_charge_globale(session: Session) -> tuple[int, int]:
     lister_rapports_en_retard), pas dupliqués ici."""
     dossiers_affectes = session.exec(
         select(func.count())
-        .select_from(RapportESG)
-        .where(col(RapportESG.statut) == StatutRapport.AFFECTE_AUDITEUR)
+        .select_from(ESGReport)
+        .where(col(ESGReport.status) == ReportStatus.PENDING_AUDIT)
     ).one()
-    avis_rendus = session.exec(select(func.count()).select_from(AvisAudit)).one()
+    avis_rendus = session.exec(select(func.count()).select_from(AuditOpinion)).one()
     return dossiers_affectes, avis_rendus
 
 
@@ -93,54 +94,54 @@ def lister_charge_auditeurs(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Utilisateur, int, int, int]], int]:
+) -> tuple[list[tuple[User, int, int, int]], int]:
     """Charge de travail par Auditeur actif — dossiers actuellement affectés, dont ceux en retard
     (au-delà de settings.sla_audit_jours), et avis rendus au total : le détail derrière le chiffre
     "Dossiers affectés" de l'Aperçu Administrateur (indicateur → liste filtrée). Pagination par
     offset/limit, même principe que les autres listes Admin (voir app/admin/utilisateurs.py)."""
     filtres: list[ColumnElement[bool]] = [
-        col(Utilisateur.role) == Role.AUDITEUR,
-        col(Utilisateur.actif).is_(True),
+        col(User.role) == Role.AUDITOR,
+        col(User.active).is_(True),
     ]
     if recherche:
-        filtres.append(col(Utilisateur.email).ilike(f"%{recherche}%"))
+        filtres.append(contient(recherche, User.email))
 
-    total = session.exec(select(func.count()).select_from(Utilisateur).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(User).where(*filtres)).one()
     auditeurs = list(
         session.exec(
-            select(Utilisateur)
+            select(User)
             .where(*filtres)
-            .order_by(col(Utilisateur.email))
+            .order_by(col(User.email))
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
     )
 
     seuil_retard = utcnow() - timedelta(days=get_settings().sla_audit_jours)
-    resultats: list[tuple[Utilisateur, int, int, int]] = []
+    resultats: list[tuple[User, int, int, int]] = []
     for auditeur in auditeurs:
         dossiers_affectes = session.exec(
             select(func.count())
-            .select_from(RapportESG)
+            .select_from(ESGReport)
             .where(
-                col(RapportESG.auditeur_id) == auditeur.id,
-                col(RapportESG.statut) == StatutRapport.AFFECTE_AUDITEUR,
+                col(ESGReport.auditor_id) == auditeur.id,
+                col(ESGReport.status) == ReportStatus.PENDING_AUDIT,
             )
         ).one()
         dossiers_en_retard = session.exec(
             select(func.count())
-            .select_from(RapportESG)
+            .select_from(ESGReport)
             .where(
-                col(RapportESG.auditeur_id) == auditeur.id,
-                col(RapportESG.statut) == StatutRapport.AFFECTE_AUDITEUR,
-                col(RapportESG.date_affectation).is_not(None),
-                col(RapportESG.date_affectation) < seuil_retard,
+                col(ESGReport.auditor_id) == auditeur.id,
+                col(ESGReport.status) == ReportStatus.PENDING_AUDIT,
+                col(ESGReport.assigned_at).is_not(None),
+                col(ESGReport.assigned_at) < seuil_retard,
             )
         ).one()
         avis_rendus = session.exec(
             select(func.count())
-            .select_from(AvisAudit)
-            .where(col(AvisAudit.auditeur_id) == auditeur.id)
+            .select_from(AuditOpinion)
+            .where(col(AuditOpinion.auditor_id) == auditeur.id)
         ).one()
         resultats.append((auditeur, dossiers_affectes, dossiers_en_retard, avis_rendus))
     return resultats, total

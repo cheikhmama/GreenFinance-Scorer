@@ -1,8 +1,19 @@
 name: CI
 
+# Tâche 4.4 : une exécution par pull request, et une sur main après fusion — plus une par push sur
+# chaque branche en plus de celle de sa PR (deux exécutions identiques pour un même commit).
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+
+# Un nouveau push sur la même PR (ou sur main) annule l'exécution devenue obsolète.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   ci:
@@ -10,35 +21,59 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v10
+        with:
+          # Même uv que les images (Dockerfile) et même Python que la production.
+          version: "0.11.15"
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Lint (ruff)
         run: uv run ruff check .
 
       - name: Type check (mypy)
-        run: uv run mypy app/
+        run: uv run mypy app tests
 
-      - name: Start db and redis
-        # --wait attend que les healthchecks Compose (docker-compose.yml) passent au vert,
-        # plutôt qu'une boucle pg_isready répétée ici indépendamment.
-        run: docker compose up -d --wait db redis
+      - name: Single Alembic head
+        # Deux migrations écrites en parallèle sur deux branches donnent deux têtes : `upgrade
+        # head` échouerait au déploiement. Détecté ici, avant la fusion.
+        run: |
+          heads=$(uv run alembic heads | grep -c "(head)")
+          if [ "$heads" -ne 1 ]; then
+            uv run alembic heads
+            echo "::error::Alembic a $heads têtes : fusionner les migrations (alembic merge)."
+            exit 1
+          fi
 
       - name: Prepare environment file
         run: cp .env.example .env
+
+      - name: Start db and redis
+        # --wait attend que les healthchecks Compose passent au vert. docker-compose.override.yml
+        # (chargé automatiquement) publie les ports utilisés par les tests.
+        run: docker compose up -d --wait db redis
+
+      - name: Migrations match the models
+        # Chaîne complète appliquée sur une base vide, puis `alembic check` : un modèle modifié
+        # sans migration correspondante fait échouer la CI.
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
 
       - name: Run tests with coverage
         run: uv run pytest --cov=app --cov-report=term-missing
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -64,3 +99,23 @@ jobs:
         # sous frontend/src/shared/api/generated/ — dérive de contrat détectée avant fusion.
         working-directory: frontend
         run: npm run api:check
+
+  image-api:
+    # L'image légère (tâche 4.2) se construit en moins d'une minute : une erreur dans le
+    # Dockerfile ou le groupe de dépendances de l'API est vue avant la fusion. L'image worker
+    # (torch, Docling, plusieurs Go) n'est pas construite ici.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build api image
+        run: docker build --target api -t greenfinance-api:ci .
+
+      - name: API image has no dev tools nor extraction stack
+        run: |
+          docker run --rm --entrypoint python greenfinance-api:ci -c "
+          import importlib.util as u
+          present = [m for m in ('pytest', 'mypy', 'torch', 'docling') if u.find_spec(m)]
+          assert not present, present
+          "

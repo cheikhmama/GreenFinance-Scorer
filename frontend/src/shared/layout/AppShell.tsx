@@ -107,14 +107,14 @@ export function AppShell() {
           }
         >
           <UserAvatar
-            nom={user.nom ?? user.email}
+            nom={user.name ?? user.email}
             avatar={user.avatar}
             fallback="icone"
             className="size-9 shrink-0 text-xs"
           />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold text-white">
-              {user.nom || user.email}
+              {user.name || user.email}
             </span>
             <span className="block truncate text-[11px] text-slate-400">Profil</span>
           </span>

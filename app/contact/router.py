@@ -6,23 +6,15 @@ from fastapi import APIRouter, Request
 
 from app.contact.schemas import ContactMessageRequest
 from app.core.config import get_settings
-from app.core.email import EmailDeliveryError, send_email
+from app.core.email import EmailDeliveryError, envoyer_email_differe
 from app.core.exceptions import ServiceUnavailableError, TooManyRequestsError
-from app.core.redis import get_redis_client
+from app.core.redis import get_redis_client, incrementer_fenetre
 
 router = APIRouter(tags=["contact"])
 logger = structlog.get_logger(__name__)
 
 _RATE_LIMIT_MAX = 3
 _RATE_LIMIT_WINDOW_SECONDS = 3600
-# Une seule opération Redis : aucune fenêtre concurrente entre INCR et EXPIRE.
-_RATE_LIMIT_SCRIPT = """
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then
-    redis.call('EXPIRE', KEYS[1], ARGV[1])
-end
-return count
-"""
 
 
 def _enforce_rate_limit(request: Request) -> None:
@@ -31,9 +23,7 @@ def _enforce_rate_limit(request: Request) -> None:
     address = request.client.host if request.client else "unknown"
     key = f"contact_requests:{hashlib.sha256(address.encode()).hexdigest()}"
     try:
-        attempts = int(
-            get_redis_client().eval(_RATE_LIMIT_SCRIPT, 1, key, _RATE_LIMIT_WINDOW_SECONDS)
-        )
+        attempts = incrementer_fenetre(get_redis_client(), key, _RATE_LIMIT_WINDOW_SECONDS)
     except redis.RedisError as exc:
         logger.error("contact_rate_limit_unavailable", error_type=type(exc).__name__)
         raise ServiceUnavailableError(
@@ -58,13 +48,13 @@ def _enforce_rate_limit(request: Request) -> None:
 def send_contact_message(payload: ContactMessageRequest, request: Request) -> None:
     _enforce_rate_limit(request)
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=get_settings().contact_to_email,
-            subject=f"[GreenFinance-Scorer] {payload.sujet}",
+            subject=f"[GreenFinance-Scorer] {payload.subject}",
             reply_to=str(payload.email),
             body=(
-                f"Nom : {payload.nom}\nE-mail : {payload.email}\n"
-                f"Sujet : {payload.sujet}\n\n{payload.message}\n"
+                f"Nom : {payload.name}\nE-mail : {payload.email}\n"
+                f"Sujet : {payload.subject}\n\n{payload.message}\n"
             ),
         )
     except EmailDeliveryError as exc:

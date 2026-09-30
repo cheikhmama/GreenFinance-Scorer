@@ -14,7 +14,7 @@ def sa_enum_column(enum_cls: type[Enum], *, nullable: bool = False) -> Column:
     """Colonne SQLAlchemy pour un champ enum, stockée en VARCHAR + CHECK
     plutôt qu'en type ENUM natif PostgreSQL (native_enum=False).
 
-    Certaines de ces énumérations (ex. MethodeDonnee) sont réutilisées sur
+    Certaines de ces énumérations (ex. DataMethod) sont réutilisées sur
     plusieurs tables : un type ENUM natif porte le même nom PostgreSQL
     partout où il est utilisé, ce qui expose à un conflit de création lors
     d'une même migration. Le stockage VARCHAR+CHECK évite ce risque tout en
@@ -23,42 +23,63 @@ def sa_enum_column(enum_cls: type[Enum], *, nullable: bool = False) -> Column:
     return Column(SAEnum(enum_cls, native_enum=False, length=64), nullable=nullable)
 
 
-class StatutRapport(str, Enum):
-    ENVOYE = "ENVOYE"
-    EN_EXTRACTION = "EN_EXTRACTION"
-    AFFECTE_AUDITEUR = "AFFECTE_AUDITEUR"
-    EN_VALIDATION = "EN_VALIDATION"
-    VALIDE = "VALIDE"
-    REJETE = "REJETE"
-    DEMANDE_CORRECTION = "DEMANDE_CORRECTION"
+class ReportStatus(str, Enum):
+    """Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
+    d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne."""
+
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    PENDING_AUDIT = "PENDING_AUDIT"
+    # Avis de l'auditeur rendu, décision de l'Administrateur attendue (décision D2).
+    PENDING_DECISION = "PENDING_DECISION"
+    REVISION_REQUESTED = "REVISION_REQUESTED"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
 
 
-class TypeRapport(str, Enum):
+class ExtractionStatus(str, Enum):
+    NOT_STARTED = "NOT_STARTED"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    DONE = "DONE"
+    FAILED = "FAILED"
+
+
+class CompanyStatus(str, Enum):
+    """Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
+    score (Company.published_at)."""
+
+    PENDING_ONBOARDING = "PENDING_ONBOARDING"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+
+
+class ReportType(str, Enum):
     RAPPORT_ANNUEL = "RAPPORT_ANNUEL"
     RAPPORT_ESG = "RAPPORT_ESG"
     RAPPORT_CLIMAT = "RAPPORT_CLIMAT"
 
 
-class CanalDepot(str, Enum):
+class SubmissionChannel(str, Enum):
     AUTOMATIQUE = "AUTOMATIQUE"
     ENTREPRISE = "ENTREPRISE"
 
 
-class Pilier(str, Enum):
+class Pillar(str, Enum):
     ENVIRONNEMENT = "ENVIRONNEMENT"
     SOCIAL = "SOCIAL"
     GOUVERNANCE = "GOUVERNANCE"
 
 
-class MethodeDonnee(str, Enum):
+class DataMethod(str, Enum):
     RAPPORTEE = "RAPPORTEE"
     ESTIMEE = "ESTIMEE"
     CALCULEE = "CALCULEE"
 
 
-class StatutCouvertureIndicateur(str, Enum):
+class MetricCoverageStatus(str, Enum):
     """Statut à 3 valeurs d'un code cible pour un rapport (Phase 6, remplace l'ancien booléen
-    CouvertureIndicateur.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
+    MetricCoverage.trouve). ABSENT_CONFIRME n'est posé automatiquement par le pipeline que
     sous conditions strictes (voir app/ingestion/completeness.py::_absence_confirmee) — jamais une
     simple absence dans les pages examinées, qui reste NON_TROUVE."""
 
@@ -67,50 +88,94 @@ class StatutCouvertureIndicateur(str, Enum):
     ABSENT_CONFIRME = "ABSENT_CONFIRME"
 
 
-class NiveauConfiance(str, Enum):
+class ConfidenceLevel(str, Enum):
     ELEVE = "ELEVE"
     MOYEN = "MOYEN"
     FAIBLE = "FAIBLE"
 
 
-class DecisionAudit(str, Enum):
+class AuditDecision(str, Enum):
     RECOMMANDE_VALIDATION = "RECOMMANDE_VALIDATION"
     RECOMMANDE_REJET = "RECOMMANDE_REJET"
     DEMANDE_CLARIFICATION = "DEMANDE_CLARIFICATION"
 
 
 class Role(str, Enum):
-    ADMINISTRATEUR = "ADMINISTRATEUR"
-    ENTREPRISE = "ENTREPRISE"
-    AUDITEUR = "AUDITEUR"
-    INVESTISSEUR = "INVESTISSEUR"
-    CHERCHEUR = "CHERCHEUR"
+    """Rôles de la plateforme (docs/ARCHITECTURE.md §1) — INSTITUTION conservé (décision D1)."""
+
+    ADMIN = "ADMIN"
+    ENTERPRISE = "ENTERPRISE"
+    AUDITOR = "AUDITOR"
+    INVESTOR = "INVESTOR"
+    RESEARCHER = "RESEARCHER"
     INSTITUTION = "INSTITUTION"
 
 
-class DevisePosition(str, Enum):
+class Currency(str, Enum):
     MRU = "MRU"
     USD = "USD"
     EUR = "EUR"
 
 
-class TypeDureeInvestissement(str, Enum):
+class BaselineScope(str, Enum):
+    """Ensemble de référence d'une explication de score (tâche 3.2) : les pairs du même secteur,
+    ou toutes les entreprises publiées."""
+
+    SECTOR = "SECTOR"
+    UNIVERSE = "UNIVERSE"
+
+
+class ComparedScore(str, Enum):
+    """Score comparé par une validation croisée (tâche 3.3) : un pilier ou le score global."""
+
+    ENVIRONMENTAL = "ENVIRONMENTAL"
+    SOCIAL = "SOCIAL"
+    GOVERNANCE = "GOVERNANCE"
+    GLOBAL = "GLOBAL"
+
+
+class UnmatchedReason(str, Enum):
+    """Pourquoi une ligne d'un jeu de référence n'entre pas dans la comparaison (tâche 3.3).
+    UNKNOWN ne distingue jamais une entreprise inconnue d'une entreprise hors du périmètre."""
+
+    UNKNOWN = "UNKNOWN"
+    DUPLICATE = "DUPLICATE"  # entreprise déjà rapprochée par une ligne précédente
+    NO_PLATFORM_SCORE = "NO_PLATFORM_SCORE"
+
+
+class IdentifierType(str, Enum):
+    """Identifiant de marché d'une ligne de portefeuille importée (tâche 2.2)."""
+
+    ISIN = "ISIN"
+    TICKER = "TICKER"
+
+
+class MatchStatus(str, Enum):
+    """Rapprochement d'une ligne de portefeuille avec une entreprise de la plateforme."""
+
+    MATCHED = "MATCHED"
+    UNMATCHED = "UNMATCHED"
+    # Plusieurs entreprises possibles (ex. un ticker coté sur plusieurs places).
+    AMBIGUOUS = "AMBIGUOUS"
+
+
+class DurationType(str, Enum):
     OUVERTE = "OUVERTE"
     FIXE = "FIXE"
 
 
-class StatutRattachement(str, Enum):
+class AffiliationStatus(str, Enum):
     EN_ATTENTE = "EN_ATTENTE"
     ACCEPTE = "ACCEPTE"
     REFUSE = "REFUSE"
 
 
-class StatutProjet(str, Enum):
+class ProjectStatus(str, Enum):
     OUVERT = "OUVERT"
     CLOTURE = "CLOTURE"
 
 
-class StatutAnalyse(str, Enum):
+class AnalysisStatus(str, Enum):
     BROUILLON = "BROUILLON"
     SOUMISE = "SOUMISE"
     VALIDEE = "VALIDEE"

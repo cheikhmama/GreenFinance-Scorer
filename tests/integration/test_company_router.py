@@ -5,27 +5,30 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core import storage
+from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    MethodeDonnee,
-    NiveauConfiance,
-    Pilier,
+    CompanyStatus,
+    ConfidenceLevel,
+    DataMethod,
+    ExtractionStatus,
+    MetricCoverageStatus,
+    Pillar,
+    ReportStatus,
+    ReportType,
     Role,
-    StatutCouvertureIndicateur,
-    StatutRapport,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    CouvertureIndicateur,
-    DonneeCarbone,
-    IndicateurESG,
-    PreuveDocumentaire,
-    RapportESG,
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
+    MetricCoverage,
 )
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 from app.investor.entreprises import couverture_publique
@@ -42,25 +45,25 @@ def _minimal_pdf_bytes() -> bytes:
     return data
 
 
-def _create_entreprise_utilisateur(session, *, password: str, avec_entreprise: bool = True) -> Utilisateur:
+def _create_entreprise_utilisateur(session, *, password: str, avec_entreprise: bool = True) -> User:
     entreprise = None
     if avec_entreprise:
-        entreprise = Entreprise(nom=f"Entreprise {uuid.uuid4()}", secteur="Technologies", pays="France")
+        entreprise = Company(name=f"Entreprise {uuid.uuid4()}", sector="Technologies", country="France")
         session.add(entreprise)
         session.commit()
         session.refresh(entreprise)
 
-    user = Utilisateur(
+    user = User(
         email=f"entreprise-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
-        role=Role.ENTREPRISE,
-        actif=True,
+        password_hash=hash_password(password),
+        role=Role.ENTERPRISE,
+        active=True,
     )
     session.add(user)
     session.commit()
 
     if entreprise is not None:
-        entreprise.utilisateur_id = user.id
+        entreprise.owner_user_id = user.id
         session.add(entreprise)
         session.commit()
 
@@ -84,9 +87,9 @@ def test_consulter_mon_profil_retourne_la_fiche_entreprise(session) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["nom"].startswith("Entreprise ")
-    assert body["secteur"] == "Technologies"
-    assert body["pays"] == "France"
+    assert body["name"].startswith("Entreprise ")
+    assert body["sector"] == "Technologies"
+    assert body["country"] == "France"
 
 
 def test_consulter_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(session) -> None:
@@ -100,46 +103,45 @@ def test_consulter_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(se
 
 
 def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 201
-    assert response.json()["statut"] == StatutRapport.ENVOYE.value
-    assert response.json()["canal"] == CanalDepot.ENTREPRISE.value
+    assert response.json()["status"] == ReportStatus.SUBMITTED.value
+    assert response.json()["extraction_status"] == ExtractionStatus.QUEUED.value
+    assert response.json()["channel"] == SubmissionChannel.ENTREPRISE.value
 
 
 def test_deposer_rapport_notifie_lentreprise(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     rapport_id = uuid.UUID(response.json()["id"])
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == user.id, Notification.type == "RAPPORT_DEPOSE"
+            Notification.user_id == user.id, Notification.type == "RAPPORT_DEPOSE"
         )
     ).one()
-    assert notification.id_ressource == rapport_id
+    assert notification.resource_id == rapport_id
 
 
 def test_deposer_rapport_sans_authentification_est_rejete() -> None:
     response = client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 401
@@ -147,11 +149,11 @@ def test_deposer_rapport_sans_authentification_est_rejete() -> None:
 
 
 def test_deposer_rapport_avec_role_investisseur_est_rejete(session) -> None:
-    user = Utilisateur(
+    user = User(
         email=f"investisseur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password("s3cret-pass"),
-        role=Role.INVESTISSEUR,
-        actif=True,
+        password_hash=hash_password("s3cret-pass"),
+        role=Role.INVESTOR,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -160,7 +162,7 @@ def test_deposer_rapport_avec_role_investisseur_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 403
@@ -176,7 +178,7 @@ def test_deposer_rapport_fichier_non_pdf_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.txt", b"pas un pdf", "text/plain")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -190,7 +192,7 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -198,18 +200,17 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
 
 
 def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    user.entreprise.actif = False
-    session.add(user.entreprise)
+    assert user.company is not None
+    user.company.status = CompanyStatus.SUSPENDED
+    session.add(user.company)
     session.commit()
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -219,19 +220,21 @@ def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatc
 def test_lister_rapports_ne_montre_que_ceux_de_lentreprise_courante(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
     autre = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
-    assert autre.entreprise is not None
-    mien = RapportESG(
-        entreprise_id=proprietaire.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/mien.pdf",
+    assert proprietaire.company is not None
+    assert autre.company is not None
+    mien = ESGReport(
+        company_id=proprietaire.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/mien.pdf",
+        submitted_at=utcnow(),
     )
-    dautrui = RapportESG(
-        entreprise_id=autre.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dautrui.pdf",
+    dautrui = ESGReport(
+        company_id=autre.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dautrui.pdf",
+        submitted_at=utcnow(),
     )
     session.add(mien)
     session.add(dautrui)
@@ -256,21 +259,20 @@ def test_lister_rapports_sans_authentification_est_rejete() -> None:
 def test_deposer_rapport_genere_le_nom_de_stockage_cote_serveur(session, monkeypatch) -> None:
     """Phase 4 §4.2 : le nom de fichier fourni par le client n'apparaît jamais dans le chemin de
     stockage, même assaini — seuls des identifiants déjà connus côté serveur le déterminent."""
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("../../etc/passwd-mais-pdf.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 201
-    fichier_source = response.json()["fichier_source"]
+    fichier_source = response.json()["source_file"]
     assert "passwd" not in fichier_source
-    assert fichier_source == f"rapports/{user.entreprise.id}/{response.json()['id']}.pdf"
+    assert fichier_source == f"rapports/{user.company.id}/{response.json()['id']}.pdf"
 
 
 def test_deposer_rapport_fichier_trop_volumineux_est_rejete(session, monkeypatch) -> None:
@@ -281,7 +283,7 @@ def test_deposer_rapport_fichier_trop_volumineux_est_rejete(session, monkeypatch
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", _minimal_pdf_bytes(), "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -295,7 +297,7 @@ def test_deposer_rapport_fichier_vide_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", b"", "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -317,7 +319,7 @@ def test_deposer_rapport_pdf_chiffre_est_rejete(session) -> None:
     response = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", contenu_chiffre, "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert response.status_code == 422
@@ -325,7 +327,6 @@ def test_deposer_rapport_pdf_chiffre_est_rejete(session) -> None:
 
 
 def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")
     contenu = _minimal_pdf_bytes()
@@ -333,14 +334,14 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
     premier = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("rapport.pdf", contenu, "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
     assert premier.status_code == 201
 
     deuxieme = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("copie.pdf", contenu, "application/pdf")},
-        data={"type": TypeRapport.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
 
     assert deuxieme.status_code == 422
@@ -348,15 +349,15 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
 
 
 def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_a, **_k: None)
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    original = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.DEMANDE_CORRECTION,
-        fichier_source="rapports/test/original.pdf",
+    assert user.company is not None
+    original = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        status=ReportStatus.REVISION_REQUESTED,
+        source_file="rapports/test/original.pdf",
+        submitted_at=utcnow(),
     )
     session.add(original)
     session.commit()
@@ -372,25 +373,26 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
     assert response.status_code == 201
     body = response.json()
     assert body["version"] == 2
-    assert body["rapport_precedent_id"] == str(original.id)
-    assert body["statut"] == StatutRapport.ENVOYE.value
+    assert body["previous_report_id"] == str(original.id)
+    assert body["status"] == ReportStatus.SUBMITTED.value
     assert body["id"] != str(original.id)
 
     # L'original n'est jamais réécrit — il reste DEMANDE_CORRECTION indéfiniment (Phase 0).
     session.refresh(original)
-    assert original.statut == StatutRapport.DEMANDE_CORRECTION
-    assert original.fichier_source == "rapports/test/original.pdf"
+    assert original.status == ReportStatus.REVISION_REQUESTED
+    assert original.source_file == "rapports/test/original.pdf"
 
 
 def test_creer_correction_sur_un_rapport_pas_en_attente_est_rejetee(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.EN_VALIDATION,
-        fichier_source="rapports/test/dummy.pdf",
+    assert user.company is not None
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        status=ReportStatus.PENDING_DECISION,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -410,13 +412,14 @@ def test_creer_correction_sur_un_rapport_pas_en_attente_est_rejetee(session) -> 
 def test_creer_correction_sur_le_rapport_dune_autre_entreprise_est_404(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
     autre = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=proprietaire.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.DEMANDE_CORRECTION,
-        fichier_source="rapports/test/dummy.pdf",
+    assert proprietaire.company is not None
+    rapport = ESGReport(
+        company_id=proprietaire.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        status=ReportStatus.REVISION_REQUESTED,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -436,12 +439,13 @@ def test_creer_correction_sur_le_rapport_dune_autre_entreprise_est_404(session) 
 def test_consulter_rapport_dune_autre_entreprise_est_404(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
     autre = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=proprietaire.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    assert proprietaire.company is not None
+    rapport = ESGReport(
+        company_id=proprietaire.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -466,12 +470,13 @@ def test_consulter_rapport_inexistant_est_404(session) -> None:
 
 def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    assert user.company is not None
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -482,7 +487,7 @@ def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == str(rapport.id)
-    assert response.json()["statut"] == StatutRapport.ENVOYE.value
+    assert response.json()["status"] == ReportStatus.SUBMITTED.value
 
 
 def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(session, monkeypatch) -> None:
@@ -503,14 +508,15 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
 
     monkeypatch.setattr("app.ingestion.extractor._get_embed_model", lambda: _FakeEmbedModel())
 
-    entreprise = Entreprise(nom="Cible Test", secteur="Technologies", pays="France")
+    entreprise = Company(name="Cible Test", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -519,14 +525,16 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
     run_extraction_pipeline(rapport.id, 2024)
 
     session.refresh(rapport)
-    assert rapport.extraction_erreur == "docling_conversion_echouee"
-    assert rapport.extraction_terminee_le is None
-    assert rapport.statut == StatutRapport.EN_EXTRACTION
+    assert rapport.extraction_error == "docling_conversion_echouee"
+    assert rapport.extraction_finished_at is None
+    assert rapport.status == ReportStatus.SUBMITTED
+    assert rapport.extraction_status == ExtractionStatus.FAILED
 
 
-def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_termine(
-    session, monkeypatch
-) -> None:
+def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) -> None:
+    """Remplace Docling, l'indexation, le modèle d'embedding, le LLM et la génération de preuve
+    par des doubles : run_extraction_pipeline ne dépend plus que de `extraction`, la réponse
+    simulée du LLM (un seul passage, la relance groupée est court-circuitée)."""
     from app.ingestion import extractor
     from app.ingestion.docling_pipeline import ConversionResult
 
@@ -568,6 +576,43 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
 
     monkeypatch.setattr("app.ingestion.extractor._build_context", _fake_build_context)
 
+    monkeypatch.setattr("app.ingestion.extractor._call_llm_extraction", lambda **_k: extraction)
+
+    def _fake_proof(*, source_pdf_path, nom_document, annee, nombre_pages_total, page, rapport_id):
+        return Evidence(
+            document_name=nom_document,
+            year=annee,
+            total_pages=nombre_pages_total,
+            page_start=page,
+            page_end=page,
+            excerpt_pdf_path=f"preuves/{rapport_id}/page_{page}.pdf",
+        )
+
+    monkeypatch.setattr("app.ingestion.extractor.proof_generator.generate_page_proof", _fake_proof)
+
+
+def _rapport_a_extraire(session) -> ESGReport:
+    entreprise = Company(name="Cible Test", sector="Technologies", country="France")
+    session.add(entreprise)
+    session.commit()
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
+    )
+    session.add(rapport)
+    session.commit()
+    session.refresh(rapport)
+    return rapport
+
+
+def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_termine(
+    session, monkeypatch
+) -> None:
+    from app.ingestion import extractor
+
     fake_extraction = ExtractionEntreprise(
         entreprise="Cible Test",
         indicateurs=[
@@ -578,7 +623,7 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
                 page_source=3,
                 trouve=True,
                 valeur_brute="100 tCO2e",
-                confiance=NiveauConfiance.ELEVE,
+                confiance=ConfidenceLevel.ELEVE,
             ),
             IndicateurExtrait(
                 code="intensite_scope_1_2_marketbased",
@@ -590,58 +635,64 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
             IndicateurExtrait(code="scope_3", valeur=None, unite=None, page_source=None, trouve=False),
         ],
     )
-    monkeypatch.setattr(
-        "app.ingestion.extractor._call_llm_extraction", lambda **_k: fake_extraction
-    )
-
-    def _fake_proof(*, source_pdf_path, nom_document, annee, nombre_pages_total, page, rapport_id):
-        return PreuveDocumentaire(
-            nom_document=nom_document,
-            annee=annee,
-            nombre_pages_total=nombre_pages_total,
-            page_debut=page,
-            page_fin=page,
-            pdf_extrait_genere=f"preuves/{rapport_id}/page_{page}.pdf",
-        )
-
-    monkeypatch.setattr("app.ingestion.extractor.proof_generator.generate_page_proof", _fake_proof)
-
-    entreprise = Entreprise(nom="Cible Test", secteur="Technologies", pays="France")
-    session.add(entreprise)
-    session.commit()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
-    )
-    session.add(rapport)
-    session.commit()
-    session.refresh(rapport)
+    _simuler_pipeline_extraction(monkeypatch, fake_extraction)
+    rapport = _rapport_a_extraire(session)
 
     extractor.run_extraction_pipeline(rapport.id, 2024)
 
     session.refresh(rapport)
-    assert rapport.extraction_erreur is None
-    assert rapport.extraction_terminee_le is not None
+    assert rapport.extraction_error is None
+    assert rapport.extraction_finished_at is not None
+    assert rapport.extraction_status == ExtractionStatus.DONE
+    assert rapport.status == ReportStatus.SUBMITTED
 
     donnees_carbone = session.exec(
-        select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport.id)
+        select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)
     ).all()
     indicateurs = session.exec(
-        select(IndicateurESG).where(IndicateurESG.rapport_id == rapport.id)
+        select(ESGMetric).where(ESGMetric.report_id == rapport.id)
     ).all()
     assert len(donnees_carbone) == 1
     assert donnees_carbone[0].scope == 1
-    assert donnees_carbone[0].valeur_tonnes_co2e == 100.0
-    assert donnees_carbone[0].valeur_brute == "100 tCO2e"
-    assert donnees_carbone[0].confiance == NiveauConfiance.ELEVE
+    assert donnees_carbone[0].tonnes_co2e == 100.0
+    assert donnees_carbone[0].raw_value == "100 tCO2e"
+    assert donnees_carbone[0].confidence == ConfidenceLevel.ELEVE
     assert len(indicateurs) == 1
-    assert indicateurs[0].code == "intensite_scope_1_2_marketbased"
+    assert indicateurs[0].metric_code == "intensite_scope_1_2_marketbased"
 
     # Les deux valeurs trouvées sont sur la même page (3) : une seule preuve doit être créée et
     # partagée, pas une par indicateur.
-    assert donnees_carbone[0].preuve_id == indicateurs[0].preuve_id
+    assert donnees_carbone[0].proof_id == indicateurs[0].proof_id
+
+
+def test_pipeline_ne_persiste_quun_indicateur_par_code_meme_si_le_llm_le_repete(
+    session, monkeypatch
+) -> None:
+    """Le LLM peut renvoyer deux fois le même code : la première occurrence exploitable
+    l'emporte, jamais deux lignes (uq_esg_metrics_report_metric_code rejetterait sinon toute
+    l'extraction)."""
+    from app.ingestion import extractor
+
+    code = "intensite_scope_1_2_marketbased"
+    _simuler_pipeline_extraction(
+        monkeypatch,
+        ExtractionEntreprise(
+            entreprise="Cible Test",
+            indicateurs=[
+                IndicateurExtrait(code=code, valeur=42.0, unite="gCO2e/kWh", page_source=3, trouve=True),
+                IndicateurExtrait(code=code, valeur=None, unite=None, page_source=None, trouve=False),
+                IndicateurExtrait(code=code, valeur=99.0, unite="gCO2e/kWh", page_source=3, trouve=True),
+            ],
+        ),
+    )
+    rapport = _rapport_a_extraire(session)
+
+    extractor.run_extraction_pipeline(rapport.id, 2024)
+
+    session.refresh(rapport)
+    assert rapport.extraction_status == ExtractionStatus.DONE
+    indicateurs = session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport.id)).all()
+    assert [(i.metric_code, i.value) for i in indicateurs] == [(code, 42.0)]
 
 
 def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couverture(
@@ -726,25 +777,26 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     monkeypatch.setattr("app.ingestion.extractor._call_llm_extraction", _fake_call_llm_extraction)
 
     def _fake_proof(*, source_pdf_path, nom_document, annee, nombre_pages_total, page, rapport_id):
-        return PreuveDocumentaire(
-            nom_document=nom_document,
-            annee=annee,
-            nombre_pages_total=nombre_pages_total,
-            page_debut=page,
-            page_fin=page,
-            pdf_extrait_genere=f"preuves/{rapport_id}/page_{page}.pdf",
+        return Evidence(
+            document_name=nom_document,
+            year=annee,
+            total_pages=nombre_pages_total,
+            page_start=page,
+            page_end=page,
+            excerpt_pdf_path=f"preuves/{rapport_id}/page_{page}.pdf",
         )
 
     monkeypatch.setattr("app.ingestion.extractor.proof_generator.generate_page_proof", _fake_proof)
 
-    entreprise = Entreprise(nom="Cible Relance", secteur="Technologies", pays="France")
+    entreprise = Company(name="Cible Relance", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -753,18 +805,18 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     extractor.run_extraction_pipeline(rapport.id, 2024)
 
     session.refresh(rapport)
-    assert rapport.extraction_erreur is None
-    assert rapport.extraction_terminee_le is not None
+    assert rapport.extraction_error is None
+    assert rapport.extraction_finished_at is not None
 
     assert len(appels_llm) == 2
     assert appels_llm[1] == ["scope_3"]
 
     couvertures = session.exec(
-        select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport.id)
+        select(MetricCoverage).where(MetricCoverage.report_id == rapport.id)
     ).all()
-    par_code = {c.code: c for c in couvertures}
-    assert par_code["scope_1"].statut == StatutCouvertureIndicateur.TROUVE
-    assert par_code["scope_3"].statut == StatutCouvertureIndicateur.ABSENT_CONFIRME
+    par_code = {c.metric_code: c for c in couvertures}
+    assert par_code["scope_1"].status == MetricCoverageStatus.TROUVE
+    assert par_code["scope_3"].status == MetricCoverageStatus.ABSENT_CONFIRME
     assert len(couvertures) == len(extractor.INDICATEURS_CIBLES)
 
     # couverture_publique (app/investor/entreprises.py) lit désormais .statut au lieu de .trouve —
@@ -772,17 +824,17 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     # pas TROUVE (ABSENT_CONFIRME compte comme "manquant" au même titre que NON_TROUVE, voir
     # CouvertureResume.codes_manquants).
     resume = couverture_publique(session, rapport)
-    assert resume.total_cibles == len(extractor.INDICATEURS_CIBLES)
-    assert resume.trouves == len(extractor.INDICATEURS_CIBLES) - 1
-    assert resume.codes_manquants == ["scope_3"]
+    assert resume.total_targets == len(extractor.INDICATEURS_CIBLES)
+    assert resume.found == len(extractor.INDICATEURS_CIBLES) - 1
+    assert resume.missing_codes == ["scope_3"]
 
 
-def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"admin-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
-        role=Role.ADMINISTRATEUR,
-        actif=True,
+        password_hash=hash_password(password),
+        role=Role.ADMIN,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -793,7 +845,6 @@ def _create_admin_utilisateur(session, *, password: str = "s3cret-pass") -> Util
 def test_importer_rapport_par_url_entreprise_happy_path_marque_canal_automatique(
     session, monkeypatch
 ) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "app.company.rapports.telecharger_pdf_depuis_url", lambda _url: _minimal_pdf_bytes()
     )
@@ -804,14 +855,14 @@ def test_importer_rapport_par_url_entreprise_happy_path_marque_canal_automatique
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
     assert response.status_code == 201
-    assert response.json()["canal"] == CanalDepot.AUTOMATIQUE.value
-    assert response.json()["statut"] == StatutRapport.ENVOYE.value
+    assert response.json()["channel"] == SubmissionChannel.AUTOMATIQUE.value
+    assert response.json()["status"] == ReportStatus.SUBMITTED.value
 
 
 def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
@@ -819,12 +870,11 @@ def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
 ) -> None:
     """Un Entreprise ne peut jamais désigner une autre entreprise que la sienne, même en le
     demandant explicitement dans le corps -- même posture que le reste de l'espace Entreprise."""
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "app.company.rapports.telecharger_pdf_depuis_url", lambda _url: _minimal_pdf_bytes()
     )
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    autre = Entreprise(nom=f"Autre {uuid.uuid4()}", secteur="Technologies", pays="France")
+    autre = Company(name=f"Autre {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(autre)
     session.commit()
     authed_client = _login(user.email, "s3cret-pass")
@@ -833,18 +883,18 @@ def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
-            "entreprise_id": str(autre.id),
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
+            "company_id": str(autre.id),
         },
     )
 
     assert response.status_code == 201
-    rapport = session.get(RapportESG, uuid.UUID(response.json()["id"]))
+    rapport = session.get(ESGReport, uuid.UUID(response.json()["id"]))
     assert rapport is not None
-    assert user.entreprise is not None
-    assert rapport.entreprise_id == user.entreprise.id
-    assert rapport.entreprise_id != autre.id
+    assert user.company is not None
+    assert rapport.company_id == user.company.id
+    assert rapport.company_id != autre.id
 
 
 def test_importer_rapport_par_url_admin_sans_entreprise_id_est_rejete(session) -> None:
@@ -855,8 +905,8 @@ def test_importer_rapport_par_url_admin_sans_entreprise_id_est_rejete(session) -
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
@@ -872,9 +922,9 @@ def test_importer_rapport_par_url_admin_avec_entreprise_id_inconnu_est_404(sessi
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
-            "entreprise_id": str(uuid.uuid4()),
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
+            "company_id": str(uuid.uuid4()),
         },
     )
 
@@ -883,12 +933,11 @@ def test_importer_rapport_par_url_admin_avec_entreprise_id_inconnu_est_404(sessi
 
 
 def test_importer_rapport_par_url_admin_happy_path(session, monkeypatch) -> None:
-    monkeypatch.setattr("app.company.rapports.run_extraction_pipeline", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         "app.company.rapports.telecharger_pdf_depuis_url", lambda _url: _minimal_pdf_bytes()
     )
     admin = _create_admin_utilisateur(session)
-    cible = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Technologies", pays="France")
+    cible = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(cible)
     session.commit()
     authed_client = _login(admin.email, "s3cret-pass")
@@ -897,22 +946,22 @@ def test_importer_rapport_par_url_admin_happy_path(session, monkeypatch) -> None
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
-            "entreprise_id": str(cible.id),
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
+            "company_id": str(cible.id),
         },
     )
 
     assert response.status_code == 201
-    assert response.json()["canal"] == CanalDepot.AUTOMATIQUE.value
+    assert response.json()["channel"] == SubmissionChannel.AUTOMATIQUE.value
 
 
 def test_importer_rapport_par_url_avec_role_investisseur_est_rejete(session) -> None:
-    user = Utilisateur(
+    user = User(
         email=f"investisseur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password("s3cret-pass"),
-        role=Role.INVESTISSEUR,
-        actif=True,
+        password_hash=hash_password("s3cret-pass"),
+        role=Role.INVESTOR,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -922,8 +971,8 @@ def test_importer_rapport_par_url_avec_role_investisseur_est_rejete(session) -> 
         "/api/v1/company/rapports/import-url",
         json={
             "url": "https://exemple-public.test/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
@@ -941,8 +990,8 @@ def test_importer_rapport_par_url_url_non_autorisee_propage_lerreur_de_validatio
         "/api/v1/company/rapports/import-url",
         json={
             "url": "http://169.254.169.254/rapport.pdf",
-            "type": TypeRapport.RAPPORT_ESG.value,
-            "annee_reporting": 2024,
+            "type": ReportType.RAPPORT_ESG.value,
+            "fiscal_year": 2024,
         },
     )
 
@@ -952,12 +1001,13 @@ def test_importer_rapport_par_url_url_non_autorisee_propage_lerreur_de_validatio
 
 def test_consulter_rapport_sans_score_officiel_le_renvoie_a_null(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    assert user.company is not None
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -967,7 +1017,7 @@ def test_consulter_rapport_sans_score_officiel_le_renvoie_a_null(session) -> Non
     response = authed_client.get(f"/api/v1/company/rapports/{rapport.id}")
 
     assert response.status_code == 200
-    assert response.json()["score_officiel"] is None
+    assert response.json()["official_score"] is None
 
 
 def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_declare(
@@ -976,35 +1026,36 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
     from app.scoring.engine import calculer_score
 
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
-        score_global_declare=99.0,  # volontairement très différent du score officiel calculé
+    assert user.company is not None
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        declared_global_score=99.0,  # volontairement très différent du score officiel calculé
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=1,
-        page_fin=1,
-        pdf_extrait_genere="preuves/test/page_1.pdf",
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="preuves/test/page_1.pdf",
     )
     session.add(preuve)
     session.flush()
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.GOUVERNANCE,
-            code="femmes_conseil_pourcentage",
-            valeur=40.0,
-            unite="%",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pillar.GOUVERNANCE,
+            metric_code="femmes_conseil_pourcentage",
+            value=40.0,
+            unit="%",
+            method=DataMethod.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.commit()
@@ -1016,19 +1067,20 @@ def test_consulter_rapport_avec_score_officiel_lexpose_distinctement_du_score_de
 
     assert response.status_code == 200
     corps = response.json()
-    assert corps["score_global_declare"] == 99.0
-    assert corps["score_officiel"] is not None
-    assert corps["score_officiel"]["valeur_globale"] != 99.0
+    assert corps["declared_global_score"] == 99.0
+    assert corps["official_score"] is not None
+    assert corps["official_score"]["global_score"] != 99.0
 
 
 def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> None:
     proprietaire = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert proprietaire.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=proprietaire.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    assert proprietaire.company is not None
+    rapport = ESGReport(
+        company_id=proprietaire.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1044,14 +1096,15 @@ def test_telecharger_rapport_original_dune_autre_entreprise_est_404(session) -> 
 
 def test_telecharger_rapport_original_propre_entreprise_retourne_le_pdf(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     chemin_relatif = f"rapports/test/{uuid.uuid4()}.pdf"
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de test original")
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source=chemin_relatif,
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file=chemin_relatif,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1065,12 +1118,13 @@ def test_telecharger_rapport_original_propre_entreprise_retourne_le_pdf(session)
 
 def test_telecharger_rapport_synthese_non_generee_est_404_dedie(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
+    assert user.company is not None
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -1084,15 +1138,16 @@ def test_telecharger_rapport_synthese_non_generee_est_404_dedie(session) -> None
 
 def test_telecharger_rapport_synthese_generee_retourne_le_pdf(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
-    assert user.entreprise is not None
+    assert user.company is not None
     chemin_relatif = f"synthese/{uuid.uuid4()}.pdf"
     storage.save_bytes(chemin_relatif, b"%PDF-1.4 contenu de synthese")
-    rapport = RapportESG(
-        entreprise_id=user.entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/dummy.pdf",
-        rapport_synthese_genere=chemin_relatif,
+    rapport = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/dummy.pdf",
+        synthesis_report_path=chemin_relatif,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()

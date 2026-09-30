@@ -11,36 +11,36 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DevisePosition,
+    AnalysisStatus,
+    Currency,
+    ProjectStatus,
+    ReportStatus,
+    ReportType,
     Role,
-    StatutAnalyse,
-    StatutProjet,
-    StatutRapport,
-    TypeRapport,
+    SubmissionChannel,
 )
-from app.ingestion.models import RapportESG
-from app.institution.models import Projet
-from app.investor.models import Portefeuille
+from app.ingestion.models import ESGReport
+from app.institution.models import Project
+from app.investor.models import Portfolio
 from app.main import app
-from app.researcher.models import Analyse
+from app.researcher.models import Analysis
 from app.scoring.engine import obtenir_configuration_reference
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 client = TestClient(app, base_url="https://testserver")
 
 
-def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -57,24 +57,24 @@ def _login(email: str, password: str) -> TestClient:
 
 
 def test_apercu_acteurs_renvoie_les_quatre_blocs(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.get("/api/v1/admin/apercu-acteurs")
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"auditeurs", "investisseurs", "chercheurs", "institutions"}
-    assert set(body["auditeurs"]) == {"dossiers_affectes", "avis_rendus"}
-    assert set(body["investisseurs"]) == {
-        "portefeuilles_non_archives",
-        "positions_declarees",
-        "entreprises_distinctes",
+    assert set(body) == {"auditors", "investors", "researchers", "institutions"}
+    assert set(body["auditors"]) == {"assigned_reports", "opinions_submitted"}
+    assert set(body["investors"]) == {
+        "active_portfolios",
+        "declared_positions",
+        "distinct_companies",
     }
 
 
 def test_performance_esg_a_une_couverture_coherente(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.get("/api/v1/admin/performance-esg")
@@ -82,49 +82,50 @@ def test_performance_esg_a_une_couverture_coherente(session) -> None:
     assert response.status_code == 200
     body = response.json()
     # Jamais plus d'entreprises avec un score que d'entreprises dans le périmètre.
-    assert body["entreprises_avec_score"] <= body["entreprises_perimetre"]
+    assert body["companies_with_score"] <= body["companies_in_scope"]
     assert len(body["distribution"]) == 5
     # La couverture ne fabrique jamais une moyenne sans substance.
-    if body["entreprises_avec_score"] == 0:
-        assert body["score_global_moyen"] is None
+    if body["companies_with_score"] == 0:
+        assert body["average_global_score"] is None
 
 
 def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
     marqueur = f"secteur-{uuid.uuid4()}"
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
 
-    entreprise_sans_score = Entreprise(
-        nom=f"Sans score {uuid.uuid4()}",
-        secteur=marqueur,
-        pays="France",
-        date_publication=utcnow(),
+    entreprise_sans_score = Company(
+        name=f"Sans score {uuid.uuid4()}",
+        sector=marqueur,
+        country="France",
+        published_at=utcnow(),
     )
     session.add(entreprise_sans_score)
 
-    entreprise_avec_score = Entreprise(
-        nom=f"Avec score {uuid.uuid4()}", secteur=marqueur, pays="France", date_publication=utcnow()
+    entreprise_avec_score = Company(
+        name=f"Avec score {uuid.uuid4()}", sector=marqueur, country="France", published_at=utcnow()
     )
     session.add(entreprise_avec_score)
     session.commit()
 
-    rapport = RapportESG(
-        entreprise_id=entreprise_avec_score.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.VALIDE,
-        fichier_source="rapports/test/dummy.pdf",
+    rapport = ESGReport(
+        company_id=entreprise_avec_score.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        status=ReportStatus.VALIDATED,
+        source_file="rapports/test/dummy.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
     configuration = obtenir_configuration_reference(session)
     session.add(
-        ScoreESG(
-            rapport_id=rapport.id,
-            configuration_id=configuration.id,
-            valeur_globale=72.0,
-            score_environnement=80.0,
-            score_social=None,
-            score_gouvernance=65.0,
+        Score(
+            report_id=rapport.id,
+            config_id=configuration.id,
+            global_score=72.0,
+            environmental_score=80.0,
+            social_score=None,
+            governance_score=65.0,
         )
     )
     session.commit()
@@ -136,26 +137,27 @@ def test_entreprises_avec_score_distingue_score_absent_de_zero(session) -> None:
 
     assert response.status_code == 200
     par_id = {item["id"]: item for item in response.json()["items"]}
-    assert par_id[str(entreprise_sans_score.id)]["score_global"] is None
-    assert par_id[str(entreprise_avec_score.id)]["score_global"] == 72.0
-    assert par_id[str(entreprise_avec_score.id)]["score_social"] is None
+    assert par_id[str(entreprise_sans_score.id)]["global_score"] is None
+    assert par_id[str(entreprise_avec_score.id)]["global_score"] == 72.0
+    assert par_id[str(entreprise_avec_score.id)]["social_score"] is None
 
 
 def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Technologies", pays="France")
+    admin = _create_utilisateur(session, Role.ADMIN)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
     session.add(
-        RapportESG(
-            entreprise_id=entreprise.id,
-            type=TypeRapport.RAPPORT_ESG,
-            canal=CanalDepot.ENTREPRISE,
-            statut=StatutRapport.AFFECTE_AUDITEUR,
-            fichier_source="rapports/test/dummy.pdf",
-            auditeur_id=auditeur.id,
-            date_affectation=utcnow(),
+        ESGReport(
+            company_id=entreprise.id,
+            type=ReportType.RAPPORT_ESG,
+            channel=SubmissionChannel.ENTREPRISE,
+            status=ReportStatus.PENDING_AUDIT,
+            source_file="rapports/test/dummy.pdf",
+            auditor_id=auditeur.id,
+            assigned_at=utcnow(),
+            submitted_at=utcnow(),
         )
     )
     session.commit()
@@ -168,17 +170,17 @@ def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
-    assert items[0]["dossiers_affectes"] == 1
-    assert items[0]["dossiers_en_retard"] == 0
+    assert items[0]["assigned_reports"] == 1
+    assert items[0]["overdue_reports"] == 0
 
 
 def test_portefeuilles_admin_liste_un_portefeuille_non_archive(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    investisseur = _create_utilisateur(session, Role.INVESTISSEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
     marqueur = f"portefeuille-{uuid.uuid4()}"
     session.add(
-        Portefeuille(
-            investisseur_id=investisseur.id, nom=marqueur, devise_reference=DevisePosition.EUR
+        Portfolio(
+            user_id=investisseur.id, name=marqueur, reference_currency=Currency.EUR
         )
     )
     session.commit()
@@ -191,15 +193,15 @@ def test_portefeuilles_admin_liste_un_portefeuille_non_archive(session) -> None:
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
-    assert items[0]["investisseur_email"] == investisseur.email
-    assert items[0]["nombre_positions"] == 0
+    assert items[0]["investor_email"] == investisseur.email
+    assert items[0]["position_count"] == 0
 
 
 def test_projets_admin_filtre_par_statut(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     institution = _create_utilisateur(session, Role.INSTITUTION)
     marqueur = f"projet-{uuid.uuid4()}"
-    session.add(Projet(institution_id=institution.id, nom=marqueur, statut=StatutProjet.OUVERT))
+    session.add(Project(institution_id=institution.id, name=marqueur, status=ProjectStatus.OUVERT))
     session.commit()
 
     authed_client = _login(admin.email, "s3cret-pass")
@@ -208,25 +210,25 @@ def test_projets_admin_filtre_par_statut(session) -> None:
     )
 
     assert response.status_code == 200
-    noms = [item["nom"] for item in response.json()["items"]]
+    noms = [item["name"] for item in response.json()["items"]]
     assert marqueur in noms
 
 
 def test_analyses_admin_filtre_par_statut(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
+    admin = _create_utilisateur(session, Role.ADMIN)
     institution = _create_utilisateur(session, Role.INSTITUTION)
-    chercheur = _create_utilisateur(session, Role.CHERCHEUR)
+    chercheur = _create_utilisateur(session, Role.RESEARCHER)
     marqueur = f"analyse-{uuid.uuid4()}"
-    projet = Projet(institution_id=institution.id, nom=f"Projet {marqueur}")
+    projet = Project(institution_id=institution.id, name=f"Projet {marqueur}")
     session.add(projet)
     session.commit()
     session.add(
-        Analyse(
-            projet_id=projet.id,
-            chercheur_id=chercheur.id,
-            titre=marqueur,
-            contenu="contenu de test",
-            statut=StatutAnalyse.SOUMISE,
+        Analysis(
+            project_id=projet.id,
+            researcher_id=chercheur.id,
+            title=marqueur,
+            content="contenu de test",
+            status=AnalysisStatus.SOUMISE,
         )
     )
     session.commit()
@@ -237,5 +239,5 @@ def test_analyses_admin_filtre_par_statut(session) -> None:
     )
 
     assert response.status_code == 200
-    titres = [item["titre"] for item in response.json()["items"]]
+    titres = [item["title"] for item in response.json()["items"]]
     assert marqueur in titres

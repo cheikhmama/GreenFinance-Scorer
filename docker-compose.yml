@@ -1,38 +1,86 @@
+# Définitions communes (tâche 4.2) — jamais utilisées seules : aucun port publié, aucun identifiant.
+#
+#   Développement : docker compose up                (+ docker-compose.override.yml, chargé
+#                                                     automatiquement : ports, identifiants de dev)
+#   Production    : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#                                                    (mots de passe obligatoires, Redis protégé)
+#
+# `migrate` applique `alembic upgrade head` une fois, avant l'API et les workers.
+
 services:
-  api:
-    build: .
-    ports:
-      # Même port des deux côtés : c'est aussi ce que vite.config.ts cible en dev
-      # (voir frontend/vite.config.ts) — un seul port à retenir, que l'API tourne
-      # via ce conteneur ou via `uvicorn` lancé localement.
-      - "8000:8000"
+  migrate:
+    build:
+      context: .
+      target: api
+    command: ["alembic", "upgrade", "head"]
     env_file:
       - .env
-    environment:
-      # À l'intérieur du réseau Docker, la base est joignable via le nom de
-      # service "db", pas "localhost" (qui désignerait le conteneur api lui-même).
-      DATABASE_URL: postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance
-      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: api
+    env_file:
+      - .env
     volumes:
-      # Rapports déposés et artefacts d'extraction (Étape 5) — sans ça, perdus à chaque
-      # recréation du conteneur, même besoin de durabilité que pgdata ci-dessous.
-      - ./storage:/code/storage
+      # Rapports déposés, preuves et PDF de synthèse — partagés avec les workers.
+      - storage:/code/storage
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Worker par défaut (tâche 4.1) : e-mails, PDF de synthèse, tâche planifiée — image légère.
+  worker:
+    build:
+      context: .
+      target: api
+    command: ["arq", "app.worker.settings.WorkerSettings"]
+    env_file:
+      - .env
+    volumes:
+      - storage:/code/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Worker d'extraction : une extraction à la fois — pour plus de débit, augmenter ses réplicas.
+  worker-extraction:
+    build:
+      context: .
+      target: worker
+    env_file:
+      - .env
+    volumes:
+      - storage:/code/storage
+      # Modèles téléchargés au premier usage (bge-m3, Docling) : conservés entre redémarrages.
+      - modeles:/home/greenfinance/.cache
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   db:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: greenfinance
-      POSTGRES_PASSWORD: changeme
       POSTGRES_DB: greenfinance
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U greenfinance"]
       interval: 5s
@@ -41,8 +89,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -51,3 +97,5 @@ services:
 
 volumes:
   pgdata:
+  storage:
+  modeles:

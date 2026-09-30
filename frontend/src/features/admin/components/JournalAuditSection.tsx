@@ -1,5 +1,11 @@
 import { History, Search } from "lucide-react";
 import { useState } from "react";
+import {
+  libelleActionJournal,
+  libelleResultatJournal,
+  libelleTypeRessource,
+  libelleValeurJournal,
+} from "@/shared/format/journal";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -10,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useJournalAudit } from "../api";
 
 /** Trace des événements de compte et de session (connexion, déconnexion, changement de mot de
- * passe, changement de rôle, désactivation) — voir app/core/models.py::JournalAudit. Ne couvre
+ * passe, changement de rôle, désactivation) — voir app/core/models.py::AuditLogEntry. Ne couvre
  * pas les décisions métier (affectation, validation, rejet), déjà notifiées à l'entreprise
  * concernée et visibles dans l'historique de son rapport. */
 export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
@@ -42,7 +48,7 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
                 id="journal-action"
                 value={action}
                 onChange={(event) => setAction(event.target.value)}
-                placeholder="Filtrer par action (ex. connexion)"
+                placeholder="Filtrer par action (ex. login)"
                 className="pl-9"
               />
             </label>
@@ -52,7 +58,7 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
                 id="journal-type-ressource"
                 value={typeRessource}
                 onChange={(event) => setTypeRessource(event.target.value)}
-                placeholder="Filtrer par ressource (ex. Utilisateur)"
+                placeholder="Filtrer par ressource (ex. User)"
               />
             </label>
           </div>
@@ -84,14 +90,14 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
               {entrees.map((entree) => (
                 <TableRow key={entree.id}>
                   <TableCell className="whitespace-nowrap">
-                    {new Date(entree.date).toLocaleString("fr-FR")}
+                    {new Date(entree.occurred_at).toLocaleString("fr-FR")}
                   </TableCell>
-                  <TableCell>{entree.action}</TableCell>
-                  <TableCell>{entree.type_ressource}</TableCell>
-                  <TableCell>{entree.resultat}</TableCell>
+                  <TableCell>{libelleActionJournal(entree.action)}</TableCell>
+                  <TableCell>{libelleTypeRessource(entree.resource_type)}</TableCell>
+                  <TableCell>{libelleResultatJournal(entree.result)}</TableCell>
                   <TableCell className="text-brand-grey">
-                    {entree.ancienne_valeur && entree.nouvelle_valeur
-                      ? `${entree.ancienne_valeur} → ${entree.nouvelle_valeur}`
+                    {entree.old_value && entree.new_value
+                      ? `${libelleValeurJournal(entree.old_value)} → ${libelleValeurJournal(entree.new_value)}`
                       : "—"}
                   </TableCell>
                 </TableRow>

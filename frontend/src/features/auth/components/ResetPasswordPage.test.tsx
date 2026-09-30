@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,7 +68,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it.each([
-    ["court", "court", "8 caractères minimum"],
+    ["court-11car", "court-11car", "12 caractères minimum"],
     ["nouveau-secret", "autre-secret", "Les deux mots de passe ne correspondent pas."],
     [
       "a".repeat(73),
@@ -101,10 +101,14 @@ describe("ResetPasswordPage", () => {
       "/api/v1/auth/reinitialiser-mot-de-passe",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ token: TOKEN, nouveau_mot_de_passe: "nouveau-secret" }),
+        body: JSON.stringify({ token: TOKEN, new_password: "nouveau-secret" }),
       }),
     );
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/reinitialiser-mot-de-passe$/);
+    // setSearchParams (retrait du jeton) s'applique après le rendu du message de succès : attendre
+    // l'URL plutôt que de la lire aussitôt — sous charge, l'ordre n'est pas garanti (test instable).
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(/^\/reinitialiser-mot-de-passe$/),
+    );
     expect(screen.getByRole("link", { name: "Se connecter" })).toHaveAttribute("href", "/login");
     expect(
       screen.queryByLabelText("Nouveau mot de passe", { selector: "input" }),

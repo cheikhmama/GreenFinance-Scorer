@@ -15,7 +15,7 @@ import { Role } from "../schemas";
  * déjà enregistrés, jamais une saisie libre (règle déjà validée pour ce projet). */
 export function ReportsToAssignSection() {
   const { data: rapports, isLoading, isError } = useReportsToAssign();
-  const { data: auditeurs } = useUtilisateursSelectionnables(Role.AUDITEUR);
+  const { data: auditeurs } = useUtilisateursSelectionnables(Role.AUDITOR);
 
   return (
     <Card>
@@ -62,7 +62,7 @@ function LigneAffectation({
     if (!auditeurId) return;
     setError(null);
     assign.mutate(
-      { auditeur_id: auditeurId },
+      { auditor_id: auditeurId },
       {
         onError: (err) => {
           setError(err instanceof ApiError ? err.message : "Échec de l'affectation.");

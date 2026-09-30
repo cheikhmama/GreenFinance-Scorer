@@ -1,3 +1,5 @@
+import random
+
 """Prompt 3.9 — scénario de bout en bout sur le schéma complet (Étape 3).
 
 Construit un graphe couvrant les 14 entités du diagramme de classes plus les
@@ -10,36 +12,42 @@ modèles SQLModel, pas seulement que chaque table existe isolément.
 
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
-from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+import pytest
+from sqlalchemy import delete
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import col, select
+
+from app.audit.models import AuditOpinion
+from app.auth.models import User
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DecisionAudit,
-    DevisePosition,
-    MethodeDonnee,
-    Pilier,
+    AuditDecision,
+    Currency,
+    DataMethod,
+    DurationType,
+    Pillar,
+    ReportType,
     Role,
-    TypeDureeInvestissement,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    DonneeCarbone,
-    IndicateurESG,
-    PreuveDocumentaire,
-    RapportESG,
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
 )
-from app.investor.models import Portefeuille, PositionPortefeuille
-from app.scoring.models import ConfigurationPonderation, ScoreESG
+from app.investor.models import Portfolio, PortfolioPosition
+from app.scoring.models import Score, ScoringConfig
 
 
-def _utilisateur(session, role: Role) -> Utilisateur:
-    utilisateur = Utilisateur(
+def _utilisateur(session, role: Role) -> User:
+    utilisateur = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
+        password_hash="hash",
         role=role,
     )
     session.add(utilisateur)
@@ -49,163 +57,164 @@ def _utilisateur(session, role: Role) -> Utilisateur:
 
 def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> None:
     # --- Entreprise avec montant minimum d'investissement renseigné -------
-    entreprise = Entreprise(
-        nom="Acme Verte",
-        secteur="Industrie",
-        pays="MR",
-        montant_minimum_investissement=500.0,
+    entreprise = Company(
+        name="Acme Verte",
+        sector="Industrie",
+        country="MR",
+        minimum_investment_amount=500.0,
     )
     session.add(entreprise)
     session.flush()
 
-    # --- RapportESG -------------------------------------------------------
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.AUTOMATIQUE,
-        fichier_source="s3://bucket/rapport.pdf",
+    # --- ESGReport -------------------------------------------------------
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
+        source_file="s3://bucket/rapport.pdf",
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()
 
-    assert rapport in entreprise.rapports
-    assert rapport.entreprise.id == entreprise.id
+    assert rapport in entreprise.reports
+    assert rapport.company.id == entreprise.id
 
-    # --- PreuveDocumentaire + IndicateurESG + DonneeCarbone ---------------
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-annuel-2025.pdf",
-        annee=2025,
-        nombre_pages_total=120,
-        page_debut=42,
-        page_fin=44,
-        pdf_extrait_genere="s3://bucket/extraits/42-44.pdf",
+    # --- Evidence + ESGMetric + CarbonEmission ---------------
+    preuve = Evidence(
+        document_name="rapport-annuel-2025.pdf",
+        year=2025,
+        total_pages=120,
+        page_start=42,
+        page_end=44,
+        excerpt_pdf_path="s3://bucket/extraits/42-44.pdf",
     )
     session.add(preuve)
     session.flush()
 
-    indicateur = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.ENVIRONNEMENT,
-        code="GHG-SCOPE1",
-        valeur=123.4,
-        unite="tCO2e",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    indicateur = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pillar.ENVIRONNEMENT,
+        metric_code="GHG-SCOPE1",
+        value=123.4,
+        unit="tCO2e",
+        method=DataMethod.RAPPORTEE,
+        proof_id=preuve.id,
     )
-    donnee_carbone = DonneeCarbone(
-        rapport_id=rapport.id,
+    donnee_carbone = CarbonEmission(
+        report_id=rapport.id,
         scope=1,
-        valeur_tonnes_co2e=123.4,
-        annee=2025,
-        methode=MethodeDonnee.RAPPORTEE,
-        score_qualite_pcaf=3,
-        preuve_id=preuve.id,
+        tonnes_co2e=123.4,
+        year=2025,
+        method=DataMethod.RAPPORTEE,
+        pcaf_data_quality=3,
+        proof_id=preuve.id,
     )
     session.add(indicateur)
     session.add(donnee_carbone)
     session.flush()
 
-    assert indicateur.rapport.id == rapport.id
-    assert indicateur in rapport.indicateurs
-    assert donnee_carbone.rapport.id == rapport.id
-    assert donnee_carbone in rapport.donnees_carbone
-    assert indicateur.preuve.id == preuve.id
-    assert indicateur in preuve.indicateurs
-    assert donnee_carbone.preuve.id == preuve.id
-    assert donnee_carbone in preuve.donnees_carbone
+    assert indicateur.report.id == rapport.id
+    assert indicateur in rapport.metrics
+    assert donnee_carbone.report.id == rapport.id
+    assert donnee_carbone in rapport.carbon_data
+    assert indicateur.proof.id == preuve.id
+    assert indicateur in preuve.metrics
+    assert donnee_carbone.proof.id == preuve.id
+    assert donnee_carbone in preuve.carbon_emissions
 
-    # --- ConfigurationPonderation de référence ET personnalisée (Chercheur)
-    chercheur = _utilisateur(session, Role.CHERCHEUR)
-    config_reference = ConfigurationPonderation(
-        nom="reference", version=1, fichier_yaml="scoring/reference.yaml"
+    # --- ScoringConfig de référence ET personnalisée (Chercheur)
+    chercheur = _utilisateur(session, Role.RESEARCHER)
+    # Version tirée au hasard : une seule référence par version, base de test partagée.
+    config_reference = ScoringConfig(
+        name="reference", version=random.randint(10_000, 10_000_000)
     )
-    config_chercheur = ConfigurationPonderation(
-        nom="config-chercheur",
+    config_chercheur = ScoringConfig(
+        name="config-chercheur",
         version=1,
-        fichier_yaml="scoring/chercheur.yaml",
-        utilisateur_id=chercheur.id,
+        owner_user_id=chercheur.id,
     )
     session.add(config_reference)
     session.add(config_chercheur)
     session.flush()
 
-    assert config_chercheur.utilisateur is not None
-    assert config_chercheur.utilisateur.id == chercheur.id
-    assert config_chercheur in chercheur.configurations_ponderation
+    assert config_chercheur.owner is not None
+    assert config_chercheur.owner.id == chercheur.id
+    assert config_chercheur in chercheur.scoring_configs
 
-    # --- ScoreESG (un par configuration, sur le même RapportESG) ----------
-    score_reference = ScoreESG(
-        rapport_id=rapport.id,
-        configuration_id=config_reference.id,
-        valeur_globale=72.0,
-        score_environnement=70.0,
-        score_social=75.0,
-        score_gouvernance=71.0,
+    # --- Score (un par configuration, sur le même ESGReport) ----------
+    score_reference = Score(
+        report_id=rapport.id,
+        config_id=config_reference.id,
+        global_score=72.0,
+        environmental_score=70.0,
+        social_score=75.0,
+        governance_score=71.0,
     )
-    score_chercheur = ScoreESG(
-        rapport_id=rapport.id,
-        configuration_id=config_chercheur.id,
-        valeur_globale=68.0,
-        score_environnement=65.0,
-        score_social=70.0,
-        score_gouvernance=69.0,
+    score_chercheur = Score(
+        report_id=rapport.id,
+        config_id=config_chercheur.id,
+        global_score=68.0,
+        environmental_score=65.0,
+        social_score=70.0,
+        governance_score=69.0,
     )
     session.add(score_reference)
     session.add(score_chercheur)
     session.flush()
 
     assert {s.id for s in rapport.scores} == {score_reference.id, score_chercheur.id}
-    assert score_reference.rapport.id == rapport.id
-    assert score_reference.configuration.id == config_reference.id
+    assert score_reference.report.id == rapport.id
+    assert score_reference.config.id == config_reference.id
     assert score_reference in config_reference.scores
-    assert score_chercheur.configuration.id == config_chercheur.id
+    assert score_chercheur.config.id == config_chercheur.id
     assert score_chercheur in config_chercheur.scores
 
     # --- Portefeuille + positions (USD converti, FIXE, OUVERTE) -----------
-    investisseur = _utilisateur(session, Role.INVESTISSEUR)
-    portefeuille = Portefeuille(
-        investisseur_id=investisseur.id, nom="Portefeuille vert", devise_reference=DevisePosition.USD
+    investisseur = _utilisateur(session, Role.INVESTOR)
+    portefeuille = Portfolio(
+        user_id=investisseur.id, name="Portefeuille vert", reference_currency=Currency.USD
     )
     session.add(portefeuille)
     session.flush()
 
-    assert portefeuille.investisseur.id == investisseur.id
-    assert portefeuille in investisseur.portefeuilles
+    assert portefeuille.user.id == investisseur.id
+    assert portefeuille in investisseur.portfolios
 
     debut_fixe = utcnow() + timedelta(days=1)
-    position_usd = PositionPortefeuille.model_validate(
+    position_usd = PortfolioPosition.model_validate(
         {
-            "portefeuille_id": portefeuille.id,
-            "entreprise_id": entreprise.id,
-            "montant_investi": 1000.0,
-            "devise": DevisePosition.USD,
-            "taux_change_utilise": 0.92,
-            "montant_converti": 920.0,
-            "type_duree": TypeDureeInvestissement.OUVERTE,
-            "date_debut": utcnow(),
+            "portfolio_id": portefeuille.id,
+            "company_id": entreprise.id,
+            "outstanding_amount": Decimal(1000),
+            "currency": Currency.USD,
+            "fx_rate_used": Decimal("0.92"),
+            "converted_amount": Decimal(920),
+            "duration_type": DurationType.OUVERTE,
+            "start_date": utcnow(),
         }
     )
-    position_fixe = PositionPortefeuille.model_validate(
+    position_fixe = PortfolioPosition.model_validate(
         {
-            "portefeuille_id": portefeuille.id,
-            "entreprise_id": entreprise.id,
-            "montant_investi": 2000.0,
-            "devise": DevisePosition.MRU,
-            "montant_converti": 52.0,
-            "type_duree": TypeDureeInvestissement.FIXE,
-            "date_debut": debut_fixe,
-            "date_fin": debut_fixe + timedelta(days=180),
+            "portfolio_id": portefeuille.id,
+            "company_id": entreprise.id,
+            "outstanding_amount": 2000.0,
+            "currency": Currency.MRU,
+            "converted_amount": 52.0,
+            "duration_type": DurationType.FIXE,
+            "start_date": debut_fixe,
+            "end_date": debut_fixe + timedelta(days=180),
         }
     )
-    position_ouverte = PositionPortefeuille.model_validate(
+    position_ouverte = PortfolioPosition.model_validate(
         {
-            "portefeuille_id": portefeuille.id,
-            "entreprise_id": entreprise.id,
-            "montant_investi": 750.0,
-            "devise": DevisePosition.EUR,
-            "montant_converti": 750.0,
-            "type_duree": TypeDureeInvestissement.OUVERTE,
-            "date_debut": utcnow(),
+            "portfolio_id": portefeuille.id,
+            "company_id": entreprise.id,
+            "outstanding_amount": 750.0,
+            "currency": Currency.EUR,
+            "converted_amount": 750.0,
+            "duration_type": DurationType.OUVERTE,
+            "start_date": utcnow(),
         }
     )
     session.add(position_usd)
@@ -213,37 +222,37 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.add(position_ouverte)
     session.flush()
 
-    assert position_usd.taux_change_utilise == 0.92
-    assert position_usd.montant_converti == 920.0
-    assert position_fixe.date_fin is not None
-    assert position_ouverte.date_fin is None
+    assert position_usd.fx_rate_used == Decimal("0.92")
+    assert position_usd.converted_amount == Decimal(920)
+    assert position_fixe.end_date is not None
+    assert position_ouverte.end_date is None
     assert {position_usd.id, position_fixe.id, position_ouverte.id} == {
         p.id for p in portefeuille.positions
     }
     for position in (position_usd, position_fixe, position_ouverte):
-        assert position.portefeuille.id == portefeuille.id
-        assert position.entreprise.id == entreprise.id
+        assert position.portfolio.id == portefeuille.id
+        assert position.company is not None and position.company.id == entreprise.id
         assert position in entreprise.positions
 
-    # --- AvisAudit ----------------------------------------------------
-    auditeur = _utilisateur(session, Role.AUDITEUR)
-    avis = AvisAudit(
-        rapport_id=rapport.id,
-        auditeur_id=auditeur.id,
-        decision=DecisionAudit.RECOMMANDE_VALIDATION,
-        commentaire="Données cohérentes avec le rapport annuel.",
+    # --- AuditOpinion ----------------------------------------------------
+    auditeur = _utilisateur(session, Role.AUDITOR)
+    avis = AuditOpinion(
+        report_id=rapport.id,
+        auditor_id=auditeur.id,
+        decision=AuditDecision.RECOMMANDE_VALIDATION,
+        comment="Données cohérentes avec le rapport annuel.",
     )
     session.add(avis)
     session.flush()
 
-    assert avis.rapport.id == rapport.id
-    assert avis in rapport.avis_audit
-    assert avis.auditeur.id == auditeur.id
-    assert avis in auditeur.avis_rendus
+    assert avis.report.id == rapport.id
+    assert avis in rapport.audit_opinions
+    assert avis.auditor.id == auditeur.id
+    assert avis in auditeur.audit_opinions
 
     # --- Notification (entité transverse, hors diagramme de classes) ------
     notification = Notification(
-        utilisateur_id=investisseur.id,
+        user_id=investisseur.id,
         message="Un nouveau rapport est disponible pour une entreprise de votre portefeuille.",
         type="RAPPORT_DISPONIBLE",
     )
@@ -251,4 +260,83 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     session.flush()
 
     assert notification in investisseur.notifications
-    assert notification.utilisateur.id == investisseur.id
+    assert notification.user.id == investisseur.id
+
+
+def _rapport_avec_indicateur(session) -> tuple[Company, ESGReport, ESGMetric]:
+    entreprise = Company(name="Acme Verte", sector="Industrie", country="MR")
+    session.add(entreprise)
+    session.flush()
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.AUTOMATIQUE,
+        source_file="s3://bucket/rapport.pdf",
+        submitted_at=utcnow(),
+    )
+    session.add(rapport)
+    session.flush()
+    preuve = Evidence(
+        document_name="rapport.pdf",
+        year=2025,
+        total_pages=10,
+        page_start=1,
+        page_end=1,
+        excerpt_pdf_path="s3://bucket/extraits/1.pdf",
+    )
+    session.add(preuve)
+    session.flush()
+    indicateur = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pillar.SOCIAL,
+        metric_code="effectif_total",
+        value=1200.0,
+        unit="",
+        method=DataMethod.RAPPORTEE,
+        proof_id=preuve.id,
+    )
+    session.add(indicateur)
+    session.flush()
+    return entreprise, rapport, indicateur
+
+
+def test_un_seul_indicateur_par_code_et_par_rapport(session) -> None:
+    _entreprise, rapport, indicateur = _rapport_avec_indicateur(session)
+    session.add(
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pillar.SOCIAL,
+            metric_code=indicateur.metric_code,
+            value=1300.0,
+            unit="",
+            method=DataMethod.RAPPORTEE,
+            proof_id=indicateur.proof_id,
+        )
+    )
+    with pytest.raises(IntegrityError, match="uq_esg_metrics_report_metric_code"):
+        session.flush()
+    session.rollback()
+
+
+def test_suppression_en_base_applique_les_regles_on_delete(session) -> None:
+    """DELETE SQL direct (jamais la cascade ORM) : ce sont bien les règles ON DELETE de la base
+    qui s'appliquent (docs/RENAME_PLAN.md §2.5)."""
+    entreprise, rapport, indicateur = _rapport_avec_indicateur(session)
+    auditeur = _utilisateur(session, Role.AUDITOR)
+    rapport.auditor_id = auditeur.id
+    session.add(rapport)
+    session.flush()
+    rapport_id, indicateur_id = rapport.id, indicateur.id
+
+    # SET NULL : supprimer l'auditeur ne supprime jamais le rapport.
+    session.execute(delete(User).where(col(User.id) == auditeur.id))
+    session.expire_all()
+    rapport_apres = session.get(ESGReport, rapport_id)
+    assert rapport_apres is not None
+    assert rapport_apres.auditor_id is None
+
+    # CASCADE : supprimer l'entreprise emporte ses rapports et leurs indicateurs.
+    session.execute(delete(Company).where(col(Company.id) == entreprise.id))
+    session.expire_all()
+    assert session.get(ESGReport, rapport_id) is None
+    assert session.exec(select(ESGMetric).where(ESGMetric.id == indicateur_id)).first() is None

@@ -20,7 +20,6 @@ import os
 os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 
 import json
-import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -29,6 +28,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import faiss
+import httpx
 import numpy as np
 import structlog
 from docling_core.types.doc.document import DoclingDocument
@@ -38,26 +38,36 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from sqlmodel import Session, col, select
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
+from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import MethodeDonnee, Pilier, Role, StatutRapport
+from app.core.enums import DataMethod, ExtractionStatus, Pillar, Role
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
 from app.ingestion.completeness import calculer_couverture
+from app.ingestion.etat_extraction import ExtractionTransitoire, marquer_echec
 from app.ingestion.models import (
-    CouvertureIndicateur,
-    DonneeCarbone,
-    IndicateurESG,
-    PreuveDocumentaire,
-    RapportESG,
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
+    MetricCoverage,
 )
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
 logger = structlog.get_logger(__name__)
 
-_extraction_lock = threading.Lock()
+
+
+def _est_transitoire(exc: BaseException) -> bool:
+    if isinstance(exc, genai_errors.ServerError):
+        return True
+    if isinstance(exc, genai_errors.ClientError) and getattr(exc, "code", None) == 429:
+        return True
+    return isinstance(exc, ConnectionError | TimeoutError | httpx.TransportError)
+
 
 # Une requête sémantique dédiée par code cible (Phase 6) — remplace les 3 requêtes génériques
 # d'origine (Prompt 4.3/4.4). Sur un rapport de plusieurs centaines de pages, les ~23 codes de
@@ -137,10 +147,6 @@ TABLE_SCORE_BOOST = 1.15
 # l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
 EXTRACTION_MODEL = "gemini-3.6-flash"
 
-# Score PCAF non calculé à cette étape (Étape 13, app/carbon/) — placeholder documenté plutôt
-# qu'une valeur inventée qui se ferait passer pour une vraie notation.
-PLACEHOLDER_SCORE_QUALITE_PCAF = 3
-
 EXTRACTION_TOOL = genai_types.FunctionDeclaration(
     name="extraction_indicateurs",
     description=(
@@ -158,12 +164,12 @@ EXTRACTION_TOOL = genai_types.FunctionDeclaration(
 class CibleIndicateur:
     code: str
     # "rapport_score_global" : score transversal auto-déclaré par l'entreprise (ex. "Score global
-    # ESG : 66/100"), écrit directement sur RapportESG.score_global_declare — aucun pilier E/S/G
+    # ESG : 66/100"), écrit directement sur ESGReport.declared_global_score — aucun pilier E/S/G
     # ne convient à une valeur transversale aux trois.
     cible: Literal["donnee_carbone", "indicateur_esg", "rapport_score_global"]
     scope: int | None = None
     categorie_ges: str | None = None
-    pilier: Pilier | None = None
+    pilier: Pillar | None = None
 
 
 # Les 7 codes carbone/environnement déjà validés sur le corpus pilote (voir
@@ -190,43 +196,43 @@ INDICATEURS_CIBLES: list[CibleIndicateur] = [
     ),
     CibleIndicateur("scope_3", "donnee_carbone", scope=3),
     CibleIndicateur(
-        "intensite_scope_1_2_marketbased", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "intensite_scope_1_2_marketbased", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     CibleIndicateur(
-        "intensite_scope_1_2_3_hors_cat11", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "intensite_scope_1_2_3_hors_cat11", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     CibleIndicateur(
-        "intensite_scope_1_2_3_total", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "intensite_scope_1_2_3_total", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
-    CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
     # Second lot — transparence humaine, repris du catalogue déjà pensé dans
     # data_test/reference_esg_8_entreprises.json (codes déjà nommés, jamais branchés jusqu'ici).
     # Liste non exhaustive : le pattern (un CibleIndicateur par fait numérique avec page-preuve)
     # se répète, d'autres codes pourront s'ajouter au fil des rapports rencontrés.
-    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
     CibleIndicateur(
-        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pilier.GOUVERNANCE
+        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE
     ),
-    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pilier.SOCIAL),
+    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pillar.SOCIAL),
     CibleIndicateur(
-        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     CibleIndicateur(
-        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT
+        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
     ),
     # Scores auto-déclarés par l'entreprise dans sa propre synthèse ESG — par pilier uniquement
     # (pas de "global" : Pilier n'a que 3 valeurs, et la plateforme calcule déjà son propre score
-    # officiel via ScoreESG/config/weights/default.yaml ; ajouter un score global auto-déclaré à
+    # officiel via Score/config/weights/default.yaml ; ajouter un score global auto-déclaré à
     # côté créerait une confusion entre "ce que l'entreprise prétend" et "ce que la plateforme
     # calcule" — décision produit à part entière, pas un ajout silencieux ici).
-    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pilier.ENVIRONNEMENT),
-    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pilier.SOCIAL),
-    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pilier.GOUVERNANCE),
+    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT),
+    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pillar.SOCIAL),
+    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
     CibleIndicateur("score_global_declare", "rapport_score_global"),
 ]
 
@@ -234,17 +240,6 @@ assert {c.code for c in INDICATEURS_CIBLES} == set(REQUETES_PAR_CODE), (
     "Chaque code de INDICATEURS_CIBLES doit avoir exactement une requête sémantique dédiée "
     "dans REQUETES_PAR_CODE."
 )
-
-# Les 3 codes "score_{pilier}_declare" ci-dessus atterrissent comme des IndicateurESG ordinaires
-# (même branche indicateur_esg que n'importe quel autre code) -- rien ne les distingue en base
-# des indicateurs réellement mesurés. Cette constante est le point unique de vérité pour les en
-# exclure explicitement partout où "les indicateurs extraits" doivent rester séparés de "ce que
-# l'entreprise prétend" (config/weights/default.yaml les exclut déjà par omission ; le PDF de
-# synthèse et RapportESGDetail doivent les exclure/isoler activement, pas par omission silencieuse).
-CODES_AUTO_DECLARES_PAR_PILIER = frozenset(
-    {"score_environnement_declare", "score_social_declare", "score_gouvernance_declare"}
-)
-
 
 @lru_cache
 def _get_embed_model() -> BGEM3FlagModel:
@@ -553,41 +548,47 @@ def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> Ex
     )
 
 
-def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None:
-    """Point d'entrée pour un déclenchement BackgroundTasks (app/company/router.py). Ouvre sa
-    propre session DB — celle de la requête HTTP est déjà fermée quand une tâche de fond s'exécute
-    — et est sérialisé par _extraction_lock."""
-    with _extraction_lock, Session(engine) as session:
-        rapport = session.get(RapportESG, rapport_id)
+def run_extraction_pipeline(
+    rapport_id: uuid.UUID, annee_reporting: int, *, derniere_tentative: bool = True
+) -> None:
+    """Exécuté par le worker (app/worker/jobs.py::extract_report, file d'extraction à un job à la
+    fois — plus de verrou applicatif). Ouvre sa propre session DB.
+
+    derniere_tentative=False : un échec transitoire (_est_transitoire) remet le rapport en QUEUED
+    et lève ExtractionTransitoire pour que le worker retente plus tard ; toute autre erreur, ou un
+    échec transitoire à la dernière tentative, marque le rapport FAILED comme avant."""
+    with Session(engine) as session:
+        rapport = session.get(ESGReport, rapport_id)
         if rapport is None:
             logger.error("extraction_rapport_introuvable", rapport_id=str(rapport_id))
             return
+        if rapport.source_file is None:
+            # Un brouillon (tâche 1.5) n'a pas de fichier : rien à extraire. Jamais programmé
+            # par l'application, gardé en défense.
+            logger.error("extraction_sans_fichier", rapport_id=str(rapport_id))
+            return
+        fichier_source = rapport.source_file
 
-        # Ne régresse jamais un rapport déjà avancé dans le workflow (AFFECTE_AUDITEUR,
-        # EN_VALIDATION, VALIDE...) — seul un rapport pas encore extrait démarre à EN_EXTRACTION.
-        # Sans cette garde, rejouer l'extraction (ex. après élargissement d'INDICATEURS_CIBLES) sur
-        # un rapport déjà affecté à un auditeur effacerait silencieusement cette affectation aux
-        # yeux du statut, alors que auditeur_id resterait renseigné — un vrai bug rencontré en
-        # pratique (SMH/SNDE repassés à EN_EXTRACTION par une ré-extraction alors que déjà
-        # AFFECTE_AUDITEUR).
-        if rapport.statut == StatutRapport.ENVOYE:
-            rapport.statut = StatutRapport.EN_EXTRACTION
-            session.add(rapport)
-            session.commit()
-
-        # Posé à CHAQUE entrée dans le pipeline (dépôt initial ou relance manuelle après échec) —
-        # sert de référence à lister_rapports_extraction_bloquee (app/admin/review_queue.py) pour
-        # détecter un traitement interrompu ; une relance doit repartir d'un chronomètre frais,
-        # pas de celui de la toute première tentative.
-        rapport.extraction_demarree_le = utcnow()
+        # Seul extraction_status avance ici, jamais le statut métier (ReportStatus) : rejouer
+        # l'extraction (ex. après élargissement d'INDICATEURS_CIBLES) sur un rapport déjà affecté
+        # à un auditeur ne doit jamais le faire régresser dans le workflow — un vrai bug rencontré
+        # en pratique avec l'ancien statut unique (SMH/SNDE repassés en extraction alors que déjà
+        # affectés).
+        #
+        # extraction_started_at est posé à CHAQUE entrée dans le pipeline (dépôt initial ou
+        # relance manuelle après échec) — sert de référence à la tâche planifiée
+        # (app/ingestion/supervision.py) pour détecter un traitement interrompu ; une relance doit
+        # repartir d'un chronomètre frais, pas de celui de la toute première tentative.
+        rapport.extraction_status = ExtractionStatus.RUNNING
+        rapport.extraction_started_at = utcnow()
         session.add(rapport)
         session.commit()
 
         etape = "erreur_inattendue"
         try:
-            source_path = storage.resolve_path(rapport.fichier_source)
-            nom_entreprise = rapport.entreprise.nom
-            nom_document = Path(rapport.fichier_source).name
+            source_path = storage.resolve_path(fichier_source)
+            nom_entreprise = rapport.company.name
+            nom_document = Path(fichier_source).name
             demo = get_settings().gemini_api_key_is_placeholder
             if demo:
                 nom_document = f"[DEMO] {nom_document}"
@@ -670,45 +671,55 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             etape = "persistance_echouee"
             # Purge des données dérivées d'une extraction précédente sur ce même rapport, pour que
             # run_extraction_pipeline soit rejouable (ex. après élargissement d'INDICATEURS_CIBLES)
-            # sans dupliquer les lignes. Ne touche jamais RapportESG (le PDF déposé) ni AvisAudit —
+            # sans dupliquer les lignes. Ne touche jamais ESGReport (le PDF déposé) ni AuditOpinion —
             # seules les données automatiques, best-effort et remplaçables sont concernées.
-            # PreuveDocumentaire n'a pas de rapport_id direct (liée uniquement via le preuve_id des
+            # Evidence n'a pas de rapport_id direct (liée uniquement via le preuve_id des
             # lignes ci-dessous, et son fichier est stocké sous preuves/{rapport_id}/page_N.pdf,
             # app/ingestion/proof_generator.py — jamais partagée entre rapports) : ses ids doivent
             # être collectés avant de supprimer les lignes qui les référencent.
             anciens_indicateurs = session.exec(
-                select(IndicateurESG).where(IndicateurESG.rapport_id == rapport_id)
+                select(ESGMetric).where(ESGMetric.report_id == rapport_id)
             ).all()
             anciennes_donnees_carbone = session.exec(
-                select(DonneeCarbone).where(DonneeCarbone.rapport_id == rapport_id)
+                select(CarbonEmission).where(CarbonEmission.report_id == rapport_id)
             ).all()
             anciennes_couvertures = session.exec(
-                select(CouvertureIndicateur).where(CouvertureIndicateur.rapport_id == rapport_id)
+                select(MetricCoverage).where(MetricCoverage.report_id == rapport_id)
             ).all()
             for ancienne_couverture in anciennes_couvertures:
                 session.delete(ancienne_couverture)
-            anciennes_preuve_ids = {i.preuve_id for i in anciens_indicateurs} | {
-                d.preuve_id for d in anciennes_donnees_carbone
+            anciennes_preuve_ids = {i.proof_id for i in anciens_indicateurs} | {
+                d.proof_id for d in anciennes_donnees_carbone
             }
-            if rapport.score_global_declare_preuve_id is not None:
-                anciennes_preuve_ids.add(rapport.score_global_declare_preuve_id)
-            rapport.score_global_declare = None
-            rapport.score_global_declare_preuve_id = None
+            if rapport.declared_global_score_proof_id is not None:
+                anciennes_preuve_ids.add(rapport.declared_global_score_proof_id)
+            rapport.declared_global_score = None
+            rapport.declared_global_score_proof_id = None
             session.add(rapport)
             for ancienne_ligne in [*anciens_indicateurs, *anciennes_donnees_carbone]:
                 session.delete(ancienne_ligne)
             if anciennes_preuve_ids:
                 for ancienne_preuve in session.exec(
-                    select(PreuveDocumentaire).where(
-                        col(PreuveDocumentaire.id).in_(anciennes_preuve_ids)
+                    select(Evidence).where(
+                        col(Evidence.id).in_(anciennes_preuve_ids)
                     )
                 ).all():
                     session.delete(ancienne_preuve)
             session.flush()
 
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}
-            preuves_par_page: dict[int, PreuveDocumentaire] = {}
+            preuves_par_page: dict[int, Evidence] = {}
+            # Le LLM peut renvoyer deux fois le même code : la première occurrence exploitable
+            # l'emporte, jamais deux lignes pour un même code (uq_esg_metrics_report_metric_code
+            # l'impose en base pour ESGMetric ; le même principe évite un double comptage des
+            # émissions pour CarbonEmission).
+            codes_persistes: set[str] = set()
             for indicateur in extraction.indicateurs:
+                if indicateur.code in codes_persistes:
+                    logger.warning(
+                        "indicateur_duplique_ignore", rapport_id=str(rapport_id), code=indicateur.code
+                    )
+                    continue
                 if (
                     not indicateur.trouve
                     or indicateur.valeur is None
@@ -726,6 +737,7 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                     )
                     continue
 
+                codes_persistes.add(indicateur.code)
                 page = indicateur.page_source
                 if page not in preuves_par_page:
                     preuve = proof_generator.generate_page_proof(
@@ -744,43 +756,43 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 if cible.cible == "donnee_carbone":
                     assert cible.scope is not None  # invariant garanti par INDICATEURS_CIBLES
                     session.add(
-                        DonneeCarbone(
-                            rapport_id=rapport_id,
+                        CarbonEmission(
+                            report_id=rapport_id,
                             scope=cible.scope,
-                            categorie_ges=cible.categorie_ges,
-                            valeur_tonnes_co2e=indicateur.valeur,
-                            annee=annee_reporting,
-                            methode=MethodeDonnee.RAPPORTEE,
-                            score_qualite_pcaf=PLACEHOLDER_SCORE_QUALITE_PCAF,
-                            preuve_id=preuve.id,
-                            valeur_brute=indicateur.valeur_brute,
+                            ghg_category=cible.categorie_ges,
+                            tonnes_co2e=indicateur.valeur,
+                            year=annee_reporting,
+                            method=DataMethod.RAPPORTEE,
+                            pcaf_data_quality=qualite_donnee_pcaf(DataMethod.RAPPORTEE),
+                            proof_id=preuve.id,
+                            raw_value=indicateur.valeur_brute,
                             section=indicateur.section,
-                            citation_source=indicateur.citation_source,
-                            annee_valeur=indicateur.annee_valeur,
-                            confiance=indicateur.confiance,
+                            proof_text=indicateur.citation_source,
+                            value_year=indicateur.annee_valeur,
+                            confidence=indicateur.confiance,
                         )
                     )
                 elif cible.cible == "indicateur_esg":
                     assert cible.pilier is not None  # invariant garanti par INDICATEURS_CIBLES
                     session.add(
-                        IndicateurESG(
-                            rapport_id=rapport_id,
-                            pilier=cible.pilier,
-                            code=cible.code,
-                            valeur=indicateur.valeur,
-                            unite=indicateur.unite or "",
-                            methode=MethodeDonnee.RAPPORTEE,
-                            preuve_id=preuve.id,
-                            valeur_brute=indicateur.valeur_brute,
+                        ESGMetric(
+                            report_id=rapport_id,
+                            pillar=cible.pilier,
+                            metric_code=cible.code,
+                            value=indicateur.valeur,
+                            unit=indicateur.unite or "",
+                            method=DataMethod.RAPPORTEE,
+                            proof_id=preuve.id,
+                            raw_value=indicateur.valeur_brute,
                             section=indicateur.section,
-                            citation_source=indicateur.citation_source,
-                            annee_valeur=indicateur.annee_valeur,
-                            confiance=indicateur.confiance,
+                            proof_text=indicateur.citation_source,
+                            value_year=indicateur.annee_valeur,
+                            confidence=indicateur.confiance,
                         )
                     )
                 else:  # "rapport_score_global"
-                    rapport.score_global_declare = indicateur.valeur
-                    rapport.score_global_declare_preuve_id = preuve.id
+                    rapport.declared_global_score = indicateur.valeur
+                    rapport.declared_global_score_proof_id = preuve.id
                     session.add(rapport)
 
             # Exhaustivité par code (statut ABSENT_CONFIRME, voir completeness._absence_confirmee) :
@@ -803,8 +815,9 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             ):
                 session.add(couverture)
 
-            rapport.extraction_terminee_le = utcnow()
-            rapport.extraction_erreur = None
+            rapport.extraction_finished_at = utcnow()
+            rapport.extraction_error = None
+            rapport.extraction_status = ExtractionStatus.DONE
             session.add(rapport)
 
             # Import différé : app.ingestion.synthesis_report importe
@@ -820,7 +833,7 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
             try:
                 contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
                 storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
-                rapport.rapport_synthese_genere = f"synthese/{rapport_id}.pdf"
+                rapport.synthesis_report_path = f"synthese/{rapport_id}.pdf"
                 session.add(rapport)
             except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
                 logger.error(
@@ -830,8 +843,8 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                 )
 
             admins = session.exec(
-                select(Utilisateur).where(
-                    col(Utilisateur.role) == Role.ADMINISTRATEUR, col(Utilisateur.actif).is_(True)
+                select(User).where(
+                    col(User.role) == Role.ADMIN, col(User.active).is_(True)
                 )
             ).all()
             for admin in admins:
@@ -839,29 +852,29 @@ def run_extraction_pipeline(rapport_id: uuid.UUID, annee_reporting: int) -> None
                     session,
                     admin.id,
                     "RAPPORT_PRET_A_AFFECTER",
-                    f"Le rapport {rapport.type.value} ({rapport.annee_reporting}) de "
+                    f"Le rapport {rapport.type.value} ({rapport.fiscal_year}) de "
                     f"{nom_entreprise} est prêt à être affecté à un auditeur.",
                     id_ressource=rapport_id,
                 )
             session.commit()
             logger.info("extraction_pipeline_reussie", rapport_id=str(rapport_id))
 
-        except Exception as exc:  # noqa: BLE001 — frontière délibérée du pipeline de fond : toute
+        except Exception as exc:
             # erreur (Docling, réseau, Anthropic, DB) doit être classée et journalisée, jamais
             # remonter silencieusement dans une BackgroundTask sans observateur.
             session.rollback()
-            rapport.extraction_erreur = etape
-            rapport.tentatives_extraction += 1
-            session.add(rapport)
-            if rapport.entreprise.utilisateur_id is not None:
-                notifier(
-                    session,
-                    rapport.entreprise.utilisateur_id,
-                    "RAPPORT_EXTRACTION_ECHOUEE",
-                    f"L'extraction de votre rapport {rapport.type.value} ({rapport.annee_reporting}) "
-                    "a échoué. Vous pouvez déposer une nouvelle version.",
-                    id_ressource=rapport_id,
+            if not derniere_tentative and _est_transitoire(exc):
+                rapport.extraction_status = ExtractionStatus.QUEUED
+                session.add(rapport)
+                session.commit()
+                logger.warning(
+                    "extraction_echec_transitoire",
+                    rapport_id=str(rapport_id),
+                    error_type=type(exc).__name__,
+                    etape=etape,
                 )
+                raise ExtractionTransitoire(etape) from exc
+            marquer_echec(session, rapport, etape)
             session.commit()
             logger.error(
                 "extraction_pipeline_echouee",

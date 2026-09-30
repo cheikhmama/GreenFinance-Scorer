@@ -3,52 +3,52 @@ import uuid
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.company.models import Entreprise
+from app.company.models import Company
 
 
 def test_creation_sans_montant_minimum_et_sans_compte(session) -> None:
-    entreprise = Entreprise(nom="Acme", secteur="Industrie", pays="MR")
+    entreprise = Company(name="Acme", sector="Industrie", country="MR")
     session.add(entreprise)
     session.flush()
 
     assert entreprise.id is not None
-    assert entreprise.montant_minimum_investissement is None
-    assert entreprise.utilisateur_id is None
+    assert entreprise.minimum_investment_amount is None
+    assert entreprise.owner_user_id is None
 
 
 def test_creation_avec_montant_minimum(session) -> None:
-    entreprise = Entreprise(
-        nom="Acme Green",
-        secteur="Energie",
-        pays="MR",
-        montant_minimum_investissement=1000.0,
+    entreprise = Company(
+        name="Acme Green",
+        sector="Energie",
+        country="MR",
+        minimum_investment_amount=1000.0,
     )
     session.add(entreprise)
     session.flush()
 
-    assert entreprise.montant_minimum_investissement == 1000.0
+    assert entreprise.minimum_investment_amount == 1000.0
 
 
 def test_montant_minimum_nul_distinct_de_zero(session) -> None:
-    sans_minimum = Entreprise(nom="SansMin", secteur="X", pays="MR")
-    avec_minimum_zero = Entreprise(
-        nom="MinZero", secteur="X", pays="MR", montant_minimum_investissement=0.0
+    sans_minimum = Company(name="SansMin", sector="X", country="MR")
+    avec_minimum_zero = Company(
+        name="MinZero", sector="X", country="MR", minimum_investment_amount=0.0
     )
     session.add(sans_minimum)
     session.add(avec_minimum_zero)
     session.flush()
 
-    assert sans_minimum.montant_minimum_investissement is None
-    assert avec_minimum_zero.montant_minimum_investissement == 0.0
+    assert sans_minimum.minimum_investment_amount is None
+    assert avec_minimum_zero.minimum_investment_amount == 0.0
     assert (
-        sans_minimum.montant_minimum_investissement
-        != avec_minimum_zero.montant_minimum_investissement
+        sans_minimum.minimum_investment_amount
+        != avec_minimum_zero.minimum_investment_amount
     )
 
 
 def test_utilisateur_id_inexistant_rejete(session) -> None:
-    entreprise = Entreprise(
-        nom="Fantome", secteur="X", pays="MR", utilisateur_id=uuid.uuid4()
+    entreprise = Company(
+        name="Fantome", sector="X", country="MR", owner_user_id=uuid.uuid4()
     )
     session.add(entreprise)
     with pytest.raises(IntegrityError):

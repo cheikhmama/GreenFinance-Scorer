@@ -12,7 +12,7 @@ import uuid
 from fastapi import Cookie, Depends
 from sqlmodel import Session
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.revocation import is_session_revoked
 from app.auth.tokens import COOKIE_NAME, InvalidTokenError, decode_access_token
 from app.core.database import get_session
@@ -24,7 +24,7 @@ __all__ = ["get_current_user", "get_session"]
 def get_current_user(
     session: Session = Depends(get_session),
     access_token: str | None = Cookie(default=None, alias=COOKIE_NAME),
-) -> Utilisateur:
+) -> User:
     if access_token is None:
         raise UnauthorizedError("Authentification requise.", code="not_authenticated")
 
@@ -38,8 +38,8 @@ def get_current_user(
     if is_session_revoked(user_id, generation):
         raise UnauthorizedError("Session révoquée.", code="session_revoked")
 
-    user = session.get(Utilisateur, user_id)
-    if user is None or not user.actif:
+    user = session.get(User, user_id)
+    if user is None or not user.active:
         raise UnauthorizedError("Compte introuvable ou désactivé.", code="not_authenticated")
 
     return user

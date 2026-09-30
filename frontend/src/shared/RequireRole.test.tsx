@@ -21,7 +21,7 @@ function renderProtectedRoute(mockResult: Partial<UseQueryResult<User, ApiError>
         <Route
           path="/protected"
           element={
-            <RequireRole allowedRoles={["ADMINISTRATEUR"]}>
+            <RequireRole allowedRoles={["ADMIN"]}>
               <div>Contenu protégé</div>
             </RequireRole>
           }
@@ -43,12 +43,12 @@ describe("RequireRole", () => {
       data: {
         id: "1",
         email: "entreprise@example.com",
-        nom: "Entreprise Test",
+        name: "Entreprise Test",
         avatar: null,
-        role: "ENTREPRISE",
-        date_creation: "",
-        actif: true,
-        date_activation: "2026-09-01T00:00:00Z",
+        role: "ENTERPRISE",
+        created_at: "",
+        active: true,
+        activated_at: "2026-09-01T00:00:00Z",
       },
       isLoading: false,
       isError: false,
@@ -62,12 +62,12 @@ describe("RequireRole", () => {
       data: {
         id: "1",
         email: "admin@example.com",
-        nom: "Admin Test",
+        name: "Admin Test",
         avatar: null,
-        role: "ADMINISTRATEUR",
-        date_creation: "",
-        actif: true,
-        date_activation: "2026-09-01T00:00:00Z",
+        role: "ADMIN",
+        created_at: "",
+        active: true,
+        activated_at: "2026-09-01T00:00:00Z",
       },
       isLoading: false,
       isError: false,

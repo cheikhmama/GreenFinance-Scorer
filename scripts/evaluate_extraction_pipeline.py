@@ -4,7 +4,7 @@ Script autonome, hors DB/HTTP — appelle directement les fonctions internes de
 app/ingestion/{docling_pipeline,extractor}.py, comme scripts/generate_reference_e2e_reports.py
 appelle directement pymupdf plutôt que de passer par l'API.
 
-Ne réutilise PAS run_extraction_pipeline (qui exige une session DB et un RapportESG) : ce script
+Ne réutilise PAS run_extraction_pipeline (qui exige une session DB et un ESGReport) : ce script
 mesure la fidélité de l'extraction elle-même, indépendamment du reste du cycle de vie applicatif.
 
 Usage : uv run python scripts/evaluate_extraction_pipeline.py [--limit N]
@@ -63,7 +63,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 # PyTorch qui suit une init Paddle). Force le runtime PyTorch à s'initialiser et tourner réellement
 # AVANT le tout premier import lié à Paddle/Docling, mono-thread, la combinaison la plus stable
 # documentée pour ce conflit connu (PyTorch+Paddle dans le même process, Windows CPU).
-import torch  # noqa: E402
+import torch
 
 torch.set_num_threads(int(_EVAL_NUM_THREADS))
 _ = torch.zeros(1).sum().item()
@@ -87,8 +87,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # docling_pipeline en premier dans ce script a provoqué un segfault natif reproductible lors du
 # premier essai, cohérent avec la fragilité déjà documentée dans extractor.py). docling_pipeline
 # reste accessible via l'attribut du module extractor.
-from app.ingestion import completeness, extractor  # noqa: E402
-from app.ingestion.extractor import (  # noqa: E402
+from app.ingestion import completeness, extractor
+from app.ingestion.extractor import (
     INDICATEURS_CIBLES,
     _build_context,
     _build_search_index,
@@ -271,7 +271,7 @@ def evaluer_entreprise(entree: dict, *, cache_docling_dir: Path | None) -> dict:
     couvertures = completeness.calculer_couverture(
         uuid.uuid4(), extraction, codes, pages_examinees_par_code, recherche_exhaustive_par_code
     )
-    statut_par_code = {c.code: c.statut.value for c in couvertures}
+    statut_par_code = {c.metric_code: c.status.value for c in couvertures}
 
     # Diagnostic mesure-seule (ne modifie rien à extractor.py) : rejoue les étapes internes du 1er
     # passage pour isoler l'effet de _elargir_aux_voisins et de TABLE_SCORE_BOOST.

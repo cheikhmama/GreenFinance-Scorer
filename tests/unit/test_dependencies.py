@@ -27,7 +27,7 @@ class _FakeSession:
 class _FakeUtilisateur:
     def __init__(self, *, actif: bool = True) -> None:
         self.id = uuid.uuid4()
-        self.actif = actif
+        self.active = actif
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +55,7 @@ def test_get_current_user_raises_unauthorized_for_a_token_with_a_non_uuid_subjec
     HTTP."""
     settings = get_settings()
     now = datetime.now(UTC)
-    payload = {"sub": "pas-un-uuid", "role": Role.CHERCHEUR.value, "iat": now, "exp": now + timedelta(hours=1)}
+    payload = {"sub": "pas-un-uuid", "role": Role.RESEARCHER.value, "iat": now, "exp": now + timedelta(hours=1)}
     token = jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
     with pytest.raises(UnauthorizedError, match="Jeton invalide"):
@@ -63,7 +63,7 @@ def test_get_current_user_raises_unauthorized_for_a_token_with_a_non_uuid_subjec
 
 
 def test_get_current_user_raises_unauthorized_when_the_user_no_longer_exists() -> None:
-    token = create_access_token(uuid.uuid4(), Role.INVESTISSEUR)
+    token = create_access_token(uuid.uuid4(), Role.INVESTOR)
 
     with pytest.raises(UnauthorizedError, match="Compte introuvable"):
         get_current_user(session=_FakeSession(None), access_token=token)  # type: ignore[arg-type]
@@ -71,7 +71,7 @@ def test_get_current_user_raises_unauthorized_when_the_user_no_longer_exists() -
 
 def test_get_current_user_raises_unauthorized_for_a_deactivated_account() -> None:
     user = _FakeUtilisateur(actif=False)
-    token = create_access_token(user.id, Role.AUDITEUR)
+    token = create_access_token(user.id, Role.AUDITOR)
 
     with pytest.raises(UnauthorizedError, match="Compte introuvable"):
         get_current_user(session=_FakeSession(user), access_token=token)  # type: ignore[arg-type]
@@ -79,7 +79,7 @@ def test_get_current_user_raises_unauthorized_for_a_deactivated_account() -> Non
 
 def test_get_current_user_returns_the_matching_active_user() -> None:
     user = _FakeUtilisateur(actif=True)
-    token = create_access_token(user.id, Role.ENTREPRISE)
+    token = create_access_token(user.id, Role.ENTERPRISE)
 
     result = get_current_user(session=_FakeSession(user), access_token=token)  # type: ignore[arg-type]
 
@@ -88,7 +88,7 @@ def test_get_current_user_returns_the_matching_active_user() -> None:
 
 def test_get_current_user_raises_unauthorized_when_session_is_revoked() -> None:
     user = _FakeUtilisateur(actif=True)
-    token = create_access_token(user.id, Role.ENTREPRISE)
+    token = create_access_token(user.id, Role.ENTERPRISE)
 
     with (
         patch("app.core.dependencies.is_session_revoked", return_value=True),

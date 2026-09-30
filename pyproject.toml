@@ -11,25 +11,15 @@ dependencies = [
     "psycopg[binary]",
     "pydantic-settings",
     "pydantic[email]",
-    "pytest",
-    "pytest-cov",
     "structlog",
     "pyjwt",
     "passlib[bcrypt]",
     "bcrypt<4.1",  # passlib 1.7.4 ne reconnaît pas l'API de bcrypt >=4.1 (module __about__ retiré)
     "redis",
     "python-multipart",  # requis par FastAPI pour UploadFile/Form (POST /company/rapports, Étape 5)
-    # Pipeline d'extraction documentaire (Étape 5) — promues depuis le groupe notebook : l'API en a
-    # besoin au runtime (app/ingestion/docling_pipeline.py, extractor.py), pas seulement les notebooks.
-    "docling",
-    "paddlepaddle",
-    "paddleocr",
+    # Validation des PDF déposés (app/company/upload_validation.py) et extraits de preuve : l'API
+    # en a besoin. Le reste de la pile d'extraction est dans le groupe `extraction` ci-dessous.
     "pymupdf",
-    "faiss-cpu",
-    "FlagEmbedding",
-    "google-genai",
-    "torch",
-    "torchvision",
     # app/scoring/config_schema.py lit config/weights/*.yaml au runtime (Phase 5 §9) — même
     # raisonnement que le bloc ci-dessus, promu du groupe notebook où il ne servait jusqu'ici
     # qu'à lire data_test/ground_truth.yaml depuis les scripts de validation.
@@ -41,21 +31,42 @@ dependencies = [
     # uniquement par scripts/generate_technology_report.py hors périmètre applicatif ; l'API en a
     # désormais besoin au runtime, même raisonnement de promotion que le reste de ce bloc.
     "reportlab",
+    "arq>=0.28.0",
 ]
 
 [dependency-groups]
+# Pile d'extraction documentaire (tâche 4.2) : seul le worker d'extraction l'exécute
+# (app/ingestion/extractor.py, docling_pipeline.py) — l'API et le worker par défaut tournent sans
+# elle, sur l'image légère. Installée par défaut en local (tests, mypy), voir default-groups.
+extraction = [
+    "docling",
+    "paddlepaddle",
+    "paddleocr",
+    "faiss-cpu",
+    "FlagEmbedding",
+    "google-genai",
+    "torch",
+    "torchvision",
+]
 dev = [
+    "pytest",
+    "pytest-cov",
     "ruff",
     "mypy",
     "pre-commit",
     "types-passlib",
     "types-pyyaml",
     "types-reportlab>=5.0.0.20260911",
+    "hypothesis>=6.168.3",
 ]
 notebook = [
     "jupyter",
     "ipykernel",
 ]
+
+[tool.uv]
+# Local et CI : tout (tests et mypy importent le pipeline). Images : --no-default-groups.
+default-groups = ["dev", "extraction"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]

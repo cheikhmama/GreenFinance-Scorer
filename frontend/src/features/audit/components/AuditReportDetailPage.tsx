@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 import { useAssignedReport, useSubmitOpinion } from "../api";
-import { DecisionAudit, type SoumettreAvisForm, soumettreAvisSchema } from "../schemas";
+import { AuditDecision, type SoumettreAvisForm, soumettreAvisSchema } from "../schemas";
 
 /** URL construite en dur, même patron que les CompanyDetailPage.tsx des espaces Investisseur/
  * Chercheur/Institution (voir frontend/src/shared/esg/EvidenceTables.tsx) — pas d'attente sur la
@@ -45,27 +45,27 @@ export function AuditReportDetailPage() {
           ← Mes dossiers
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
-          Dossier {dossier.type} — {dossier.annee_reporting ?? "année inconnue"}
+          Dossier {dossier.type} — {dossier.fiscal_year ?? "année inconnue"}
         </h1>
-        <Badge className="mt-2" variant={variantStatutRapport(dossier.statut)}>
-          {libelleStatutRapport(dossier.statut)}
+        <Badge className="mt-2" variant={variantStatutRapport(dossier.status)}>
+          {libelleStatutRapport(dossier.status, dossier.extraction_status)}
         </Badge>
       </div>
 
-      {dossier.score_global_declare !== null ? (
+      {dossier.declared_global_score !== null ? (
         <Card>
           <CardHeader>
             <CardTitle>Score ESG global auto-déclaré</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm">
-              <strong className="text-brand-blue">{dossier.score_global_declare}/100</strong>
-              {dossier.score_global_declare_preuve ? (
+              <strong className="text-brand-blue">{dossier.declared_global_score}/100</strong>
+              {dossier.declared_global_score_proof ? (
                 <span className="ml-2 text-brand-grey">
                   —{" "}
                   <PreuveLien
-                    preuve={dossier.score_global_declare_preuve}
-                    url={construireUrlPreuveAudit(dossier.id, dossier.score_global_declare_preuve.id)}
+                    preuve={dossier.declared_global_score_proof}
+                    url={construireUrlPreuveAudit(dossier.id, dossier.declared_global_score_proof.id)}
                   />
                 </span>
               ) : null}
@@ -75,17 +75,17 @@ export function AuditReportDetailPage() {
       ) : null}
 
       <IndicatorsTable
-        indicateurs={dossier.indicateurs}
-        couverture={dossier.couverture}
+        indicateurs={dossier.metrics}
+        couverture={dossier.coverage}
         construireUrlPreuve={(preuveId) => construireUrlPreuveAudit(dossier.id, preuveId)}
       />
 
       <CarbonTable
-        donneesCarbone={dossier.donnees_carbone}
+        donneesCarbone={dossier.carbon_data}
         construireUrlPreuve={(preuveId) => construireUrlPreuveAudit(dossier.id, preuveId)}
       />
 
-      {dossier.statut === "AFFECTE_AUDITEUR" ? (
+      {dossier.status === "PENDING_AUDIT" ? (
         <FormulaireAvis rapportId={dossier.id} />
       ) : (
         <Alert>
@@ -105,13 +105,13 @@ function FormulaireAvis({ rapportId }: { rapportId: string }) {
 
   const form = useForm<SoumettreAvisForm>({
     resolver: zodResolver(soumettreAvisSchema),
-    defaultValues: { decision: DecisionAudit.RECOMMANDE_VALIDATION, commentaire: "" },
+    defaultValues: { decision: AuditDecision.RECOMMANDE_VALIDATION, comment: "" },
   });
 
   function onSubmit(values: SoumettreAvisForm) {
     setServerError(null);
     submitOpinion.mutate(
-      { decision: values.decision, commentaire: values.commentaire || null },
+      { decision: values.decision, comment: values.comment || null },
       {
         onError: (error) => {
           setServerError(
@@ -159,11 +159,11 @@ function FormulaireAvis({ rapportId }: { rapportId: string }) {
                   <FormLabel>Décision</FormLabel>
                   <FormControl>
                     <Select {...field}>
-                      <option value={DecisionAudit.RECOMMANDE_VALIDATION}>
+                      <option value={AuditDecision.RECOMMANDE_VALIDATION}>
                         Recommande la validation
                       </option>
-                      <option value={DecisionAudit.RECOMMANDE_REJET}>Recommande le rejet</option>
-                      <option value={DecisionAudit.DEMANDE_CLARIFICATION}>
+                      <option value={AuditDecision.RECOMMANDE_REJET}>Recommande le rejet</option>
+                      <option value={AuditDecision.DEMANDE_CLARIFICATION}>
                         Demande une clarification
                       </option>
                     </Select>
@@ -174,7 +174,7 @@ function FormulaireAvis({ rapportId }: { rapportId: string }) {
             />
             <FormField
               control={form.control}
-              name="commentaire"
+              name="comment"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Commentaire</FormLabel>

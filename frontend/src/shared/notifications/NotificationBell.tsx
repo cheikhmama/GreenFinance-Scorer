@@ -29,11 +29,11 @@ export function NotificationBell() {
   const navigate = useNavigate();
 
   function onClicNotification(notification: NotificationPublic) {
-    if (!notification.lu) {
+    if (!notification.read) {
       marquerLue.mutate(notification.id);
     }
     setOuvert(false);
-    const lien = resolveNotificationLink(notification.type, notification.id_ressource);
+    const lien = resolveNotificationLink(notification.type, notification.resource_id);
     if (lien) navigate(lien);
   }
 
@@ -74,7 +74,7 @@ export function NotificationBell() {
             ) : (
               <ul className="divide-y">
                 {notifications.map((notification) => {
-                  const lien = resolveNotificationLink(notification.type, notification.id_ressource);
+                  const lien = resolveNotificationLink(notification.type, notification.resource_id);
                   return (
                     <li key={notification.id}>
                       <button
@@ -89,7 +89,7 @@ export function NotificationBell() {
                         <span
                           className={cn(
                             "mt-1.5 size-1.5 shrink-0 rounded-full",
-                            notification.lu ? "bg-transparent" : "bg-destructive",
+                            notification.read ? "bg-transparent" : "bg-destructive",
                           )}
                           aria-hidden="true"
                         />
@@ -97,13 +97,13 @@ export function NotificationBell() {
                           <span
                             className={cn(
                               "block",
-                              notification.lu ? "text-brand-grey" : "font-medium text-brand-blue",
+                              notification.read ? "text-brand-grey" : "font-medium text-brand-blue",
                             )}
                           >
                             {notification.message}
                           </span>
                           <span className="text-xs text-brand-grey">
-                            {new Date(notification.date_envoi).toLocaleString("fr-FR")}
+                            {new Date(notification.sent_at).toLocaleString("fr-FR")}
                           </span>
                         </span>
                       </button>

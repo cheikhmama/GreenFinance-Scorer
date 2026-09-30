@@ -4,39 +4,40 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.auth.hashing import hash_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
-    CanalDepot,
-    DecisionAudit,
-    MethodeDonnee,
-    Pilier,
+    AuditDecision,
+    DataMethod,
+    ExtractionStatus,
+    Pillar,
+    ReportStatus,
+    ReportType,
     Role,
-    StatutRapport,
-    TypeRapport,
+    SubmissionChannel,
 )
 from app.core.models import Notification
 from app.ingestion.models import (
-    DonneeCarbone,
-    IndicateurESG,
-    PreuveDocumentaire,
-    RapportESG,
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
 )
 from app.main import app
 
 client = TestClient(app, base_url="https://testserver")
 
 
-def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> Utilisateur:
-    user = Utilisateur(
+def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -> User:
+    user = User(
         email=f"{role.value.lower()}-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache=hash_password(password),
+        password_hash=hash_password(password),
         role=role,
-        actif=True,
+        active=True,
     )
     session.add(user)
     session.commit()
@@ -44,18 +45,19 @@ def _create_utilisateur(session, role: Role, *, password: str = "s3cret-pass") -
     return user
 
 
-def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> RapportESG:
-    entreprise = Entreprise(nom=f"Cible {uuid.uuid4()}", secteur="Technologies", pays="France")
+def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> ESGReport:
+    entreprise = Company(name=f"Cible {uuid.uuid4()}", sector="Technologies", country="France")
     session.add(entreprise)
     session.commit()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        statut=StatutRapport.AFFECTE_AUDITEUR if auditeur_id else StatutRapport.EN_EXTRACTION,
-        fichier_source="rapports/test/dummy.pdf",
-        extraction_terminee_le=utcnow(),
-        auditeur_id=auditeur_id,
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        status=ReportStatus.PENDING_AUDIT if auditeur_id else ReportStatus.SUBMITTED,
+        source_file="rapports/test/dummy.pdf",
+        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        auditor_id=auditeur_id,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()
@@ -72,8 +74,8 @@ def _login(email: str, password: str) -> TestClient:
 
 
 def test_lister_mes_dossiers_ne_montre_que_mes_rapports_affectes(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    autre_auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    autre_auditeur = _create_utilisateur(session, Role.AUDITOR)
     mon_rapport = _create_rapport_affecte(session, auditeur.id)
     _create_rapport_affecte(session, autre_auditeur.id)
 
@@ -87,8 +89,8 @@ def test_lister_mes_dossiers_ne_montre_que_mes_rapports_affectes(session) -> Non
 
 
 def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    autre_auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    autre_auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, autre_auditeur.id)
 
     authed_client = _login(auditeur.email, "s3cret-pass")
@@ -99,38 +101,38 @@ def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
 
 
 def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
-    preuve = PreuveDocumentaire(
-        nom_document="rapport.pdf",
-        annee=2024,
-        nombre_pages_total=25,
-        page_debut=3,
-        page_fin=3,
-        pdf_extrait_genere="preuves/test/page_3.pdf",
+    preuve = Evidence(
+        document_name="rapport.pdf",
+        year=2024,
+        total_pages=25,
+        page_start=3,
+        page_end=3,
+        excerpt_pdf_path="preuves/test/page_3.pdf",
     )
     session.add(preuve)
     session.commit()
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.ENVIRONNEMENT,
-            code="intensite_scope_1_2_marketbased",
-            valeur=42.0,
-            unite="gCO2e/kWh",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pillar.ENVIRONNEMENT,
+            metric_code="intensite_scope_1_2_marketbased",
+            value=42.0,
+            unit="gCO2e/kWh",
+            method=DataMethod.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=1,
-            valeur_tonnes_co2e=100.0,
-            annee=2024,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=3,
-            preuve_id=preuve.id,
+            tonnes_co2e=100.0,
+            year=2024,
+            method=DataMethod.RAPPORTEE,
+            pcaf_data_quality=3,
+            proof_id=preuve.id,
         )
     )
     session.commit()
@@ -140,39 +142,39 @@ def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> N
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["indicateurs"]) == 1
-    assert body["indicateurs"][0]["code"] == "intensite_scope_1_2_marketbased"
-    assert body["indicateurs"][0]["preuve"]["page_debut"] == 3
-    assert len(body["donnees_carbone"]) == 1
-    assert body["donnees_carbone"][0]["scope"] == 1
+    assert len(body["metrics"]) == 1
+    assert body["metrics"][0]["metric_code"] == "intensite_scope_1_2_marketbased"
+    assert body["metrics"][0]["proof"]["page_start"] == 3
+    assert len(body["carbon_data"]) == 1
+    assert body["carbon_data"][0]["scope"] == 1
 
 
 def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
 
     authed_client = _login(auditeur.email, "s3cret-pass")
     response = authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_VALIDATION", "commentaire": "Données cohérentes."},
+        json={"decision": "RECOMMANDE_VALIDATION", "comment": "Données cohérentes."},
     )
 
     assert response.status_code == 201
-    assert response.json()["decision"] == DecisionAudit.RECOMMANDE_VALIDATION.value
-    assert response.json()["auditeur_id"] == str(auditeur.id)
+    assert response.json()["decision"] == AuditDecision.RECOMMANDE_VALIDATION.value
+    assert response.json()["auditor_id"] == str(auditeur.id)
 
     session.refresh(rapport)
-    assert rapport.statut == StatutRapport.EN_VALIDATION
-    avis = session.exec(select(AvisAudit).where(AvisAudit.rapport_id == rapport.id)).first()
+    assert rapport.status == ReportStatus.PENDING_DECISION
+    avis = session.exec(select(AuditOpinion).where(AuditOpinion.report_id == rapport.id)).first()
     assert avis is not None
-    assert avis.auditeur_id == auditeur.id
+    assert avis.auditor_id == auditeur.id
 
 
 def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    admin = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_inactif = _create_utilisateur(session, Role.ADMINISTRATEUR)
-    admin_inactif.actif = False
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    admin = _create_utilisateur(session, Role.ADMIN)
+    admin_inactif = _create_utilisateur(session, Role.ADMIN)
+    admin_inactif.active = False
     session.add(admin_inactif)
     session.commit()
     rapport = _create_rapport_affecte(session, auditeur.id)
@@ -180,20 +182,20 @@ def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
 
     authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_REJET", "commentaire": "Données incohérentes."},
+        json={"decision": "RECOMMANDE_REJET", "comment": "Données incohérentes."},
     )
 
     notification = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == admin.id, Notification.type == "RAPPORT_AVIS_RENDU_ADMIN"
+            Notification.user_id == admin.id, Notification.type == "RAPPORT_AVIS_RENDU_ADMIN"
         )
     ).one()
-    assert notification.id_ressource == rapport.id
+    assert notification.resource_id == rapport.id
     assert "rejet" in notification.message
 
     notification_inactif = session.exec(
         select(Notification).where(
-            Notification.utilisateur_id == admin_inactif.id,
+            Notification.user_id == admin_inactif.id,
             Notification.type == "RAPPORT_AVIS_RENDU_ADMIN",
         )
     ).first()
@@ -201,7 +203,7 @@ def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
 
 
 def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
     authed_client = _login(auditeur.email, "s3cret-pass")
 
@@ -224,7 +226,7 @@ def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
     "decision", ["RECOMMANDE_VALIDATION", "RECOMMANDE_REJET", "DEMANDE_CLARIFICATION"]
 )
 def test_soumettre_avis_accepte_les_trois_recommandations(session, decision: str) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
     authed_client = _login(auditeur.email, "s3cret-pass")
 
@@ -238,8 +240,8 @@ def test_soumettre_avis_accepte_les_trois_recommandations(session, decision: str
 
 
 def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
-    auditeur = _create_utilisateur(session, Role.AUDITEUR)
-    autre_auditeur = _create_utilisateur(session, Role.AUDITEUR)
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    autre_auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport_a = _create_rapport_affecte(session, auditeur.id)
     rapport_b = _create_rapport_affecte(session, auditeur.id)
     rapport_dautrui = _create_rapport_affecte(session, autre_auditeur.id)
@@ -259,7 +261,7 @@ def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
     response = authed_client.get("/api/v1/audit/historique")
 
     assert response.status_code == 200
-    rapport_ids = [item["rapport_id"] for item in response.json()]
+    rapport_ids = [item["report_id"] for item in response.json()]
     assert str(rapport_a.id) in rapport_ids
     assert str(rapport_b.id) in rapport_ids
     assert str(rapport_dautrui.id) not in rapport_ids
@@ -284,7 +286,7 @@ def test_soumettre_avis_sans_authentification_est_rejete() -> None:
 
 
 def test_lister_mes_dossiers_avec_role_entreprise_est_rejete(session) -> None:
-    user = _create_utilisateur(session, Role.ENTREPRISE)
+    user = _create_utilisateur(session, Role.ENTERPRISE)
     authed_client = _login(user.email, "s3cret-pass")
 
     response = authed_client.get("/api/v1/audit/rapports")

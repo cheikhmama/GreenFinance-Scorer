@@ -1,38 +1,41 @@
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.auth.models import User
+from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import DevisePosition, Role, TypeDureeInvestissement
-from app.investor.models import Portefeuille, PositionPortefeuille
+from app.core.enums import Currency, DurationType, Role
+from app.investor.models import Portfolio, PortfolioPosition
 
 
-def _investisseur(session) -> Utilisateur:
-    utilisateur = Utilisateur(
+def _investisseur(session) -> User:
+    utilisateur = User(
         email=f"investisseur-{uuid.uuid4()}@example.com",
-        mot_de_passe_hache="hash",
-        role=Role.INVESTISSEUR,
+        password_hash="hash",
+        role=Role.INVESTOR,
     )
     session.add(utilisateur)
     session.flush()
     return utilisateur
 
 
-def _entreprise(session, **kwargs) -> Entreprise:
-    entreprise = Entreprise(nom="Acme", secteur="Industrie", pays="MR", **kwargs)
+def _entreprise(session, **kwargs) -> Company:
+    # SQLModel ignore silencieusement un kwarg inconnu : jamais un champ de test perdu en route.
+    assert set(kwargs) <= set(Company.model_fields), set(kwargs) - set(Company.model_fields)
+    entreprise = Company(name="Acme", sector="Industrie", country="MR", **kwargs)
     session.add(entreprise)
     session.flush()
     return entreprise
 
 
-def _portefeuille(session, investisseur_id: uuid.UUID) -> Portefeuille:
-    portefeuille = Portefeuille(
-        investisseur_id=investisseur_id, nom="Portefeuille vert", devise_reference=DevisePosition.USD
+def _portefeuille(session, investisseur_id: uuid.UUID) -> Portfolio:
+    portefeuille = Portfolio(
+        user_id=investisseur_id, name="Portefeuille vert", reference_currency=Currency.USD
     )
     session.add(portefeuille)
     session.flush()
@@ -41,27 +44,31 @@ def _portefeuille(session, investisseur_id: uuid.UUID) -> Portefeuille:
 
 def _base_position(portefeuille_id: uuid.UUID, entreprise_id: uuid.UUID, **kwargs) -> dict:
     defaults = {
-        "portefeuille_id": portefeuille_id,
-        "entreprise_id": entreprise_id,
-        "montant_investi": 1000.0,
-        "devise": DevisePosition.USD,
-        "montant_converti": 1000.0,
-        "type_duree": TypeDureeInvestissement.OUVERTE,
-        "date_debut": utcnow(),
+        "portfolio_id": portefeuille_id,
+        "company_id": entreprise_id,
+        "outstanding_amount": 1000.0,
+        "currency": Currency.USD,
+        "converted_amount": 1000.0,
+        "duration_type": DurationType.OUVERTE,
+        "start_date": utcnow(),
     }
     defaults.update(kwargs)
+    # model_validate ignore silencieusement une clé inconnue : jamais un champ de test perdu.
+    assert set(defaults) <= set(PortfolioPosition.model_fields), set(defaults) - set(
+        PortfolioPosition.model_fields
+    )
     return defaults
 
 
 def test_position_sous_le_minimum_requis_rejetee(session) -> None:
     investisseur = _investisseur(session)
-    entreprise = _entreprise(session, montant_minimum_investissement=5000.0)
+    entreprise = _entreprise(session, minimum_investment_amount=5000.0)
     portefeuille = _portefeuille(session, investisseur.id)
 
-    data = _base_position(portefeuille.id, entreprise.id, montant_investi=100.0)
+    data = _base_position(portefeuille.id, entreprise.id, outstanding_amount=100.0)
 
     with pytest.raises(ValidationError):
-        PositionPortefeuille.model_validate(data, context={"entreprise": entreprise})
+        PortfolioPosition.model_validate(data, context={"entreprise": entreprise})
 
 
 def test_position_fixe_date_fin_plus_dun_an_rejetee(session) -> None:
@@ -73,13 +80,13 @@ def test_position_fixe_date_fin_plus_dun_an_rejetee(session) -> None:
     data = _base_position(
         portefeuille.id,
         entreprise.id,
-        type_duree=TypeDureeInvestissement.FIXE,
-        date_debut=debut,
-        date_fin=debut + timedelta(days=400),
+        duration_type=DurationType.FIXE,
+        start_date=debut,
+        end_date=debut + timedelta(days=400),
     )
 
     with pytest.raises(ValidationError):
-        PositionPortefeuille.model_validate(data)
+        PortfolioPosition.model_validate(data)
 
 
 def test_position_fixe_date_debut_dans_le_passe_rejetee(session) -> None:
@@ -91,13 +98,13 @@ def test_position_fixe_date_debut_dans_le_passe_rejetee(session) -> None:
     data = _base_position(
         portefeuille.id,
         entreprise.id,
-        type_duree=TypeDureeInvestissement.FIXE,
-        date_debut=debut,
-        date_fin=debut + timedelta(days=30),
+        duration_type=DurationType.FIXE,
+        start_date=debut,
+        end_date=debut + timedelta(days=30),
     )
 
     with pytest.raises(ValidationError):
-        PositionPortefeuille.model_validate(data)
+        PortfolioPosition.model_validate(data)
 
 
 def test_position_fixe_valide_est_acceptee(session) -> None:
@@ -109,12 +116,12 @@ def test_position_fixe_valide_est_acceptee(session) -> None:
     data = _base_position(
         portefeuille.id,
         entreprise.id,
-        type_duree=TypeDureeInvestissement.FIXE,
-        date_debut=debut,
-        date_fin=debut + timedelta(days=180),
+        duration_type=DurationType.FIXE,
+        start_date=debut,
+        end_date=debut + timedelta(days=180),
     )
 
-    position = PositionPortefeuille.model_validate(data)
+    position = PortfolioPosition.model_validate(data)
     session.add(position)
     session.flush()
 
@@ -127,17 +134,17 @@ def test_position_ouverte_sans_date_fin_puis_fermeture(session) -> None:
     portefeuille = _portefeuille(session, investisseur.id)
     debut = utcnow()
 
-    data = _base_position(portefeuille.id, entreprise.id, date_debut=debut)
-    position = PositionPortefeuille.model_validate(data)
+    data = _base_position(portefeuille.id, entreprise.id, start_date=debut)
+    position = PortfolioPosition.model_validate(data)
     session.add(position)
     session.flush()
 
-    assert position.date_fin is None
+    assert position.end_date is None
 
-    position.date_fin = debut + timedelta(days=30)
+    position.end_date = debut + timedelta(days=30)
     session.flush()
 
-    assert position.date_fin is not None
+    assert position.end_date is not None
 
 
 def test_position_ouverte_fermeture_avec_date_fin_anterieure_rejetee(session) -> None:
@@ -146,13 +153,13 @@ def test_position_ouverte_fermeture_avec_date_fin_anterieure_rejetee(session) ->
     portefeuille = _portefeuille(session, investisseur.id)
     debut = utcnow()
 
-    data = _base_position(portefeuille.id, entreprise.id, date_debut=debut)
-    position = PositionPortefeuille.model_validate(data)
+    data = _base_position(portefeuille.id, entreprise.id, start_date=debut)
+    position = PortfolioPosition.model_validate(data)
     session.add(position)
     session.flush()
 
     with pytest.raises(ValidationError):
-        position.date_fin = debut - timedelta(days=1)
+        position.end_date = debut - timedelta(days=1)
 
 
 def test_taux_change_fige_independant_entre_positions(session) -> None:
@@ -164,31 +171,34 @@ def test_taux_change_fige_independant_entre_positions(session) -> None:
     portefeuille = _portefeuille(session, investisseur.id)
     debut = utcnow()
 
-    position_matin = PositionPortefeuille.model_validate(
+    position_matin = PortfolioPosition.model_validate(
         _base_position(
             portefeuille.id,
             entreprise.id,
-            date_debut=debut,
-            taux_change_utilise=36.5,
-            montant_converti=36500.0,
+            start_date=debut,
+            fx_rate_used=Decimal("36.5"),
+            converted_amount=Decimal(36500),
         )
     )
-    position_soir = PositionPortefeuille.model_validate(
+    position_soir = PortfolioPosition.model_validate(
         _base_position(
             portefeuille.id,
             entreprise.id,
-            date_debut=debut,
-            taux_change_utilise=36.8,
-            montant_converti=36800.0,
+            start_date=debut,
+            fx_rate_used=Decimal("36.8"),
+            converted_amount=Decimal(36800),
         )
     )
     session.add(position_matin)
     session.add(position_soir)
     session.flush()
+    session.refresh(position_matin)
+    session.refresh(position_soir)
 
-    assert position_matin.taux_change_utilise == 36.5
-    assert position_soir.taux_change_utilise == 36.8
-    assert position_matin.taux_change_utilise != position_soir.taux_change_utilise
+    # Relus depuis la base (numeric) : Decimal exact, jamais 36.799999…
+    assert position_matin.fx_rate_used == Decimal("36.5")
+    assert position_soir.fx_rate_used == Decimal("36.8")
+    assert position_matin.fx_rate_used != position_soir.fx_rate_used
 
 
 def test_suppression_entreprise_referencee_par_position_echoue(session) -> None:
@@ -196,7 +206,7 @@ def test_suppression_entreprise_referencee_par_position_echoue(session) -> None:
     entreprise = _entreprise(session)
     portefeuille = _portefeuille(session, investisseur.id)
 
-    position = PositionPortefeuille.model_validate(
+    position = PortfolioPosition.model_validate(
         _base_position(portefeuille.id, entreprise.id)
     )
     session.add(position)

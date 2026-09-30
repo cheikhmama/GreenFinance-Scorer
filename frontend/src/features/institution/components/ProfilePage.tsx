@@ -26,7 +26,7 @@ export function ProfilePage() {
                 Exports restants
               </p>
               <p className="text-2xl font-semibold text-brand-blue">
-                {profil ? profil.quota_export : "—"}
+                {profil ? profil.export_quota : "—"}
               </p>
             </div>
           </div>

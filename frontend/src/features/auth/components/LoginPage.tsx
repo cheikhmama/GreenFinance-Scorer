@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, FlaskConical, LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isPrototypeEnabled } from "@/features/prototype/routes";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
@@ -11,6 +11,7 @@ import { Button } from "@/shared/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { useLogin } from "../api";
+import { pageDeRetour } from "../session";
 import { type LoginRequest, loginRequestSchema } from "../schemas";
 import { PasswordInput } from "./PasswordInput";
 
@@ -23,6 +24,7 @@ import { PasswordInput } from "./PasswordInput";
  */
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useLogin();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -35,7 +37,8 @@ export function LoginPage() {
     if (login.isPending) return;
     setServerError(null);
     login.mutate(values, {
-      onSuccess: () => navigate("/dashboard", { replace: true }),
+      // Retour à la page quittée pour cause de session expirée, sinon l'espace du rôle.
+      onSuccess: () => navigate(pageDeRetour(location.state) ?? "/dashboard", { replace: true }),
       onError: (error: ApiError) => {
         // 401 invalid_credentials est le seul cas métier attendu du contrat
         // POST /auth/login ; tout autre code (panne réseau, 500) reste un message
@@ -127,6 +130,15 @@ export function LoginPage() {
       <p className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
         <LockKeyhole size={13} aria-hidden="true" />
         Un accès sécurisé à votre espace professionnel
+      </p>
+      <p className="mt-3 text-center text-sm text-muted-foreground">
+        Votre entreprise n’est pas encore sur la plateforme ?{" "}
+        <Link
+          to="/inscription-entreprise"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Inscrire mon entreprise
+        </Link>
       </p>
 
       {isPrototypeEnabled ? (

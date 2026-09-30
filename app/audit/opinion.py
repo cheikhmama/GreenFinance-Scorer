@@ -10,19 +10,19 @@ import uuid
 import structlog
 from sqlmodel import Session, col, select
 
-from app.audit.models import AvisAudit
-from app.auth.models import Utilisateur
-from app.core.enums import DecisionAudit, Role, StatutRapport
+from app.audit.models import AuditOpinion
+from app.auth.models import User
+from app.core.enums import AuditDecision, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 
 logger = structlog.get_logger(__name__)
 
 _LIBELLES_DECISION = {
-    DecisionAudit.RECOMMANDE_VALIDATION: "recommande la validation",
-    DecisionAudit.RECOMMANDE_REJET: "recommande le rejet",
-    DecisionAudit.DEMANDE_CLARIFICATION: "demande une clarification",
+    AuditDecision.RECOMMANDE_VALIDATION: "recommande la validation",
+    AuditDecision.RECOMMANDE_REJET: "recommande le rejet",
+    AuditDecision.DEMANDE_CLARIFICATION: "demande une clarification",
 }
 
 
@@ -30,45 +30,45 @@ def soumettre_avis(
     session: Session,
     rapport_id: uuid.UUID,
     auditeur_id: uuid.UUID,
-    decision: DecisionAudit,
+    decision: AuditDecision,
     commentaire: str | None,
-) -> AvisAudit:
-    rapport = session.get(RapportESG, rapport_id)
+) -> AuditOpinion:
+    rapport = session.get(ESGReport, rapport_id)
     # Même règle de non-divulgation que company/router.py::consulter_rapport : un rapport
     # inexistant et un rapport affecté à un autre auditeur rendent la même erreur, jamais un 403
     # qui confirmerait l'existence du rapport_id à quelqu'un à qui il n'est pas affecté.
-    if rapport is None or rapport.auditeur_id != auditeur_id:
+    if rapport is None or rapport.auditor_id != auditeur_id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
-    if rapport.statut != StatutRapport.AFFECTE_AUDITEUR:
+    if rapport.status != ReportStatus.PENDING_AUDIT:
         raise ValidationError(
             "Un avis a déjà été soumis pour ce rapport.", code="avis_deja_soumis"
         )
 
-    avis = AvisAudit(
-        rapport_id=rapport_id,
-        auditeur_id=auditeur_id,
+    avis = AuditOpinion(
+        report_id=rapport_id,
+        auditor_id=auditeur_id,
         decision=decision,
-        commentaire=commentaire,
+        comment=commentaire,
     )
     session.add(avis)
 
-    rapport.statut = StatutRapport.EN_VALIDATION
+    rapport.status = ReportStatus.PENDING_DECISION
     session.add(rapport)
 
-    if rapport.entreprise.utilisateur_id is not None:
+    if rapport.company.owner_user_id is not None:
         notifier(
             session,
-            rapport.entreprise.utilisateur_id,
+            rapport.company.owner_user_id,
             "RAPPORT_AVIS_RENDU_ENTREPRISE",
-            f"L'examen de votre rapport {rapport.type.value} ({rapport.annee_reporting}) est "
+            f"L'examen de votre rapport {rapport.type.value} ({rapport.fiscal_year}) est "
             "terminé, en attente de décision finale.",
             id_ressource=rapport_id,
         )
 
     admins = session.exec(
-        select(Utilisateur).where(
-            col(Utilisateur.role) == Role.ADMINISTRATEUR, col(Utilisateur.actif).is_(True)
+        select(User).where(
+            col(User.role) == Role.ADMIN, col(User.active).is_(True)
         )
     ).all()
     for admin in admins:
@@ -77,7 +77,7 @@ def soumettre_avis(
             admin.id,
             "RAPPORT_AVIS_RENDU_ADMIN",
             f"L'auditeur {_LIBELLES_DECISION[decision]} pour le rapport "
-            f"{rapport.type.value} ({rapport.annee_reporting}) de {rapport.entreprise.nom}.",
+            f"{rapport.type.value} ({rapport.fiscal_year}) de {rapport.company.name}.",
             id_ressource=rapport_id,
         )
 

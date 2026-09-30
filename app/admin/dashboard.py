@@ -17,29 +17,29 @@ from app.admin.review_queue import (
 )
 from app.admin.schemas import TableauDeBordAdmin
 from app.admin.utilisateurs import lister_utilisateurs_en_attente
-from app.auth.models import Utilisateur
-from app.company.models import Entreprise
-from app.core.enums import Role, StatutRapport
-from app.ingestion.models import RapportESG
+from app.auth.models import User
+from app.company.models import Company
+from app.core.enums import ReportStatus, Role
+from app.ingestion.models import ESGReport
 
 
 def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
-    entreprises_inscrites = session.exec(select(func.count()).select_from(Entreprise)).one()
-    rapports_soumis = session.exec(select(func.count()).select_from(RapportESG)).one()
+    entreprises_inscrites = session.exec(select(func.count()).select_from(Company)).one()
+    rapports_soumis = session.exec(select(func.count()).select_from(ESGReport)).one()
     rapports_valides = session.exec(
         select(func.count())
-        .select_from(RapportESG)
-        .where(col(RapportESG.statut) == StatutRapport.VALIDE)
+        .select_from(ESGReport)
+        .where(col(ESGReport.status) == ReportStatus.VALIDATED)
     ).one()
     rapports_rejetes = session.exec(
         select(func.count())
-        .select_from(RapportESG)
-        .where(col(RapportESG.statut) == StatutRapport.REJETE)
+        .select_from(ESGReport)
+        .where(col(ESGReport.status) == ReportStatus.REJECTED)
     ).one()
     entreprises_publiees = session.exec(
         select(func.count())
-        .select_from(Entreprise)
-        .where(col(Entreprise.date_publication).is_not(None))
+        .select_from(Company)
+        .where(col(Company.published_at).is_not(None))
     ).one()
 
     _, total_a_republier = lister_entreprises_a_republier(session, page=1, page_size=1)
@@ -52,28 +52,28 @@ def construire_tableau_de_bord(session: Session) -> TableauDeBordAdmin:
     # afficher tous les deux côte à côte sèmerait la confusion plutôt que d'informer.
     comptes_par_role = dict(
         session.exec(
-            select(Utilisateur.role, func.count())
-            .where(col(Utilisateur.actif).is_(True))
-            .group_by(col(Utilisateur.role))
+            select(User.role, func.count())
+            .where(col(User.active).is_(True))
+            .group_by(col(User.role))
         ).all()
     )
 
     return TableauDeBordAdmin(
-        entreprises_inscrites=entreprises_inscrites,
-        rapports_soumis=rapports_soumis,
-        rapports_valides=rapports_valides,
-        rapports_rejetes=rapports_rejetes,
-        entreprises_publiees=entreprises_publiees,
-        audits_en_retard=len(lister_rapports_en_retard(session)),
-        rapports_a_affecter=len(lister_rapports_a_affecter(session)),
-        decisions_a_rendre=len(lister_rapports_en_validation(session)),
-        demandes_republication=total_a_republier,
-        utilisateurs_en_attente=len(lister_utilisateurs_en_attente(session)),
-        rapports_echec_extraction=len(lister_rapports_echec_extraction(session)),
-        rapports_orphelins=len(lister_rapports_orphelins_en_validation(session)),
-        administrateurs_actifs=comptes_par_role.get(Role.ADMINISTRATEUR, 0),
-        auditeurs_actifs=comptes_par_role.get(Role.AUDITEUR, 0),
-        investisseurs_actifs=comptes_par_role.get(Role.INVESTISSEUR, 0),
-        chercheurs_actifs=comptes_par_role.get(Role.CHERCHEUR, 0),
-        institutions_actives=comptes_par_role.get(Role.INSTITUTION, 0),
+        registered_companies=entreprises_inscrites,
+        submitted_reports=rapports_soumis,
+        validated_reports=rapports_valides,
+        rejected_reports=rapports_rejetes,
+        published_companies=entreprises_publiees,
+        overdue_audits=len(lister_rapports_en_retard(session)),
+        reports_to_assign=len(lister_rapports_a_affecter(session)),
+        pending_decisions=len(lister_rapports_en_validation(session)),
+        republication_requests=total_a_republier,
+        pending_users=len(lister_utilisateurs_en_attente(session)),
+        failed_extraction_reports=len(lister_rapports_echec_extraction(session)),
+        orphan_reports=len(lister_rapports_orphelins_en_validation(session)),
+        active_admins=comptes_par_role.get(Role.ADMIN, 0),
+        active_auditors=comptes_par_role.get(Role.AUDITOR, 0),
+        active_investors=comptes_par_role.get(Role.INVESTOR, 0),
+        active_researchers=comptes_par_role.get(Role.RESEARCHER, 0),
+        active_institutions=comptes_par_role.get(Role.INSTITUTION, 0),
     )

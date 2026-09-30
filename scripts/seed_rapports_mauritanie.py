@@ -10,8 +10,6 @@ Script à usage unique, pas un outil réutilisable — à supprimer une fois le 
 Usage : uv run python scripts/seed_rapports_mauritanie.py
 """
 
-import app.main  # noqa: F401  -- enregistre tous les modèles pour SQLAlchemy avant toute requête
-
 import asyncio
 import uuid
 from pathlib import Path
@@ -19,12 +17,13 @@ from pathlib import Path
 from fastapi import BackgroundTasks
 from sqlmodel import Session, select
 
+import app.main  # noqa: F401  -- enregistre tous les modèles pour SQLAlchemy avant toute requête
 from app.admin.utilisateurs import creer_utilisateur
-from app.auth.models import Utilisateur
-from app.company.models import Entreprise
+from app.auth.models import User
+from app.company.models import Company
 from app.company.rapports import deposer_rapport
 from app.core.database import engine
-from app.core.enums import Role, TypeRapport
+from app.core.enums import ReportType, Role
 from app.core.exceptions import ValidationError
 
 SOURCE_DIR = Path(__file__).resolve().parent.parent / "storage" / "seed_data" / "rapports_esg_mauritanie"
@@ -73,19 +72,19 @@ SNDE_FICHIER = "SNDE_rapport_ESG_2025.pdf"
 async def _deposer(session: Session, entreprise_id: uuid.UUID, contenu: bytes, label: str) -> None:
     tasks = BackgroundTasks()
     rapport = deposer_rapport(
-        session, tasks, entreprise_id, contenu, TypeRapport.RAPPORT_ESG, ANNEE_REPORTING
+        session, tasks, entreprise_id, contenu, ReportType.RAPPORT_ESG, ANNEE_REPORTING
     )
-    print(f"[{label}] rapport {rapport.id} deposé (statut={rapport.statut}) — extraction en cours...")
+    print(f"[{label}] rapport {rapport.id} deposé (statut={rapport.status}) — extraction en cours...")
     await tasks()
     session.refresh(rapport)
-    print(f"[{label}] extraction terminée — statut={rapport.statut} erreur={rapport.extraction_erreur}")
+    print(f"[{label}] extraction terminée — statut={rapport.status} erreur={rapport.extraction_error}")
 
 
 async def main() -> None:
     with Session(engine) as session:
         for spec in NOUVELLES_ENTREPRISES:
             utilisateur = session.exec(
-                select(Utilisateur).where(Utilisateur.email == spec["email"])
+                select(User).where(User.email == spec["email"])
             ).first()
             if utilisateur is not None:
                 print(f"[{spec['acronyme']}] compte {spec['email']} déjà existant, réutilisation.")
@@ -96,7 +95,7 @@ async def main() -> None:
                         ACTEUR_ADMIN_ID,
                         spec["email"],
                         None,
-                        Role.ENTREPRISE,
+                        Role.ENTERPRISE,
                         nom_entreprise=spec["nom"],
                         secteur=spec["secteur"],
                         pays=spec["pays"],
@@ -110,7 +109,7 @@ async def main() -> None:
                     continue
 
             entreprise = session.exec(
-                select(Entreprise).where(Entreprise.utilisateur_id == utilisateur.id)
+                select(Company).where(Company.owner_user_id == utilisateur.id)
             ).first()
             if entreprise is None:
                 print(f"[{spec['acronyme']}] ERREUR : aucune fiche Entreprise liée, dépôt impossible.")

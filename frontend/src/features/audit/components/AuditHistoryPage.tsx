@@ -30,14 +30,14 @@ export function AuditHistoryPage() {
                     <p className="font-medium text-brand-blue">
                       {libelleDecisionAudit(item.decision)}
                     </p>
-                    {item.commentaire ? (
-                      <p className="text-sm text-brand-grey">{item.commentaire}</p>
+                    {item.comment ? (
+                      <p className="text-sm text-brand-grey">{item.comment}</p>
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1 text-sm text-brand-grey">
-                    <span>{new Date(item.date_avis).toLocaleDateString("fr-FR")}</span>
+                    <span>{new Date(item.submitted_at).toLocaleDateString("fr-FR")}</span>
                     <Link
-                      to={`/audit/rapports/${item.rapport_id}`}
+                      to={`/audit/rapports/${item.report_id}`}
                       className="text-brand-green underline underline-offset-2"
                     >
                       Voir le dossier

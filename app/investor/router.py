@@ -7,20 +7,21 @@ appeler cette logique (même convention que les autres espaces, voir ARCHITECTUR
 """
 
 import uuid
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.permissions import require_role
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role
+from app.core.enums import MatchStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.investor import dashboard, entreprises, portfolio
-from app.investor.models import Portefeuille, PositionPortefeuille
+from app.investor import carbon, dashboard, entreprises, importation, portfolio
+from app.investor.models import Portfolio
 from app.investor.schemas import (
     AjouterPositionRequest,
     CreerPortefeuilleRequest,
@@ -30,6 +31,8 @@ from app.investor.schemas import (
     ModifierPositionRequest,
     PortefeuilleDetail,
     PortefeuilleResume,
+    PortfolioCarbon,
+    PortfolioImportResult,
     PositionDetail,
     RenommerPortefeuilleRequest,
     TableauDeBordInvestisseur,
@@ -50,7 +53,7 @@ def lister_entreprises_route(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublieePublic]:
     items, total = entreprises.lister_entreprises_publiees(
@@ -69,7 +72,7 @@ def lister_entreprises_route(
 )
 def consulter_entreprise_route(
     entreprise_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> EntrepriseDetailInvestisseur:
     return entreprises.consulter_entreprise_publiee(session, entreprise_id)
@@ -83,7 +86,7 @@ def consulter_entreprise_route(
 def consulter_preuve_route(
     entreprise_id: uuid.UUID,
     preuve_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     chemin = entreprises.fichier_preuve(session, entreprise_id, preuve_id)
@@ -98,7 +101,7 @@ def consulter_preuve_route(
 )
 def comparer_entreprises_route(
     entreprise_ids: list[uuid.UUID] = Query(...),
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> list[EntrepriseDetailInvestisseur]:
     return entreprises.comparer_entreprises(session, entreprise_ids)
@@ -111,7 +114,7 @@ def comparer_entreprises_route(
     summary="Tableau de bord de l'espace Investisseur",
 )
 def tableau_de_bord_route(
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> TableauDeBordInvestisseur:
     return dashboard.construire_tableau_de_bord(session, current_user.id)
@@ -126,10 +129,10 @@ def tableau_de_bord_route(
 )
 def creer_portefeuille_route(
     payload: CreerPortefeuilleRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
-    portefeuille_cree = portfolio.creer_portefeuille(session, current_user.id, payload.nom)
+    portefeuille_cree = portfolio.creer_portefeuille(session, current_user.id, payload.name)
     return portfolio.resume_portefeuille(session, portefeuille_cree)
 
 
@@ -145,7 +148,7 @@ def lister_mes_portefeuilles_route(
     recherche: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> Page[PortefeuilleResume]:
     items, total = portfolio.lister_mes_portefeuilles(
@@ -162,9 +165,9 @@ def lister_mes_portefeuilles_route(
     )
 
 
-def _portefeuille_ou_404(session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID) -> Portefeuille:
-    portefeuille = session.get(Portefeuille, portefeuille_id)
-    if portefeuille is None or portefeuille.investisseur_id != investisseur_id:
+def _portefeuille_ou_404(session: Session, investisseur_id: uuid.UUID, portefeuille_id: uuid.UUID) -> Portfolio:
+    portefeuille = session.get(Portfolio, portefeuille_id)
+    if portefeuille is None or portefeuille.user_id != investisseur_id:
         raise NotFoundError("Portefeuille introuvable.", code="portefeuille_introuvable")
     return portefeuille
 
@@ -177,7 +180,7 @@ def _portefeuille_ou_404(session: Session, investisseur_id: uuid.UUID, portefeui
 )
 def consulter_portefeuille_route(
     portefeuille_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleDetail:
     portefeuille = _portefeuille_ou_404(session, current_user.id, portefeuille_id)
@@ -193,11 +196,11 @@ def consulter_portefeuille_route(
 def renommer_portefeuille_route(
     portefeuille_id: uuid.UUID,
     payload: RenommerPortefeuilleRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
     portefeuille_renomme = portfolio.renommer_portefeuille(
-        session, current_user.id, portefeuille_id, payload.nom
+        session, current_user.id, portefeuille_id, payload.name
     )
     return portfolio.resume_portefeuille(session, portefeuille_renomme)
 
@@ -210,7 +213,7 @@ def renommer_portefeuille_route(
 )
 def archiver_portefeuille_route(
     portefeuille_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
     portefeuille_archive = portfolio.archiver_portefeuille(session, current_user.id, portefeuille_id)
@@ -225,7 +228,7 @@ def archiver_portefeuille_route(
 )
 def restaurer_portefeuille_route(
     portefeuille_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PortefeuilleResume:
     portefeuille_restaure = portfolio.restaurer_portefeuille(session, current_user.id, portefeuille_id)
@@ -240,7 +243,7 @@ def restaurer_portefeuille_route(
 )
 def supprimer_portefeuille_route(
     portefeuille_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> None:
     portfolio.supprimer_portefeuille(session, current_user.id, portefeuille_id)
@@ -253,7 +256,7 @@ def supprimer_portefeuille_route(
 )
 def exporter_portefeuille_route(
     portefeuille_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> Response:
     portefeuille = _portefeuille_ou_404(session, current_user.id, portefeuille_id)
@@ -265,13 +268,48 @@ def exporter_portefeuille_route(
     )
 
 
-def _position_detail_apres_mutation(
-    session: Session, portefeuille_id: uuid.UUID, position: PositionPortefeuille
-) -> PositionDetail:
-    portefeuille = session.get(Portefeuille, portefeuille_id)
-    assert portefeuille is not None
-    resume = portfolio.resume_portefeuille(session, portefeuille)
-    return portfolio.position_detail(session, position, resume.montant_total)
+@router.get(
+    "/portfolios/{portfolio_id}/carbon",
+    response_model=PortfolioCarbon,
+    operation_id="getPortfolioCarbon",
+    summary="Empreinte carbone PCAF d'un portefeuille (Scopes 1+2, Scope 3 à part)",
+)
+def get_portfolio_carbon(
+    portfolio_id: uuid.UUID,
+    current_user: User = Depends(require_role(Role.INVESTOR)),
+    session: Session = Depends(get_session),
+) -> PortfolioCarbon:
+    portefeuille = portfolio.portefeuille_de_investisseur(session, current_user.id, portfolio_id)
+    return carbon.empreinte_carbone(session, portefeuille)
+
+
+@router.post(
+    "/portfolios/{portfolio_id}/positions/import",
+    response_model=PortfolioImportResult,
+    status_code=201,
+    operation_id="importPortfolioPositions",
+    summary="Importer les positions d'un portefeuille vide (CSV ou JSON, par ISIN ou ticker)",
+)
+def import_portfolio_positions(
+    portfolio_id: uuid.UUID,
+    file: UploadFile,
+    total_value: Decimal | None = Form(default=None, gt=0, max_digits=20, decimal_places=2),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
+    session: Session = Depends(get_session),
+) -> PortfolioImportResult:
+    # Lecture bornée : un octet de plus que la limite suffit à refuser le fichier.
+    contenu = file.file.read(importation.TAILLE_MAX_OCTETS + 1)
+    positions = importation.importer_positions(
+        session, current_user.id, portfolio_id, contenu, file.filename, total_value
+    )
+    statuts = [position.match_status for position in positions]
+    return PortfolioImportResult(
+        portfolio_id=portfolio_id,
+        imported=len(positions),
+        matched=statuts.count(MatchStatus.MATCHED),
+        unmatched=statuts.count(MatchStatus.UNMATCHED),
+        ambiguous=statuts.count(MatchStatus.AMBIGUOUS),
+    )
 
 
 @router.post(
@@ -284,11 +322,11 @@ def _position_detail_apres_mutation(
 def ajouter_position_route(
     portefeuille_id: uuid.UUID,
     payload: AjouterPositionRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PositionDetail:
     position = portfolio.ajouter_position(session, current_user.id, portefeuille_id, payload)
-    return _position_detail_apres_mutation(session, portefeuille_id, position)
+    return portfolio.detail_position_du_portefeuille(session, position)
 
 
 @router.patch(
@@ -301,13 +339,13 @@ def modifier_position_route(
     portefeuille_id: uuid.UUID,
     position_id: uuid.UUID,
     payload: ModifierPositionRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PositionDetail:
     position = portfolio.modifier_position(
         session, current_user.id, portefeuille_id, position_id, payload
     )
-    return _position_detail_apres_mutation(session, portefeuille_id, position)
+    return portfolio.detail_position_du_portefeuille(session, position)
 
 
 @router.post(
@@ -320,13 +358,13 @@ def fermer_position_route(
     portefeuille_id: uuid.UUID,
     position_id: uuid.UUID,
     payload: FermerPositionRequest,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> PositionDetail:
     position = portfolio.fermer_position(
-        session, current_user.id, portefeuille_id, position_id, payload.date_fin
+        session, current_user.id, portefeuille_id, position_id, payload.end_date
     )
-    return _position_detail_apres_mutation(session, portefeuille_id, position)
+    return portfolio.detail_position_du_portefeuille(session, position)
 
 
 @router.delete(
@@ -338,7 +376,7 @@ def fermer_position_route(
 def supprimer_position_route(
     portefeuille_id: uuid.UUID,
     position_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.INVESTISSEUR)),
+    current_user: User = Depends(require_role(Role.INVESTOR)),
     session: Session = Depends(get_session),
 ) -> None:
     portfolio.supprimer_position(session, current_user.id, portefeuille_id, position_id)

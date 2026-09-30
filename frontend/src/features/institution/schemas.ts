@@ -5,27 +5,27 @@ import { z } from "zod";
  * confort immédiat, jamais la source de vérité. */
 export const creerProjetSchema = z
   .object({
-    nom: z.string().min(1, "Le nom est requis."),
+    name: z.string().min(1, "Le nom est requis."),
     description: z.string().optional(),
-    objectif: z.string().optional(),
-    date_debut: z.string().optional(),
-    date_fin_prevue: z.string().optional(),
-    date_limite: z.string().optional(),
+    objective: z.string().optional(),
+    start_date: z.string().optional(),
+    planned_end_date: z.string().optional(),
+    deadline: z.string().optional(),
   })
   .refine(
     (valeurs) =>
-      !valeurs.date_debut || !valeurs.date_fin_prevue || valeurs.date_debut <= valeurs.date_fin_prevue,
-    { message: "La date de début doit précéder la date de fin prévue.", path: ["date_fin_prevue"] },
+      !valeurs.start_date || !valeurs.planned_end_date || valeurs.start_date <= valeurs.planned_end_date,
+    { message: "La date de début doit précéder la date de fin prévue.", path: ["planned_end_date"] },
   )
   .refine(
-    (valeurs) => !valeurs.date_debut || !valeurs.date_limite || valeurs.date_limite >= valeurs.date_debut,
-    { message: "La date limite ne peut pas précéder la date de début.", path: ["date_limite"] },
+    (valeurs) => !valeurs.start_date || !valeurs.deadline || valeurs.deadline >= valeurs.start_date,
+    { message: "La date limite ne peut pas précéder la date de début.", path: ["deadline"] },
   );
 
 export type CreerProjetForm = z.infer<typeof creerProjetSchema>;
 
 export const inviterChercheurSchema = z.object({
-  conditions_collaboration: z.string().optional(),
+  collaboration_terms: z.string().optional(),
 });
 
 export type InviterChercheurForm = z.infer<typeof inviterChercheurSchema>;
@@ -34,7 +34,7 @@ export type InviterChercheurForm = z.infer<typeof inviterChercheurSchema>;
  * app/institution/analyses.py::demander_correction) ; optionnel pour valider. La validation zod
  * elle-même reste permissive, la contrainte réelle est appliquée côté formulaire/serveur. */
 export const decisionAnalyseSchema = z.object({
-  commentaire: z.string().optional(),
+  comment: z.string().optional(),
 });
 
 export type DecisionAnalyseForm = z.infer<typeof decisionAnalyseSchema>;

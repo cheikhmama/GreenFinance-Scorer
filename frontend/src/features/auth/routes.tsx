@@ -1,7 +1,8 @@
 import type { RouteObject } from "react-router-dom";
+import { ConfirmEmailChangePage } from "./components/ConfirmEmailChangePage";
 import { ForgotPasswordPage } from "./components/ForgotPasswordPage";
 import { LoginPage } from "./components/LoginPage";
-import { ResetPasswordPage } from "./components/ResetPasswordPage";
+import { ActivateAccountPage, ResetPasswordPage } from "./components/ResetPasswordPage";
 
 /** Routes publiques du module auth. Les tableaux de bord par rôle vivent dans leurs
  * propres modules `features/<espace>/routes.tsx` et redirigent ici (via
@@ -14,4 +15,7 @@ export const authRoutes: RouteObject[] = [
   { path: "/login", element: <LoginPage /> },
   { path: "/mot-de-passe-oublie", element: <ForgotPasswordPage /> },
   { path: "/reinitialiser-mot-de-passe", element: <ResetPasswordPage /> },
+  // Cibles des liens envoyés par app/auth/activation.py et app/auth/email_change.py.
+  { path: "/activer-compte", element: <ActivateAccountPage /> },
+  { path: "/confirmer-email", element: <ConfirmEmailChangePage /> },
 ];

@@ -82,20 +82,20 @@ export function PortfoliosPage() {
           <Link key={portefeuille.id} to={`/investor/portefeuilles/${portefeuille.id}`}>
             <Card className="h-full transition hover:border-brand-green">
               <CardHeader className="flex flex-row items-start justify-between gap-2">
-                <CardTitle className="text-base text-brand-blue">{portefeuille.nom}</CardTitle>
-                {portefeuille.archive ? <Badge variant="secondary">archivé</Badge> : null}
+                <CardTitle className="text-base text-brand-blue">{portefeuille.name}</CardTitle>
+                {portefeuille.archived ? <Badge variant="secondary">archivé</Badge> : null}
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <p className="text-2xl font-semibold tabular-nums text-brand-blue">
-                  {portefeuille.montant_total.toLocaleString("fr-FR")} {portefeuille.devise_reference}
+                  {portefeuille.total_amount.toLocaleString("fr-FR")} {portefeuille.reference_currency}
                 </p>
-                <p className="text-brand-grey">{portefeuille.nombre_positions} position(s)</p>
+                <p className="text-brand-grey">{portefeuille.position_count} position(s)</p>
                 <div className="flex items-center gap-4 pt-1">
                   <span>
-                    Score : <strong>{formatScore(portefeuille.score_esg_agrege)}</strong>
+                    Score : <strong>{formatScore(portefeuille.aggregated_esg_score)}</strong>
                   </span>
                   <span>
-                    Couverture : <strong>{formatPourcentage(portefeuille.couverture_esg)}</strong>
+                    Couverture : <strong>{formatPourcentage(portefeuille.esg_coverage)}</strong>
                   </span>
                 </div>
               </CardContent>
@@ -118,7 +118,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<CreerPortefeuilleForm>({
     resolver: zodResolver(creerPortefeuilleSchema),
-    defaultValues: { nom: "" },
+    defaultValues: { name: "" },
   });
 
   function onSubmit(values: CreerPortefeuilleForm) {
@@ -142,7 +142,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
         ) : null}
         <FormField
           control={form.control}
-          name="nom"
+          name="name"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nom du portefeuille</FormLabel>

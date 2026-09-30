@@ -10,13 +10,13 @@ from datetime import timedelta
 
 from sqlmodel import Session, col, select
 
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import DevisePosition
+from app.core.enums import CompanyStatus, Currency
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
-from app.investor.models import Portefeuille, PositionPortefeuille
+from app.investor.models import Portfolio, PortfolioPosition
 from app.investor.schemas import (
     EntrepriseSommaire,
     RepartitionSecteur,
@@ -35,20 +35,20 @@ def construire_tableau_de_bord(
     chemin_taux = get_settings().fx_rates_path
 
     portefeuilles = list(
-        session.exec(select(Portefeuille).where(Portefeuille.investisseur_id == investisseur_id)).all()
+        session.exec(select(Portfolio).where(Portfolio.user_id == investisseur_id)).all()
     )
-    devise_par_portefeuille = {p.id: p.devise_reference for p in portefeuilles}
+    devise_par_portefeuille = {p.id: p.reference_currency for p in portefeuilles}
 
-    toutes_positions: list[PositionPortefeuille] = []
+    toutes_positions: list[PortfolioPosition] = []
     for p in portefeuilles:
         toutes_positions.extend(
             session.exec(
-                select(PositionPortefeuille).where(PositionPortefeuille.portefeuille_id == p.id)
+                select(PortfolioPosition).where(PortfolioPosition.portfolio_id == p.id)
             ).all()
         )
 
     entreprises_publiees = list(
-        session.exec(select(Entreprise).where(col(Entreprise.date_publication).is_not(None))).all()
+        session.exec(select(Company).where(col(Company.published_at).is_not(None))).all()
     )
 
     # Couverture ESG plateforme : part des entreprises publiées dont les 3 piliers sont calculés.
@@ -58,9 +58,9 @@ def construire_tableau_de_bord(
             session, entreprises_investisseur.dernier_rapport_valide(session, entreprise.id)
         )
         if (
-            score.score_environnement is not None
-            and score.score_social is not None
-            and score.score_gouvernance is not None
+            score.environmental_score is not None
+            and score.social_score is not None
+            and score.governance_score is not None
         ):
             nb_complets += 1
     taux_couverture_esg_plateforme = (
@@ -72,19 +72,22 @@ def construire_tableau_de_bord(
     repartition_usd: dict[str, float] = {}
     entreprises_suivies_ids: set[uuid.UUID] = set()
     for position in toutes_positions:
-        entreprises_suivies_ids.add(position.entreprise_id)
-        entreprise_de_la_position = session.get(Entreprise, position.entreprise_id)
+        if position.company_id is None:
+            # Ligne importée non rapprochée (tâche 2.2) : aucun secteur connu.
+            continue
+        entreprises_suivies_ids.add(position.company_id)
+        entreprise_de_la_position = session.get(Company, position.company_id)
         assert entreprise_de_la_position is not None
-        devise_portefeuille = devise_par_portefeuille[position.portefeuille_id]
+        devise_portefeuille = devise_par_portefeuille[position.portfolio_id]
         montant_usd, _ = fx.convertir(
-            position.montant_converti, devise_portefeuille, DevisePosition.USD, chemin_taux
+            position.converted_amount, devise_portefeuille, Currency.USD, chemin_taux
         )
-        repartition_usd[entreprise_de_la_position.secteur] = (
-            repartition_usd.get(entreprise_de_la_position.secteur, 0.0) + montant_usd
+        repartition_usd[entreprise_de_la_position.sector] = (
+            repartition_usd.get(entreprise_de_la_position.sector, 0.0) + float(montant_usd)
         )
 
     repartition_secteur = [
-        RepartitionSecteur(secteur=secteur, montant_usd=montant)
+        RepartitionSecteur(sector=secteur, amount_usd=montant)
         for secteur, montant in sorted(repartition_usd.items(), key=lambda item: item[1], reverse=True)
     ]
 
@@ -93,29 +96,29 @@ def construire_tableau_de_bord(
         1
         for entreprise in entreprises_publiees
         if entreprise.id in entreprises_suivies_ids
-        and entreprise.date_publication is not None
-        and entreprise.date_publication >= seuil_nouvelles_publications
+        and entreprise.published_at is not None
+        and entreprise.published_at >= seuil_nouvelles_publications
     )
 
     publications_recentes = [
         entreprises_investisseur.entreprise_publiee_publique(session, e)
         for e in sorted(
-            entreprises_publiees, key=lambda e: e.date_publication or utcnow(), reverse=True
+            entreprises_publiees, key=lambda e: e.published_at or utcnow(), reverse=True
         )[:_PUBLICATIONS_RECENTES_LIMITE]
     ]
 
     entreprises_suivies_suspendues = [
         EntrepriseSommaire.model_validate(e)
         for e in entreprises_publiees
-        if e.id in entreprises_suivies_ids and not e.actif
+        if e.id in entreprises_suivies_ids and e.status != CompanyStatus.ACTIVE
     ]
 
     return TableauDeBordInvestisseur(
-        nombre_portefeuilles=len(portefeuilles),
-        nombre_entreprises_publiees=len(entreprises_publiees),
-        taux_couverture_esg_plateforme=taux_couverture_esg_plateforme,
-        nombre_nouvelles_publications_suivies=nombre_nouvelles_publications_suivies,
-        repartition_secteur=repartition_secteur,
-        publications_recentes=publications_recentes,
-        entreprises_suivies_suspendues=entreprises_suivies_suspendues,
+        portfolio_count=len(portefeuilles),
+        published_company_count=len(entreprises_publiees),
+        platform_esg_coverage_rate=taux_couverture_esg_plateforme,
+        new_followed_publication_count=nombre_nouvelles_publications_suivies,
+        sector_breakdown=repartition_secteur,
+        recent_publications=publications_recentes,
+        suspended_followed_companies=entreprises_suivies_suspendues,
     )

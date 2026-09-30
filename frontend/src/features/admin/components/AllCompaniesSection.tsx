@@ -80,22 +80,22 @@ export function AllCompaniesSection() {
 /** Une carte par entreprise — logo + identité toujours visibles, actions (Voir le rapport /
  * Valider / Suspendre-Réactiver) regroupées et cohérentes plutôt que des liens texte épars.
  * « Valider » n'apparaît que si le dernier rapport est réellement en attente de décision
- * (EN_VALIDATION) : un raccourci vers la même action que le formulaire de décision du rapport
+ * (PENDING_DECISION) : un raccourci vers la même action que le formulaire de décision du rapport
  * (voir AdminReportDetailPage), jamais une validation à l'aveugle sans avoir pu consulter les
  * données — le bouton "Voir le rapport" reste toujours à côté pour ça. */
 function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
   const suspend = useSuspendCompany();
   const reactivate = useReactivateCompany();
-  const validate = useValidateReport(entreprise.dernier_rapport_id ?? "");
+  const validate = useValidateReport(entreprise.latest_report_id ?? "");
   const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const enAttenteDeDecision = entreprise.dernier_statut_rapport === "EN_VALIDATION";
+  const enAttenteDeDecision = entreprise.latest_report_status === "PENDING_DECISION";
 
   async function suspendre() {
     const confirme = await confirm({
       title: "Suspendre cette entreprise ?",
-      description: `${entreprise.nom} ne pourra plus déposer de nouveau rapport tant qu'elle reste suspendue. Vous pourrez la réactiver à tout moment.`,
+      description: `${entreprise.name} ne pourra plus déposer de nouveau rapport tant qu'elle reste suspendue. Vous pourrez la réactiver à tout moment.`,
       confirmLabel: "Suspendre",
     });
     if (!confirme) return;
@@ -110,28 +110,31 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
     <Card className="shadow-none">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} className="size-14 shrink-0" />
+          <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-14 shrink-0" />
           <div className="min-w-0">
             <Link
               to={`/admin/entreprises/${entreprise.id}`}
               className="font-semibold text-brand-blue hover:underline"
             >
-              {entreprise.nom}
+              {entreprise.name}
             </Link>
             <p className="text-sm text-brand-grey">
-              {entreprise.secteur} — {entreprise.pays}
+              {entreprise.sector} — {entreprise.country}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {!entreprise.actif ? <Badge variant="destructive">Suspendue</Badge> : null}
-              {entreprise.dernier_statut_rapport ? (
-                <Badge variant={variantStatutRapport(entreprise.dernier_statut_rapport)}>
-                  {libelleStatutRapport(entreprise.dernier_statut_rapport)}
+              {entreprise.status === "PENDING_ONBOARDING" ? (
+                <Badge variant="warning">Inscription à valider</Badge>
+              ) : null}
+              {entreprise.status === "SUSPENDED" ? <Badge variant="destructive">Suspendue</Badge> : null}
+              {entreprise.latest_report_status ? (
+                <Badge variant={variantStatutRapport(entreprise.latest_report_status)}>
+                  {libelleStatutRapport(entreprise.latest_report_status)}
                 </Badge>
               ) : (
                 <Badge variant="secondary">Aucun rapport</Badge>
               )}
-              <Badge variant={entreprise.utilisateur_id ? "success" : "outline"}>
-                {entreprise.utilisateur_id ? "Compte lié" : "Sans compte"}
+              <Badge variant={entreprise.owner_user_id ? "success" : "outline"}>
+                {entreprise.owner_user_id ? "Compte lié" : "Sans compte"}
               </Badge>
             </div>
             {actionError ? <p className="mt-1 text-xs text-destructive">{actionError}</p> : null}
@@ -139,22 +142,22 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-          {entreprise.dernier_rapport_id ? (
+          {entreprise.latest_report_id ? (
             <Button asChild size="sm" variant="outline">
-              <Link to={`/admin/rapports/${entreprise.dernier_rapport_id}`}>
+              <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>
                 <FileText className="size-4" />
                 Voir le rapport
               </Link>
             </Button>
           ) : null}
-          {enAttenteDeDecision && entreprise.dernier_rapport_id ? (
+          {enAttenteDeDecision && entreprise.latest_report_id ? (
             <Button
               size="sm"
               disabled={validate.isPending}
               onClick={() => {
                 setActionError(null);
                 validate.mutate(
-                  { commentaire: null },
+                  { comment: null },
                   {
                     onError: (err) =>
                       setActionError(err instanceof ApiError ? err.message : "Échec de la validation."),
@@ -166,11 +169,14 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
               Valider
             </Button>
           ) : null}
-          {entreprise.actif ? (
+          {/* Une inscription en attente ne se suspend ni ne se réactive : seule sa validation
+              (tâche 1.4) la rend active. */}
+          {entreprise.status === "ACTIVE" ? (
             <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
               Suspendre
             </Button>
-          ) : (
+          ) : null}
+          {entreprise.status === "SUSPENDED" ? (
             <Button
               size="sm"
               variant="outline"
@@ -185,7 +191,7 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
             >
               Réactiver
             </Button>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>

@@ -5,6 +5,7 @@ import { AnalyseDetailPage } from "./components/AnalyseDetailPage";
 import { AnalysesPage } from "./components/AnalysesPage";
 import { CompanyDetailPage } from "./components/CompanyDetailPage";
 import { ComparisonPage } from "./components/ComparisonPage";
+import { CrossValidationPage } from "./components/CrossValidationPage";
 import { DonneesPage } from "./components/DonneesPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { ProjetDetailPage } from "./components/ProjetDetailPage";
@@ -15,7 +16,7 @@ import { ResearcherDashboardPage } from "./components/ResearcherDashboardPage";
 export const researcherRoutes: RouteObject[] = [
   {
     element: (
-      <RequireRole allowedRoles={["CHERCHEUR"]}>
+      <RequireRole allowedRoles={["RESEARCHER"]}>
         <AppShell />
       </RequireRole>
     ),
@@ -29,6 +30,7 @@ export const researcherRoutes: RouteObject[] = [
       { path: "/researcher/analyses", element: <AnalysesPage /> },
       { path: "/researcher/analyses/:analyseId", element: <AnalyseDetailPage /> },
       { path: "/researcher/rattachements", element: <RattachementsPage /> },
+      { path: "/researcher/validation-croisee", element: <CrossValidationPage /> },
       { path: "/researcher/profil", element: <ProfilePage /> },
     ],
   },

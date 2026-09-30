@@ -1,57 +1,98 @@
-"""Entité de persistance de l'espace Entreprise.
+"""Entité de persistance de l'espace Entreprise (table `companies`, docs/RENAME_PLAN.md §2.1).
 
-Le compte utilisateur associé est optionnel : une Entreprise peut exister
-en base (par exemple créée par le pipeline d'ingestion à partir d'un
-dépôt automatique) avant qu'un compte ne lui soit rattaché.
-montant_minimum_investissement, nul par défaut, signifie « aucun minimum
-imposé » — distinct d'un minimum à zéro. La logique de dépôt de documents
-et de consultation du score reste implémentée à l'Étape 10 (Espace
-Entreprise + Administrateur).
+Le compte utilisateur associé est optionnel : une Company peut exister en base (par exemple créée
+par le pipeline d'ingestion à partir d'un dépôt automatique) avant qu'un compte ne lui soit
+rattaché. minimum_investment_amount, nul par défaut, signifie « aucun minimum imposé » — distinct
+d'un minimum à zéro.
+
+status (cycle de vie du compte / KYC) et published_at (publication du score officiel) sont deux
+notions distinctes, voir docs/WORKFLOWS.md §1.1 : une entreprise SUSPENDED reste visible des
+investisseurs qui la détiennent déjà, et seule une entreprise publiée apparaît aux catalogues
+Investisseur et Chercheur.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import Column, Numeric
 from sqlmodel import Field, Relationship, SQLModel
 
-from app.core.enums import DevisePosition, sa_enum_column
+from app.core.enums import CompanyStatus, Currency, sa_enum_column
 
 if TYPE_CHECKING:
-    from app.auth.models import Utilisateur
-    from app.ingestion.models import RapportESG, SignalementEcart
-    from app.investor.models import PositionPortefeuille
+    from app.auth.models import User
+    from app.ingestion.models import DiscrepancyFlag, ESGReport
+    from app.investor.models import PortfolioPosition
 
 
-class Entreprise(SQLModel, table=True):
-    __tablename__ = "entreprise"
+class Company(SQLModel, table=True):
+    __tablename__ = "companies"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    nom: str
-    secteur: str
-    pays: str
+    name: str
+    sector: str
+    country: str
     logo: str | None = None
     description: str | None = None
-    site_officiel: str | None = None
-    actif: bool = Field(default=True)
-    utilisateur_id: uuid.UUID | None = Field(
-        default=None, foreign_key="utilisateur.id"
+    website: str | None = None
+    status: CompanyStatus = Field(
+        default=CompanyStatus.ACTIVE, sa_column=sa_enum_column(CompanyStatus)
     )
-    montant_minimum_investissement: float | None = None
-    # Devise dans laquelle montant_minimum_investissement est exprimé — toujours renseignée de
-    # pair avec lui (voir app/admin/review_queue.py::modifier_entreprise_admin), jamais l'une sans
+    owner_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
+    )
+    # Identifiants de marché (ISO 6166 / ISO 17442) — uniques quand renseignés, clé de
+    # rapprochement des positions importées (tâche 2.2) et des jeux de données publics (tâche 3.3).
+    isin: str | None = Field(default=None, max_length=12, unique=True)
+    lei: str | None = Field(default=None, max_length=20, unique=True)
+    # Symbole boursier (tâche 2.2), en majuscules. Jamais unique : un même ticker peut désigner
+    # des sociétés différentes sur plusieurs places — l'import le signale AMBIGUOUS plutôt que de
+    # choisir au hasard.
+    ticker: str | None = Field(default=None, max_length=20, index=True)
+    # Données financières requises par PCAF (docs/WORKFLOWS.md §2.4) : chiffre d'affaires pour la
+    # WACI, valeur d'entreprise trésorerie incluse (EVIC) pour le facteur d'attribution. Montants
+    # en Decimal, jamais en float.
+    revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))
+    revenue_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
+    )
+    enterprise_value: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
+    )
+    enterprise_value_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
+    )
+    enterprise_value_as_of: date | None = None
+    minimum_investment_amount: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
+    )
+    # Devise dans laquelle minimum_investment_amount est exprimé — toujours renseignée de pair
+    # avec lui (voir app/admin/review_queue.py::modifier_entreprise_admin), jamais l'une sans
     # l'autre : app/investor/portfolio.py::_verifier_montant_minimum en a besoin pour convertir le
     # minimum dans la devise de référence du portefeuille avant comparaison.
-    devise_montant_minimum: DevisePosition | None = Field(
-        default=None, sa_column=sa_enum_column(DevisePosition, nullable=True)
+    minimum_investment_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
     )
-    # Signal de publication (Étape 10), nullable comme RapportESG.extraction_terminee_le : sert à
-    # la fois de booléen (publiée dès que non nul) et de "depuis quand". Distinct du statut du
-    # rapport (StatutRapport n'a pas de valeur PUBLIE, et ça reste ainsi) — "valider" un rapport et
-    # "publier" une entreprise sont deux gestes délibérément séparés côté Administrateur.
-    date_publication: datetime | None = Field(default=None)
+    # Dernière publication du score officiel par l'Administrateur : sert à la fois de booléen
+    # (publiée dès que non nul) et de "depuis quand". Distinct du statut du rapport et du statut
+    # de la Company — "valider" un rapport et "publier" une entreprise sont deux gestes
+    # délibérément séparés côté Administrateur.
+    published_at: datetime | None = Field(default=None)
+    # Validation de l'inscription par l'Administrateur (tâche 1.4, décision D5). Nuls pour une
+    # entreprise provisionnée directement par l'Administrateur ou antérieure à cette tâche.
+    onboarded_at: datetime | None = Field(default=None)
+    onboarded_by_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
+    )
 
-    utilisateur: Optional["Utilisateur"] = Relationship(back_populates="entreprise")
-    rapports: list["RapportESG"] = Relationship(back_populates="entreprise")
-    positions: list["PositionPortefeuille"] = Relationship(back_populates="entreprise")
-    signalements_ecart: list["SignalementEcart"] = Relationship(back_populates="entreprise")
+    # Deux clés vers users (titulaire, valideur de l'inscription) : la relation désigne
+    # explicitement celle du titulaire.
+    owner: Optional["User"] = Relationship(
+        back_populates="company",
+        sa_relationship_kwargs={"foreign_keys": "[Company.owner_user_id]"},
+    )
+    reports: list["ESGReport"] = Relationship(back_populates="company")
+    positions: list["PortfolioPosition"] = Relationship(back_populates="company")
+    discrepancy_flags: list["DiscrepancyFlag"] = Relationship(back_populates="company")

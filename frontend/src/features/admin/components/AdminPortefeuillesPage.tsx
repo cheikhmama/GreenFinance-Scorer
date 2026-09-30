@@ -67,14 +67,14 @@ export function AdminPortefeuillesPage() {
               <TableBody>
                 {portefeuilles.map((portefeuille) => (
                   <TableRow key={portefeuille.id}>
-                    <TableCell className="font-medium text-brand-blue">{portefeuille.nom}</TableCell>
-                    <TableCell className="text-brand-grey">{portefeuille.investisseur_email}</TableCell>
-                    <TableCell className="tabular-nums">{portefeuille.nombre_positions}</TableCell>
+                    <TableCell className="font-medium text-brand-blue">{portefeuille.name}</TableCell>
+                    <TableCell className="text-brand-grey">{portefeuille.investor_email}</TableCell>
+                    <TableCell className="tabular-nums">{portefeuille.position_count}</TableCell>
                     <TableCell className="tabular-nums">
-                      {formatMontant(portefeuille.montant_total, portefeuille.devise_reference)}
+                      {formatMontant(portefeuille.total_amount, portefeuille.reference_currency)}
                     </TableCell>
                     <TableCell className="text-brand-grey">
-                      {new Date(portefeuille.date_creation).toLocaleDateString("fr-FR")}
+                      {new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}
                     </TableCell>
                   </TableRow>
                 ))}

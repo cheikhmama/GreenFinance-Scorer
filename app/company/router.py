@@ -10,14 +10,14 @@ surface API directe) — la logique appelée ici invoque directement app.ingesti
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.permissions import require_role
 from app.company.import_rate_limit import enforce_url_import_rate_limit
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.company.rapports import (
     creer_correction,
     deposer_rapport,
@@ -25,24 +25,51 @@ from app.company.rapports import (
     lister_mes_rapports,
     rapport_de_lentreprise,
 )
-from app.company.schemas import EntreprisePublic, ImporterRapportParURLRequest
+from app.company.registration import enregistrer_demande
+from app.company.schemas import (
+    CompanyRegistrationRequest,
+    EntreprisePublic,
+    ImporterRapportParURLRequest,
+)
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role, TypeRapport
+from app.core.enums import ReportType, Role
 from app.core.exceptions import NotFoundError, ValidationError
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.scoring.engine import score_public
 
 router = APIRouter(tags=["company"])
 
 
-def _entreprise_id(current_user: Utilisateur) -> uuid.UUID:
-    if current_user.entreprise is None:
+@router.post(
+    "/companies/register",
+    status_code=202,
+    operation_id="registerCompany",
+    summary="Demander l'inscription d'une entreprise (validation par l'Administrateur)",
+    responses={
+        202: {"description": "Demande reçue. Réponse identique que la demande aboutisse ou non."},
+        429: {"description": "Limite de demandes par adresse IP atteinte."},
+        503: {"description": "Envoi d'e-mails indisponible."},
+    },
+)
+def register_company(
+    payload: CompanyRegistrationRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> None:
+    enregistrer_demande(
+        session, payload, request.client.host if request.client else None, background_tasks
+    )
+
+
+def _entreprise_id(current_user: User) -> uuid.UUID:
+    if current_user.company is None:
         raise ValidationError(
             "Aucune entreprise n'est rattachée à ce compte.", code="entreprise_non_rattachee"
         )
-    return current_user.entreprise.id
+    return current_user.company.id
 
 
 @router.get(
@@ -52,11 +79,11 @@ def _entreprise_id(current_user: Utilisateur) -> uuid.UUID:
     summary="Consulter la fiche de mon entreprise, telle que vue par les investisseurs",
 )
 def consulter_mon_profil_route(
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
-) -> Entreprise:
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
+) -> Company:
     _entreprise_id(current_user)  # lève si aucune entreprise n'est rattachée
-    assert current_user.entreprise is not None
-    return current_user.entreprise
+    assert current_user.company is not None
+    return current_user.company
 
 
 @router.get(
@@ -66,9 +93,9 @@ def consulter_mon_profil_route(
     summary="Lister les rapports déposés par l'entreprise",
 )
 def lister_rapports_route(
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_mes_rapports(session, _entreprise_id(current_user))
 
 
@@ -82,11 +109,11 @@ def lister_rapports_route(
 def deposer_rapport_route(
     background_tasks: BackgroundTasks,
     fichier: UploadFile,
-    type: TypeRapport = Form(...),
+    type: ReportType = Form(...),
     annee_reporting: int = Form(...),
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     contenu = fichier.file.read()
     return deposer_rapport(
         session,
@@ -109,22 +136,22 @@ def deposer_rapport_route(
 def importer_rapport_par_url_route(
     background_tasks: BackgroundTasks,
     payload: ImporterRapportParURLRequest,
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE, Role.ADMINISTRATEUR)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE, Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> RapportESG:
-    if current_user.role == Role.ENTREPRISE:
+) -> ESGReport:
+    if current_user.role == Role.ENTERPRISE:
         # Un entreprise_id fourni par un appelant Entreprise est toujours ignoré -- jamais fait
         # confiance à un client pour désigner une entreprise autre que la sienne.
         entreprise_id = _entreprise_id(current_user)
     else:
-        if payload.entreprise_id is None:
+        if payload.company_id is None:
             raise ValidationError(
                 "entreprise_id est requis pour un import déclenché par un administrateur.",
                 code="entreprise_id_requis",
             )
-        if session.get(Entreprise, payload.entreprise_id) is None:
+        if session.get(Company, payload.company_id) is None:
             raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-        entreprise_id = payload.entreprise_id
+        entreprise_id = payload.company_id
 
     enforce_url_import_rate_limit(entreprise_id)
     return importer_rapport_par_url(
@@ -133,7 +160,7 @@ def importer_rapport_par_url_route(
         entreprise_id,
         payload.url,
         payload.type,
-        payload.annee_reporting,
+        payload.fiscal_year,
     )
 
 
@@ -149,9 +176,9 @@ def creer_correction_route(
     background_tasks: BackgroundTasks,
     fichier: UploadFile,
     annee_reporting: int = Form(...),
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     contenu = fichier.file.read()
     return creer_correction(
         session,
@@ -172,12 +199,12 @@ def creer_correction_route(
 )
 def consulter_rapport(
     rapport_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
 ) -> RapportESGDetail:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"score_officiel": score_public(session, rapport_id)})
+    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 
 @router.get(
@@ -187,11 +214,13 @@ def consulter_rapport(
 )
 def telecharger_rapport_original_route(
     rapport_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
-    return FileResponse(storage.resolve_path(rapport.fichier_source), media_type="application/pdf")
+    if rapport.source_file is None:
+        raise NotFoundError("Ce rapport n'a pas encore de fichier.", code="fichier_absent")
+    return FileResponse(storage.resolve_path(rapport.source_file), media_type="application/pdf")
 
 
 @router.get(
@@ -201,11 +230,11 @@ def telecharger_rapport_original_route(
 )
 def telecharger_rapport_synthese_route(
     rapport_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.ENTREPRISE)),
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
-    if rapport.rapport_synthese_genere is None:
+    if rapport.synthesis_report_path is None:
         # Code distinct de "rapport introuvable" -- sûr à distinguer ici, la propriété est déjà
         # établie par rapport_de_lentreprise ci-dessus, donc cela ne confirme rien à un tiers.
         raise NotFoundError(
@@ -213,5 +242,5 @@ def telecharger_rapport_synthese_route(
             code="synthese_non_generee",
         )
     return FileResponse(
-        storage.resolve_path(rapport.rapport_synthese_genere), media_type="application/pdf"
+        storage.resolve_path(rapport.synthesis_report_path), media_type="application/pdf"
     )

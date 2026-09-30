@@ -1,5 +1,5 @@
 import { FolderKanban } from "lucide-react";
-import type { StatutProjet } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { ProjectStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -12,13 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useProjectsAdmin } from "../api";
 import { useOngletParametre } from "../useOngletParametre";
 
-const STATUTS: StatutProjet[] = ["OUVERT", "CLOTURE"];
+const STATUTS: ProjectStatus[] = ["OUVERT", "CLOTURE"];
 
 /** Tous les projets Institution, filtrable par statut — détail derrière "Projets ouverts/clôturés"
  * de l'onglet Institution du tableau de bord. Suivi en lecture seule : la composition (chercheurs
  * affectés, périmètre d'entreprises) reste gérée depuis l'espace Institution, jamais ici. */
 export function AdminProjetsPage() {
-  const [statut, setStatut] = useOngletParametre<StatutProjet | "">("statut", "");
+  const [statut, setStatut] = useOngletParametre<ProjectStatus | "">("statut", "");
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useProjectsAdmin(statut || undefined);
 
@@ -36,7 +36,7 @@ export function AdminProjetsPage() {
           <CardTitle>Projets</CardTitle>
           <Select
             value={statut}
-            onChange={(event) => setStatut(event.target.value as StatutProjet | "")}
+            onChange={(event) => setStatut(event.target.value as ProjectStatus | "")}
             className="w-48"
           >
             <option value="">Tous les statuts</option>
@@ -68,17 +68,17 @@ export function AdminProjetsPage() {
               <TableBody>
                 {projets.map((projet) => (
                   <TableRow key={projet.id}>
-                    <TableCell className="font-medium text-brand-blue">{projet.nom}</TableCell>
+                    <TableCell className="font-medium text-brand-blue">{projet.name}</TableCell>
                     <TableCell>
-                      <Badge variant={variantStatutProjet(projet.statut)}>
-                        {libelleStatutProjet(projet.statut)}
+                      <Badge variant={variantStatutProjet(projet.status)}>
+                        {libelleStatutProjet(projet.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-brand-grey">{projet.institution_email}</TableCell>
-                    <TableCell className="tabular-nums">{projet.nombre_chercheurs}</TableCell>
+                    <TableCell className="tabular-nums">{projet.researcher_count}</TableCell>
                     <TableCell className="text-brand-grey">
-                      {projet.date_limite
-                        ? new Date(projet.date_limite).toLocaleDateString("fr-FR")
+                      {projet.deadline
+                        ? new Date(projet.deadline).toLocaleDateString("fr-FR")
                         : "—"}
                     </TableCell>
                   </TableRow>

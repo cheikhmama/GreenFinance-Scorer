@@ -6,6 +6,7 @@
  */
 import type {
   AjouterPositionRequest,
+  BodyImportPortfolioPositions,
   CompareCompaniesParams,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
@@ -17,6 +18,8 @@ import type {
   PagePortefeuilleResume,
   PortefeuilleDetail,
   PortefeuilleResume,
+  PortfolioCarbon,
+  PortfolioImportResult,
   PositionDetail,
   RenommerPortefeuilleRequest,
   TableauDeBordInvestisseur
@@ -361,6 +364,58 @@ export const exportPortfolio = async (portefeuilleId: string, options?: RequestI
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getGetPortfolioCarbonUrl = (portfolioId: string,) => {
+
+
+
+
+  return `/portfolios/${portfolioId}/carbon`
+}
+
+/**
+ * @summary Empreinte carbone PCAF d'un portefeuille (Scopes 1+2, Scope 3 à part)
+ */
+export const getPortfolioCarbon = async (portfolioId: string, options?: RequestInit): Promise<PortfolioCarbon> => {
+
+  return apiFetch<PortfolioCarbon>(getGetPortfolioCarbonUrl(portfolioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getImportPortfolioPositionsUrl = (portfolioId: string,) => {
+
+
+
+
+  return `/portfolios/${portfolioId}/positions/import`
+}
+
+/**
+ * @summary Importer les positions d'un portefeuille vide (CSV ou JSON, par ISIN ou ticker)
+ */
+export const importPortfolioPositions = async (portfolioId: string,
+    bodyImportPortfolioPositions: BodyImportPortfolioPositions, options?: RequestInit): Promise<PortfolioImportResult> => {
+    const formData = new FormData();
+formData.append(`file`, bodyImportPortfolioPositions.file);
+if(bodyImportPortfolioPositions.total_value !== undefined && bodyImportPortfolioPositions.total_value !== null) {
+ formData.append(`total_value`, bodyImportPortfolioPositions.total_value.toString())
+ }
+
+  return apiFetch<PortfolioImportResult>(getImportPortfolioPositionsUrl(portfolioId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
   }
 );}
 

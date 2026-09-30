@@ -9,7 +9,7 @@ import { ProfilePage } from "./components/ProfilePage";
 export const auditRoutes: RouteObject[] = [
   {
     element: (
-      <RequireRole allowedRoles={["AUDITEUR"]}>
+      <RequireRole allowedRoles={["AUDITOR"]}>
         <AppShell />
       </RequireRole>
     ),

@@ -1,5 +1,6 @@
 import { History } from "lucide-react";
 import { Link } from "react-router-dom";
+import { libelleActionJournal, libelleTypeRessource } from "@/shared/format/journal";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -10,7 +11,7 @@ import { useJournalAudit } from "../api";
 const NOMBRE_ENTREES_APERCU = 6;
 
 /** Aperçu des dernières entrées du journal d'audit — connexions, désactivations, décisions sur
- * les comptes (voir app/core/models.py::JournalAudit). Un événement daté sur une période, jamais
+ * les comptes (voir app/core/models.py::AuditLogEntry). Un événement daté sur une période, jamais
  * un effectif à un instant T (contrairement aux cartes de statistiques ci-dessus) : ne fait jamais
  * doublon avec elles. "Voir tout le journal" reste la seule vue complète, filtrable. */
 export function RecentActivitySection() {
@@ -45,11 +46,13 @@ export function RecentActivitySection() {
             {entrees.map((entree) => (
               <li key={entree.id} className="flex items-center justify-between gap-4 py-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">{entree.action}</Badge>
-                  <span className="text-brand-grey">{entree.type_ressource}</span>
+                  <Badge variant="outline">{libelleActionJournal(entree.action)}</Badge>
+                  <span className="text-brand-grey">
+                    {libelleTypeRessource(entree.resource_type)}
+                  </span>
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(entree.date).toLocaleString("fr-FR")}
+                  {new Date(entree.occurred_at).toLocaleString("fr-FR")}
                 </span>
               </li>
             ))}

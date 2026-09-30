@@ -1,6 +1,6 @@
 """Cycle de vie des projets Institution (Étape 17).
 
-Un projet ne peut affecter qu'un Chercheur déjà ACCEPTE (voir app/auth/models.py::ChercheurInstitution)
+Un projet ne peut affecter qu'un Chercheur déjà ACCEPTE (voir app/auth/models.py::ResearcherAffiliation)
 — l'invitation et l'affectation restent deux gestes distincts, jamais fusionnés.
 """
 
@@ -10,21 +10,21 @@ from datetime import datetime
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
-from app.auth.models import ChercheurInstitution, Utilisateur
-from app.company.models import Entreprise
+from app.auth.models import ResearcherAffiliation, User
+from app.company.models import Company
 from app.core.database import utcnow
-from app.core.enums import StatutAnalyse, StatutProjet, StatutRattachement
+from app.core.enums import AffiliationStatus, AnalysisStatus, ProjectStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.institution.models import (
-    AffectationProjet,
-    Projet,
-    ProjetDocument,
-    ProjetEntreprise,
+    Project,
+    ProjectAssignment,
+    ProjectCompany,
+    ProjectDocument,
 )
 from app.investor.entreprises import dernier_rapport_valide
-from app.researcher.models import Analyse
+from app.researcher.models import Analysis
 
 
 def _verifier_coherence_dates(
@@ -57,16 +57,16 @@ def creer_projet(
     date_debut: datetime | None = None,
     date_fin_prevue: datetime | None = None,
     date_limite: datetime | None = None,
-) -> Projet:
+) -> Project:
     _verifier_coherence_dates(date_debut, date_fin_prevue, date_limite)
-    projet = Projet(
+    projet = Project(
         institution_id=institution_id,
-        nom=nom,
+        name=nom,
         description=description,
-        objectif=objectif,
-        date_debut=date_debut,
-        date_fin_prevue=date_fin_prevue,
-        date_limite=date_limite,
+        objective=objectif,
+        start_date=date_debut,
+        planned_end_date=date_fin_prevue,
+        deadline=date_limite,
     )
     session.add(projet)
     session.commit()
@@ -74,18 +74,18 @@ def creer_projet(
     return projet
 
 
-def lister_mes_projets(session: Session, institution_id: uuid.UUID) -> list[Projet]:
+def lister_mes_projets(session: Session, institution_id: uuid.UUID) -> list[Project]:
     return list(
         session.exec(
-            select(Projet).where(col(Projet.institution_id) == institution_id)
+            select(Project).where(col(Project.institution_id) == institution_id)
         ).all()
     )
 
 
 def _projet_de_institution(
     session: Session, institution_id: uuid.UUID, projet_id: uuid.UUID
-) -> Projet:
-    projet = session.get(Projet, projet_id)
+) -> Project:
+    projet = session.get(Project, projet_id)
     if projet is None or projet.institution_id != institution_id:
         raise NotFoundError("Projet introuvable.", code="projet_introuvable")
     return projet
@@ -93,7 +93,7 @@ def _projet_de_institution(
 
 def consulter_projet(
     session: Session, institution_id: uuid.UUID, projet_id: uuid.UUID
-) -> Projet:
+) -> Project:
     return _projet_de_institution(session, institution_id, projet_id)
 
 
@@ -102,27 +102,27 @@ def affecter_chercheur(
     institution_id: uuid.UUID,
     projet_id: uuid.UUID,
     chercheur_id: uuid.UUID,
-) -> AffectationProjet:
+) -> ProjectAssignment:
     projet = _projet_de_institution(session, institution_id, projet_id)
-    if projet.statut != StatutProjet.OUVERT:
+    if projet.status != ProjectStatus.OUVERT:
         raise ValidationError("Ce projet est clôturé.", code="projet_cloture")
 
     rattachement = session.exec(
-        select(ChercheurInstitution).where(
-            ChercheurInstitution.institution_id == institution_id,
-            ChercheurInstitution.chercheur_id == chercheur_id,
+        select(ResearcherAffiliation).where(
+            ResearcherAffiliation.institution_id == institution_id,
+            ResearcherAffiliation.researcher_id == chercheur_id,
         )
     ).first()
-    if rattachement is None or rattachement.statut != StatutRattachement.ACCEPTE:
+    if rattachement is None or rattachement.status != AffiliationStatus.ACCEPTE:
         raise ValidationError(
             "Ce chercheur n'a pas accepté de rattachement avec votre institution.",
             code="rattachement_requis",
         )
 
     deja_affecte = session.exec(
-        select(AffectationProjet).where(
-            AffectationProjet.projet_id == projet_id,
-            AffectationProjet.chercheur_id == chercheur_id,
+        select(ProjectAssignment).where(
+            ProjectAssignment.project_id == projet_id,
+            ProjectAssignment.researcher_id == chercheur_id,
         )
     ).first()
     if deja_affecte is not None:
@@ -130,13 +130,13 @@ def affecter_chercheur(
             "Ce chercheur est déjà affecté à ce projet.", code="deja_affecte"
         )
 
-    affectation = AffectationProjet(projet_id=projet_id, chercheur_id=chercheur_id)
+    affectation = ProjectAssignment(project_id=projet_id, researcher_id=chercheur_id)
     session.add(affectation)
     notifier(
         session,
         chercheur_id,
         "PROJET_AFFECTATION",
-        f"Vous avez été affecté au projet « {projet.nom} ».",
+        f"Vous avez été affecté au projet « {projet.name} ».",
         id_ressource=projet.id,
     )
     session.commit()
@@ -146,12 +146,12 @@ def affecter_chercheur(
 
 def cloturer_projet(
     session: Session, institution_id: uuid.UUID, projet_id: uuid.UUID
-) -> Projet:
+) -> Project:
     projet = _projet_de_institution(session, institution_id, projet_id)
-    if projet.statut == StatutProjet.CLOTURE:
+    if projet.status == ProjectStatus.CLOTURE:
         raise ValidationError("Ce projet est déjà clôturé.", code="projet_deja_cloture")
-    projet.statut = StatutProjet.CLOTURE
-    projet.date_cloture = utcnow()
+    projet.status = ProjectStatus.CLOTURE
+    projet.closed_at = utcnow()
     session.add(projet)
     session.commit()
     session.refresh(projet)
@@ -160,11 +160,11 @@ def cloturer_projet(
 
 def lister_perimetre(
     session: Session, institution_id: uuid.UUID, projet_id: uuid.UUID
-) -> list[ProjetEntreprise]:
+) -> list[ProjectCompany]:
     _projet_de_institution(session, institution_id, projet_id)
     return list(
         session.exec(
-            select(ProjetEntreprise).where(ProjetEntreprise.projet_id == projet_id)
+            select(ProjectCompany).where(ProjectCompany.project_id == projet_id)
         ).all()
     )
 
@@ -176,10 +176,10 @@ def entreprises_perimetre_institution(session: Session, institution_id: uuid.UUI
     conformément à la décision de gouvernance du 2026-09-02. Le catalogue de recherche
     (/institution/entreprises, liste) reste volontairement non filtré : l'Institution doit pouvoir
     parcourir les entreprises publiées pour choisir lesquelles ajouter à un périmètre."""
-    projet_ids = select(Projet.id).where(Projet.institution_id == institution_id)
+    projet_ids = select(Project.id).where(Project.institution_id == institution_id)
     return set(
         session.exec(
-            select(ProjetEntreprise.entreprise_id).where(col(ProjetEntreprise.projet_id).in_(projet_ids))
+            select(ProjectCompany.company_id).where(col(ProjectCompany.project_id).in_(projet_ids))
         ).all()
     )
 
@@ -189,23 +189,23 @@ def ajouter_entreprise_perimetre(
     institution_id: uuid.UUID,
     projet_id: uuid.UUID,
     entreprise_id: uuid.UUID,
-) -> ProjetEntreprise:
+) -> ProjectCompany:
     """N'autorise dans le périmètre qu'une entreprise déjà publiée (Étape 17bis) — jamais une
     entreprise non publiée, dont les données brutes ne doivent jamais atteindre un Chercheur."""
     projet = _projet_de_institution(session, institution_id, projet_id)
-    if projet.statut != StatutProjet.OUVERT:
+    if projet.status != ProjectStatus.OUVERT:
         raise ValidationError("Ce projet est clôturé.", code="projet_cloture")
 
-    entreprise = session.get(Entreprise, entreprise_id)
-    if entreprise is None or entreprise.date_publication is None:
+    entreprise = session.get(Company, entreprise_id)
+    if entreprise is None or entreprise.published_at is None:
         raise ValidationError(
             "Cette entreprise n'est pas publiée.", code="entreprise_non_publiee"
         )
 
     deja_present = session.exec(
-        select(ProjetEntreprise).where(
-            ProjetEntreprise.projet_id == projet_id,
-            ProjetEntreprise.entreprise_id == entreprise_id,
+        select(ProjectCompany).where(
+            ProjectCompany.project_id == projet_id,
+            ProjectCompany.company_id == entreprise_id,
         )
     ).first()
     if deja_present is not None:
@@ -214,7 +214,7 @@ def ajouter_entreprise_perimetre(
             code="deja_dans_perimetre",
         )
 
-    lien = ProjetEntreprise(projet_id=projet_id, entreprise_id=entreprise_id)
+    lien = ProjectCompany(project_id=projet_id, company_id=entreprise_id)
     session.add(lien)
     session.commit()
     session.refresh(lien)
@@ -223,11 +223,11 @@ def ajouter_entreprise_perimetre(
 
 def lister_documents(
     session: Session, institution_id: uuid.UUID, projet_id: uuid.UUID
-) -> list[ProjetDocument]:
+) -> list[ProjectDocument]:
     _projet_de_institution(session, institution_id, projet_id)
     return list(
         session.exec(
-            select(ProjetDocument).where(ProjetDocument.projet_id == projet_id)
+            select(ProjectDocument).where(ProjectDocument.project_id == projet_id)
         ).all()
     )
 
@@ -237,24 +237,24 @@ def ajouter_document(
     institution_id: uuid.UUID,
     projet_id: uuid.UUID,
     rapport_id: uuid.UUID,
-) -> ProjetDocument:
+) -> ProjectDocument:
     """N'accepte que le rapport actuellement publié de l'entreprise (Étape 17bis) — jamais
-    seulement statut == VALIDE : validation et publication restent deux gestes distincts (voir
-    app/company/models.py::Entreprise.date_publication), et un ancien rapport VALIDE remplacé
+    seulement statut == VALIDATED : validation et publication restent deux gestes distincts (voir
+    app/company/models.py::Company.published_at), et un ancien rapport VALIDATED remplacé
     depuis ne redevient jamais accessible ainsi. L'entreprise doit d'abord appartenir au périmètre
     du projet — mettre un document à disposition ne peut jamais élargir le périmètre en silence."""
     projet = _projet_de_institution(session, institution_id, projet_id)
-    if projet.statut != StatutProjet.OUVERT:
+    if projet.status != ProjectStatus.OUVERT:
         raise ValidationError("Ce projet est clôturé.", code="projet_cloture")
 
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
     dans_perimetre = session.exec(
-        select(ProjetEntreprise).where(
-            ProjetEntreprise.projet_id == projet_id,
-            ProjetEntreprise.entreprise_id == rapport.entreprise_id,
+        select(ProjectCompany).where(
+            ProjectCompany.project_id == projet_id,
+            ProjectCompany.company_id == rapport.company_id,
         )
     ).first()
     if dans_perimetre is None:
@@ -263,7 +263,7 @@ def ajouter_document(
             code="entreprise_hors_perimetre",
         )
 
-    rapport_public = dernier_rapport_valide(session, rapport.entreprise_id)
+    rapport_public = dernier_rapport_valide(session, rapport.company_id)
     if rapport_public is None or rapport_public.id != rapport.id:
         raise ValidationError(
             "Seul le rapport actuellement publié de l'entreprise peut être mis à disposition.",
@@ -271,9 +271,9 @@ def ajouter_document(
         )
 
     deja_present = session.exec(
-        select(ProjetDocument).where(
-            ProjetDocument.projet_id == projet_id,
-            ProjetDocument.rapport_id == rapport_id,
+        select(ProjectDocument).where(
+            ProjectDocument.project_id == projet_id,
+            ProjectDocument.report_id == rapport_id,
         )
     ).first()
     if deja_present is not None:
@@ -281,7 +281,7 @@ def ajouter_document(
             "Ce document est déjà mis à disposition sur ce projet.", code="deja_ajoute"
         )
 
-    document = ProjetDocument(projet_id=projet_id, rapport_id=rapport_id)
+    document = ProjectDocument(project_id=projet_id, report_id=rapport_id)
     session.add(document)
     session.commit()
     session.refresh(document)
@@ -293,18 +293,18 @@ def statistiques_admin(session: Session) -> tuple[int, int, int, int]:
     toutes Institutions confondues — synthèse pour l'Aperçu Administrateur (app/admin/apercu.py).
     institutions_actives (comptes) est déjà calculé ailleurs (voir app/admin/dashboard.py)."""
     projets_ouverts = session.exec(
-        select(func.count()).select_from(Projet).where(col(Projet.statut) == StatutProjet.OUVERT)
+        select(func.count()).select_from(Project).where(col(Project.status) == ProjectStatus.OUVERT)
     ).one()
     projets_clotures = session.exec(
-        select(func.count()).select_from(Projet).where(col(Projet.statut) == StatutProjet.CLOTURE)
+        select(func.count()).select_from(Project).where(col(Project.status) == ProjectStatus.CLOTURE)
     ).one()
     invitations_en_attente = session.exec(
         select(func.count())
-        .select_from(ChercheurInstitution)
-        .where(col(ChercheurInstitution.statut) == StatutRattachement.EN_ATTENTE)
+        .select_from(ResearcherAffiliation)
+        .where(col(ResearcherAffiliation.status) == AffiliationStatus.EN_ATTENTE)
     ).one()
     analyses_a_examiner = session.exec(
-        select(func.count()).select_from(Analyse).where(col(Analyse.statut) == StatutAnalyse.SOUMISE)
+        select(func.count()).select_from(Analysis).where(col(Analysis.status) == AnalysisStatus.SOUMISE)
     ).one()
     return projets_ouverts, projets_clotures, invitations_en_attente, analyses_a_examiner
 
@@ -312,36 +312,36 @@ def statistiques_admin(session: Session) -> tuple[int, int, int, int]:
 def lister_projets_admin(
     session: Session,
     *,
-    statut: StatutProjet | None = None,
+    statut: ProjectStatus | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Projet, str, int]], int]:
+) -> tuple[list[tuple[Project, str, int]], int]:
     """Vue de suivi Administrateur de tous les projets, avec filtre optionnel sur le statut — le
     détail derrière "Projets ouverts/clôturés" de l'Aperçu. Renvoie (Projet, e-mail de
     l'institution, nombre de chercheurs affectés) par ligne."""
     filtres: list[ColumnElement[bool]] = []
     if statut is not None:
-        filtres.append(col(Projet.statut) == statut)
+        filtres.append(col(Project.status) == statut)
 
-    total = session.exec(select(func.count()).select_from(Projet).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(Project).where(*filtres)).one()
     projets = list(
         session.exec(
-            select(Projet)
+            select(Project)
             .where(*filtres)
-            .order_by(col(Projet.date_creation).desc())
+            .order_by(col(Project.created_at).desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
     )
 
-    resultats: list[tuple[Projet, str, int]] = []
+    resultats: list[tuple[Project, str, int]] = []
     for projet in projets:
-        institution = session.get(Utilisateur, projet.institution_id)
+        institution = session.get(User, projet.institution_id)
         assert institution is not None  # FK NOT NULL, ne peut pas être absent
         nb_chercheurs = session.exec(
             select(func.count())
-            .select_from(AffectationProjet)
-            .where(col(AffectationProjet.projet_id) == projet.id)
+            .select_from(ProjectAssignment)
+            .where(col(ProjectAssignment.project_id) == projet.id)
         ).one()
         resultats.append((projet, institution.email, nb_chercheurs))
     return resultats, total

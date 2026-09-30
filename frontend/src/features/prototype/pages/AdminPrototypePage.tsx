@@ -45,11 +45,11 @@ interface AdminPrototypePageProps {
 }
 
 const roleLabels: Record<PrototypeRole, string> = {
-  ADMINISTRATEUR: "Administrateur",
-  ENTREPRISE: "Entreprise",
-  AUDITEUR: "Auditeur",
-  INVESTISSEUR: "Investisseur",
-  CHERCHEUR: "Chercheur",
+  ADMIN: "Administrateur",
+  ENTERPRISE: "Entreprise",
+  AUDITOR: "Auditeur",
+  INVESTOR: "Investisseur",
+  RESEARCHER: "Chercheur",
   INSTITUTION: "Institution",
 };
 
@@ -424,7 +424,7 @@ function CompaniesSection() {
   function openCompanySpace(company: PrototypeCompany) {
     const companyUser = users.find(
       (user) =>
-        user.role === "ENTREPRISE" &&
+        user.role === "ENTERPRISE" &&
         (user.entityId === company.id || user.organization === company.name),
     );
     selectPreviewUser(companyUser?.id ?? null);
@@ -613,7 +613,7 @@ function ReportsSection() {
   // la plateforme — jamais une identité saisie librement (règle appliquée à toute relation
   // acteur-à-acteur du système).
   const auditeursDisponibles = useMemo(
-    () => users.filter((user) => user.role === "AUDITEUR" && user.status === "ACTIF"),
+    () => users.filter((user) => user.role === "AUDITOR" && user.status === "ACTIF"),
     [users],
   );
 

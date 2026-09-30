@@ -23,14 +23,14 @@ export function InvestorDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicateurs clés">
         <StatCard
           label="Portefeuilles"
-          value={data?.nombre_portefeuilles ?? "—"}
+          value={data?.portfolio_count ?? "—"}
           hint="Actifs et archivés"
           icon={<Wallet className="size-5" />}
           to="/investor/portefeuilles"
         />
         <StatCard
           label="Entreprises publiées"
-          value={data?.nombre_entreprises_publiees ?? "—"}
+          value={data?.published_company_count ?? "—"}
           hint="Sur toute la plateforme"
           icon={<Building2 className="size-5" />}
           tone="blue"
@@ -38,14 +38,14 @@ export function InvestorDashboardPage() {
         />
         <StatCard
           label="Couverture ESG plateforme"
-          value={data ? formatPourcentage(data.taux_couverture_esg_plateforme) : "—"}
+          value={data ? formatPourcentage(data.platform_esg_coverage_rate) : "—"}
           hint="Entreprises avec E, S et G calculés"
           icon={<PieChart className="size-5" />}
           tone="violet"
         />
         <StatCard
           label="Nouvelles publications suivies"
-          value={data?.nombre_nouvelles_publications_suivies ?? "—"}
+          value={data?.new_followed_publication_count ?? "—"}
           hint="30 derniers jours, entreprises en position"
           icon={<Building2 className="size-5" />}
           tone="amber"
@@ -53,7 +53,7 @@ export function InvestorDashboardPage() {
         />
       </section>
 
-      {data && data.entreprises_suivies_suspendues.length > 0 ? (
+      {data && data.suspended_followed_companies.length > 0 ? (
         <Card className="border-destructive/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-destructive">
@@ -62,9 +62,9 @@ export function InvestorDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {data.entreprises_suivies_suspendues.map((entreprise) => (
+            {data.suspended_followed_companies.map((entreprise) => (
               <Badge key={entreprise.id} variant="destructive">
-                {entreprise.nom}
+                {entreprise.name}
               </Badge>
             ))}
           </CardContent>
@@ -72,29 +72,29 @@ export function InvestorDashboardPage() {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <RepartitionSecteurCard repartition={data?.repartition_secteur} />
+        <RepartitionSecteurCard repartition={data?.sector_breakdown} />
 
         <Card>
           <CardHeader>
             <CardTitle className="text-base text-brand-blue">Publications récentes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!data || data.publications_recentes.length === 0 ? (
+            {!data || data.recent_publications.length === 0 ? (
               <p className="text-sm text-brand-grey">Aucune publication récente.</p>
             ) : (
-              data.publications_recentes.map((entreprise) => (
+              data.recent_publications.map((entreprise) => (
                 <Link
                   key={entreprise.id}
                   to={`/investor/entreprises/${entreprise.id}`}
                   className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-slate-50"
                 >
-                  <CompanyAvatar nom={entreprise.nom} logo={entreprise.logo} />
+                  <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-brand-blue">{entreprise.nom}</p>
-                    <p className="truncate text-xs text-brand-grey">{entreprise.secteur}</p>
+                    <p className="truncate font-medium text-brand-blue">{entreprise.name}</p>
+                    <p className="truncate text-xs text-brand-grey">{entreprise.sector}</p>
                   </div>
-                  <Badge variant={variantScore(entreprise.score.valeur_globale)} className="shrink-0">
-                    {formatScore(entreprise.score.valeur_globale)}
+                  <Badge variant={variantScore(entreprise.score.global_score)} className="shrink-0">
+                    {formatScore(entreprise.score.global_score)}
                   </Badge>
                 </Link>
               ))
@@ -109,13 +109,13 @@ export function InvestorDashboardPage() {
 function RepartitionSecteurCard({
   repartition,
 }: {
-  repartition: { secteur: string; montant_usd: number }[] | undefined;
+  repartition: { sector: string; amount_usd: number }[] | undefined;
 }) {
   const [secteurSelectionne, setSecteurSelectionne] = useState<string | null>(null);
-  const secteurActif = secteurSelectionne ?? repartition?.[0]?.secteur ?? null;
+  const secteurActif = secteurSelectionne ?? repartition?.[0]?.sector ?? null;
   const { data: entreprisesDuSecteur } = usePublishedCompanies({ secteur: secteurActif ?? undefined });
   const nombreDisponibles = entreprisesDuSecteur?.pages[0]?.total;
-  const montantMax = repartition?.[0]?.montant_usd ?? 0;
+  const montantMax = repartition?.[0]?.amount_usd ?? 0;
 
   return (
     <Card>
@@ -135,12 +135,12 @@ function RepartitionSecteurCard({
           <>
             <div className="space-y-2">
               {repartition.map((ligne) => {
-                const selectionnee = ligne.secteur === secteurActif;
+                const selectionnee = ligne.sector === secteurActif;
                 return (
                   <button
-                    key={ligne.secteur}
+                    key={ligne.sector}
                     type="button"
-                    onClick={() => setSecteurSelectionne(ligne.secteur)}
+                    onClick={() => setSecteurSelectionne(ligne.sector)}
                     className={`block w-full rounded-lg border p-2 text-left transition ${
                       selectionnee
                         ? "border-brand-green bg-brand-green-light/40"
@@ -149,16 +149,16 @@ function RepartitionSecteurCard({
                   >
                     <div className="flex items-center justify-between text-sm">
                       <span className={selectionnee ? "font-semibold text-brand-blue" : "text-brand-grey"}>
-                        {ligne.secteur}
+                        {ligne.sector}
                       </span>
                       <span className="font-medium tabular-nums text-brand-blue">
-                        {ligne.montant_usd.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} USD
+                        {ligne.amount_usd.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} USD
                       </span>
                     </div>
                     <div className="mt-1.5 h-1.5 rounded-full bg-slate-100">
                       <div
                         className="h-1.5 rounded-full bg-brand-green"
-                        style={{ width: `${montantMax ? (ligne.montant_usd / montantMax) * 100 : 0}%` }}
+                        style={{ width: `${montantMax ? (ligne.amount_usd / montantMax) * 100 : 0}%` }}
                       />
                     </div>
                   </button>

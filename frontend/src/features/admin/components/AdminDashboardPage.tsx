@@ -39,13 +39,13 @@ export function AdminDashboardPage() {
   const { data: apercu } = useApercuActeurs();
   const aucuneActionPrioritaire =
     data !== undefined &&
-    data.rapports_a_affecter === 0 &&
-    data.decisions_a_rendre === 0 &&
-    data.demandes_republication === 0 &&
-    data.utilisateurs_en_attente === 0 &&
-    data.rapports_echec_extraction === 0 &&
-    data.rapports_orphelins === 0 &&
-    data.audits_en_retard === 0;
+    data.reports_to_assign === 0 &&
+    data.pending_decisions === 0 &&
+    data.republication_requests === 0 &&
+    data.pending_users === 0 &&
+    data.failed_extraction_reports === 0 &&
+    data.orphan_reports === 0 &&
+    data.overdue_audits === 0;
 
   return (
     <div className="space-y-8">
@@ -62,7 +62,7 @@ export function AdminDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Synthèse globale">
         <StatCard
           label="Entreprises inscrites"
-          value={data?.entreprises_inscrites ?? "—"}
+          value={data?.registered_companies ?? "—"}
           hint="Toutes, publiées ou non"
           icon={<Building2 className="size-5" />}
           tone="blue"
@@ -70,7 +70,7 @@ export function AdminDashboardPage() {
         />
         <StatCard
           label="Entreprises publiées"
-          value={data?.entreprises_publiees ?? "—"}
+          value={data?.published_companies ?? "—"}
           hint="Fiche visible publiquement"
           icon={<Building2 className="size-5" />}
           tone="blue"
@@ -78,7 +78,7 @@ export function AdminDashboardPage() {
         />
         <StatCard
           label="Rapports soumis"
-          value={data?.rapports_soumis ?? "—"}
+          value={data?.submitted_reports ?? "—"}
           hint="Dépôts initiaux et corrections"
           icon={<FileText className="size-5" />}
           tone="blue"
@@ -95,43 +95,43 @@ export function AdminDashboardPage() {
             <ActionCard
               to="/admin/rapports?onglet=a-affecter"
               label="Rapports à affecter"
-              count={data?.rapports_a_affecter}
+              count={data?.reports_to_assign}
               icon={<ClipboardCheck className="size-5" />}
             />
             <ActionCard
               to="/admin/rapports?onglet=en-validation"
               label="Décisions à rendre"
-              count={data?.decisions_a_rendre}
+              count={data?.pending_decisions}
               icon={<FileCheck2 className="size-5" />}
             />
             <ActionCard
               to="/admin/entreprises?onglet=a-republier"
               label="Demandes de republication"
-              count={data?.demandes_republication}
+              count={data?.republication_requests}
               icon={<Building2 className="size-5" />}
             />
             <ActionCard
               to="/admin/utilisateurs#en-attente"
               label="Utilisateurs en attente"
-              count={data?.utilisateurs_en_attente}
+              count={data?.pending_users}
               icon={<UserCog className="size-5" />}
             />
             <ActionCard
               to="/admin/rapports?onglet=alertes"
               label="Extractions en échec"
-              count={data?.rapports_echec_extraction}
+              count={data?.failed_extraction_reports}
               icon={<AlertTriangle className="size-5" />}
             />
             <ActionCard
               to="/admin/rapports?onglet=alertes"
               label="Rapports orphelins (sans avis)"
-              count={data?.rapports_orphelins}
+              count={data?.orphan_reports}
               icon={<AlertTriangle className="size-5" />}
             />
             <ActionCard
               to="/admin/rapports?onglet=alertes"
               label="Audits en retard"
-              count={data?.audits_en_retard}
+              count={data?.overdue_audits}
               icon={<FileWarning className="size-5" />}
             />
           </div>
@@ -158,22 +158,22 @@ export function AdminDashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard
                 label="Rapports validés"
-                value={data?.rapports_valides ?? "—"}
+                value={data?.validated_reports ?? "—"}
                 hint="Décision favorable rendue"
                 icon={<ThumbsUp className="size-5" />}
-                to="/admin/rapports?onglet=tous&statut=VALIDE"
+                to="/admin/rapports?onglet=tous&statut=VALIDATED"
               />
               <StatCard
                 label="Rapports rejetés"
-                value={data?.rapports_rejetes ?? "—"}
+                value={data?.rejected_reports ?? "—"}
                 hint="Décision défavorable rendue"
                 icon={<ThumbsDown className="size-5" />}
                 tone="violet"
-                to="/admin/rapports?onglet=tous&statut=REJETE"
+                to="/admin/rapports?onglet=tous&statut=REJECTED"
               />
               <StatCard
                 label="Demandes de republication"
-                value={data?.demandes_republication ?? "—"}
+                value={data?.republication_requests ?? "—"}
                 hint="Rapport validé après la dernière publication"
                 icon={<Building2 className="size-5" />}
                 tone="amber"
@@ -186,21 +186,21 @@ export function AdminDashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard
                 label="Auditeurs actifs"
-                value={data?.auditeurs_actifs ?? "—"}
+                value={data?.active_auditors ?? "—"}
                 hint="Comptes pouvant recevoir une affectation"
                 icon={<ClipboardCheck className="size-5" />}
-                to="/admin/utilisateurs?role=AUDITEUR"
+                to="/admin/utilisateurs?role=AUDITOR"
               />
               <StatCard
                 label="Dossiers affectés"
-                value={apercu?.auditeurs.dossiers_affectes ?? "—"}
+                value={apercu?.auditors.assigned_reports ?? "—"}
                 hint="Tous auditeurs confondus, en cours"
                 icon={<FileText className="size-5" />}
                 to="/admin/auditeurs"
               />
               <StatCard
                 label="Audits en retard"
-                value={data?.audits_en_retard ?? "—"}
+                value={data?.overdue_audits ?? "—"}
                 hint="Affecté au-delà du délai attendu"
                 icon={<FileWarning className="size-5" />}
                 tone="amber"
@@ -208,7 +208,7 @@ export function AdminDashboardPage() {
               />
               <StatCard
                 label="Avis rendus"
-                value={apercu?.auditeurs.avis_rendus ?? "—"}
+                value={apercu?.auditors.opinions_submitted ?? "—"}
                 hint="Total, toutes périodes"
                 icon={<FileCheck2 className="size-5" />}
                 to="/admin/auditeurs"
@@ -220,28 +220,28 @@ export function AdminDashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard
                 label="Investisseurs actifs"
-                value={data?.investisseurs_actifs ?? "—"}
+                value={data?.active_investors ?? "—"}
                 hint="Comptes consultant le catalogue publié"
                 icon={<Wallet className="size-5" />}
-                to="/admin/utilisateurs?role=INVESTISSEUR"
+                to="/admin/utilisateurs?role=INVESTOR"
               />
               <StatCard
                 label="Portefeuilles non archivés"
-                value={apercu?.investisseurs.portefeuilles_non_archives ?? "—"}
+                value={apercu?.investors.active_portfolios ?? "—"}
                 hint="Tous Investisseurs confondus"
                 icon={<Wallet className="size-5" />}
                 to="/admin/portefeuilles"
               />
               <StatCard
                 label="Positions déclarées"
-                value={apercu?.investisseurs.positions_declarees ?? "—"}
+                value={apercu?.investors.declared_positions ?? "—"}
                 hint="Montants déclarés par l'Investisseur, non vérifiés"
                 icon={<FileText className="size-5" />}
                 to="/admin/portefeuilles"
               />
               <StatCard
                 label="Entreprises distinctes"
-                value={apercu?.investisseurs.entreprises_distinctes ?? "—"}
+                value={apercu?.investors.distinct_companies ?? "—"}
                 hint="Présentes dans au moins un portefeuille"
                 icon={<Building2 className="size-5" />}
                 to="/admin/portefeuilles"
@@ -253,28 +253,28 @@ export function AdminDashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard
                 label="Chercheurs actifs"
-                value={data?.chercheurs_actifs ?? "—"}
+                value={data?.active_researchers ?? "—"}
                 hint="Comptes rattachables à un projet"
                 icon={<FlaskConical className="size-5" />}
-                to="/admin/utilisateurs?role=CHERCHEUR"
+                to="/admin/utilisateurs?role=RESEARCHER"
               />
               <StatCard
                 label="Affectés à un projet ouvert"
-                value={apercu?.chercheurs.chercheurs_affectes_projets_ouverts ?? "—"}
+                value={apercu?.researchers.researchers_on_open_projects ?? "—"}
                 hint="Chercheurs distincts"
                 icon={<FolderKanban className="size-5" />}
                 to="/admin/projets?statut=OUVERT"
               />
               <StatCard
                 label="Analyses soumises"
-                value={apercu?.chercheurs.analyses_soumises ?? "—"}
+                value={apercu?.researchers.submitted_analyses ?? "—"}
                 hint="En attente d'examen par l'Institution"
                 icon={<FileCheck2 className="size-5" />}
                 to="/admin/analyses?statut=SOUMISE"
               />
               <StatCard
                 label="Corrections demandées"
-                value={apercu?.chercheurs.analyses_correction_demandee ?? "—"}
+                value={apercu?.researchers.analyses_changes_requested ?? "—"}
                 hint="Analyses renvoyées au Chercheur"
                 icon={<AlertTriangle className="size-5" />}
                 tone="amber"
@@ -287,34 +287,34 @@ export function AdminDashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard
                 label="Institutions actives"
-                value={data?.institutions_actives ?? "—"}
+                value={data?.active_institutions ?? "—"}
                 hint="Comptes pouvant piloter des projets"
                 icon={<Briefcase className="size-5" />}
                 to="/admin/utilisateurs?role=INSTITUTION"
               />
               <StatCard
                 label="Projets ouverts"
-                value={apercu?.institutions.projets_ouverts ?? "—"}
+                value={apercu?.institutions.open_projects ?? "—"}
                 hint="En cours"
                 icon={<FolderKanban className="size-5" />}
                 to="/admin/projets?statut=OUVERT"
               />
               <StatCard
                 label="Projets clôturés"
-                value={apercu?.institutions.projets_clotures ?? "—"}
+                value={apercu?.institutions.closed_projects ?? "—"}
                 hint="Terminés"
                 icon={<FolderKanban className="size-5" />}
                 to="/admin/projets?statut=CLOTURE"
               />
               <StatCard
                 label="Invitations en attente"
-                value={apercu?.institutions.invitations_en_attente ?? "—"}
+                value={apercu?.institutions.pending_invitations ?? "—"}
                 hint="Chercheur pas encore répondu"
                 icon={<UserPlus className="size-5" />}
               />
               <StatCard
                 label="Analyses à examiner"
-                value={apercu?.institutions.analyses_a_examiner ?? "—"}
+                value={apercu?.institutions.analyses_to_review ?? "—"}
                 hint="Soumises, décision en attente"
                 icon={<FileCheck2 className="size-5" />}
                 to="/admin/analyses?statut=SOUMISE"

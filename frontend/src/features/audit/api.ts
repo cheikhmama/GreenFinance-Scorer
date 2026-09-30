@@ -42,7 +42,7 @@ export function useAuditHistory() {
   });
 }
 
-/** POST /audit/rapports/{id}/avis — fait passer le rapport en EN_VALIDATION côté serveur. */
+/** POST /audit/rapports/{id}/avis — fait passer le rapport en PENDING_DECISION côté serveur. */
 export function useSubmitOpinion(rapportId: string) {
   const queryClient = useQueryClient();
 

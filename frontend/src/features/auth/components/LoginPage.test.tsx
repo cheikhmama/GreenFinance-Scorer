@@ -77,7 +77,7 @@ describe("LoginPage", () => {
   });
 
   it("ouvre le routeur de tableaux de bord après une connexion réussie", async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: "utilisateur", role: "INVESTISSEUR" }), { status: 200 }));
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: "utilisateur", role: "INVESTOR" }), { status: 200 }));
     const user = userEvent.setup();
     renderLoginPage();
     await user.type(screen.getByLabelText("E-mail"), "membre@example.org");

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { TypeRapport } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-export { TypeRapport };
-export const TYPES_RAPPORT = Object.values(TypeRapport);
+export { ReportType };
+export const TYPES_RAPPORT = Object.values(ReportType);
 
 // z.number(), pas z.coerce.number() : coerce sépare le type d'entrée (unknown) du type de
 // sortie (number), ce que le résolveur zodResolver + useForm ne réconcilie pas proprement ici.
@@ -32,3 +32,32 @@ export const correctionSchema = z.object({
 });
 
 export type CorrectionForm = z.infer<typeof correctionSchema>;
+
+/** Formulaire d'inscription publique (POST /companies/register) — mêmes règles que le backend
+ * (app/company/schemas.py::CompanyRegistrationRequest), qui reste seul juge des chiffres de
+ * contrôle ISIN/LEI : ici, seulement la forme, pour un retour immédiat. */
+export const companyRegistrationFormSchema = z.object({
+  company_name: z.string().trim().min(2, "Le nom de l’entreprise est requis.").max(200),
+  sector: z.string().trim().min(2, "Le secteur est requis.").max(100),
+  country: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2}$/, "Code pays à deux lettres (ex. MR)."),
+  isin: z
+    .string()
+    .trim()
+    .regex(/^$|^[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]$/, "Un ISIN compte 12 caractères (ex. MR…)."),
+  lei: z
+    .string()
+    .trim()
+    .regex(/^$|^[A-Za-z0-9]{18}[0-9]{2}$/, "Un LEI compte 20 caractères."),
+  website: z
+    .string()
+    .trim()
+    .regex(/^$|^https?:\/\//, "Adresse web attendue (https://…)."),
+  contact_name: z.string().trim().min(2, "Votre nom est requis.").max(100),
+  contact_email: z.string().trim().min(1, "L’adresse e-mail est requise").email("Adresse e-mail invalide"),
+  company_fax: z.string(),
+});
+
+export type CompanyRegistrationForm = z.infer<typeof companyRegistrationFormSchema>;

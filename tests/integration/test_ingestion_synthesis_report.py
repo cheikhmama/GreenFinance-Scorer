@@ -1,13 +1,13 @@
 import uuid
 
-from app.company.models import Entreprise
-from app.core.enums import CanalDepot, MethodeDonnee, Pilier, TypeRapport
-from app.ingestion.extractor import CODES_AUTO_DECLARES_PAR_PILIER
+from app.company.models import Company
+from app.core.database import utcnow
+from app.core.enums import DataMethod, Pillar, ReportType, SubmissionChannel
 from app.ingestion.models import (
-    DonneeCarbone,
-    IndicateurESG,
-    PreuveDocumentaire,
-    RapportESG,
+    CarbonEmission,
+    ESGMetric,
+    ESGReport,
+    Evidence,
 )
 from app.ingestion.synthesis_report import (
     _section_carbone,
@@ -16,7 +16,8 @@ from app.ingestion.synthesis_report import (
     _section_score_officiel,
     generer_rapport_synthese,
 )
-from app.scoring.models import ScoreESG
+from app.ingestion.vocabulaire import CODES_AUTO_DECLARES_PAR_PILIER
+from app.scoring.models import Score
 
 
 def _texte(elements: list) -> str:
@@ -25,30 +26,31 @@ def _texte(elements: list) -> str:
     return " ".join(getattr(e, "text", "") for e in elements)
 
 
-def _rapport(session) -> RapportESG:
-    entreprise = Entreprise(nom=f"Synthese {uuid.uuid4()}", secteur="Industrie", pays="France")
+def _rapport(session) -> ESGReport:
+    entreprise = Company(name=f"Synthese {uuid.uuid4()}", sector="Industrie", country="France")
     session.add(entreprise)
     session.flush()
-    rapport = RapportESG(
-        entreprise_id=entreprise.id,
-        type=TypeRapport.RAPPORT_ESG,
-        canal=CanalDepot.ENTREPRISE,
-        fichier_source="rapports/test/synthese-dummy.pdf",
-        annee_reporting=2025,
+    rapport = ESGReport(
+        company_id=entreprise.id,
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
+        source_file="rapports/test/synthese-dummy.pdf",
+        fiscal_year=2025,
+        submitted_at=utcnow(),
     )
     session.add(rapport)
     session.flush()
     return rapport
 
 
-def _preuve(session) -> PreuveDocumentaire:
-    preuve = PreuveDocumentaire(
-        nom_document="rapport-test.pdf",
-        annee=2025,
-        nombre_pages_total=1,
-        page_debut=3,
-        page_fin=3,
-        pdf_extrait_genere="preuves/test/page_3.pdf",
+def _preuve(session) -> Evidence:
+    preuve = Evidence(
+        document_name="rapport-test.pdf",
+        year=2025,
+        total_pages=1,
+        page_start=3,
+        page_end=3,
+        excerpt_pdf_path="preuves/test/page_3.pdf",
     )
     session.add(preuve)
     session.flush()
@@ -61,13 +63,13 @@ def test_section_score_officiel_absent_affiche_en_attente() -> None:
 
 
 def test_section_score_officiel_present_affiche_les_valeurs() -> None:
-    score = ScoreESG(
-        rapport_id=uuid.uuid4(),
-        configuration_id=uuid.uuid4(),
-        valeur_globale=66.45,
-        score_environnement=49.91,
-        score_social=86.0,
-        score_gouvernance=80.0,
+    score = Score(
+        report_id=uuid.uuid4(),
+        config_id=uuid.uuid4(),
+        global_score=66.45,
+        environmental_score=49.91,
+        social_score=86.0,
+        governance_score=80.0,
     )
     elements = _section_score_officiel(score)
     table = elements[-1]
@@ -79,26 +81,26 @@ def test_section_score_officiel_present_affiche_les_valeurs() -> None:
 def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
     rapport = _rapport(session)
     preuve = _preuve(session)
-    reel = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.SOCIAL,
-        code="femmes_effectif_pourcentage",
-        valeur=30.0,
-        unite="%",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    reel = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pillar.SOCIAL,
+        metric_code="femmes_effectif_pourcentage",
+        value=30.0,
+        unit="%",
+        method=DataMethod.RAPPORTEE,
+        proof_id=preuve.id,
     )
-    reel.preuve = preuve
-    declare = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.SOCIAL,
-        code="score_social_declare",
-        valeur=70.0,
-        unite="",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    reel.proof = preuve
+    declare = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pillar.SOCIAL,
+        metric_code="score_social_declare",
+        value=70.0,
+        unit="",
+        method=DataMethod.RAPPORTEE,
+        proof_id=preuve.id,
     )
-    declare.preuve = preuve
+    declare.proof = preuve
 
     elements = _section_indicateurs([reel, declare])
     table = elements[-1]
@@ -109,16 +111,16 @@ def test_section_indicateurs_exclut_les_codes_auto_declares(session) -> None:
 
 def test_section_declare_par_lentreprise_isole_les_codes_auto_declares(session) -> None:
     rapport = _rapport(session)
-    rapport.score_global_declare = 66.0
+    rapport.declared_global_score = 66.0
     preuve = _preuve(session)
-    declare = IndicateurESG(
-        rapport_id=rapport.id,
-        pilier=Pilier.SOCIAL,
-        code="score_social_declare",
-        valeur=70.0,
-        unite="",
-        methode=MethodeDonnee.RAPPORTEE,
-        preuve_id=preuve.id,
+    declare = ESGMetric(
+        report_id=rapport.id,
+        pillar=Pillar.SOCIAL,
+        metric_code="score_social_declare",
+        value=70.0,
+        unit="",
+        method=DataMethod.RAPPORTEE,
+        proof_id=preuve.id,
     )
 
     elements = _section_declare_par_lentreprise(rapport, [declare])
@@ -135,16 +137,16 @@ def test_section_declare_par_lentreprise_isole_les_codes_auto_declares(session) 
 
 def test_section_carbone_signale_explicitement_la_non_integration_au_score(session) -> None:
     preuve = _preuve(session)
-    dc = DonneeCarbone(
-        rapport_id=uuid.uuid4(),
+    dc = CarbonEmission(
+        report_id=uuid.uuid4(),
         scope=1,
-        valeur_tonnes_co2e=1200.5,
-        annee=2025,
-        methode=MethodeDonnee.RAPPORTEE,
-        score_qualite_pcaf=3,
-        preuve_id=preuve.id,
+        tonnes_co2e=1200.5,
+        year=2025,
+        method=DataMethod.RAPPORTEE,
+        pcaf_data_quality=3,
+        proof_id=preuve.id,
     )
-    dc.preuve = preuve
+    dc.proof = preuve
 
     elements = _section_carbone([dc])
     assert "non intégrées au score calculé" in _texte(elements)
@@ -156,25 +158,25 @@ def test_generer_rapport_synthese_produit_un_pdf_valide(session) -> None:
     rapport = _rapport(session)
     preuve = _preuve(session)
     session.add(
-        IndicateurESG(
-            rapport_id=rapport.id,
-            pilier=Pilier.GOUVERNANCE,
-            code="femmes_conseil_pourcentage",
-            valeur=40.0,
-            unite="%",
-            methode=MethodeDonnee.RAPPORTEE,
-            preuve_id=preuve.id,
+        ESGMetric(
+            report_id=rapport.id,
+            pillar=Pillar.GOUVERNANCE,
+            metric_code="femmes_conseil_pourcentage",
+            value=40.0,
+            unit="%",
+            method=DataMethod.RAPPORTEE,
+            proof_id=preuve.id,
         )
     )
     session.add(
-        DonneeCarbone(
-            rapport_id=rapport.id,
+        CarbonEmission(
+            report_id=rapport.id,
             scope=1,
-            valeur_tonnes_co2e=500.0,
-            annee=2025,
-            methode=MethodeDonnee.RAPPORTEE,
-            score_qualite_pcaf=3,
-            preuve_id=preuve.id,
+            tonnes_co2e=500.0,
+            year=2025,
+            method=DataMethod.RAPPORTEE,
+            pcaf_data_quality=3,
+            proof_id=preuve.id,
         )
     )
     session.commit()

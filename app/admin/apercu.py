@@ -17,14 +17,14 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
 from app.audit.assignment import statistiques_charge_globale
-from app.company.models import Entreprise
-from app.core.enums import StatutAnalyse
+from app.company.models import Company
+from app.core.enums import AnalysisStatus
 from app.institution.projets import statistiques_admin as statistiques_institutions
 from app.investor.entreprises import dernier_rapport_valide
 from app.investor.portfolio import statistiques_admin as statistiques_investisseurs
 from app.researcher.analyses import statistiques_admin as statistiques_chercheurs
 from app.scoring.engine import score_officiel
-from app.scoring.models import ScoreESG
+from app.scoring.models import Score
 
 
 @dataclass
@@ -87,24 +87,24 @@ def _moyenne(valeurs: list[float]) -> float | None:
     return sum(valeurs) / len(valeurs) if valeurs else None
 
 
-def entreprises_perimetre_esg(session: Session) -> list[Entreprise]:
+def entreprises_perimetre_esg(session: Session) -> list[Company]:
     """Périmètre de calcul de la performance ESG : les entreprises publiées — celles réellement
     montrées à l'Investisseur, cohérent avec ce que "couverture ESG" doit signifier ici (jamais
     une entreprise encore inconnue du catalogue public)."""
     return list(
-        session.exec(select(Entreprise).where(col(Entreprise.date_publication).is_not(None))).all()
+        session.exec(select(Company).where(col(Company.published_at).is_not(None))).all()
     )
 
 
-def calculer_performance_esg(session: Session, entreprises: list[Entreprise]) -> PerformanceESG:
-    """Score admissible par entreprise : celui du dernier RapportESG VALIDE
+def calculer_performance_esg(session: Session, entreprises: list[Company]) -> PerformanceESG:
+    """Score admissible par entreprise : celui du dernier ESGReport VALIDATED
     (dernier_rapport_valide, app/investor/entreprises.py), sous la configuration de référence
     (score_officiel, app/scoring/engine.py) — jamais une pondération personnalisée, jamais un
     rapport non validé ; même définition que celle déjà utilisée pour le score public affiché à
     l'Investisseur, pas une nouvelle règle inventée ici. Une entreprise sans rapport validé ou
     sans score sous la référence est exclue du calcul, jamais comptée comme 0 — voir
     entreprises_avec_score/entreprises_perimetre pour la couverture réelle."""
-    scores: list[ScoreESG] = []
+    scores: list[Score] = []
     for entreprise in entreprises:
         rapport = dernier_rapport_valide(session, entreprise.id)
         if rapport is None:
@@ -118,19 +118,19 @@ def calculer_performance_esg(session: Session, entreprises: list[Entreprise]) ->
         TrancheScore(
             borne_min=lo,
             borne_max=min(hi, 100),
-            nombre_entreprises=sum(1 for s in scores if lo <= s.valeur_globale < hi),
+            nombre_entreprises=sum(1 for s in scores if lo <= s.global_score < hi),
         )
         for lo, hi in bornes
     ]
 
     return PerformanceESG(
-        score_global_moyen=_moyenne([s.valeur_globale for s in scores]),
+        score_global_moyen=_moyenne([s.global_score for s in scores]),
         score_environnement_moyen=_moyenne(
-            [s.score_environnement for s in scores if s.score_environnement is not None]
+            [s.environmental_score for s in scores if s.environmental_score is not None]
         ),
-        score_social_moyen=_moyenne([s.score_social for s in scores if s.score_social is not None]),
+        score_social_moyen=_moyenne([s.social_score for s in scores if s.social_score is not None]),
         score_gouvernance_moyen=_moyenne(
-            [s.score_gouvernance for s in scores if s.score_gouvernance is not None]
+            [s.governance_score for s in scores if s.governance_score is not None]
         ),
         entreprises_avec_score=len(scores),
         entreprises_perimetre=len(entreprises),
@@ -145,28 +145,28 @@ def lister_entreprises_avec_score(
     pays: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Entreprise, ScoreESG | None]], int]:
+) -> tuple[list[tuple[Company, Score | None]], int]:
     """Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque
     entreprise publiée avec son score admissible, None si absent plutôt que 0. Même périmètre que
     calculer_performance_esg (entreprises publiées), filtrable par secteur/pays."""
-    filtres: list[ColumnElement[bool]] = [col(Entreprise.date_publication).is_not(None)]
+    filtres: list[ColumnElement[bool]] = [col(Company.published_at).is_not(None)]
     if secteur:
-        filtres.append(col(Entreprise.secteur) == secteur)
+        filtres.append(col(Company.sector) == secteur)
     if pays:
-        filtres.append(col(Entreprise.pays) == pays)
+        filtres.append(col(Company.country) == pays)
 
-    total = session.exec(select(func.count()).select_from(Entreprise).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(Company).where(*filtres)).one()
     entreprises = list(
         session.exec(
-            select(Entreprise)
+            select(Company)
             .where(*filtres)
-            .order_by(col(Entreprise.nom))
+            .order_by(col(Company.name))
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
     )
 
-    resultats: list[tuple[Entreprise, ScoreESG | None]] = []
+    resultats: list[tuple[Company, Score | None]] = []
     for entreprise in entreprises:
         rapport = dernier_rapport_valide(session, entreprise.id)
         score = score_officiel(session, rapport.id) if rapport is not None else None
@@ -198,11 +198,11 @@ def construire_apercu_acteurs(session: Session) -> ApercuActeurs:
         ),
         chercheurs=StatistiquesChercheurs(
             chercheurs_affectes_projets_ouverts=chercheurs_affectes,
-            analyses_brouillon=analyses_par_statut.get(StatutAnalyse.BROUILLON, 0),
-            analyses_soumises=analyses_par_statut.get(StatutAnalyse.SOUMISE, 0),
-            analyses_validees=analyses_par_statut.get(StatutAnalyse.VALIDEE, 0),
+            analyses_brouillon=analyses_par_statut.get(AnalysisStatus.BROUILLON, 0),
+            analyses_soumises=analyses_par_statut.get(AnalysisStatus.SOUMISE, 0),
+            analyses_validees=analyses_par_statut.get(AnalysisStatus.VALIDEE, 0),
             analyses_correction_demandee=analyses_par_statut.get(
-                StatutAnalyse.CORRECTION_DEMANDEE, 0
+                AnalysisStatus.CORRECTION_DEMANDEE, 0
             ),
         ),
         institutions=StatistiquesInstitutions(

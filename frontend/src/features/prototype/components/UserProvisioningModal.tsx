@@ -23,7 +23,7 @@ import { usePrototype } from "../PrototypeContext";
 import type { PrototypeRole } from "../types";
 import { Field, fieldClassName, Modal, StatusBadge } from "./shared";
 
-type ProvisionableRole = Exclude<PrototypeRole, "ADMINISTRATEUR">;
+type ProvisionableRole = Exclude<PrototypeRole, "ADMIN">;
 type SelectedRole = ProvisionableRole | "";
 type DocumentMode = "URL" | "UPLOAD";
 type DiscoveryStatus = "IDLE" | "LOADING" | "FOUND" | "PARTIAL";
@@ -143,22 +143,22 @@ const roleIntroductions: Record<
   ProvisionableRole,
   { title: string; description: string; icon: typeof UserRound }
 > = {
-  ENTREPRISE: {
+  ENTERPRISE: {
     title: "Entreprise et responsable",
     description: "Ajout de l’entreprise, du compte responsable et de son premier rapport.",
     icon: Building2,
   },
-  AUDITEUR: {
+  AUDITOR: {
     title: "Compte auditeur",
     description: "Profil destiné au contrôle des indicateurs, preuves et rapports.",
     icon: BadgeCheck,
   },
-  INVESTISSEUR: {
+  INVESTOR: {
     title: "Compte investisseur",
     description: "Accès aux entreprises publiées, comparaisons et portefeuilles.",
     icon: BriefcaseBusiness,
   },
-  CHERCHEUR: {
+  RESEARCHER: {
     title: "Compte chercheur",
     description: "Accès aux données autorisées et aux outils d’analyse.",
     icon: FlaskConical,
@@ -171,19 +171,19 @@ const roleIntroductions: Record<
 };
 
 const submitLabels: Record<ProvisionableRole, string> = {
-  ENTREPRISE: "Ajouter l’entreprise et inviter",
-  INVESTISSEUR: "Ajouter l’investisseur et inviter",
-  AUDITEUR: "Ajouter l’auditeur et inviter",
+  ENTERPRISE: "Ajouter l’entreprise et inviter",
+  INVESTOR: "Ajouter l’investisseur et inviter",
+  AUDITOR: "Ajouter l’auditeur et inviter",
   INSTITUTION: "Ajouter l’institution et inviter",
-  CHERCHEUR: "Ajouter le chercheur et inviter",
+  RESEARCHER: "Ajouter le chercheur et inviter",
 };
 
 const provisionableRoles = [
-  "ENTREPRISE",
-  "INVESTISSEUR",
-  "AUDITEUR",
+  "ENTERPRISE",
+  "INVESTOR",
+  "AUDITOR",
   "INSTITUTION",
-  "CHERCHEUR",
+  "RESEARCHER",
 ] as const satisfies readonly ProvisionableRole[];
 
 const provisionableRoleConfigs = provisionableRoles.flatMap((role) => {
@@ -486,7 +486,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
       name: "Responsable ESG",
       email: contactEmail,
       organization: company.name,
-      role: "ENTREPRISE",
+      role: "ENTERPRISE",
       entityId: company.id,
       profile: {
         website: company.website,
@@ -497,7 +497,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
     });
     setCreated({
       name: company.name,
-      role: "ENTREPRISE",
+      role: "ENTERPRISE",
       userId: user.id,
       email: user.email,
       document: documentFile?.name ?? reportUrl?.href,
@@ -506,18 +506,18 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
     return null;
   }
 
-  function submitOtherRole(role: Exclude<ProvisionableRole, "ENTREPRISE">) {
+  function submitOtherRole(role: Exclude<ProvisionableRole, "ENTERPRISE">) {
     const organization =
       role === "INSTITUTION"
         ? draft.institutionName
-        : role === "AUDITEUR"
+        : role === "AUDITOR"
           ? draft.organization
-          : role === "CHERCHEUR"
+          : role === "RESEARCHER"
             ? draft.organization.trim() || "Chercheur indépendant"
             : draft.organization.trim() || "Investisseur particulier";
     const commonError = validateIdentity(draft.fullName, draft.email);
     if (commonError) return commonError;
-    if (role === "AUDITEUR" && !draft.organization.trim()) {
+    if (role === "AUDITOR" && !draft.organization.trim()) {
       return "Indiquez le cabinet ou l’organisation d’appartenance.";
     }
     if (role === "INSTITUTION") {
@@ -533,14 +533,14 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
       organization: organization.trim(),
       role,
       profile:
-        role === "AUDITEUR"
+        role === "AUDITOR"
           ? { position: draft.position.trim(), professionalReferences: draft.reference.trim() }
-          : role === "INVESTISSEUR"
+          : role === "INVESTOR"
             ? {
                 investorType: draft.investorType,
                 investmentPreferences: draft.investmentPreferences.trim(),
               }
-            : role === "CHERCHEUR"
+            : role === "RESEARCHER"
               ? {
                   affiliation: draft.organization.trim(),
                   researchDomain: draft.researchDomain.trim(),
@@ -566,7 +566,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
       return;
     }
     const submissionError =
-      draft.role === "ENTREPRISE" ? submitCompany() : submitOtherRole(draft.role);
+      draft.role === "ENTERPRISE" ? submitCompany() : submitOtherRole(draft.role);
     if (submissionError) setError(submissionError);
   }
 
@@ -588,7 +588,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
       onClose={close}
       title={
         created
-          ? created.role === "ENTREPRISE" || created.role === "INSTITUTION"
+          ? created.role === "ENTERPRISE" || created.role === "INSTITUTION"
             ? "Ajout terminé"
             : "Création terminée"
           : "Ajouter un utilisateur"
@@ -598,7 +598,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
           ? "Les données ont été ajoutées à l’état partagé du prototype."
           : "Commencez par sélectionner un rôle. Le formulaire adapté apparaîtra automatiquement."
       }
-      size={draft.role === "ENTREPRISE" ? "xl" : "lg"}
+      size={draft.role === "ENTERPRISE" ? "xl" : "lg"}
     >
       {created ? (
         <div className="space-y-6 text-center">
@@ -622,7 +622,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
             </div>
             <div className="rounded-xl border bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {created.role === "ENTREPRISE" ? "Entreprise" : "Organisation"}
+                {created.role === "ENTERPRISE" ? "Entreprise" : "Organisation"}
               </p>
               <p className="mt-2 truncate text-sm font-semibold text-brand-blue">{created.name}</p>
               <p className="mt-1 text-xs text-muted-foreground">Ajoutée au prototype</p>
@@ -697,7 +697,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
                 </p>
               </div>
 
-              {draft.role === "ENTREPRISE" ? (
+              {draft.role === "ENTERPRISE" ? (
                 <CompanyFields
                   draft={draft}
                   update={update}
@@ -720,7 +720,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
                 />
               ) : null}
 
-              {draft.role === "AUDITEUR" ? (
+              {draft.role === "AUDITOR" ? (
                 <div className="space-y-5">
                   <PersonFields
                     draft={draft}
@@ -750,7 +750,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
                 </div>
               ) : null}
 
-              {draft.role === "INVESTISSEUR" ? (
+              {draft.role === "INVESTOR" ? (
                 <div className="space-y-5">
                   <PersonFields
                     draft={draft}
@@ -781,7 +781,7 @@ export function UserProvisioningModal({ open, onClose }: { open: boolean; onClos
                 </div>
               ) : null}
 
-              {draft.role === "CHERCHEUR" ? (
+              {draft.role === "RESEARCHER" ? (
                 <div className="space-y-5">
                   <PersonFields
                     draft={draft}

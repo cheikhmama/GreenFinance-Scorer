@@ -57,6 +57,7 @@ const LIENS_AVEC_ID: Record<string, (id: string) => string> = {
   RAPPORT_CORRECTION_DEMANDEE: (id) => `/company/rapports/${id}`,
   RAPPORT_AFFECTE_AUDITEUR: (id) => `/audit/rapports/${id}`,
   RAPPORT_PRET_A_AFFECTER: (id) => `/admin/rapports/${id}`,
+  ENTREPRISE_INSCRITE: (id) => `/admin/entreprises/${id}`,
   RAPPORT_AVIS_RENDU_ADMIN: (id) => `/admin/rapports/${id}`,
   ANALYSE_VALIDEE: (id) => `/researcher/analyses/${id}`,
   ANALYSE_CORRECTION_DEMANDEE: (id) => `/researcher/analyses/${id}`,

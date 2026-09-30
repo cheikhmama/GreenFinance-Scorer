@@ -26,6 +26,7 @@ from app.admin.apercu import (
 )
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import lister_journal_audit
+from app.admin.onboarding import decider_inscription
 from app.admin.review_queue import (
     consulter_entreprise_admin,
     demander_correction,
@@ -36,12 +37,13 @@ from app.admin.review_queue import (
     lister_rapports_echec_extraction,
     lister_rapports_en_retard,
     lister_rapports_en_validation,
-    lister_rapports_extraction_bloquee,
     lister_rapports_orphelins_en_validation,
     lister_tous_les_rapports,
     lister_toutes_les_entreprises,
     lister_versions,
+    modifier_donnees_financieres,
     modifier_entreprise_admin,
+    modifier_identifiants,
     publier_entreprise,
     reactiver_entreprise,
     recalculer_score,
@@ -58,6 +60,12 @@ from app.admin.schemas import (
     AnalyseAdmin,
     ApercuActeursAdmin,
     ChargeAuditeurAdmin,
+    CompanyFinancials,
+    CompanyFinancialsRequest,
+    CompanyIdentifiers,
+    CompanyIdentifiersRequest,
+    CompanyOnboardingRequest,
+    CompanyOnboardingResult,
     CreerUtilisateurRequest,
     DecisionAdminRequest,
     EntrepriseAdmin,
@@ -67,6 +75,7 @@ from app.admin.schemas import (
     PerformanceESGAdmin,
     PortefeuilleAdmin,
     ProjetAdmin,
+    ScoreRecalculeAdmin,
     ScoreVerificationAdmin,
     StatistiquesAuditeursAdmin,
     StatistiquesChercheursAdmin,
@@ -85,33 +94,32 @@ from app.admin.utilisateurs import (
     renvoyer_lien_activation,
 )
 from app.audit.assignment import affecter_auditeur, lister_charge_auditeurs
-from app.audit.models import AvisAudit
+from app.audit.models import AuditOpinion
 from app.audit.schemas import AvisAuditAdmin
 from app.auth.activation import envoyer_lien_activation
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.permissions import require_role
 from app.auth.schemas import UtilisateurPublic
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.company.rapports import lister_mes_rapports
 from app.company.schemas import EntreprisePublic
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import Role, StatutAnalyse, StatutProjet, StatutRapport
+from app.core.enums import AnalysisStatus, ProjectStatus, ReportStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.ingestion.extractor import run_extraction_pipeline
-from app.ingestion.models import RapportESG
+from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.institution.projets import lister_projets_admin
 from app.investor.portfolio import lister_portefeuilles_admin
 from app.researcher.analyses import lister_analyses_admin
-from app.scoring.engine import score_calculable, score_public
-from app.scoring.models import ScoreESG
+from app.scoring.engine import apercu_score, score_public
+from app.worker.queue import enfiler_extraction
 
 router = APIRouter(tags=["admin"])
 
 
-def _vers_entreprise_admin(session: Session, entreprise: Entreprise) -> EntrepriseAdmin:
+def _vers_entreprise_admin(session: Session, entreprise: Company) -> EntrepriseAdmin:
     """Vue EntrepriseAdmin d'une entreprise déjà chargée — utilisée par les routes qui agissent
     sur UNE entreprise (détail, modification, logo), contrairement à lister_toutes_les_entreprises_
     route ci-dessous qui batch cette même construction pour toute une page à la fois."""
@@ -120,10 +128,10 @@ def _vers_entreprise_admin(session: Session, entreprise: Entreprise) -> Entrepri
     )
     return EntrepriseAdmin(
         **EntreprisePublic.model_validate(entreprise).model_dump(),
-        utilisateur_id=entreprise.utilisateur_id,
-        nombre_rapports=nombre_rapports,
-        dernier_statut_rapport=dernier_statut,
-        dernier_rapport_id=dernier_rapport_id,
+        owner_user_id=entreprise.owner_user_id,
+        report_count=nombre_rapports,
+        latest_report_status=dernier_statut,
+        latest_report_id=dernier_rapport_id,
     )
 
 
@@ -142,7 +150,7 @@ def lister_utilisateurs_route(
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[UtilisateurPublic]:
     """Page de comptes existants pour un rôle donné — la seule source à partir de laquelle une
@@ -173,9 +181,9 @@ def lister_utilisateurs_route(
     summary="Lister les comptes actifs, tous rôles confondus, qui n'ont pas encore cliqué leur lien d'activation",
 )
 def lister_utilisateurs_en_attente_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[Utilisateur]:
+) -> list[User]:
     return lister_utilisateurs_en_attente(session)
 
 
@@ -189,27 +197,28 @@ def lister_utilisateurs_en_attente_route(
 def creer_utilisateur_route(
     payload: CreerUtilisateurRequest,
     background_tasks: BackgroundTasks,
-    current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> UtilisateurCree:
     utilisateur = creer_utilisateur(
         session,
         current_user.id,
         payload.email,
-        payload.nom,
+        payload.name,
         payload.role,
-        nom_entreprise=payload.nom_entreprise,
-        secteur=payload.secteur,
-        pays=payload.pays,
+        nom_entreprise=payload.company_name,
+        secteur=payload.sector,
+        pays=payload.country,
     )
     envoyer_lien_activation(session, utilisateur, background_tasks)
+    session.commit()
     return UtilisateurCree(
         id=utilisateur.id,
         email=utilisateur.email,
-        nom=utilisateur.nom,
+        name=utilisateur.name,
         role=utilisateur.role,
-        date_creation=utilisateur.date_creation,
-        actif=utilisateur.actif,
+        created_at=utilisateur.created_at,
+        active=utilisateur.active,
     )
 
 
@@ -222,7 +231,7 @@ def creer_utilisateur_route(
 def renvoyer_activation_route(
     utilisateur_id: uuid.UUID,
     background_tasks: BackgroundTasks,
-    current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> None:
     renvoyer_lien_activation(session, current_user.id, utilisateur_id, background_tasks)
@@ -236,9 +245,9 @@ def renvoyer_activation_route(
 )
 def desactiver_utilisateur_route(
     utilisateur_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Utilisateur:
+) -> User:
     return desactiver_utilisateur(session, current_user.id, utilisateur_id)
 
 
@@ -250,9 +259,9 @@ def desactiver_utilisateur_route(
 )
 def reactiver_utilisateur_route(
     utilisateur_id: uuid.UUID,
-    current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Utilisateur:
+) -> User:
     return reactiver_utilisateur(session, current_user.id, utilisateur_id)
 
 
@@ -263,10 +272,10 @@ def reactiver_utilisateur_route(
     summary="Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut",
 )
 def lister_tous_les_rapports_route(
-    statut: StatutRapport | None = Query(None, description="Filtre sur le statut du rapport"),
+    statut: ReportStatus | None = Query(None, description="Filtre sur le statut du rapport"),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[RapportESGPublic]:
     items, total = lister_tous_les_rapports(session, statut=statut, page=page, page_size=page_size)
@@ -286,9 +295,9 @@ def lister_tous_les_rapports_route(
     summary="Lister les rapports affectés à un auditeur au-delà du délai attendu, sans décision rendue",
 )
 def lister_rapports_en_retard_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_en_retard(session)
 
 
@@ -299,9 +308,9 @@ def lister_rapports_en_retard_route(
     summary="Lister les rapports extraits en attente d'affectation",
 )
 def lister_rapports_a_affecter_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_a_affecter(session)
 
 
@@ -312,23 +321,10 @@ def lister_rapports_a_affecter_route(
     summary="Lister les rapports dont l'extraction automatique a échoué",
 )
 def lister_rapports_echec_extraction_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_echec_extraction(session)
-
-
-@router.get(
-    "/admin/rapports/extraction-bloquee",
-    response_model=list[RapportESGPublic],
-    operation_id="listStuckExtractionReports",
-    summary="Lister les rapports dont l'extraction semble interrompue (aucune erreur, aucune fin)",
-)
-def lister_rapports_extraction_bloquee_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
-    session: Session = Depends(get_session),
-) -> list[RapportESG]:
-    return lister_rapports_extraction_bloquee(session)
 
 
 @router.post(
@@ -340,12 +336,12 @@ def lister_rapports_extraction_bloquee_route(
 def relancer_extraction_route(
     rapport_id: uuid.UUID,
     background_tasks: BackgroundTasks,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> RapportESG:
+) -> ESGReport:
     rapport = relancer_extraction(session, rapport_id)
-    assert rapport.annee_reporting is not None  # garanti par relancer_extraction ci-dessus
-    background_tasks.add_task(run_extraction_pipeline, rapport.id, rapport.annee_reporting)
+    assert rapport.fiscal_year is not None  # garanti par relancer_extraction ci-dessus
+    background_tasks.add_task(enfiler_extraction, rapport.id, rapport.fiscal_year)
     return rapport
 
 
@@ -358,10 +354,10 @@ def relancer_extraction_route(
 def affecter_route(
     rapport_id: uuid.UUID,
     payload: AffecterAuditeurRequest,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> RapportESG:
-    return affecter_auditeur(session, rapport_id, payload.auditeur_id)
+) -> ESGReport:
+    return affecter_auditeur(session, rapport_id, payload.auditor_id)
 
 
 @router.get(
@@ -374,18 +370,18 @@ def lister_charge_auditeurs_route(
     recherche: str | None = Query(None, description="Filtre sur l'e-mail"),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[ChargeAuditeurAdmin]:
     items, total = lister_charge_auditeurs(session, recherche=recherche, page=page, page_size=page_size)
     return Page[ChargeAuditeurAdmin](
         items=[
             ChargeAuditeurAdmin(
-                auditeur_id=auditeur.id,
+                auditor_id=auditeur.id,
                 email=auditeur.email,
-                dossiers_affectes=affectes,
-                dossiers_en_retard=en_retard,
-                avis_rendus=avis,
+                assigned_reports=affectes,
+                overdue_reports=en_retard,
+                opinions_submitted=avis,
             )
             for auditeur, affectes, en_retard, avis in items
         ],
@@ -403,9 +399,9 @@ def lister_charge_auditeurs_route(
     summary="Lister les rapports en attente de décision, avis d'audit déjà rendu",
 )
 def lister_rapports_en_validation_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_en_validation(session)
 
 
@@ -416,9 +412,9 @@ def lister_rapports_en_validation_route(
     summary="Lister les rapports en attente de décision mais sans aucun avis d'audit (état incohérent)",
 )
 def lister_rapports_orphelins_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_rapports_orphelins_en_validation(session)
 
 
@@ -430,24 +426,40 @@ def lister_rapports_orphelins_route(
 )
 def verifier_score_calculable_route(
     rapport_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ScoreVerificationAdmin:
-    return ScoreVerificationAdmin(calculable=score_calculable(session, rapport_id))
+    apercu = apercu_score(session, rapport_id)
+    return ScoreVerificationAdmin(
+        computable=apercu.calculable,
+        coverage_rate=apercu.coverage_rate,
+        min_coverage=apercu.min_coverage,
+    )
 
 
 @router.post(
     "/admin/rapports/{rapport_id}/recalculer-score",
-    response_model=ScoreESG,
+    response_model=ScoreRecalculeAdmin,
     operation_id="recalculateReportScore",
     summary="Recalculer le score d'un rapport validé qui en est dépourvu (état incohérent)",
 )
 def recalculer_score_route(
     rapport_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> ScoreESG:
-    return recalculer_score(session, rapport_id)
+) -> ScoreRecalculeAdmin:
+    score = recalculer_score(session, rapport_id)
+    return ScoreRecalculeAdmin(
+        id=score.id,
+        report_id=score.report_id,
+        config_id=score.config_id,
+        global_score=score.global_score,
+        environmental_score=score.environmental_score,
+        social_score=score.social_score,
+        governance_score=score.governance_score,
+        coverage_rate=score.coverage_rate,
+        computed_at=score.computed_at,
+    )
 
 
 @router.get(
@@ -458,14 +470,14 @@ def recalculer_score_route(
 )
 def consulter_rapport_route(
     rapport_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> RapportESGDetail:
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"score_officiel": score_public(session, rapport_id)})
+    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 
 @router.get(
@@ -475,13 +487,15 @@ def consulter_rapport_route(
 )
 def consulter_fichier_route(
     rapport_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> FileResponse:
-    rapport = session.get(RapportESG, rapport_id)
+    rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
-    return FileResponse(storage.resolve_path(rapport.fichier_source))
+    if rapport.source_file is None:
+        raise NotFoundError("Ce rapport n'a pas encore de fichier.", code="fichier_absent")
+    return FileResponse(storage.resolve_path(rapport.source_file))
 
 
 @router.get(
@@ -492,9 +506,9 @@ def consulter_fichier_route(
 )
 def lister_versions_route(
     rapport_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_versions(session, rapport_id)
 
 
@@ -506,9 +520,9 @@ def lister_versions_route(
 )
 def lister_avis_route(
     rapport_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[AvisAudit]:
+) -> list[AuditOpinion]:
     return lister_avis(session, rapport_id)
 
 
@@ -521,10 +535,10 @@ def lister_avis_route(
 def valider_route(
     rapport_id: uuid.UUID,
     payload: DecisionAdminRequest,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> RapportESG:
-    return valider_rapport(session, rapport_id, payload.commentaire)
+) -> ESGReport:
+    return valider_rapport(session, rapport_id, payload.comment)
 
 
 @router.post(
@@ -536,10 +550,10 @@ def valider_route(
 def rejeter_route(
     rapport_id: uuid.UUID,
     payload: DecisionAdminRequest,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> RapportESG:
-    return rejeter_rapport(session, rapport_id, payload.commentaire)
+) -> ESGReport:
+    return rejeter_rapport(session, rapport_id, payload.comment)
 
 
 @router.post(
@@ -551,10 +565,10 @@ def rejeter_route(
 def demander_correction_route(
     rapport_id: uuid.UUID,
     payload: DecisionAdminRequest,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> RapportESG:
-    return demander_correction(session, rapport_id, payload.commentaire)
+) -> ESGReport:
+    return demander_correction(session, rapport_id, payload.comment)
 
 
 @router.get(
@@ -567,7 +581,7 @@ def lister_toutes_les_entreprises_route(
     recherche: str | None = Query(None, description="Filtre sur le nom, le secteur ou le pays"),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntrepriseAdmin]:
     items, total = lister_toutes_les_entreprises(
@@ -577,10 +591,10 @@ def lister_toutes_les_entreprises_route(
         items=[
             EntrepriseAdmin(
                 **EntreprisePublic.model_validate(entreprise).model_dump(),
-                utilisateur_id=entreprise.utilisateur_id,
-                nombre_rapports=nombre_rapports,
-                dernier_statut_rapport=dernier_statut,
-                dernier_rapport_id=dernier_rapport_id,
+                owner_user_id=entreprise.owner_user_id,
+                report_count=nombre_rapports,
+                latest_report_status=dernier_statut,
+                latest_report_id=dernier_rapport_id,
             )
             for entreprise, nombre_rapports, dernier_statut, dernier_rapport_id in items
         ],
@@ -601,7 +615,7 @@ def lister_entreprises_publiables_route(
     recherche: str | None = Query(None, description="Filtre sur le nom, le secteur ou le pays"),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublic]:
     items, total = lister_entreprises_publiables(
@@ -625,7 +639,7 @@ def lister_entreprises_publiables_route(
 def lister_entreprises_a_republier_route(
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublic]:
     items, total = lister_entreprises_a_republier(session, page=page, page_size=page_size)
@@ -649,7 +663,7 @@ def lister_entreprises_avec_score_route(
     pays: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntrepriseAvecScoreAdmin]:
     items, total = lister_entreprises_avec_score(
@@ -659,13 +673,13 @@ def lister_entreprises_avec_score_route(
         items=[
             EntrepriseAvecScoreAdmin(
                 id=entreprise.id,
-                nom=entreprise.nom,
-                secteur=entreprise.secteur,
-                pays=entreprise.pays,
-                score_global=score.valeur_globale if score else None,
-                score_environnement=score.score_environnement if score else None,
-                score_social=score.score_social if score else None,
-                score_gouvernance=score.score_gouvernance if score else None,
+                name=entreprise.name,
+                sector=entreprise.sector,
+                country=entreprise.country,
+                global_score=score.global_score if score else None,
+                environmental_score=score.environmental_score if score else None,
+                social_score=score.social_score if score else None,
+                governance_score=score.governance_score if score else None,
             )
             for entreprise, score in items
         ],
@@ -673,6 +687,44 @@ def lister_entreprises_avec_score_route(
         page_size=page_size,
         total=total,
         pages=math.ceil(total / page_size) if page_size else 0,
+    )
+
+
+@router.patch(
+    "/admin/companies/{company_id}/identifiers",
+    response_model=CompanyIdentifiers,
+    operation_id="updateCompanyIdentifiers",
+    summary="Renseigner l'ISIN, le LEI ou le ticker d'une entreprise",
+)
+def update_company_identifiers(
+    company_id: uuid.UUID,
+    payload: CompanyIdentifiersRequest,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyIdentifiers:
+    entreprise = modifier_identifiants(
+        session, company_id, payload.model_dump(include=payload.model_fields_set)
+    )
+    return CompanyIdentifiers(
+        company_id=entreprise.id, isin=entreprise.isin, lei=entreprise.lei, ticker=entreprise.ticker
+    )
+
+
+@router.patch(
+    "/admin/companies/{company_id}/onboard",
+    response_model=CompanyOnboardingResult,
+    operation_id="onboardCompany",
+    summary="Valider ou refuser l'inscription d'une entreprise",
+)
+def onboard_company(
+    company_id: uuid.UUID,
+    payload: CompanyOnboardingRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyOnboardingResult:
+    return decider_inscription(
+        session, current_user.id, company_id, payload.decision, payload.reason, background_tasks
     )
 
 
@@ -684,9 +736,9 @@ def lister_entreprises_avec_score_route(
 )
 def publier_route(
     entreprise_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Entreprise:
+) -> Company:
     return publier_entreprise(session, entreprise_id)
 
 
@@ -698,9 +750,9 @@ def publier_route(
 )
 def suspendre_route(
     entreprise_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Entreprise:
+) -> Company:
     return suspendre_entreprise(session, entreprise_id)
 
 
@@ -712,9 +764,9 @@ def suspendre_route(
 )
 def reactiver_entreprise_route(
     entreprise_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Entreprise:
+) -> Company:
     return reactiver_entreprise(session, entreprise_id)
 
 
@@ -726,7 +778,7 @@ def reactiver_entreprise_route(
 )
 def consulter_entreprise_route(
     entreprise_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> EntrepriseAdmin:
     entreprise = consulter_entreprise_admin(session, entreprise_id)
@@ -742,19 +794,19 @@ def consulter_entreprise_route(
 def modifier_entreprise_route(
     entreprise_id: uuid.UUID,
     payload: ModifierEntrepriseAdminRequest,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> EntrepriseAdmin:
     entreprise = modifier_entreprise_admin(
         session,
         entreprise_id,
-        nom=payload.nom,
-        secteur=payload.secteur,
-        pays=payload.pays,
+        nom=payload.name,
+        secteur=payload.sector,
+        pays=payload.country,
         description=payload.description,
-        site_officiel=payload.site_officiel,
-        montant_minimum_investissement=payload.montant_minimum_investissement,
-        devise_montant_minimum=payload.devise_montant_minimum,
+        site_officiel=payload.website,
+        montant_minimum_investissement=payload.minimum_investment_amount,
+        devise_montant_minimum=payload.minimum_investment_currency,
     )
     return _vers_entreprise_admin(session, entreprise)
 
@@ -768,7 +820,7 @@ def modifier_entreprise_route(
 def televerser_logo_entreprise_route(
     entreprise_id: uuid.UUID,
     fichier: UploadFile,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> EntrepriseAdmin:
     contenu = fichier.file.read()
@@ -784,7 +836,7 @@ def televerser_logo_entreprise_route(
 )
 def supprimer_logo_entreprise_route(
     entreprise_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> EntrepriseAdmin:
     entreprise = supprimer_logo_entreprise(session, entreprise_id)
@@ -799,9 +851,9 @@ def supprimer_logo_entreprise_route(
 )
 def lister_rapports_entreprise_route(
     entreprise_id: uuid.UUID,
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[RapportESG]:
+) -> list[ESGReport]:
     return lister_mes_rapports(session, entreprise_id)
 
 
@@ -823,7 +875,7 @@ def lister_journal_audit_route(
     jusqu_a: datetime | None = Query(None, description="Borne haute incluse"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[JournalAuditPublic]:
     items, total = lister_journal_audit(
@@ -854,7 +906,7 @@ def lister_journal_audit_route(
     summary="Indicateurs agrégés du tableau de bord Administrateur",
 )
 def tableau_de_bord_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> TableauDeBordAdmin:
     return construire_tableau_de_bord(session)
@@ -867,32 +919,32 @@ def tableau_de_bord_route(
     summary="Statistiques agrégées des espaces Auditeur, Investisseur, Chercheur et Institution",
 )
 def apercu_acteurs_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ApercuActeursAdmin:
     apercu = construire_apercu_acteurs(session)
     return ApercuActeursAdmin(
-        auditeurs=StatistiquesAuditeursAdmin(
-            dossiers_affectes=apercu.auditeurs.dossiers_affectes,
-            avis_rendus=apercu.auditeurs.avis_rendus,
+        auditors=StatistiquesAuditeursAdmin(
+            assigned_reports=apercu.auditeurs.dossiers_affectes,
+            opinions_submitted=apercu.auditeurs.avis_rendus,
         ),
-        investisseurs=StatistiquesInvestisseursAdmin(
-            portefeuilles_non_archives=apercu.investisseurs.portefeuilles_non_archives,
-            positions_declarees=apercu.investisseurs.positions_declarees,
-            entreprises_distinctes=apercu.investisseurs.entreprises_distinctes,
+        investors=StatistiquesInvestisseursAdmin(
+            active_portfolios=apercu.investisseurs.portefeuilles_non_archives,
+            declared_positions=apercu.investisseurs.positions_declarees,
+            distinct_companies=apercu.investisseurs.entreprises_distinctes,
         ),
-        chercheurs=StatistiquesChercheursAdmin(
-            chercheurs_affectes_projets_ouverts=apercu.chercheurs.chercheurs_affectes_projets_ouverts,
-            analyses_brouillon=apercu.chercheurs.analyses_brouillon,
-            analyses_soumises=apercu.chercheurs.analyses_soumises,
-            analyses_validees=apercu.chercheurs.analyses_validees,
-            analyses_correction_demandee=apercu.chercheurs.analyses_correction_demandee,
+        researchers=StatistiquesChercheursAdmin(
+            researchers_on_open_projects=apercu.chercheurs.chercheurs_affectes_projets_ouverts,
+            draft_analyses=apercu.chercheurs.analyses_brouillon,
+            submitted_analyses=apercu.chercheurs.analyses_soumises,
+            approved_analyses=apercu.chercheurs.analyses_validees,
+            analyses_changes_requested=apercu.chercheurs.analyses_correction_demandee,
         ),
         institutions=StatistiquesInstitutionsAdmin(
-            projets_ouverts=apercu.institutions.projets_ouverts,
-            projets_clotures=apercu.institutions.projets_clotures,
-            invitations_en_attente=apercu.institutions.invitations_en_attente,
-            analyses_a_examiner=apercu.institutions.analyses_a_examiner,
+            open_projects=apercu.institutions.projets_ouverts,
+            closed_projects=apercu.institutions.projets_clotures,
+            pending_invitations=apercu.institutions.invitations_en_attente,
+            analyses_to_review=apercu.institutions.analyses_a_examiner,
         ),
     )
 
@@ -904,22 +956,22 @@ def apercu_acteurs_route(
     summary="Score ESG global/E/S/G moyen et couverture, sur le périmètre des entreprises publiées",
 )
 def performance_esg_route(
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> PerformanceESGAdmin:
     performance = calculer_performance_esg(session, entreprises_perimetre_esg(session))
     return PerformanceESGAdmin(
-        score_global_moyen=performance.score_global_moyen,
-        score_environnement_moyen=performance.score_environnement_moyen,
-        score_social_moyen=performance.score_social_moyen,
-        score_gouvernance_moyen=performance.score_gouvernance_moyen,
-        entreprises_avec_score=performance.entreprises_avec_score,
-        entreprises_perimetre=performance.entreprises_perimetre,
+        average_global_score=performance.score_global_moyen,
+        average_environmental_score=performance.score_environnement_moyen,
+        average_social_score=performance.score_social_moyen,
+        average_governance_score=performance.score_gouvernance_moyen,
+        companies_with_score=performance.entreprises_avec_score,
+        companies_in_scope=performance.entreprises_perimetre,
         distribution=[
             TrancheScorePublic(
-                borne_min=tranche.borne_min,
-                borne_max=tranche.borne_max,
-                nombre_entreprises=tranche.nombre_entreprises,
+                lower_bound=tranche.borne_min,
+                upper_bound=tranche.borne_max,
+                company_count=tranche.nombre_entreprises,
             )
             for tranche in performance.distribution
         ],
@@ -936,7 +988,7 @@ def lister_portefeuilles_admin_route(
     recherche: str | None = Query(None, description="Filtre sur le nom du portefeuille ou l'e-mail"),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[PortefeuilleAdmin]:
     items, total = lister_portefeuilles_admin(session, recherche=recherche, page=page, page_size=page_size)
@@ -944,12 +996,12 @@ def lister_portefeuilles_admin_route(
         items=[
             PortefeuilleAdmin(
                 id=portefeuille.id,
-                nom=portefeuille.nom,
-                investisseur_email=investisseur.email,
-                devise_reference=portefeuille.devise_reference,
-                nombre_positions=nombre_positions,
-                montant_total=montant_total,
-                date_creation=portefeuille.date_creation,
+                name=portefeuille.name,
+                investor_email=investisseur.email,
+                reference_currency=portefeuille.reference_currency,
+                position_count=nombre_positions,
+                total_amount=montant_total,
+                created_at=portefeuille.created_at,
             )
             for portefeuille, investisseur, nombre_positions, montant_total in items
         ],
@@ -967,10 +1019,10 @@ def lister_portefeuilles_admin_route(
     summary="Lister toutes les analyses Chercheur, filtrable par statut",
 )
 def lister_analyses_admin_route(
-    statut: StatutAnalyse | None = Query(None),
+    statut: AnalysisStatus | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[AnalyseAdmin]:
     items, total = lister_analyses_admin(session, statut=statut, page=page, page_size=page_size)
@@ -978,14 +1030,14 @@ def lister_analyses_admin_route(
         items=[
             AnalyseAdmin(
                 id=analyse.id,
-                titre=analyse.titre,
-                statut=analyse.statut,
+                title=analyse.title,
+                status=analyse.status,
                 version=analyse.version,
-                chercheur_email=chercheur_email,
-                projet_nom=projet_nom,
-                date_creation=analyse.date_creation,
-                date_soumission=analyse.date_soumission,
-                date_decision=analyse.date_decision,
+                researcher_email=chercheur_email,
+                project_name=projet_nom,
+                created_at=analyse.created_at,
+                submitted_at=analyse.submitted_at,
+                decided_at=analyse.decided_at,
             )
             for analyse, chercheur_email, projet_nom in items
         ],
@@ -1003,10 +1055,10 @@ def lister_analyses_admin_route(
     summary="Lister tous les projets Institution, filtrable par statut",
 )
 def lister_projets_admin_route(
-    statut: StatutProjet | None = Query(None),
+    statut: ProjectStatus | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=50),
-    _current_user: Utilisateur = Depends(require_role(Role.ADMINISTRATEUR)),
+    _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[ProjetAdmin]:
     items, total = lister_projets_admin(session, statut=statut, page=page, page_size=page_size)
@@ -1014,13 +1066,13 @@ def lister_projets_admin_route(
         items=[
             ProjetAdmin(
                 id=projet.id,
-                nom=projet.nom,
-                statut=projet.statut,
+                name=projet.name,
+                status=projet.status,
                 institution_email=institution_email,
-                nombre_chercheurs=nombre_chercheurs,
-                date_creation=projet.date_creation,
-                date_limite=projet.date_limite,
-                date_cloture=projet.date_cloture,
+                researcher_count=nombre_chercheurs,
+                created_at=projet.created_at,
+                deadline=projet.deadline,
+                closed_at=projet.closed_at,
             )
             for projet, institution_email, nombre_chercheurs in items
         ],
@@ -1029,3 +1081,45 @@ def lister_projets_admin_route(
         total=total,
         pages=math.ceil(total / page_size) if page_size else 0,
     )
+
+
+def _donnees_financieres(entreprise: Company) -> CompanyFinancials:
+    return CompanyFinancials(
+        company_id=entreprise.id,
+        revenue=entreprise.revenue,
+        revenue_currency=entreprise.revenue_currency,
+        enterprise_value=entreprise.enterprise_value,
+        enterprise_value_currency=entreprise.enterprise_value_currency,
+        enterprise_value_as_of=entreprise.enterprise_value_as_of,
+    )
+
+
+@router.get(
+    "/admin/companies/{company_id}/financials",
+    response_model=CompanyFinancials,
+    operation_id="getCompanyFinancials",
+    summary="Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)",
+)
+def get_company_financials(
+    company_id: uuid.UUID,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyFinancials:
+    return _donnees_financieres(consulter_entreprise_admin(session, company_id))
+
+
+@router.put(
+    "/admin/companies/{company_id}/financials",
+    response_model=CompanyFinancials,
+    operation_id="updateCompanyFinancials",
+    summary="Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)",
+)
+def update_company_financials(
+    company_id: uuid.UUID,
+    payload: CompanyFinancialsRequest,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> CompanyFinancials:
+    entreprise = modifier_donnees_financieres(session, company_id, payload.model_dump())
+    return _donnees_financieres(entreprise)
+

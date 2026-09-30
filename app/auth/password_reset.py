@@ -5,7 +5,7 @@ ne doivent pas révéler si une adresse correspond à un compte. La configuratio
 avant toute recherche de compte et produit la même erreur 503 pour toutes les adresses.
 Le jeton n'apparaît jamais dans les journaux ni dans une réponse HTTP.
 
-Le jeton en clair n'est jamais persisté (voir app/auth/models.py::ReinitialisationMotDePasse) :
+Le jeton en clair n'est jamais persisté (voir app/auth/models.py::PasswordResetToken) :
 seule son empreinte SHA-256 l'est. Un hachage rapide suffit ici, contrairement au mot de passe
 (bcrypt) — l'entropie du jeton (32 octets aléatoires) rend une attaque par force brute sur
 l'empreinte impraticable, ce qui est le vrai facteur de sécurité, pas le coût du hachage.
@@ -23,18 +23,22 @@ from fastapi import BackgroundTasks
 from sqlmodel import Session, col, select
 
 from app.auth.hashing import hash_password
-from app.auth.models import ReinitialisationMotDePasse, Utilisateur
+from app.auth.models import PasswordResetToken, User
 from app.auth.revocation import revoke_all_sessions
 from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.email import EmailDeliveryError, ensure_email_configured, send_email
+from app.core.email import (
+    EmailDeliveryError,
+    ensure_email_configured,
+    envoyer_email_differe,
+)
 from app.core.exceptions import (
     ServiceUnavailableError,
     TooManyRequestsError,
     ValidationError,
 )
-from app.core.redis import get_redis_client
+from app.core.redis import get_redis_client, incrementer_fenetre, lire_entier
 
 logger = structlog.get_logger(__name__)
 
@@ -78,7 +82,7 @@ def _construire_lien(jeton_clair: str) -> str:
 
 def _envoyer_lien(email: str, jeton_clair: str) -> None:
     try:
-        send_email(
+        envoyer_email_differe(
             recipient=email,
             subject="Réinitialisez votre mot de passe GreenFinance-Scorer",
             body=(
@@ -112,36 +116,36 @@ def demander_reinitialisation(
             "Service de réinitialisation temporairement indisponible. Réessayez plus tard."
         ) from exc
     email_normalise = email.strip().lower()
-    attempts = _guarded("get", lambda: get_redis_client().get(_rate_limit_key(email_normalise)))
-    if attempts is not None and int(attempts) >= _RATE_LIMIT_MAX:
+    attempts = _guarded(
+        "get", lambda: lire_entier(get_redis_client(), _rate_limit_key(email_normalise))
+    )
+    if attempts is not None and attempts >= _RATE_LIMIT_MAX:
         raise TooManyRequestsError(
             "Trop de demandes de réinitialisation pour cette adresse. Réessayez plus tard."
         )
 
-    def _incr_and_expire() -> int:
-        client = get_redis_client()
-        compte = client.incr(_rate_limit_key(email_normalise))
-        if compte == 1:
-            client.expire(_rate_limit_key(email_normalise), _RATE_LIMIT_WINDOW_SECONDS)
-        return compte
-
-    _guarded("incr", _incr_and_expire)
+    _guarded(
+        "incr",
+        lambda: incrementer_fenetre(
+            get_redis_client(), _rate_limit_key(email_normalise), _RATE_LIMIT_WINDOW_SECONDS
+        ),
+    )
 
     user = session.exec(
-        select(Utilisateur).where(col(Utilisateur.email) == email_normalise)
+        select(User).where(col(User.email) == email_normalise)
     ).first()
     # Un compte jamais activé (app/auth/activation.py) n'a pas de mot de passe à réinitialiser —
     # doit passer par son lien d'activation, pas par ce flux ; même réponse uniforme que "compte
     # inconnu", pour ne rien révéler.
-    if user is None or not user.actif or user.mot_de_passe_hache is None:
+    if user is None or not user.active or user.password_hash is None:
         return
 
     # Un nouveau lien invalide les précédents, encore valides ou non — jamais plus d'un lien
     # utilisable à la fois pour un même compte.
     anciens = session.exec(
-        select(ReinitialisationMotDePasse).where(
-            col(ReinitialisationMotDePasse.utilisateur_id) == user.id,
-            col(ReinitialisationMotDePasse.utilise_le).is_(None),
+        select(PasswordResetToken).where(
+            col(PasswordResetToken.user_id) == user.id,
+            col(PasswordResetToken.used_at).is_(None),
         )
     ).all()
     for ancien in anciens:
@@ -149,13 +153,13 @@ def demander_reinitialisation(
 
     jeton_clair = secrets.token_urlsafe(32)
     session.add(
-        ReinitialisationMotDePasse(
-            utilisateur_id=user.id,
-            jeton_hache=_hash_token(jeton_clair),
-            date_expiration=utcnow() + TOKEN_TTL,
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=_hash_token(jeton_clair),
+            expires_at=utcnow() + TOKEN_TTL,
         )
     )
-    auditer(session, user.id, "demande_reinitialisation_mot_de_passe", "Utilisateur", user.id, "succes")
+    auditer(session, user.id, "password_reset_requested", "User", user.id, "success")
     session.commit()
 
     background_tasks.add_task(_envoyer_lien, user.email, jeton_clair)
@@ -168,28 +172,28 @@ def reinitialiser_mot_de_passe(session: Session, jeton_clair: str, nouveau_mot_d
     légitime de la session côté navigateur ici)."""
     jeton_hache = _hash_token(jeton_clair)
     entree = session.exec(
-        select(ReinitialisationMotDePasse).where(
-            col(ReinitialisationMotDePasse.jeton_hache) == jeton_hache
+        select(PasswordResetToken).where(
+            col(PasswordResetToken.token_hash) == jeton_hache
         )
     ).first()
 
     if (
         entree is None
-        or entree.utilise_le is not None
-        or entree.date_expiration < utcnow()
+        or entree.used_at is not None
+        or entree.expires_at < utcnow()
     ):
         raise ValidationError("Ce lien de réinitialisation est invalide ou a expiré.", code="jeton_invalide")
 
-    user = session.get(Utilisateur, entree.utilisateur_id)
-    if user is None or not user.actif or user.mot_de_passe_hache is None:
+    user = session.get(User, entree.user_id)
+    if user is None or not user.active or user.password_hash is None:
         raise ValidationError("Ce lien de réinitialisation est invalide ou a expiré.", code="jeton_invalide")
 
-    entree.utilise_le = utcnow()
-    user.mot_de_passe_hache = hash_password(nouveau_mot_de_passe)
+    entree.used_at = utcnow()
+    user.password_hash = hash_password(nouveau_mot_de_passe)
     session.add(entree)
     session.add(user)
     auditer(
-        session, user.id, "reinitialisation_mot_de_passe", "Utilisateur", user.id, "succes"
+        session, user.id, "password_reset", "User", user.id, "success"
     )
     session.commit()
 

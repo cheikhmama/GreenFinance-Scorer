@@ -15,7 +15,7 @@ import redis
 import structlog
 
 from app.core.exceptions import ServiceUnavailableError, TooManyRequestsError
-from app.core.redis import get_redis_client
+from app.core.redis import get_redis_client, incrementer_fenetre
 
 logger = structlog.get_logger(__name__)
 
@@ -46,16 +46,9 @@ def _guarded(operation: str, call: Callable[[], T]) -> T:
 def enforce_url_import_rate_limit(entreprise_id: uuid.UUID) -> None:
     """À appeler avant tout téléchargement — lève avant même de contacter l'URL cible si le
     seuil est déjà atteint pour cette entreprise."""
-    key = _key(entreprise_id)
-
-    def _incr_and_expire() -> int:
-        client = get_redis_client()
-        attempts = client.incr(key)
-        if attempts == 1:
-            client.expire(key, WINDOW_SECONDS)
-        return attempts
-
-    attempts = _guarded("incr", _incr_and_expire)
+    attempts = _guarded(
+        "incr", lambda: incrementer_fenetre(get_redis_client(), _key(entreprise_id), WINDOW_SECONDS)
+    )
     if attempts > MAX_IMPORTS:
         raise TooManyRequestsError(
             "Trop d'imports automatiques pour cette entreprise. Réessayez plus tard.",

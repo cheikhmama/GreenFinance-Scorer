@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import {
+  activateAccount,
   changePassword,
+  confirmEmailChange,
   deleteMyAvatar,
   demanderReinitialisationMotDePasse,
   getCurrentUser,
@@ -13,6 +15,7 @@ import {
   verifyMyPassword,
 } from "@/shared/api/generated/auth/auth";
 import type {
+  ActiverCompteRequest,
   ChangerMotDePasseRequest,
   DemanderReinitialisationRequest,
   ModifierProfilRequest,
@@ -23,7 +26,7 @@ import type { LoginRequest, User } from "./schemas";
 
 /** Clé de cache TanStack Query partagée par useCurrentUser, useLogin et useLogout,
  * pour que les trois hooks restent synchronisés sur un seul état de session. */
-const CURRENT_USER_QUERY_KEY = ["auth", "me"] as const;
+export const CURRENT_USER_QUERY_KEY = ["auth", "me"] as const;
 
 /**
  * GET /auth/me. Sert deux usages : afficher l'utilisateur connecté, et — via
@@ -67,6 +70,39 @@ export function useResetPassword() {
   return useMutation<void, ApiError, ReinitialiserMotDePasseRequest>({
     mutationFn: (payload) => reinitialiserMotDePasse(payload),
     retry: false,
+  });
+}
+
+/** Consomme le lien d'activation reçu à la création du compte (app/auth/activation.py) et pose
+ * le premier mot de passe, sans ouvrir de session — même contrat que useResetPassword. */
+export function useActivateAccount() {
+  return useMutation<void, ApiError, ActiverCompteRequest>({
+    mutationFn: (payload) => activateAccount(payload),
+    retry: false,
+  });
+}
+
+/** Consomme le lien reçu à la nouvelle adresse (app/auth/email_change.py). Une requête plutôt
+ * qu'une mutation : ouvrir le lien EST la confirmation, sans geste de l'utilisateur, et le cache
+ * de requêtes déduplique l'appel au double montage de React.StrictMode — une mutation lancée
+ * depuis un effet y perdait son résultat (observateur démonté). Jamais relancée : le jeton est à
+ * usage unique. Rafraîchit l'utilisateur courant pour qu'un navigateur déjà connecté affiche
+ * aussitôt la nouvelle adresse. */
+export function useConfirmEmailChange(token: string | null) {
+  const queryClient = useQueryClient();
+  return useQuery<User, ApiError>({
+    queryKey: ["auth", "confirmer-changement-email", token],
+    queryFn: async () => {
+      const user = await confirmEmailChange({ token: token ?? "" });
+      await queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+      return user;
+    },
+    enabled: token !== null,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

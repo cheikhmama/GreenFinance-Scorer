@@ -28,7 +28,6 @@ import {
   listReportsInValidation,
   listReportsToAssign,
   listReportVersions,
-  listStuckExtractionReports,
   listUsersAwaitingActivation,
   listUsersByRole,
   publishCompany,
@@ -38,13 +37,23 @@ import {
   rejectReport,
   requestReportCorrection,
   retryExtraction,
+  onboardCompany,
   suspendCompany,
+  getCompanyFinancials,
+  updateCompanyFinancials,
+  updateCompanyIdentifiers,
   updateCompanyProfile,
   uploadCompanyLogo,
   validateReport,
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
+  CompanyFinancials,
+  CompanyFinancialsRequest,
+  CompanyIdentifiers,
+  CompanyIdentifiersRequest,
+  CompanyOnboardingRequest,
+  CompanyOnboardingResult,
   AffecterAuditeurRequest,
   ApercuActeursAdmin,
   AvisAuditAdmin,
@@ -68,11 +77,11 @@ import type {
   RapportESGDetail,
   RapportESGPublic,
   Role,
-  ScoreESG,
+  ScoreRecalculeAdmin,
+  ReportStatus,
   ScoreVerificationAdmin,
-  StatutAnalyse,
-  StatutProjet,
-  StatutRapport,
+  AnalysisStatus,
+  ProjectStatus,
   TableauDeBordAdmin,
   UtilisateurCree,
   UtilisateurPublic,
@@ -151,22 +160,12 @@ export function useFailedExtractionReports() {
   });
 }
 
-/** Rapports EN_VALIDATION sans aucun avis d'audit — état incohérent normalement inatteignable via
+/** Rapports PENDING_DECISION sans aucun avis d'audit — état incohérent normalement inatteignable via
  * l'API seule, gardé en visibilité de défense (voir lister_rapports_orphelins_en_validation). */
 export function useOrphanReportsInValidation() {
   return useQuery<RapportESGPublic[], ApiError>({
     queryKey: ORPHELINS_KEY,
     queryFn: () => listOrphanReportsInValidation(),
-  });
-}
-
-/** Rapports EN_EXTRACTION sans erreur classifiée ni fin, bloqués depuis plus longtemps que
- * settings.extraction_timeout_minutes — traitement probablement interrompu (voir
- * lister_rapports_extraction_bloquee), distinct d'un échec classifié (useFailedExtractionReports). */
-export function useStuckExtractionReports() {
-  return useQuery<RapportESGPublic[], ApiError>({
-    queryKey: EXTRACTION_BLOQUEE_KEY,
-    queryFn: () => listStuckExtractionReports(),
   });
 }
 
@@ -196,7 +195,7 @@ export function useOverdueReports() {
 /** Vue globale de tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut
  * (voir app/admin/review_queue.py::lister_tous_les_rapports) — sert le suivi transverse depuis le
  * tableau de bord (ex. "rapports validés"), distinct des files scopées à une étape du workflow. */
-export function useAllReports(statut?: StatutRapport) {
+export function useAllReports(statut?: ReportStatus) {
   return useInfiniteQuery<PageRapportESGPublic, ApiError>({
     queryKey: [...TOUS_RAPPORTS_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>
@@ -229,7 +228,7 @@ export function useReportScoreVerification(rapportId: string, enabled: boolean) 
  * indéfiniment la publication de l'entreprise, voir app/admin/review_queue.py::recalculer_score). */
 export function useRecalculateReportScore(rapportId: string) {
   const queryClient = useQueryClient();
-  return useMutation<ScoreESG, ApiError, void>({
+  return useMutation<ScoreRecalculeAdmin, ApiError, void>({
     mutationFn: () => recalculateReportScore(rapportId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rapportKey(rapportId) });
@@ -357,6 +356,23 @@ export function useSuspendCompany() {
   });
 }
 
+/** PATCH /admin/companies/{id}/onboard — valide (lien d'activation envoyé au titulaire) ou refuse
+ * (inscription supprimée, motif envoyé) une inscription en attente (app/admin/onboarding.py). */
+export function useOnboardCompany() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    CompanyOnboardingResult,
+    ApiError,
+    { entrepriseId: string } & CompanyOnboardingRequest
+  >({
+    mutationFn: ({ entrepriseId, ...decision }) => onboardCompany(entrepriseId, decision),
+    onSuccess: (_resultat, { entrepriseId }) => {
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+      queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
+    },
+  });
+}
+
 export function useReactivateCompany() {
   const queryClient = useQueryClient();
   return useMutation<EntreprisePublic, ApiError, string>({
@@ -388,6 +404,43 @@ export function useUpdateCompanyProfile(entrepriseId: string) {
     onSuccess: (entreprise) => {
       queryClient.setQueryData(companyDetailKey(entrepriseId), entreprise);
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
+  });
+}
+
+/** PATCH /admin/companies/{id}/identifiers (tâche 2.2) — patch partiel : seuls les champs
+ * envoyés changent, `null` efface. Relit la fiche (qui expose isin/lei/ticker) au succès. */
+export function useUpdateCompanyIdentifiers(entrepriseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<CompanyIdentifiers, ApiError, CompanyIdentifiersRequest>({
+    mutationFn: (payload) => updateCompanyIdentifiers(entrepriseId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
+  });
+}
+
+const financialsKey = (entrepriseId: string) =>
+  [...companyDetailKey(entrepriseId), "financials"] as const;
+
+/** GET /admin/companies/{id}/financials (tâche 2.3) — chiffre d'affaires et EVIC, dont le moteur
+ * PCAF a besoin. */
+export function useCompanyFinancials(entrepriseId: string) {
+  return useQuery<CompanyFinancials, ApiError>({
+    queryKey: financialsKey(entrepriseId),
+    queryFn: () => getCompanyFinancials(entrepriseId),
+    enabled: entrepriseId.length > 0,
+  });
+}
+
+/** PUT /admin/companies/{id}/financials — remplacement complet (un champ omis vaut null). */
+export function useUpdateCompanyFinancials(entrepriseId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<CompanyFinancials, ApiError, CompanyFinancialsRequest>({
+    mutationFn: (payload) => updateCompanyFinancials(entrepriseId, payload),
+    onSuccess: (financieres) => {
+      queryClient.setQueryData(financialsKey(entrepriseId), financieres);
     },
   });
 }
@@ -599,7 +652,7 @@ export function usePortfoliosAdmin(recherche = "") {
 /** Toutes les analyses Chercheur, filtrable par statut — détail derrière "Analyses par statut" de
  * l'onglet Chercheur/Institution (app/researcher/analyses.py::lister_analyses_admin). Une ligne =
  * une version précise, jamais fusionnée avec ses versions précédentes/suivantes. */
-export function useAnalysesAdmin(statut?: StatutAnalyse) {
+export function useAnalysesAdmin(statut?: AnalysisStatus) {
   return useInfiniteQuery<PageAnalyseAdmin, ApiError>({
     queryKey: [...ANALYSES_ADMIN_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>
@@ -611,7 +664,7 @@ export function useAnalysesAdmin(statut?: StatutAnalyse) {
 
 /** Tous les projets Institution, filtrable par statut — détail derrière "Projets ouverts/clôturés"
  * de l'onglet Institution (app/institution/projets.py::lister_projets_admin). */
-export function useProjectsAdmin(statut?: StatutProjet) {
+export function useProjectsAdmin(statut?: ProjectStatus) {
   return useInfiniteQuery<PageProjetAdmin, ApiError>({
     queryKey: [...PROJETS_ADMIN_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>

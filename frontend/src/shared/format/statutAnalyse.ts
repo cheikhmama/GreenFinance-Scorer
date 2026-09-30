@@ -1,6 +1,6 @@
-import type { StatutAnalyse } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { AnalysisStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-const LIBELLES: Record<StatutAnalyse, string> = {
+const LIBELLES: Record<AnalysisStatus, string> = {
   BROUILLON: "Brouillon",
   SOUMISE: "Soumise",
   VALIDEE: "Validée",
@@ -8,7 +8,7 @@ const LIBELLES: Record<StatutAnalyse, string> = {
 };
 
 const VARIANTES: Record<
-  StatutAnalyse,
+  AnalysisStatus,
   "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
 > = {
   BROUILLON: "secondary",
@@ -17,10 +17,10 @@ const VARIANTES: Record<
   CORRECTION_DEMANDEE: "warning",
 };
 
-export function libelleStatutAnalyse(statut: StatutAnalyse): string {
+export function libelleStatutAnalyse(statut: AnalysisStatus): string {
   return LIBELLES[statut];
 }
 
-export function variantStatutAnalyse(statut: StatutAnalyse) {
+export function variantStatutAnalyse(statut: AnalysisStatus) {
   return VARIANTES[statut];
 }

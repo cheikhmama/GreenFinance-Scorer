@@ -1,0 +1,146 @@
+# Implementation Task Tracker
+
+Target design: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) and [`docs/WORKFLOWS.md`](WORKFLOWS.md).
+Current binding conventions: [`/ARCHITECTURE.md`](../ARCHITECTURE.md).
+
+Rules for every task:
+- One Alembic migration per schema change, with a working `downgrade()`.
+- Tests land in the same commit (unit for pure logic, integration for routes and transactions).
+- When a phase is complete, update `/ARCHITECTURE.md` and mark the section *Implemented* in
+  `docs/ARCHITECTURE.md`.
+- Tasks marked **[review]** fix a finding from the project review (2026-09-28).
+
+## Phase 0: Decisions and groundwork
+
+- [x] 0.1 Settle the open decisions D1–D5 in `docs/ARCHITECTURE.md` §9 (INSTITUTION role, `PENDING_DECISION` status, rename strategy, password policy rollout, public registration).
+- [x] 0.2 Domain rename plan: map every table, column and enum from French to the target English names — [`RENAME_PLAN.md`](RENAME_PLAN.md) (boundary rules, task 1.1 glossary, later renames).
+- [x] 0.3 Rule adopted: regenerate the OpenAPI client (`npm run api:generate`) whenever the HTTP contract changes and update the frontend in the same commit; CI `api:check` must stay green.
+
+## Phase 1: Enterprise Management & Onboarding
+
+- [x] 1.1 DB Models: Refactor `Company`, `ESGReport`, and `ESGMetric` models according to domain spec. (migration `21e17187789f`)
+  - [x] Rename `entreprise`/`rapport_esg`/`indicateur_esg` to `companies`/`esg_reports`/`esg_metrics` per [`RENAME_PLAN.md`](RENAME_PLAN.md) §2, in one consolidated migration.
+  - [x] Add `isin`, `lei` (check-digit validated), `revenue`, `enterprise_value` (EVIC) with currencies and dates, `status` (replaces `actif`; `published_at` keeps the publication timestamp).
+  - [x] Split report `status` from `extraction_status`; add `DRAFT`, `PENDING_DECISION` (D2), `official_score`, `coverage_rate`, `config_hash`.
+  - [x] Unique `(report_id, metric_code)` on metrics **[review]**; the extractor keeps the first exploitable occurrence of a repeated code.
+  - [x] Auditor override fields on metrics (columns only; the auditor API is part of the audit workflow work).
+  - [x] Explicit `ON DELETE` rules and indexes on every foreign key to or from the three tables (RENAME_PLAN §2.5).
+  - Follow-ups: ISIN/LEI check-digit validation lands with registration input (1.3); `official_score`, `coverage_rate`, `config_hash` are filled by 1.6 and 3.1.
+- [x] 1.2 Auth & Email Sanitization: Enforce lowercase email normalization and Pydantic password validation (12-72 bytes). (migration `7499c018ddb1`)
+  - [x] Rename `utilisateur` → `users` (+ token tables, `Role` values) per RENAME_PLAN §3.
+  - [x] Password policy per D4: 12 characters minimum on activation, reset and change; existing hashes untouched.
+  - [x] Lower-case email on login, admin creation, profile update and reset; case-insensitive uniqueness (stored lower-case + CHECK + unique index); the migration refuses to run on existing case-duplicates **[review]**.
+  - [x] One shared password validator used by activation, reset **and** change-password **[review]**.
+  - [x] Rate-limit `POST /auth/changer-mot-de-passe` like verify-password **[review]**.
+  - [x] Require the current password and a confirmation link to change email **[review]**; frontend confirmation page `/confirmer-email`.
+  - [x] Atomic `INCR` + `EXPIRE` in rate-limit counters; add a per-IP limit behind a trusted proxy **[review]**.
+  - [x] Found while testing: the activation e-mail linked to `/activer-compte`, a frontend page that did not exist — added (shares the reset page).
+- [x] 1.3 Company Registration API: Implement Self-Service registration (`POST /api/v1/companies/register`).
+  - [x] Public endpoint with the first English JSON contract; ISIN (ISO 6166) and LEI (ISO 17442) check digits validated when given (`app/company/identifiers.py`).
+  - [x] Company `PENDING_ONBOARDING` + owner account without password; no activation link before onboarding (1.4); admins notified.
+  - [x] Uniform `202` (no disclosure of known e-mails / ISIN / LEI); per-IP rate limit; trap field. No CAPTCHA — needs a third-party service decision before production.
+  - [x] Admin actions can't bypass onboarding: reactivate only from `SUSPENDED`, suspend only from `ACTIVE`, no activation-link resend for a pending company; `statut` added to the company API contract.
+  - [x] Frontend: public page `/inscription-entreprise` (linked from login), pending badge in the admin views.
+- [x] 1.4 Admin KYC API: Implement onboarding approval endpoint (`PATCH /api/v1/admin/companies/{id}/onboard`). (migration `e7d012541fce`)
+  - [x] `approve`: company `ACTIVE`, `onboarded_at` / `onboarded_by_id` recorded, owner's activation link sent — status and token in one commit, company row locked.
+  - [x] `reject` (reason required): registration deleted, reason e-mailed, decision kept in the audit journal; the requester can register again.
+  - [x] Decision: no ISIN/LEI or financial data required to approve (unlisted companies); revisit with PCAF (2.3).
+  - [x] `envoyer_lien_activation` no longer commits: callers commit the token with the rest of their change.
+  - [x] Frontend: approve / reject panel on a pending company's admin page; end-to-end test register → approve → activate → log in.
+- [x] 1.5 Fiscal Reporting Session API: Implement session creation and multi-tenant scoping (`POST /api/v1/reports`). (migration `fa4f8e80e840`)
+  - [x] `POST /reports` opens a `DRAFT` (no file); one draft per company, fiscal year and report type; ADMIN may open for a designated company.
+  - [x] `GET /reports`, `GET /reports/{id}` scoped by role in one place (`app/reporting/sessions.py::perimetre`): enterprise → its company, auditor → assigned reports, admin → all; out of scope → 404.
+  - [x] `POST /reports/{id}/submit` (same deposit logic as the one-step upload, bounded read) and `DELETE /reports/{id}` (discard a draft).
+  - [x] Schema: `created_at` added; `source_file` / `submitted_at` nullable for drafts, CHECK for every other status. Existing lists and file downloads handle drafts.
+  - [ ] Frontend screens to open / submit / discard a draft (the existing one-step deposit keeps working; drafts already show as "Brouillon").
+- [x] 1.6 Audit Queue & Atomic Validation: Refactor `valider_rapport` to run score calculation and status transition inside a single atomic BDD transaction. **[review]** (migration `834bf70ae1b9`)
+  - [x] Remove `session.commit()` from `obtenir_configuration_reference`; `INSERT ... ON CONFLICT` on a new partial unique index (one reference row per version); existing duplicate rows merged by the migration.
+  - [x] Stop GET endpoints (`score_officiel`, `score_public`, `score_calculable`) from creating rows (`trouver_configuration_reference` is read-only).
+  - [x] Lock the report row (`SELECT ... FOR UPDATE`) during every decision and during score recalculation.
+  - [x] Regression test: first validation under a reference version with no row yet and an uncomputable score leaves the report un-validated (verified to fail on the old code).
+  - [x] `official_score` set in the validation transaction (backfilled for validated reports); the score uses the auditor override when one exists; the synthesis PDF is generated only after the commit.
+
+## Phase 2: Investment Portfolios & Carbon Module (PCAF)
+
+- [x] 2.1 DB Models: Implement `Portfolio` and `PortfolioPosition` models. (migration `be63d4541f22`)
+  - [x] Renamed to `portfolios` / `portfolio_positions` with English columns (RENAME_PLAN §3b).
+  - [x] Extended with `identifier_type`, `identifier_raw`, `match_status`, `weight`; `company_id` nullable for lines kept unmatched (CHECK ties it to `match_status`); cached aggregates on `portfolios` (filled by the recompute job, task 4.1 — see 2.3).
+  - [x] Aggregation counts unmatched lines in the total but never scores them (coverage drops, scores don't); sector breakdown skips them.
+  - [x] `ON DELETE`: `portfolios.user_id` CASCADE, `portfolio_positions.portfolio_id` CASCADE + index.
+  - [x] Found while renaming: three attribute writes (archive, rename, close position) that mypy cannot see on SQLModel — fixed; archive/close were already covered by tests, a rename test was added (verified to fail on the old code); one more timing-flaky test made deterministic.
+- [x] 2.2 Portfolio API: CSV/JSON upload endpoint for portfolio positions mapped by ISIN/Ticker. (migration `161f99c1f733`)
+  - [x] `POST /portfolios/{id}/positions/import` (multipart `file` + optional `total_value`, `app/investor/importation.py`): CSV (`,` `;` or tab, decimal comma with `;`) or JSON, 1 MB / 5 000 lines max.
+  - [x] All-or-nothing import with a per-line error report (`fields.line_<n>`, `fields.file`); unmatched lines kept (`UNMATCHED` / `AMBIGUOUS`), shown with their raw identifier and never scored.
+  - [x] Weight-only imports require a total portfolio value (PCAF needs amounts); amount and weight modes cannot be mixed; weights sum to 1 ± 0.001.
+  - [x] Matching only against **published** companies (an import never reveals a pending one); a matched company follows the manual-entry rules (`ACTIVE`, minimum investment).
+  - [x] Scope choice: import only into an **empty**, non-archived portfolio — replacing positions that have a history would destroy it (re-import: later, with the recompute job of task 4.1).
+  - [x] `companies.ticker` (indexed, never unique: one symbol can exist on several exchanges → `AMBIGUOUS`); `PATCH /admin/companies/{id}/identifiers` (partial, English contract) + admin form; ISIN/LEI/ticker added to the company contract.
+  - [x] Frontend: import form in the empty-portfolio state; `ApiError.fields` exposed.
+- [x] 2.3 PCAF Carbon Engine: Implement real Scope 1, 2, 3 carbon footprint calculations (replacing placeholder scores). **[review]** (migration `c3a9f2d71b58`)
+  - [x] Attribution factor (amount / EVIC), financed emissions per scope, carbon footprint, WACI, weighted data quality — pure engine `app/carbon/pcaf.py`, assembled by `app/investor/carbon.py`, served by `GET /portfolios/{id}/carbon` (English contract) + carbon card on the portfolio page.
+  - [x] Scope 3 reported separately; missing data excluded and counted in coverage, never zero (each excluded line carries its reason: `UNMATCHED`, `NO_VALIDATED_REPORT`, `MISSING_EMISSIONS`, `MISSING_EVIC`).
+  - [x] Remove `PLACEHOLDER_SCORE_QUALITE_PCAF = 3`; `pcaf_data_quality` nullable and derived from the extraction method (reported 2, calculated 3, estimated 4 — never 1 without assurance information); existing rows re-derived by the migration.
+  - [x] Use `Decimal` for monetary amounts and FX (`numeric` columns; amounts at most two decimals, refused otherwise); return `422` (`devise_non_prise_en_charge`) for a currency missing from the rates file instead of a `500` **[review]**.
+  - [x] Revenue and EVIC had no input path: `GET`/`PUT /admin/companies/{id}/financials` + admin form (task 1.4 decision revisited: still not required at onboarding, PCAF reports the gap).
+  - [x] Renamed `donnee_carbone` → `carbon_emissions`, `preuve_documentaire` → `evidence`, `couverture_indicateur` → `metric_coverage`, `signalement_ecart` → `discrepancy_flags` (RENAME_PLAN §4); `carbon_emissions.proof_id` gets `ON DELETE CASCADE` + index (it had neither).
+  - [x] Scope choices: computed on read, active positions only; the cached aggregates on `portfolios` are left for the recompute job of task 4.1 (they need the worker to stay fresh when a new score is published).
+
+## Phase 3: Researcher Tooling & SHAP Explainability
+
+- [x] 3.1 YAML Config Versioning: Hash and store YAML configuration files on every calculation. **[review]** (migration `c1d4a8e2f935`)
+  - [x] Store `content_yaml` + `content_hash` on `scoring_configs`; recalculation always uses the stored content. The hash is SHA-256 of the canonical form (parsed YAML as sorted JSON: comments and layout don't count, weights, bounds and version do); a config is identified by its hash per owner (partial unique indexes), no longer by its version number — editing the file without bumping the version registers a new config instead of silently changing the old one.
+  - [x] Store `coverage_rate` with every score and show it next to the score (shared score summary, admin pre-validation check); optional `min_coverage` per config blocks validation below it (`couverture_insuffisante`) **[review]**. The reference YAML sets no minimum yet — a methodology decision left open.
+  - [x] Official score = the latest score under a reference config, not "the score under the current file version": a methodology change no longer hides every published score, so `scripts/recalculer_scores_v2.py` (the workaround) is deleted. Validation also fills `esg_reports.coverage_rate` / `config_hash`.
+  - [x] Renamed `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores`, `Pilier` → `Pillar` (RENAME_PLAN §3d); `scores.config_id` RESTRICT + index; `analyse_entreprise.score_esg_id` gets `ON DELETE SET NULL` + index (deleting a scored report failed once an analysis had frozen it).
+  - [x] Migration keeps a config's content only when the file it pointed to still declares the same version; otherwise content stays unknown (never guessed) and that config can't be used for a calculation (`configuration_sans_contenu`).
+- [x] 3.2 SHAP Explainability Module: Implement feature attribution endpoints for score decomposition.
+  - [x] Exact linear SHAP with a sector baseline; contributions must sum to `score − baseline` (property test). `app/scoring/engine.py::termes_effectifs` exposes the score's linear form (effective weights after renormalisation); `app/explainability/decomposition.py` is pure; property tests (`hypothesis`, new dev dependency) check on random reports that the linear form equals the engine's score and that contributions sum exactly to `score − baseline`.
+  - [x] Waterfall endpoint and frontend chart: `GET /reports/{id}/score-explanation?baseline=SECTOR|UNIVERSE` (English contract), "D'où vient ce score ?" card on the investor, researcher and institution company pages (plain HTML bars, no chart library).
+  - [x] Baseline = mean normalised value of each indicator over the latest validated report of the other published companies, under the **same** stored config as the explained score; sector by default, whole universe when the sector has fewer than 3 peers (flagged). An indicator no peer publishes has no baseline and a zero contribution — never an invented mean.
+  - [x] Access follows what each role already sees: `/reports` perimeter for admin, company and auditor; latest validated report of a published company for the others, inside the project perimeter for researcher and institution. Company detail gains `rapport_id`.
+  - [x] Removed the empty `app/explainability/justification.py` stub (textual justifications are in no task).
+- [x] 3.3 Public dataset cross-validation (Kaggle / CDP / GRI): staging import, ISIN/LEI matching, Spearman and MAE report. (migration `a7e3b9c2d410`)
+  - [x] Staging tables `reference_datasets` (source URL and licence required, declared scale and direction) / `reference_dataset_rows`, private to their researcher (`owner_user_id` CASCADE), never read by scoring.
+  - [x] Generic CSV import (no dataset ships with the repo, and Kaggle/CDP/GRI files differ): `isin` / `lei` + any of `environmental`, `social`, `governance`, `total`; other columns ignored; unusable lines skipped with their reason (invalid identifier, unreadable or out-of-scale score), all-unusable → 422 and nothing saved.
+  - [x] Matching by ISIN, then LEI — never by name — against the published companies of the researcher's project perimeter (governance decision of 2026-09-02; an unmatched line never reveals a company outside it). Duplicates and companies without an official score are listed separately.
+  - [x] Report per score (E, S, G, global): pairs, Spearman (average ranks for ties; `null` under 3 pairs or for a constant series — never a misleading 0), mean absolute difference after rescaling the dataset to 0-100 (inverted for "lower is better" risk scores). Pure-Python statistics, checked against `scipy` in a property test.
+  - [x] Endpoints under `/researcher/reference-datasets` (import, list, report, delete; English contract) + "Validation croisée" researcher page.
+
+## Phase 4: Architecture & Quality
+
+- [x] 4.1 ARQ/Redis Task Queue: Offload Docling extraction to asynchronous background tasks. **[review]**
+  - [x] Worker process with deterministic job IDs, retries with backoff, and a cron job that fails stuck extractions. Two workers (`app/worker/settings.py`): `ExtractionWorkerSettings` (queue `arq:extraction`, one job at a time) and `WorkerSettings` (queue `arq:queue`: e-mails, synthesis PDF, the cron). Extraction job id `extract:{report_id}`; transient failures (LLM 429/5xx, network) retried with a growing delay up to 3 tries, any other error is FAILED at once with its fixed cause. Cron every 5 min: RUNNING past the timeout → FAILED `delai_depasse` (+ owner notified), QUEUED whose job was lost → re-enqueued (same id, so no duplicate).
+  - [x] Replace `BackgroundTasks` + `threading.Lock`; move synthesis PDF and emails to jobs. Jobs are enqueued **after** the commit (post-response `BackgroundTasks` hook or right after `commit()`); every e-mail goes through the `send_email` job (retried up to 5 times; missing SMTP config is abandoned, not retried). The read-time "stuck extraction" list and endpoint are removed (the cron replaces them); relaunch is FAILED-only.
+  - [x] Found by running a real worker: the worker must load every model module (`app/core/registre_modeles.py`), and ARQ logs job arguments at INFO — e-mail links with tokens — so its loggers are raised to WARNING in the worker. Result keys are not kept (`keep_result=0`).
+  - [x] The API process no longer imports the extraction stack (torch, Docling, bge-m3) — checked by a test; prepares separate images in 4.2. `redis-py` goes from 8.x to 5.x (pinned by `arq`), with typed helpers in `app/core/redis.py`.
+  - [x] Not done here: the `recompute_portfolio` job — portfolio figures are computed on read and nothing consumes the cached columns on `portfolios` yet (decision pending: implement when a consumer needs them, or drop the columns).
+- [x] 4.2 Docker Multi-Stage Refactoring: Production build cleanup (non-root user, slim image). **[review]**
+  - [x] Separate `api` and `worker` images; `uv sync --no-dev --frozen`; no `tests/` in the image. One multi-stage `Dockerfile`, targets `api` (API, default worker, migrations — 468 MB, 48 packages, no torch/Docling) and `worker` (extraction). Build stages hold uv and its cache; runtime images run as uid 10001; `.dockerignore` is an allow-list (`app/`, `alembic/`, `config/`, lock files) — no tests, secrets or storage in the build context.
+  - [x] Move `pytest`, `pytest-cov` to the `dev` group; the extraction stack (Docling, Paddle, torch, bge-m3, faiss, genai) moves to an `extraction` group, installed by default locally (`default-groups`) but only in the worker image (`--no-default-groups --group extraction`).
+  - [x] The default worker no longer loads the extraction stack either: `ExtractionTransitoire` / `marquer_echec` moved to `app/ingestion/etat_extraction.py`, `CODES_AUTO_DECLARES_PAR_PILIER` to `app/ingestion/vocabulaire.py`, and the extraction job imports the pipeline lazily (test extended to the default worker).
+  - [x] Run `alembic upgrade head` at deploy (`migrate` one-shot service, API and workers wait for it); don't publish Postgres/Redis ports outside dev; Redis password. `docker-compose.yml` (shared, no ports, no credentials) + `docker-compose.override.yml` (dev, auto-loaded, unchanged behaviour) + `docker-compose.prod.yml` (`POSTGRES_PASSWORD` / `REDIS_PASSWORD` required, `requirepass`, only the API port published, `ENVIRONMENT=production`).
+- [x] 4.3 Hardening leftovers **[review]** (migration `d5b8e1f0a3c7`)
+  - [x] `/health` returns a fixed message, not `str(exc)` (the error type is logged).
+  - [x] URL import: block every non-global IP (`not ip.is_global`) and add a total download deadline. Also checks the IPv4 embedded in IPv4-mapped and 6to4 IPv6 addresses; newly blocked ranges include CGNAT 100.64.0.0/10, which the old deny-list let through. The 60 s deadline covers redirects and the whole stream (a server dripping a byte under the per-read timeout is cut).
+  - [x] Escape `%` and `_` in `ilike` search inputs: one helper (`app/core/recherche.py::contient`, `ESCAPE '\'`) for all 8 searches; integration test shows `100%` no longer matches `1000…`.
+  - [x] Store avatars as files instead of base64 in the user row: `users.avatar_path`, file under `avatars/{user_id}/` with a random name, served by `GET /auth/avatars/{user_id}/{file}` (authenticated, only the current file, immutable cache); the JSON field `avatar` keeps its name and now holds that URL. Upload read is bounded. The migration moves existing avatars to files and drops any data URI that is not a PNG/JPEG/WEBP image; downgrade reads the files back. Company logos stay data URIs (not in this task).
+  - [x] Frontend: global `401` handler that sends the user to the login page. On the QueryClient's query and mutation caches (`src/queryClient.ts`, `features/auth/session.ts`): only session codes (`not_authenticated`, `invalid_token`, `session_revoked`), never `invalid_credentials`; `/auth/me` itself is ignored (no refetch loop); the login page returns to the page that was left (internal paths only).
+- [x] 4.4 CI **[review]**
+  - [x] Run on `pull_request` + push to `main` only; add a `concurrency` group that cancels superseded runs; upgrade `setup-uv`. `setup-uv` v3 → v10 with uv pinned to the images' version (0.11.15) and Python 3.11 (production), cache on `uv.lock`; `checkout` v7, `setup-node` v7; Node 20 (end of life) → 22; `permissions: contents: read`; `uv sync --frozen`.
+  - [x] Fail when Alembic has more than one head (verified both ways locally with a temporary forked migration).
+  - [x] Also: `alembic upgrade head` + `alembic check` on the CI database (a model changed without its migration fails; the 39 migrations apply from an empty database); mypy on `tests` as well as `app`; a second job builds the `api` image (task 4.2) and asserts it has no dev tools nor extraction stack. Workflow checked with `actionlint`.
+- [x] 4.5 Test coverage **[review]**
+  - [x] Backend: extraction pipeline (with a stubbed LLM), semantic search, completeness, explainability, activation, avatar, CSRF middleware in isolation. Measured first: completeness and the explainability decomposition were already at 100% (3.2), the pipeline's failure paths covered in 4.1, avatars in 4.3. Added: semantic search with a deterministic word-hash embedder and the real FAISS chain (chunking, ranking, context with neighbours and relevance floor) and the LLM call with a fake Gemini client (prompt, server-error retry, missing tool call) — `extractor.py` 74% → 93%; CSRF middleware on a bare app (revoked generation, foreign `Origin`/`Referer`, exempt login, invalid JWT) 87% → 100%; activation (one valid link at a time, single use, deactivated account, delivery failure logged without the token) 90% → 100%; evidence excerpt from a real 3-page PDF 43% → 100%; avatar branches 91% → 97%. Backend total 94% → 95%, 664 tests. `docling_pipeline.py` stays at 63%: the rest is the real Docling conversion (heavy models), exercised only by the worker.
+  - [x] Frontend: at least one flow test per user space. Added auditor (render an opinion: comment required to recommend rejection, then sent), company (deposit: missing file caught, server refusal shown, success goes to the reports list) and institution (create a project: date order checked, POST body, list reloaded); admin, investor and researcher already had one. 79 tests.
+  - [x] Intermittent frontend failures explained and fixed: "Test timed out in 5000ms" — `userEvent` typing long forms under parallel load; Vitest `testTimeout` raised to 15 s (5 consecutive clean runs).
+- [x] 4.7 Finish the English rename: remaining modules and the remaining French JSON field names (RENAME_PLAN §4), with the regenerated client and frontend.
+  - [x] Persistence (migration `f2a6c9d4e8b1`, round-trip on seeded data + `alembic check`): the last 11 French tables — `avis_audit`, `journal_audit`, `notification`, `institution_profil`, `chercheur_institution`, `analyse`, `analyse_entreprise`, `projet`, `affectation_projet`, `projet_entreprise`, `projet_document` — with their columns, constraints and indexes (RENAME_PLAN §3e). The six foreign keys that still had no `ON DELETE` get one: project children and analysis companies `CASCADE`, `analyses.project_id` `RESTRICT` + index, `previous_analysis_id` `SET NULL` + index. The last French enum classes are renamed too (values unchanged).
+  - [x] Audit log values in English (`connexion` → `login`, `Utilisateur` → `User`, `succes` → `success`, `actif` → `active`…), existing rows translated by the migration in both directions; the admin screens show French labels (`shared/format/journal.ts`).
+  - [x] JSON contract in English on every endpoint: field names are now the model attribute names, so the translation layer is gone (`rapport_vers_contrat`, the Evidence / metric / carbon / coverage validators); `UserContractMixin` and `CompanyContractMixin` only add what is computed (avatar URL, `active`). About 250 fields, glossary in RENAME_PLAN §3e. Kept on purpose: URL paths, path and query parameters, multipart form fields, enum values, error codes, the LLM tool schema and the scoring YAML schema.
+  - [x] Found on the way: several assignments to French attribute names on SQLModel rows were invisible to mypy (SQLModel defines `__setattr__`) — caught by grep and the tests; a scoring test that passed French kwargs to `Score` and so never exercised its CHECK constraint.
+  - [x] Orval client regenerated; frontend moved to the new fields (tsc-guided), including form schemas whose values are sent as request bodies. 664 backend tests, 81 frontend tests.
+- [x] 4.6 Documentation: expand `README.md` (features, roles and permissions, architecture diagram, deployment, screenshots).
+  - [x] README rewritten: features by stage (report to score, investors, research, platform), role table with data scope and the 403/404 rule, Mermaid diagrams (runtime architecture, report lifecycle), local start, demo data, tests and CI, production deployment and main environment variables, documentation index.
+  - [x] 10 screenshots (`docs/screenshots/`, one or more per role) captured with Playwright on the demo data set.
+  - [x] `scripts/seed_demo.py`: loads the six synthetic companies of `data_test/reference_e2e/` into an empty database through the real services (assignment, opinion, validation with score, publication), with page proofs cut from the real PDFs, plus a portfolio, a research project and a submitted analysis; refuses a non-empty database and sends nothing to Redis.
+  - [x] `docs/ARCHITECTURE.md` §1: role table no longer lists the pre-1.2 French enum values, nor researcher YAML weights (not built).

@@ -6,14 +6,18 @@ cookie __Host-, révocation Redis par génération de session, jeton CSRF signé
 périmètre, réservé à une phase dédiée (app/core/config.py, mfa_issuer_name).
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Response, UploadFile
+import uuid
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
+from app.auth import avatar
 from app.auth.activation import activer_compte
-from app.auth.avatar import construire_avatar_data_uri
 from app.auth.csrf import generate_csrf_token
+from app.auth.email_change import confirmer_changement_email, demander_changement_email
 from app.auth.hashing import hash_password, verify_password
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.auth.password_reset import (
     demander_reinitialisation,
     reinitialiser_mot_de_passe,
@@ -27,6 +31,7 @@ from app.auth.revocation import current_generation, revoke_all_sessions
 from app.auth.schemas import (
     ActiverCompteRequest,
     ChangerMotDePasseRequest,
+    ConfirmerChangementEmailRequest,
     DemanderReinitialisationRequest,
     LoginRequest,
     ModifierProfilRequest,
@@ -42,14 +47,14 @@ from app.auth.tokens import (
 )
 from app.core.audit import auditer
 from app.core.dependencies import get_current_user, get_session
-from app.core.exceptions import UnauthorizedError, ValidationError
+from app.core.exceptions import UnauthorizedError
 
 router = APIRouter(tags=["auth"])
 
 _MAX_AGE = int(ACCESS_TOKEN_TTL.total_seconds())
 
 
-def _ouvrir_session(response: Response, user: Utilisateur, generation: int) -> None:
+def _ouvrir_session(response: Response, user: User, generation: int) -> None:
     """Pose les deux cookies de session (jeton d'accès + jeton CSRF), tous deux liés à la même
     génération de session (app/auth/revocation.py). __Host- exige Secure, Path=/ et aucun
     attribut Domain — Secure reste vrai même en développement local, où le navigateur traite
@@ -90,32 +95,35 @@ def _fermer_session(response: Response) -> None:
 )
 def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     session: Session = Depends(get_session),
-) -> Utilisateur:
-    enforce_login_rate_limit(payload.email)
+) -> User:
+    # IP fournie par le serveur ASGI, jamais lue dans un en-tête (voir app/auth/rate_limit.py).
+    adresse_ip = request.client.host if request.client else None
+    enforce_login_rate_limit(payload.email, adresse_ip)
 
-    user = session.exec(select(Utilisateur).where(Utilisateur.email == payload.email)).first()
+    user = session.exec(select(User).where(User.email == payload.email)).first()
     if (
         user is None
-        or not user.actif
-        or user.mot_de_passe_hache is None
-        or not verify_password(payload.password, user.mot_de_passe_hache)
+        or not user.active
+        or user.password_hash is None
+        or not verify_password(payload.password, user.password_hash)
     ):
-        register_failed_login_attempt(payload.email)
+        register_failed_login_attempt(payload.email, adresse_ip)
         auditer(
             session,
             user.id if user else None,
-            "connexion",
-            "Utilisateur",
+            "login",
+            "User",
             user.id if user else None,
-            "echec",
+            "failure",
         )
         session.commit()
         raise UnauthorizedError("Identifiants invalides.", code="invalid_credentials")
 
     clear_login_attempts(payload.email)
-    auditer(session, user.id, "connexion", "Utilisateur", user.id, "succes")
+    auditer(session, user.id, "login", "User", user.id, "success")
     session.commit()
 
     _ouvrir_session(response, user, current_generation(user.id))
@@ -146,7 +154,7 @@ def reinitialiser_mot_de_passe_route(
     payload: ReinitialiserMotDePasseRequest,
     session: Session = Depends(get_session),
 ) -> None:
-    reinitialiser_mot_de_passe(session, payload.token, payload.nouveau_mot_de_passe)
+    reinitialiser_mot_de_passe(session, payload.token, payload.new_password)
 
 
 @router.post(
@@ -159,7 +167,7 @@ def activer_compte_route(
     payload: ActiverCompteRequest,
     session: Session = Depends(get_session),
 ) -> None:
-    activer_compte(session, payload.token, payload.nouveau_mot_de_passe)
+    activer_compte(session, payload.token, payload.new_password)
 
 
 @router.post(
@@ -170,11 +178,11 @@ def activer_compte_route(
 )
 def logout(
     response: Response,
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> None:
     revoke_all_sessions(current_user.id)
-    auditer(session, current_user.id, "deconnexion", "Utilisateur", current_user.id, "succes")
+    auditer(session, current_user.id, "logout", "User", current_user.id, "success")
     session.commit()
     _fermer_session(response)
 
@@ -185,7 +193,7 @@ def logout(
     operation_id="getCurrentUser",
     summary="Consulter le compte actuellement connecté",
 )
-def me(current_user: Utilisateur = Depends(get_current_user)) -> Utilisateur:
+def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
@@ -193,37 +201,45 @@ def me(current_user: Utilisateur = Depends(get_current_user)) -> Utilisateur:
     "/auth/me",
     response_model=UtilisateurPublic,
     operation_id="updateMyProfile",
-    summary="Modifier mon nom et mon e-mail",
+    summary="Modifier mon nom, et demander un changement d'e-mail",
 )
 def modifier_mon_profil(
     payload: ModifierProfilRequest,
-    current_user: Utilisateur = Depends(get_current_user),
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> Utilisateur:
-    ancien_email = current_user.email
-    if payload.email != ancien_email:
-        existant = session.exec(
-            select(Utilisateur).where(Utilisateur.email == payload.email)
-        ).first()
-        if existant is not None:
-            raise ValidationError("Un compte existe déjà avec cet e-mail.", code="email_deja_utilise")
-        auditer(
-            session,
-            current_user.id,
-            "modification_email",
-            "Utilisateur",
-            current_user.id,
-            "succes",
-            ancienne_valeur=ancien_email,
-            nouvelle_valeur=payload.email,
-        )
-
-    current_user.nom = payload.nom
-    current_user.email = payload.email
+) -> UtilisateurPublic:
+    """Le nom change immédiatement. Un nouvel e-mail n'est qu'une DEMANDE (voir
+    app/auth/email_change.py) : `email` reste l'ancienne adresse et `email_en_attente` indique où
+    le lien de confirmation a été envoyé."""
+    current_user.name = payload.name
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
-    return current_user
+
+    email_en_attente = None
+    if payload.email != current_user.email:
+        demander_changement_email(
+            session, current_user, payload.email, payload.current_password, background_tasks
+        )
+        email_en_attente = payload.email
+
+    return UtilisateurPublic.model_validate(current_user).model_copy(
+        update={"pending_email": email_en_attente}
+    )
+
+
+@router.post(
+    "/auth/confirmer-changement-email",
+    response_model=UtilisateurPublic,
+    operation_id="confirmEmailChange",
+    summary="Confirmer un changement d'e-mail à partir du lien reçu à la nouvelle adresse",
+)
+def confirmer_changement_email_route(
+    payload: ConfirmerChangementEmailRequest,
+    session: Session = Depends(get_session),
+) -> User:
+    return confirmer_changement_email(session, payload.token)
 
 
 @router.post(
@@ -234,15 +250,12 @@ def modifier_mon_profil(
 )
 def televerser_mon_avatar(
     fichier: UploadFile,
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> Utilisateur:
-    contenu = fichier.file.read()
-    current_user.avatar = construire_avatar_data_uri(contenu)
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
-    return current_user
+) -> User:
+    # Lecture bornée : un octet de plus que la limite suffit à refuser le fichier.
+    contenu = fichier.file.read(avatar.TAILLE_MAX_OCTETS + 1)
+    return avatar.remplacer_avatar(session, current_user, contenu)
 
 
 @router.delete(
@@ -252,14 +265,31 @@ def televerser_mon_avatar(
     summary="Retirer ma photo de profil",
 )
 def supprimer_mon_avatar(
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> Utilisateur:
-    current_user.avatar = None
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
-    return current_user
+) -> User:
+    return avatar.retirer_avatar(session, current_user)
+
+
+@router.get(
+    "/auth/avatars/{user_id}/{nom_fichier}",
+    response_class=FileResponse,
+    operation_id="getUserAvatar",
+    summary="Photo de profil d'un utilisateur (URL fournie par le champ `avatar`)",
+)
+def lire_avatar(
+    user_id: uuid.UUID,
+    nom_fichier: str,
+    _current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    chemin, type_mime = avatar.fichier_avatar(session, user_id, nom_fichier)
+    # Le nom change à chaque envoi : l'URL désigne toujours le même contenu, cache sans fin.
+    return FileResponse(
+        chemin,
+        media_type=type_mime,
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )
 
 
 @router.post(
@@ -270,7 +300,7 @@ def supprimer_mon_avatar(
 )
 def verifier_mon_mot_de_passe(
     payload: VerifierMotDePasseRequest,
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> None:
     # Même bac à sable de débit que la connexion : un attaquant en possession d'une session volée
     # ne connaît pas forcément le mot de passe, cette route ne doit pas devenir un oracle
@@ -278,8 +308,8 @@ def verifier_mon_mot_de_passe(
     enforce_login_rate_limit(current_user.email)
     # Un compte authentifié a nécessairement déjà un mot de passe (login/activer-compte le
     # garantissent avant d'ouvrir une session) — jamais None ici.
-    assert current_user.mot_de_passe_hache is not None
-    if not verify_password(payload.mot_de_passe, current_user.mot_de_passe_hache):
+    assert current_user.password_hash is not None
+    if not verify_password(payload.password, current_user.password_hash):
         register_failed_login_attempt(current_user.email)
         raise UnauthorizedError("Mot de passe actuel invalide.", code="invalid_credentials")
     clear_login_attempts(current_user.email)
@@ -294,23 +324,28 @@ def verifier_mon_mot_de_passe(
 def changer_mot_de_passe(
     payload: ChangerMotDePasseRequest,
     response: Response,
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> Utilisateur:
+) -> User:
+    # Même limitation de débit que verifier_mon_mot_de_passe : sans elle, cette route vérifiant
+    # elle aussi le mot de passe actuel en redevenait un oracle illimité.
+    enforce_login_rate_limit(current_user.email)
     # Voir verifier_mon_mot_de_passe ci-dessus : jamais None pour un compte déjà authentifié.
-    assert current_user.mot_de_passe_hache is not None
-    if not verify_password(payload.mot_de_passe_actuel, current_user.mot_de_passe_hache):
+    assert current_user.password_hash is not None
+    if not verify_password(payload.current_password, current_user.password_hash):
+        register_failed_login_attempt(current_user.email)
         raise UnauthorizedError("Mot de passe actuel invalide.", code="invalid_credentials")
+    clear_login_attempts(current_user.email)
 
-    current_user.mot_de_passe_hache = hash_password(payload.nouveau_mot_de_passe)
+    current_user.password_hash = hash_password(payload.new_password)
     session.add(current_user)
     auditer(
         session,
         current_user.id,
-        "changement_mot_de_passe",
-        "Utilisateur",
+        "password_changed",
+        "User",
         current_user.id,
-        "succes",
+        "success",
     )
     session.commit()
     session.refresh(current_user)

@@ -12,9 +12,9 @@ from app.core.email import EmailDeliveryError
 from app.core.exceptions import register_exception_handlers
 
 _PAYLOAD = {
-    "nom": "Aminata Diallo",
+    "name": "Aminata Diallo",
     "email": "aminata@example.com",
-    "sujet": "Accès à la plateforme",
+    "subject": "Accès à la plateforme",
     "message": "Bonjour, je souhaite en savoir plus sur la création de mon compte.",
 }
 
@@ -30,7 +30,7 @@ def contact(monkeypatch):
     settings = Settings.model_construct(contact_to_email="equipe@example.com")
     monkeypatch.setattr("app.contact.router.get_settings", lambda: settings)
     delivery = Mock()
-    monkeypatch.setattr("app.contact.router.send_email", delivery)
+    monkeypatch.setattr("app.contact.router.envoyer_email_differe", delivery)
     return TestClient(app), redis_client, delivery
 
 
@@ -43,20 +43,20 @@ def test_public_message_is_sent_to_configured_team_with_reply_to(contact):
     sent = delivery.call_args.kwargs
     assert sent["recipient"] == "equipe@example.com"
     assert sent["reply_to"] == _PAYLOAD["email"]
-    assert _PAYLOAD["nom"] in sent["body"]
+    assert _PAYLOAD["name"] in sent["body"]
     assert _PAYLOAD["message"] in sent["body"]
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("nom", " "),
-        ("nom", "x" * 101),
+        ("name", " "),
+        ("name", "x" * 101),
         ("email", "invalid"),
         ("email", "a@example.com\r\nBcc: b@example.com"),
-        ("sujet", "a"),
-        ("sujet", "x" * 151),
-        ("sujet", "Sujet\r\nBcc: b@example.com"),
+        ("subject", "a"),
+        ("subject", "x" * 151),
+        ("subject", "Sujet\r\nBcc: b@example.com"),
         ("message", "trop court"),
         ("message", "x" * 5001),
     ],
@@ -86,7 +86,8 @@ def test_fourth_message_is_blocked_and_forwarded_header_cannot_change_the_key(co
     assert delivery.call_count == 3
     arguments = [call.args for call in redis_client.eval.call_args_list]
     assert len({args[2] for args in arguments}) == 1
-    assert all(args[1] == 1 and args[3] == 3600 for args in arguments)
+    # Envoyée en chaîne (typage redis-py 5, tâche 4.1) : identique sur le fil pour Redis.
+    assert all(args[1] == 1 and args[3] == "3600" for args in arguments)
 
 
 def test_redis_failure_blocks_delivery(contact):

@@ -11,16 +11,17 @@ import uuid
 
 from fastapi import BackgroundTasks
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, col, func, select
 
 from app.auth.activation import envoyer_lien_activation
-from app.auth.models import InstitutionProfil, Utilisateur
+from app.auth.models import InstitutionProfile, User
 from app.auth.revocation import revoke_all_sessions
-from app.company.models import Entreprise
+from app.company.models import Company
 from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
-from app.core.enums import Role
+from app.core.enums import CompanyStatus, Role
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
+from app.core.recherche import contient
 
 # Quota de départ pour un compte Institution (Étape 17 §quota d'export) — pas encore un champ du
 # formulaire de création (aucune institution réelle n'a encore exprimé un besoin différencié),
@@ -37,7 +38,7 @@ def lister_utilisateurs_par_role(
     en_attente_activation: bool | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[Utilisateur], int]:
+) -> tuple[list[User], int]:
     """Page de comptes d'un rôle donné, filtrée par e-mail OU nom si `recherche` est fourni —
     seuls les comptes actifs par défaut, tous si `inclure_inactifs` (nécessaire pour retrouver un
     compte à réactiver, sinon invisible dès qu'il est désactivé). `en_attente_activation`
@@ -47,24 +48,23 @@ def lister_utilisateurs_par_role(
 
     Pagination par offset/limit — le total ne descend jamais à la base entière : seule la page
     demandée est chargée (voir app/core/schemas.py::Page, posé pour ce cas précisément)."""
-    filtres: list[ColumnElement[bool]] = [col(Utilisateur.role) == role]
+    filtres: list[ColumnElement[bool]] = [col(User.role) == role]
     if not inclure_inactifs:
-        filtres.append(col(Utilisateur.actif).is_(True))
+        filtres.append(col(User.active).is_(True))
     if en_attente_activation is not None:
         if en_attente_activation:
-            filtres.append(col(Utilisateur.date_activation).is_(None))
+            filtres.append(col(User.activated_at).is_(None))
         else:
-            filtres.append(col(Utilisateur.date_activation).is_not(None))
+            filtres.append(col(User.activated_at).is_not(None))
     if recherche:
-        motif = f"%{recherche}%"
-        filtres.append(or_(col(Utilisateur.email).ilike(motif), col(Utilisateur.nom).ilike(motif)))
+        filtres.append(contient(recherche, User.email, User.name))
 
-    total = session.exec(select(func.count()).select_from(Utilisateur).where(*filtres)).one()
+    total = session.exec(select(func.count()).select_from(User).where(*filtres)).one()
     items = list(
         session.exec(
-            select(Utilisateur)
+            select(User)
             .where(*filtres)
-            .order_by(col(Utilisateur.email))
+            .order_by(col(User.email))
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
@@ -72,7 +72,7 @@ def lister_utilisateurs_par_role(
     return items, total
 
 
-def lister_utilisateurs_en_attente(session: Session) -> list[Utilisateur]:
+def lister_utilisateurs_en_attente(session: Session) -> list[User]:
     """Comptes actifs, tous rôles confondus, qui n'ont pas encore cliqué leur lien d'activation —
     extrait de construire_tableau_de_bord (app/admin/dashboard.py), qui jusqu'ici ne faisait que
     les compter (utilisateurs_en_attente). lister_utilisateurs_par_role exige un rôle unique ;
@@ -80,9 +80,9 @@ def lister_utilisateurs_en_attente(session: Session) -> list[Utilisateur]:
     n'est scopé à aucun rôle précis."""
     return list(
         session.exec(
-            select(Utilisateur).where(
-                col(Utilisateur.date_activation).is_(None),
-                col(Utilisateur.actif).is_(True),
+            select(User).where(
+                col(User.activated_at).is_(None),
+                col(User.active).is_(True),
             )
         ).all()
     )
@@ -98,7 +98,7 @@ def creer_utilisateur(
     nom_entreprise: str | None = None,
     secteur: str | None = None,
     pays: str | None = None,
-) -> Utilisateur:
+) -> User:
     """Provisionne un compte sans mot de passe — aucun secret généré ni transmis par
     l'Administrateur : le compte reste sans mot de passe (mot_de_passe_hache=None,
     date_activation=None) jusqu'à ce que la personne titulaire clique le lien d'activation reçu
@@ -114,19 +114,19 @@ def creer_utilisateur(
     nommé pour un compte Entreprise) — sans ce profil, le compte ne peut rien déposer
     (app/company/router.py::_entreprise_id exige current_user.entreprise). nom_entreprise/
     secteur/pays sont ignorés pour tout autre rôle."""
-    if role == Role.ADMINISTRATEUR:
+    if role == Role.ADMIN:
         raise ValidationError(
             "La création d'un compte Administrateur n'est pas permise par ce formulaire.",
             code="role_non_autorise",
         )
 
-    if role == Role.ENTREPRISE:
+    if role == Role.ENTERPRISE:
         champs_manquants = {
             champ: "Ce champ est requis pour créer une Entreprise."
             for champ, valeur in {
-                "nom_entreprise": nom_entreprise,
-                "secteur": secteur,
-                "pays": pays,
+                "company_name": nom_entreprise,
+                "sector": secteur,
+                "country": pays,
             }.items()
             if not valeur
         }
@@ -144,34 +144,34 @@ def creer_utilisateur(
             "Service d'activation de compte temporairement indisponible. Réessayez plus tard."
         ) from exc
 
-    existant = session.exec(select(Utilisateur).where(Utilisateur.email == email)).first()
+    existant = session.exec(select(User).where(User.email == email)).first()
     if existant is not None:
         raise ValidationError("Un compte existe déjà avec cet e-mail.", code="email_deja_utilise")
 
-    utilisateur = Utilisateur(
+    utilisateur = User(
         email=email,
-        nom=nom or email.split("@")[0],
-        mot_de_passe_hache=None,
+        name=nom or email.split("@")[0],
+        password_hash=None,
         role=role,
-        actif=True,
-        date_activation=None,
+        active=True,
+        activated_at=None,
     )
     session.add(utilisateur)
     session.flush()  # attribue utilisateur.id avant de construire l'entrée d'audit / l'entreprise
 
-    if role == Role.ENTREPRISE:
+    if role == Role.ENTERPRISE:
         assert nom_entreprise is not None and secteur is not None and pays is not None  # validé ci-dessus
-        entreprise = Entreprise(
-            nom=nom_entreprise, secteur=secteur, pays=pays, utilisateur_id=utilisateur.id
+        entreprise = Company(
+            name=nom_entreprise, sector=secteur, country=pays, owner_user_id=utilisateur.id
         )
         session.add(entreprise)
     elif role == Role.INSTITUTION:
         # Sans ce profil, aucun export n'est possible (app/institution/analyses.py exige un
-        # InstitutionProfil pour décrémenter quota_export) — même raisonnement que le profil
+        # InstitutionProfile pour décrémenter quota_export) — même raisonnement que le profil
         # Entreprise ci-dessus : créé dans le même geste, jamais après coup.
-        session.add(InstitutionProfil(utilisateur_id=utilisateur.id, quota_export=_QUOTA_EXPORT_INITIAL))
+        session.add(InstitutionProfile(user_id=utilisateur.id, export_quota=_QUOTA_EXPORT_INITIAL))
 
-    auditer(session, acteur_id, "creation_compte", "Utilisateur", utilisateur.id, "succes")
+    auditer(session, acteur_id, "account_created", "User", utilisateur.id, "success")
     session.commit()
     session.refresh(utilisateur)
     return utilisateur
@@ -184,33 +184,43 @@ def renvoyer_lien_activation(
     e-mail non reçu : sans cette action, un tel compte resterait bloqué indéfiniment (le flux
     « mot de passe oublié », app/auth/password_reset.py, ne fonctionne que pour un compte qui a
     déjà un mot de passe, donc jamais pour un compte encore en attente d'activation)."""
-    utilisateur = session.get(Utilisateur, cible_id)
+    utilisateur = session.get(User, cible_id)
     if utilisateur is None:
         raise NotFoundError("Utilisateur introuvable.", code="utilisateur_introuvable")
-    if utilisateur.date_activation is not None:
+    if utilisateur.activated_at is not None:
         raise ValidationError("Ce compte est déjà activé.", code="compte_deja_active")
+    if (
+        utilisateur.company is not None
+        and utilisateur.company.status == CompanyStatus.PENDING_ONBOARDING
+    ):
+        # Le lien part à la validation de l'inscription (tâche 1.4), jamais avant : sinon le
+        # titulaire se connecterait à une entreprise que personne n'a encore validée.
+        raise ValidationError(
+            "L'inscription de cette entreprise n'est pas encore validée.",
+            code="inscription_non_validee",
+        )
 
     envoyer_lien_activation(session, utilisateur, background_tasks)
-    auditer(session, acteur_id, "renvoi_lien_activation", "Utilisateur", utilisateur.id, "succes")
+    auditer(session, acteur_id, "activation_link_resent", "User", utilisateur.id, "success")
     session.commit()
 
 
-def desactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID) -> Utilisateur:
-    utilisateur = session.get(Utilisateur, cible_id)
+def desactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID) -> User:
+    utilisateur = session.get(User, cible_id)
     if utilisateur is None:
         raise NotFoundError("Utilisateur introuvable.", code="utilisateur_introuvable")
 
-    utilisateur.actif = False
+    utilisateur.active = False
     session.add(utilisateur)
     auditer(
         session,
         acteur_id,
-        "desactivation_compte",
-        "Utilisateur",
+        "account_deactivated",
+        "User",
         cible_id,
-        "succes",
-        ancienne_valeur="actif",
-        nouvelle_valeur="inactif",
+        "success",
+        old_value="active",
+        new_value="inactive",
     )
     session.commit()
     session.refresh(utilisateur)
@@ -220,22 +230,22 @@ def desactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uui
     return utilisateur
 
 
-def reactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID) -> Utilisateur:
-    utilisateur = session.get(Utilisateur, cible_id)
+def reactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid.UUID) -> User:
+    utilisateur = session.get(User, cible_id)
     if utilisateur is None:
         raise NotFoundError("Utilisateur introuvable.", code="utilisateur_introuvable")
 
-    utilisateur.actif = True
+    utilisateur.active = True
     session.add(utilisateur)
     auditer(
         session,
         acteur_id,
-        "reactivation_compte",
-        "Utilisateur",
+        "account_reactivated",
+        "User",
         cible_id,
-        "succes",
-        ancienne_valeur="inactif",
-        nouvelle_valeur="actif",
+        "success",
+        old_value="inactive",
+        new_value="active",
     )
     session.commit()
     session.refresh(utilisateur)

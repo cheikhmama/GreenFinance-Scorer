@@ -37,7 +37,7 @@ interface PrototypeRoleConfig {
 export const prototypeRoleConfigs: Record<RoleSlug, PrototypeRoleConfig> = {
   admin: {
     slug: "admin",
-    role: "ADMINISTRATEUR",
+    role: "ADMIN",
     label: "Administrateur",
     persona: "Aminata Diallo",
     organization: "GreenFinance-Scorer",
@@ -51,7 +51,7 @@ export const prototypeRoleConfigs: Record<RoleSlug, PrototypeRoleConfig> = {
   },
   company: {
     slug: "company",
-    role: "ENTREPRISE",
+    role: "ENTERPRISE",
     label: "Entreprise",
     persona: "Sofia Martin",
     organization: "Microsoft",
@@ -64,7 +64,7 @@ export const prototypeRoleConfigs: Record<RoleSlug, PrototypeRoleConfig> = {
   },
   audit: {
     slug: "audit",
-    role: "AUDITEUR",
+    role: "AUDITOR",
     label: "Auditeur",
     persona: "Lucas Bernard",
     organization: "Audit Climat Conseil",
@@ -76,7 +76,7 @@ export const prototypeRoleConfigs: Record<RoleSlug, PrototypeRoleConfig> = {
   },
   investor: {
     slug: "investor",
-    role: "INVESTISSEUR",
+    role: "INVESTOR",
     label: "Investisseur",
     persona: "Maya Chen",
     organization: "Impact Capital",
@@ -89,7 +89,7 @@ export const prototypeRoleConfigs: Record<RoleSlug, PrototypeRoleConfig> = {
   },
   researcher: {
     slug: "researcher",
-    role: "CHERCHEUR",
+    role: "RESEARCHER",
     label: "Chercheur",
     persona: "Dr. Noah Kim",
     organization: "Université Verte",

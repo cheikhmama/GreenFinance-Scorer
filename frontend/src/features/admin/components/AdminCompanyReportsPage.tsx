@@ -1,6 +1,10 @@
 import { FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleDateRapport,
+  libelleStatutRapport,
+  variantStatutRapport,
+} from "@/shared/format/statut";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -34,16 +38,16 @@ export function AdminCompanyReportsPage() {
             <li key={rapport.id} className="flex items-center justify-between gap-4 p-4">
               <div>
                 <p className="font-medium text-brand-blue">
-                  {rapport.type} — {rapport.annee_reporting ?? "année inconnue"}
+                  {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
                 </p>
                 <p className="text-xs text-brand-grey">
-                  Déposé le {new Date(rapport.date_depot).toLocaleDateString("fr-FR")} — version{" "}
+                  {libelleDateRapport(rapport)} — version{" "}
                   {rapport.version}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={variantStatutRapport(rapport.statut)}>
-                  {libelleStatutRapport(rapport.statut)}
+                <Badge variant={variantStatutRapport(rapport.status)}>
+                  {libelleStatutRapport(rapport.status, rapport.extraction_status)}
                 </Badge>
                 <Button asChild size="sm" variant="outline">
                   <Link to={`/admin/rapports/${rapport.id}`}>Ouvrir</Link>

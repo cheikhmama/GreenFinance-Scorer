@@ -19,7 +19,8 @@ export function CompanyDashboardPage() {
   const { data: notifications, isLoading: chargementNotifications } = useMyNotifications(5);
 
   const rapportsTries = [...(rapports ?? [])].sort(
-    (a, b) => new Date(b.date_depot).getTime() - new Date(a.date_depot).getTime(),
+    // date_creation, jamais date_depot : un brouillon (sans dépôt) reste le rapport le plus récent.
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
   const dernierRapport = rapportsTries[0];
 
@@ -55,8 +56,8 @@ export function CompanyDashboardPage() {
               {chargementRapports ? (
                 <span className="text-brand-grey">…</span>
               ) : dernierRapport ? (
-                <Badge variant={variantStatutRapport(dernierRapport.statut)}>
-                  {libelleStatutRapport(dernierRapport.statut)}
+                <Badge variant={variantStatutRapport(dernierRapport.status)}>
+                  {libelleStatutRapport(dernierRapport.status, dernierRapport.extraction_status)}
                 </Badge>
               ) : (
                 <span className="text-sm text-brand-grey">Aucun rapport déposé</span>
@@ -85,11 +86,11 @@ export function CompanyDashboardPage() {
             <ul className="divide-y">
               {notifications.map((notification) => (
                 <li key={notification.id} className="flex items-center justify-between gap-4 py-3 text-sm">
-                  <span className={notification.lu ? "text-brand-grey" : "font-medium text-brand-blue"}>
+                  <span className={notification.read ? "text-brand-grey" : "font-medium text-brand-blue"}>
                     {notification.message}
                   </span>
                   <span className="shrink-0 text-xs text-brand-grey">
-                    {new Date(notification.date_envoi).toLocaleDateString("fr-FR")}
+                    {new Date(notification.sent_at).toLocaleDateString("fr-FR")}
                   </span>
                 </li>
               ))}

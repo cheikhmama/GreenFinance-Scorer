@@ -34,6 +34,10 @@ class _FakeRedis:
     def delete(self, key: str) -> None:
         self._counts.pop(key, None)
 
+    def eval(self, _script: str, _numkeys: int, key: str, _window: int) -> int:
+        """Reproduit app/core/redis.py::incrementer_fenetre (INCR + EXPIRE atomiques)."""
+        return self.incr(key)
+
 
 class _BrokenRedis:
     """Simule une panne Redis (connexion coupée, timeout…) sur chaque appel —
@@ -50,6 +54,7 @@ class _BrokenRedis:
     incr = _boom
     expire = _boom
     delete = _boom
+    eval = _boom
 
 
 @pytest.fixture()

@@ -20,15 +20,15 @@ import { useCreateProject, useMyProjects } from "../api";
 import { type CreerProjetForm, creerProjetSchema } from "../schemas";
 
 function formatPeriode(projet: {
-  date_debut: string | null;
-  date_fin_prevue: string | null;
-  date_limite: string | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  deadline: string | null;
 }): string | null {
   const morceaux: string[] = [];
-  if (projet.date_debut) morceaux.push(`Du ${new Date(projet.date_debut).toLocaleDateString("fr-FR")}`);
-  if (projet.date_fin_prevue) morceaux.push(`au ${new Date(projet.date_fin_prevue).toLocaleDateString("fr-FR")}`);
-  if (projet.date_limite) {
-    morceaux.push(`échéance : ${new Date(projet.date_limite).toLocaleDateString("fr-FR")}`);
+  if (projet.start_date) morceaux.push(`Du ${new Date(projet.start_date).toLocaleDateString("fr-FR")}`);
+  if (projet.planned_end_date) morceaux.push(`au ${new Date(projet.planned_end_date).toLocaleDateString("fr-FR")}`);
+  if (projet.deadline) {
+    morceaux.push(`échéance : ${new Date(projet.deadline).toLocaleDateString("fr-FR")}`);
   }
   return morceaux.length > 0 ? morceaux.join(" — ") : null;
 }
@@ -77,13 +77,13 @@ export function ProjectsPage() {
               <Card className="h-full gap-3 transition hover:border-brand-green hover:shadow-md">
                 <CardContent className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-base font-semibold text-brand-blue">{projet.nom}</p>
-                    <Badge variant={variantStatutProjet(projet.statut)}>
-                      {libelleStatutProjet(projet.statut)}
+                    <p className="text-base font-semibold text-brand-blue">{projet.name}</p>
+                    <Badge variant={variantStatutProjet(projet.status)}>
+                      {libelleStatutProjet(projet.status)}
                     </Badge>
                   </div>
                   <p className="text-sm text-brand-grey">
-                    {projet.objectif ?? projet.description ?? "Aucune description."}
+                    {projet.objective ?? projet.description ?? "Aucune description."}
                   </p>
                   {periode ? <p className="text-xs text-brand-grey">{periode}</p> : null}
                 </CardContent>
@@ -102,12 +102,12 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
   const form = useForm<CreerProjetForm>({
     resolver: zodResolver(creerProjetSchema),
     defaultValues: {
-      nom: "",
+      name: "",
       description: "",
-      objectif: "",
-      date_debut: "",
-      date_fin_prevue: "",
-      date_limite: "",
+      objective: "",
+      start_date: "",
+      planned_end_date: "",
+      deadline: "",
     },
   });
 
@@ -115,12 +115,12 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
     setServerError(null);
     createProject.mutate(
       {
-        nom: values.nom,
+        name: values.name,
         description: values.description || null,
-        objectif: values.objectif || null,
-        date_debut: values.date_debut || null,
-        date_fin_prevue: values.date_fin_prevue || null,
-        date_limite: values.date_limite || null,
+        objective: values.objective || null,
+        start_date: values.start_date || null,
+        planned_end_date: values.planned_end_date || null,
+        deadline: values.deadline || null,
       },
       {
         onSuccess: onCreated,
@@ -142,7 +142,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
         ) : null}
         <FormField
           control={form.control}
-          name="nom"
+          name="name"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nom du projet</FormLabel>
@@ -155,7 +155,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
         />
         <FormField
           control={form.control}
-          name="objectif"
+          name="objective"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Objectif (optionnel)</FormLabel>
@@ -182,7 +182,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
         <div className="grid gap-4 sm:grid-cols-3">
           <FormField
             control={form.control}
-            name="date_debut"
+            name="start_date"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Début</FormLabel>
@@ -195,7 +195,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
           />
           <FormField
             control={form.control}
-            name="date_fin_prevue"
+            name="planned_end_date"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Fin prévue</FormLabel>
@@ -208,7 +208,7 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
           />
           <FormField
             control={form.control}
-            name="date_limite"
+            name="deadline"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Date limite</FormLabel>

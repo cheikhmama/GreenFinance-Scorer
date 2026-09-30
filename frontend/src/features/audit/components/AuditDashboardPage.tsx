@@ -43,14 +43,16 @@ export function AuditDashboardPage() {
                   {dossiers.map((dossier) => (
                     <tr key={dossier.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
-                        <Badge variant={variantStatutRapport(dossier.statut)}>
-                          {libelleStatutRapport(dossier.statut)}
+                        <Badge variant={variantStatutRapport(dossier.status)}>
+                          {libelleStatutRapport(dossier.status, dossier.extraction_status)}
                         </Badge>
                       </td>
                       <td className="py-2 pr-4">{dossier.type}</td>
-                      <td className="py-2 pr-4">{dossier.annee_reporting ?? "—"}</td>
+                      <td className="py-2 pr-4">{dossier.fiscal_year ?? "—"}</td>
                       <td className="py-2 pr-4">
-                        {new Date(dossier.date_depot).toLocaleDateString("fr-FR")}
+                        {dossier.submitted_at
+                          ? new Date(dossier.submitted_at).toLocaleDateString("fr-FR")
+                          : "—"}
                       </td>
                       <td className="py-2">
                         <Link

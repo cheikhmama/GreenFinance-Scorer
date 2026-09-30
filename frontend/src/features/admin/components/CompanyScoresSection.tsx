@@ -75,22 +75,22 @@ export function CompanyScoresSection() {
                       to={`/admin/entreprises/${entreprise.id}`}
                       className="font-medium text-brand-blue hover:underline"
                     >
-                      {entreprise.nom}
+                      {entreprise.name}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-brand-grey">{entreprise.secteur}</TableCell>
-                  <TableCell className="text-brand-grey">{entreprise.pays}</TableCell>
+                  <TableCell className="text-brand-grey">{entreprise.sector}</TableCell>
+                  <TableCell className="text-brand-grey">{entreprise.country}</TableCell>
                   <TableCell className="font-semibold tabular-nums text-brand-blue">
-                    {formatScore(entreprise.score_global)}
+                    {formatScore(entreprise.global_score)}
                   </TableCell>
                   <TableCell className="tabular-nums text-brand-grey">
-                    {formatScore(entreprise.score_environnement)}
+                    {formatScore(entreprise.environmental_score)}
                   </TableCell>
                   <TableCell className="tabular-nums text-brand-grey">
-                    {formatScore(entreprise.score_social)}
+                    {formatScore(entreprise.social_score)}
                   </TableCell>
                   <TableCell className="tabular-nums text-brand-grey">
-                    {formatScore(entreprise.score_gouvernance)}
+                    {formatScore(entreprise.governance_score)}
                   </TableCell>
                 </TableRow>
               ))}

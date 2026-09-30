@@ -13,7 +13,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
-from app.auth.models import Utilisateur
+from app.auth.models import User
 from app.core.dependencies import get_current_user, get_session
 from app.core.models import Notification
 from app.core.notifications import lister_mes_notifications, marquer_lue
@@ -32,7 +32,7 @@ def lister_mes_notifications_route(
     non_lues_seulement: bool = Query(False, description="Ne renvoyer que les notifications non lues"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> Page[NotificationPublic]:
     items, total = lister_mes_notifications(
@@ -59,7 +59,7 @@ def lister_mes_notifications_route(
 )
 def marquer_notification_lue_route(
     notification_id: uuid.UUID,
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> Notification:
     return marquer_lue(session, current_user.id, notification_id)

@@ -43,8 +43,8 @@ import type {
   ProjetDetail,
   ProjetPublic,
   RattachementPublic,
-  StatutAnalyse,
-  StatutRattachement,
+  AnalysisStatus,
+  AffiliationStatus,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export const TAILLE_PAGE_INSTITUTION = 10;
@@ -81,7 +81,7 @@ export function useAvailableResearchers() {
   });
 }
 
-export function useMyResearchers(statut?: StatutRattachement) {
+export function useMyResearchers(statut?: AffiliationStatus) {
   return useQuery<RattachementPublic[], ApiError>({
     queryKey: [...MES_CHERCHEURS_KEY, statut],
     queryFn: () => listMyResearchers({ statut }),
@@ -216,7 +216,7 @@ export function useCloseProject(projetId: string) {
 /** Toutes les analyses reçues, tous projets confondus — seule vue d'ensemble permettant de
  * repérer ce qui reste à décider sans ouvrir chaque projet un par un (voir ProjectDetailPage,
  * qui ne montre que les analyses d'un seul projet à la fois). */
-export function useMyAnalysesForInstitution(statut?: StatutAnalyse) {
+export function useMyAnalysesForInstitution(statut?: AnalysisStatus) {
   return useQuery<AnalyseInstitutionPublic[], ApiError>({
     queryKey: [...MES_ANALYSES_KEY, statut],
     queryFn: () => listMyAnalysesForInstitution({ statut }),

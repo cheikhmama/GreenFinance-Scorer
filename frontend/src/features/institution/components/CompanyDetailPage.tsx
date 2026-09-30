@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
+import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { useCompanyDetailForInstitution } from "../api";
@@ -18,8 +19,8 @@ export function CompanyDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`${entreprise.secteur} — ${entreprise.pays}`}
-        title={entreprise.nom}
+        eyebrow={`${entreprise.sector} — ${entreprise.country}`}
+        title={entreprise.name}
         description={entreprise.description ?? "Fiche entreprise publiée."}
       />
 
@@ -32,24 +33,35 @@ export function CompanyDetailPage() {
         </CardContent>
       </Card>
 
+      {entreprise.report_id && entreprise.score.global_score !== null ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>D’où vient ce score ?</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScoreWaterfall rapportId={entreprise.report_id} />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Émissions Scope 1/2/3</CardTitle>
         </CardHeader>
         <CardContent>
-          <CarbonSummary carbone={entreprise.carbone} />
+          <CarbonSummary carbone={entreprise.carbon} />
         </CardContent>
       </Card>
 
       <IndicatorsTable
-        indicateurs={entreprise.indicateurs}
-        couverture={entreprise.couverture}
+        indicateurs={entreprise.metrics}
+        couverture={entreprise.coverage}
         construireUrlPreuve={(preuveId) =>
           `/api/v1/institution/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
         }
       />
       <CarbonTable
-        donneesCarbone={entreprise.donnees_carbone}
+        donneesCarbone={entreprise.carbon_data}
         construireUrlPreuve={(preuveId) =>
           `/api/v1/institution/entreprises/${entrepriseId}/preuves/${preuveId}/fichier`
         }
