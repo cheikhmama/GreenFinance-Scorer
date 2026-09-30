@@ -229,6 +229,29 @@ export interface AvisAuditAdmin {
   auditeur_id: string;
 }
 
+/**
+ * Ensemble de référence d'une explication de score (tâche 3.2) : les pairs du même secteur,
+ * ou toutes les entreprises publiées.
+ */
+export type BaselineScope = typeof BaselineScope[keyof typeof BaselineScope];
+
+
+export const BaselineScope = {
+  SECTOR: 'SECTOR',
+  UNIVERSE: 'UNIVERSE',
+} as const;
+
+/**
+ * L'ensemble de référence réellement utilisé. `used` diffère de `requested` quand le secteur
+ * compte trop peu de pairs (repli sur toutes les entreprises publiées).
+ */
+export interface BaselineInfo {
+  requested: BaselineScope;
+  used: BaselineScope;
+  sector: string | null;
+  peer_count: number;
+}
+
 export interface BodyImportPortfolioPositions {
   file: Blob;
   total_value?: number | string | null;
@@ -760,6 +783,7 @@ export interface EntrepriseDetailInvestisseur {
   indicateurs: IndicateurESGDetail[];
   donnees_carbone: DonneeCarboneDetail[];
   couverture: CouvertureResume;
+  rapport_id?: string | null;
 }
 
 export interface EntreprisePerimetrePublic {
@@ -937,6 +961,16 @@ export const MatchStatus = {
   UNMATCHED: 'UNMATCHED',
   AMBIGUOUS: 'AMBIGUOUS',
 } as const;
+
+export interface MetricContribution {
+  pillar: Pillar;
+  metric_code: string;
+  value: number;
+  normalized_value: number;
+  baseline_value: number | null;
+  effective_weight: number;
+  contribution: number;
+}
 
 export interface ModifierAnalyseRequest {
   titre: string;
@@ -1231,6 +1265,11 @@ export interface PerformanceESGAdmin {
   distribution: TrancheScorePublic[];
 }
 
+export interface PillarContribution {
+  pillar: Pillar;
+  contribution: number;
+}
+
 export interface PositionDetail {
   id: string;
   portefeuille_id: string;
@@ -1474,6 +1513,22 @@ export interface ReportCreateRequest {
   fiscal_year: number;
   report_type: TypeRapport;
   company_id?: string | null;
+}
+
+/**
+ * Cascade : baseline_score + Σ contributions = score, exactement (SHAP linéaire).
+ */
+export interface ScoreExplanation {
+  report_id: string;
+  company_id: string;
+  config_version: number;
+  config_hash: string | null;
+  score: number;
+  baseline_score: number;
+  coverage_rate: number | null;
+  baseline: BaselineInfo;
+  pillars: PillarContribution[];
+  contributions: MetricContribution[];
 }
 
 /**
@@ -1781,6 +1836,10 @@ page?: number;
  * @maximum 100
  */
 page_size?: number;
+};
+
+export type GetScoreExplanationParams = {
+baseline?: BaselineScope;
 };
 
 export type ListPublishedCompaniesParams = {

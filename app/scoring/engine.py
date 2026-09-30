@@ -154,6 +154,80 @@ def _score_pilier(pilier_config: PilierConfig, valeurs_par_code: dict[str, float
     return sum(sous_note * poids for sous_note, poids in contributions) / poids_total
 
 
+@dataclass(frozen=True)
+class TermeScore:
+    """Un indicateur présent dans la forme linéaire du score global : score = Σ poids_effectif ×
+    valeur_normalisee. poids_effectif = poids du pilier renormalisé sur les piliers présents ×
+    poids de l'indicateur renormalisé sur les indicateurs présents de son pilier ; les poids
+    effectifs somment à 1. Base de l'explicabilité exacte (app/explainability/decomposition.py)."""
+
+    pilier: Pillar
+    code: str
+    valeur: float
+    valeur_normalisee: float
+    poids_effectif: float
+
+
+def termes_effectifs(
+    schema: ConfigurationScoring, valeurs_par_pilier: dict[Pillar, dict[str, float]]
+) -> list[TermeScore]:
+    """Même règles que _calculer (indicateur absent retiré, poids renormalisés), jamais une autre
+    lecture de la configuration : tests/unit/test_explainability.py vérifie que Σ poids ×
+    valeur retombe exactement sur le score global."""
+    presents = {
+        pilier: {
+            code: config_indicateur
+            for code, config_indicateur in pilier_config.indicateurs.items()
+            if code in valeurs_par_pilier[pilier]
+        }
+        for pilier, pilier_config in schema.piliers.items()
+    }
+    poids_piliers = sum(schema.piliers[pilier].poids for pilier, codes in presents.items() if codes)
+    termes: list[TermeScore] = []
+    for pilier, indicateurs in presents.items():
+        if not indicateurs:
+            continue
+        poids_indicateurs = sum(config.poids for config in indicateurs.values())
+        for code, config in indicateurs.items():
+            valeur = valeurs_par_pilier[pilier][code]
+            termes.append(
+                TermeScore(
+                    pilier=pilier,
+                    code=code,
+                    valeur=valeur,
+                    valeur_normalisee=normaliser(
+                        valeur,
+                        borne_min=config.borne_min,
+                        borne_max=config.borne_max,
+                        plus_haut_est_meilleur=config.plus_haut_est_meilleur,
+                    ),
+                    poids_effectif=schema.piliers[pilier].poids
+                    / poids_piliers
+                    * config.poids
+                    / poids_indicateurs,
+                )
+            )
+    return termes
+
+
+def valeurs_des_rapports(
+    session: Session, rapport_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, dict[Pillar, dict[str, float]]]:
+    """Valeurs effectives (correction de l'Auditeur incluse) de plusieurs rapports, en une
+    requête — pour comparer un rapport à ses pairs."""
+    valeurs: dict[uuid.UUID, dict[Pillar, dict[str, float]]] = {
+        rapport_id: {pilier: {} for pilier in Pillar} for rapport_id in rapport_ids
+    }
+    if rapport_ids:
+        for indicateur in session.exec(
+            select(ESGMetric).where(col(ESGMetric.report_id).in_(rapport_ids))
+        ).all():
+            valeurs[indicateur.report_id][indicateur.pillar][indicateur.metric_code] = (
+                _valeur_effective(indicateur)
+            )
+    return valeurs
+
+
 def couverture(schema: ConfigurationScoring, codes_par_pilier: dict[Pillar, set[str]]) -> float:
     """Part pondérée des indicateurs de la configuration présents dans le rapport, entre 0 et 1 :
     Σ poids du pilier × Σ poids des indicateurs présents dans ce pilier (les deux niveaux de poids
@@ -179,10 +253,7 @@ class ResultatScore:
 def _valeurs_du_rapport(session: Session, rapport_id: uuid.UUID) -> dict[Pillar, dict[str, float]]:
     if session.get(ESGReport, rapport_id) is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
-    valeurs: dict[Pillar, dict[str, float]] = {pilier: {} for pilier in Pillar}
-    for indicateur in session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport_id)).all():
-        valeurs[indicateur.pillar][indicateur.metric_code] = _valeur_effective(indicateur)
-    return valeurs
+    return valeurs_des_rapports(session, [rapport_id])[rapport_id]
 
 
 def _calculer(

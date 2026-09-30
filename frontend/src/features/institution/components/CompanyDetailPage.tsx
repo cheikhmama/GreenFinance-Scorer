@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
+import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { useCompanyDetailForInstitution } from "../api";
@@ -31,6 +32,17 @@ export function CompanyDetailPage() {
           <ScoreSummary score={entreprise.score} />
         </CardContent>
       </Card>
+
+      {entreprise.rapport_id && entreprise.score.valeur_globale !== null ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>D’où vient ce score ?</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScoreWaterfall rapportId={entreprise.rapport_id} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

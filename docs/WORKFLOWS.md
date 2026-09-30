@@ -246,6 +246,12 @@ closed form (see `docs/ARCHITECTURE.md` §7):
 - Endpoint returns the contributions, the baseline set used, the config hash and the effective
   weights after renormalisation for missing indicators.
 
+*Implemented in task 3.2* (`GET /reports/{id}/score-explanation`, `app/explainability/`). Peers are
+the latest validated report of every **other** published company, normalised under the config
+that produced the explained score; the sector falls back to the whole universe below 3 peers
+(`baseline.requested` ≠ `baseline.used`). An indicator that no peer publishes keeps its own value
+as baseline (zero contribution, `baseline_value: null`). Computed on read, not stored.
+
 ### 3.4 Cross-validation against public datasets
 
 - Import a reference dataset (Kaggle ESG, CDP, GRI) into a staging table with its licence and
@@ -255,4 +261,4 @@ closed form (see `docs/ARCHITECTURE.md` §7):
   unmatched list. Results are researcher-scoped and never modify platform data.
 
 *Current:* researchers work in projects supervised by an institution (`Analyse`, `Projet`,
-`Rattachement`), and explainability is a per-indicator decomposition without a baseline.
+`Rattachement`); explainability: see §3.3 (task 3.2).

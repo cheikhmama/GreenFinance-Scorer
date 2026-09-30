@@ -53,7 +53,7 @@ def perimetre(user: User) -> list[ColumnElement[bool]]:
     raise PermissionDeniedError(f"Rôle {user.role.value} non autorisé pour cette action.")
 
 
-def _rapport_visible(
+def rapport_visible(
     session: Session, user: User, rapport_id: uuid.UUID, *, verrouiller: bool = False
 ) -> ESGReport:
     requete = select(ESGReport).where(col(ESGReport.id) == rapport_id, *perimetre(user))
@@ -72,7 +72,7 @@ def _brouillon_modifiable(
     ne voit que des rapports déjà soumis), ligne verrouillée jusqu'au commit."""
     if user.role not in (Role.ENTERPRISE, Role.ADMIN):
         raise PermissionDeniedError(f"Rôle {user.role.value} non autorisé pour cette action.")
-    rapport = _rapport_visible(session, user, rapport_id, verrouiller=True)
+    rapport = rapport_visible(session, user, rapport_id, verrouiller=True)
     if rapport.status != ReportStatus.DRAFT:
         raise ValidationError("Ce rapport n'est plus un brouillon.", code="transition_invalide")
     return rapport
@@ -152,7 +152,7 @@ def lister(
 
 
 def consulter(session: Session, user: User, rapport_id: uuid.UUID) -> ESGReport:
-    return _rapport_visible(session, user, rapport_id)
+    return rapport_visible(session, user, rapport_id)
 
 
 def soumettre(

@@ -261,7 +261,8 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
   no model training and no sampling, and it is reproducible. The `shap` library is only needed
   if a non-linear model (e.g. a researcher-trained predictor) is added later.
 - **Waterfall.** baseline score → contribution per indicator, grouped by pillar → final score;
-  contributions always sum exactly to `score − baseline`.
+  contributions always sum exactly to `score − baseline`. *Implemented in task 3.2*; the `shap`
+  library is not a dependency.
 
 ---
 

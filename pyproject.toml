@@ -51,6 +51,7 @@ dev = [
     "types-passlib",
     "types-pyyaml",
     "types-reportlab>=5.0.0.20260911",
+    "hypothesis>=6.168.3",
 ]
 notebook = [
     "jupyter",

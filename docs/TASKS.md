@@ -93,9 +93,12 @@ Rules for every task:
   - [x] Official score = the latest score under a reference config, not "the score under the current file version": a methodology change no longer hides every published score, so `scripts/recalculer_scores_v2.py` (the workaround) is deleted. Validation also fills `esg_reports.coverage_rate` / `config_hash`.
   - [x] Renamed `configuration_ponderation` → `scoring_configs`, `score_esg` → `scores`, `Pilier` → `Pillar` (RENAME_PLAN §3d); `scores.config_id` RESTRICT + index; `analyse_entreprise.score_esg_id` gets `ON DELETE SET NULL` + index (deleting a scored report failed once an analysis had frozen it).
   - [x] Migration keeps a config's content only when the file it pointed to still declares the same version; otherwise content stays unknown (never guessed) and that config can't be used for a calculation (`configuration_sans_contenu`).
-- [ ] 3.2 SHAP Explainability Module: Implement feature attribution endpoints for score decomposition.
-  - [ ] Exact linear SHAP with a sector baseline; contributions must sum to `score − baseline` (property test).
-  - [ ] Waterfall endpoint and frontend chart.
+- [x] 3.2 SHAP Explainability Module: Implement feature attribution endpoints for score decomposition.
+  - [x] Exact linear SHAP with a sector baseline; contributions must sum to `score − baseline` (property test). `app/scoring/engine.py::termes_effectifs` exposes the score's linear form (effective weights after renormalisation); `app/explainability/decomposition.py` is pure; property tests (`hypothesis`, new dev dependency) check on random reports that the linear form equals the engine's score and that contributions sum exactly to `score − baseline`.
+  - [x] Waterfall endpoint and frontend chart: `GET /reports/{id}/score-explanation?baseline=SECTOR|UNIVERSE` (English contract), "D'où vient ce score ?" card on the investor, researcher and institution company pages (plain HTML bars, no chart library).
+  - [x] Baseline = mean normalised value of each indicator over the latest validated report of the other published companies, under the **same** stored config as the explained score; sector by default, whole universe when the sector has fewer than 3 peers (flagged). An indicator no peer publishes has no baseline and a zero contribution — never an invented mean.
+  - [x] Access follows what each role already sees: `/reports` perimeter for admin, company and auditor; latest validated report of a published company for the others, inside the project perimeter for researcher and institution. Company detail gains `rapport_id`.
+  - [x] Removed the empty `app/explainability/justification.py` stub (textual justifications are in no task).
 - [ ] 3.3 Public dataset cross-validation (Kaggle / CDP / GRI): staging import, ISIN/LEI matching, Spearman and MAE report.
 
 ## Phase 4: Architecture & Quality

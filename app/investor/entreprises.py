@@ -221,6 +221,7 @@ def consulter_entreprise_publiee(
         indicateurs=indicateurs,
         donnees_carbone=donnees_carbone,
         couverture=couverture_publique(session, rapport),
+        rapport_id=rapport.id if rapport else None,
     )
 
 

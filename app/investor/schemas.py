@@ -88,6 +88,8 @@ class EntrepriseDetailInvestisseur(EntreprisePublieePublic):
     indicateurs: list[IndicateurESGDetail]
     donnees_carbone: list[DonneeCarboneDetail]
     couverture: CouvertureResume
+    # Le rapport publié affiché (tâche 3.2) : clé de GET /reports/{id}/score-explanation.
+    rapport_id: uuid.UUID | None = None
 
 
 class CreerPortefeuilleRequest(BaseModel):

@@ -117,6 +117,14 @@ class DevisePosition(str, Enum):
     EUR = "EUR"
 
 
+class BaselineScope(str, Enum):
+    """Ensemble de référence d'une explication de score (tâche 3.2) : les pairs du même secteur,
+    ou toutes les entreprises publiées."""
+
+    SECTOR = "SECTOR"
+    UNIVERSE = "UNIVERSE"
+
+
 class IdentifierType(str, Enum):
     """Identifiant de marché d'une ligne de portefeuille importée (tâche 2.2)."""
 
