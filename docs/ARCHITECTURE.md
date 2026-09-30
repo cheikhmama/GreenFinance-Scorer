@@ -17,14 +17,14 @@ portfolios and financial research. It turns sustainability reports (PDF / CSRD) 
 metrics into auditable, evidence-backed scores, and aggregates them at portfolio level together
 with PCAF financed emissions.
 
-| Target role | Current enum value (`app/core/enums.py::Role`) | Responsibility |
-|---|---|---|
-| `ADMIN` | `ADMINISTRATEUR` | Onboarding (KYC), audit queue, publication, platform configuration |
-| `ENTERPRISE` | `ENTREPRISE` | Company profile, report submission, corrections |
-| `AUDITOR` | `AUDITEUR` | Reviews evidence snippets, issues the audit opinion |
-| `INVESTOR` | `INVESTISSEUR` | Portfolios, positions, aggregated ESG and PCAF analytics |
-| `RESEARCHER` | `CHERCHEUR` | Custom YAML weights, recalculation, explainability, dataset cross-validation |
-| `INSTITUTION` (kept, D1) | `INSTITUTION` | Creates research projects, invites researchers, reviews their analyses |
+| Role (`app/core/enums.py::Role`) | Responsibility |
+|---|---|
+| `ADMIN` | Onboarding (KYC), audit queue, publication, platform configuration |
+| `ENTERPRISE` | Company profile, report submission, corrections |
+| `AUDITOR` | Reviews evidence snippets, issues the audit opinion |
+| `INVESTOR` | Portfolios, positions, aggregated ESG and PCAF analytics |
+| `RESEARCHER` | Comparative analyses within a project's scope, explainability, dataset cross-validation |
+| `INSTITUTION` (kept, D1) | Creates research projects, invites researchers, reviews their analyses |
 
 The mission brief uses both `PORTFOLIO_MANAGER` and `INVESTOR` for the same actor. This document
 standardises on **`INVESTOR`** (matches the `users` role list in the brief and the existing
