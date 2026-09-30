@@ -43,10 +43,9 @@ class User(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
     name: str | None = None
-    # Data URI complet (voir app/company/models.py::Company.logo, même convention) — jamais un
-    # fichier séparé sur disque, une image d'avatar reste petite (voir
-    # app/auth/avatar.py::TAILLE_MAX_OCTETS).
-    avatar: str | None = None
+    # Chemin relatif du fichier d'avatar sous STORAGE_PATH (tâche 4.3, app/auth/avatar.py) —
+    # plus le contenu base64 lui-même, relu à chaque requête authentifiée.
+    avatar_path: str | None = Field(default=None, max_length=255)
     # None tant que le compte n'a pas été activé (voir activated_at ci-dessous) : un compte
     # provisionné par l'Administrateur n'a d'abord aucun mot de passe, la personne titulaire pose
     # le sien elle-même via le lien d'activation (app/auth/activation.py).

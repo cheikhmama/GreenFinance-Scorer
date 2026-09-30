@@ -290,6 +290,31 @@ export const deleteMyAvatar = async ( options?: RequestInit): Promise<Utilisateu
 );}
 
 
+export const getGetUserAvatarUrl = (userId: string,
+    nomFichier: string,) => {
+
+
+
+
+  return `/auth/avatars/${userId}/${nomFichier}`
+}
+
+/**
+ * @summary Photo de profil d'un utilisateur (URL fournie par le champ `avatar`)
+ */
+export const getUserAvatar = async (userId: string,
+    nomFichier: string, options?: RequestInit): Promise<void> => {
+
+  return apiFetch<void>(getGetUserAvatarUrl(userId,nomFichier),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getVerifyMyPasswordUrl = () => {
 
 

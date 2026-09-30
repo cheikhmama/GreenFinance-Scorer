@@ -17,7 +17,7 @@ from typing import Any
 
 import pydantic
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, col, func, select
 
 from app.auth.models import User
 from app.company.models import Company
@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import CompanyStatus, DevisePosition, TypeDureeInvestissement
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.recherche import contient
 from app.ingestion.models import ESGMetric
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
@@ -309,7 +310,7 @@ def lister_mes_portefeuilles(
     if archive is not None:
         filtres.append(col(Portfolio.archived) == archive)
     if recherche:
-        filtres.append(col(Portfolio.name).ilike(f"%{recherche}%"))
+        filtres.append(contient(recherche, Portfolio.name))
 
     tous = list(
         session.exec(
@@ -597,12 +598,7 @@ def lister_portefeuilles_admin(
     portefeuilles de devises différentes."""
     filtres: list[ColumnElement[bool]] = [col(Portfolio.archived).is_(False)]
     if recherche:
-        filtres.append(
-            or_(
-                col(Portfolio.name).ilike(f"%{recherche}%"),
-                col(User.email).ilike(f"%{recherche}%"),
-            )
-        )
+        filtres.append(contient(recherche, Portfolio.name, User.email))
 
     total = session.exec(
         select(func.count())

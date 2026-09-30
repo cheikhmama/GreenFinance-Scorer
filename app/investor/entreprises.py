@@ -9,13 +9,14 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, col, func, select
 
 from app.company.models import Company
 from app.company.schemas import EntreprisePublic
 from app.core.config import get_settings
 from app.core.enums import DevisePosition, ReportStatus, StatutCouvertureIndicateur
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.recherche import contient
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
@@ -162,8 +163,7 @@ def lister_entreprises_publiees(
     if pays:
         filtres.append(col(Company.country) == pays)
     if recherche:
-        motif = f"%{recherche}%"
-        filtres.append(or_(col(Company.name).ilike(motif), col(Company.sector).ilike(motif)))
+        filtres.append(contient(recherche, Company.name, Company.sector))
 
     total = session.exec(select(func.count()).select_from(Company).where(*filtres)).one()
     items = session.exec(

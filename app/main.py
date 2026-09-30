@@ -52,6 +52,9 @@ def health(response: Response) -> dict[str, str]:
     try:
         check_database_connection()
     except DatabaseConnectionError as exc:
+        # Route publique : jamais le message de l'exception (hôte, port, utilisateur de la base
+        # peuvent y figurer) — seulement dans les journaux (tâche 4.3).
+        logger.error("health_database_unreachable", error_type=type(exc.__cause__ or exc).__name__)
         response.status_code = 503
-        return {"status": "error", "database": "unreachable", "detail": str(exc)}
+        return {"status": "error", "database": "unreachable"}
     return {"status": "ok", "database": "connected"}

@@ -21,6 +21,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.auth.avatar import url_avatar
 from app.auth.models import User
 from app.core.enums import Role
 
@@ -65,7 +66,8 @@ def user_vers_contrat(user: User) -> dict[str, Any]:
         "id": user.id,
         "email": user.email,
         "nom": user.name,
-        "avatar": user.avatar,
+        # URL du fichier (tâche 4.3), plus un data URI : même usage côté client (src d'image).
+        "avatar": url_avatar(user),
         "role": user.role,
         "date_creation": user.created_at,
         "actif": user.active,

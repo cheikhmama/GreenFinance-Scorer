@@ -11,7 +11,7 @@ import uuid
 
 from fastapi import BackgroundTasks
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, col, func, select
 
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import InstitutionProfil, User
@@ -21,6 +21,7 @@ from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
 from app.core.enums import CompanyStatus, Role
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
+from app.core.recherche import contient
 
 # Quota de départ pour un compte Institution (Étape 17 §quota d'export) — pas encore un champ du
 # formulaire de création (aucune institution réelle n'a encore exprimé un besoin différencié),
@@ -56,8 +57,7 @@ def lister_utilisateurs_par_role(
         else:
             filtres.append(col(User.activated_at).is_not(None))
     if recherche:
-        motif = f"%{recherche}%"
-        filtres.append(or_(col(User.email).ilike(motif), col(User.name).ilike(motif)))
+        filtres.append(contient(recherche, User.email, User.name))
 
     total = session.exec(select(func.count()).select_from(User).where(*filtres)).one()
     items = list(

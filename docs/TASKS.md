@@ -119,12 +119,12 @@ Rules for every task:
   - [x] Move `pytest`, `pytest-cov` to the `dev` group; the extraction stack (Docling, Paddle, torch, bge-m3, faiss, genai) moves to an `extraction` group, installed by default locally (`default-groups`) but only in the worker image (`--no-default-groups --group extraction`).
   - [x] The default worker no longer loads the extraction stack either: `ExtractionTransitoire` / `marquer_echec` moved to `app/ingestion/etat_extraction.py`, `CODES_AUTO_DECLARES_PAR_PILIER` to `app/ingestion/vocabulaire.py`, and the extraction job imports the pipeline lazily (test extended to the default worker).
   - [x] Run `alembic upgrade head` at deploy (`migrate` one-shot service, API and workers wait for it); don't publish Postgres/Redis ports outside dev; Redis password. `docker-compose.yml` (shared, no ports, no credentials) + `docker-compose.override.yml` (dev, auto-loaded, unchanged behaviour) + `docker-compose.prod.yml` (`POSTGRES_PASSWORD` / `REDIS_PASSWORD` required, `requirepass`, only the API port published, `ENVIRONMENT=production`).
-- [ ] 4.3 Hardening leftovers **[review]**
-  - [ ] `/health` returns a fixed message, not `str(exc)`.
-  - [ ] URL import: block every non-global IP (`not ip.is_global`) and add a total download deadline.
-  - [ ] Escape `%` and `_` in `ilike` search inputs.
-  - [ ] Store avatars as files instead of base64 in the user row.
-  - [ ] Frontend: global `401` handler that sends the user to the login page.
+- [x] 4.3 Hardening leftovers **[review]** (migration `d5b8e1f0a3c7`)
+  - [x] `/health` returns a fixed message, not `str(exc)` (the error type is logged).
+  - [x] URL import: block every non-global IP (`not ip.is_global`) and add a total download deadline. Also checks the IPv4 embedded in IPv4-mapped and 6to4 IPv6 addresses; newly blocked ranges include CGNAT 100.64.0.0/10, which the old deny-list let through. The 60 s deadline covers redirects and the whole stream (a server dripping a byte under the per-read timeout is cut).
+  - [x] Escape `%` and `_` in `ilike` search inputs: one helper (`app/core/recherche.py::contient`, `ESCAPE '\'`) for all 8 searches; integration test shows `100%` no longer matches `1000…`.
+  - [x] Store avatars as files instead of base64 in the user row: `users.avatar_path`, file under `avatars/{user_id}/` with a random name, served by `GET /auth/avatars/{user_id}/{file}` (authenticated, only the current file, immutable cache); the JSON field `avatar` keeps its name and now holds that URL. Upload read is bounded. The migration moves existing avatars to files and drops any data URI that is not a PNG/JPEG/WEBP image; downgrade reads the files back. Company logos stay data URIs (not in this task).
+  - [x] Frontend: global `401` handler that sends the user to the login page. On the QueryClient's query and mutation caches (`src/queryClient.ts`, `features/auth/session.ts`): only session codes (`not_authenticated`, `invalid_token`, `session_revoked`), never `invalid_credentials`; `/auth/me` itself is ignored (no refetch loop); the login page returns to the page that was left (internal paths only).
 - [ ] 4.4 CI **[review]**
   - [ ] Run on `pull_request` + push to `main` only; add a `concurrency` group that cancels superseded runs; upgrade `setup-uv`.
   - [ ] Fail when Alembic has more than one head.

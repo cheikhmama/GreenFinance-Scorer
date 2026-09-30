@@ -26,7 +26,7 @@ import type { LoginRequest, User } from "./schemas";
 
 /** Clé de cache TanStack Query partagée par useCurrentUser, useLogin et useLogout,
  * pour que les trois hooks restent synchronisés sur un seul état de session. */
-const CURRENT_USER_QUERY_KEY = ["auth", "me"] as const;
+export const CURRENT_USER_QUERY_KEY = ["auth", "me"] as const;
 
 /**
  * GET /auth/me. Sert deux usages : afficher l'utilisateur connecté, et — via

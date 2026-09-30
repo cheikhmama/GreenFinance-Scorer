@@ -173,7 +173,8 @@ An import that only has weights needs a total portfolio value so that amounts ca
 ### 3.5 `users`
 
 `id`, `email` (stored lower-case, unique index on `lower(email)`), `name`, `role`, `active`,
-`password_hash`, `activated_at`, `avatar_path` (file storage, not a base64 column as today).
+`password_hash`, `activated_at`, `avatar_path` (file storage, not a base64 column — done in
+task 4.3; company logos are still data URIs in `companies.logo`).
 
 ### 3.6 `scoring_configs` and `scores`
 
@@ -202,7 +203,9 @@ recovered keep NULL content and hash (a CHECK ties them) and cannot be used for 
 | Password policy | **12 characters minimum, 72 UTF-8 bytes maximum**, on every endpoint that sets a password (activation, reset, change) | ✅ task 1.2 (one shared validator; login unaffected, D4) |
 | Rate limiting | Login, verify-password, **change-password**, email change, reset request, contact, URL import. Per account **and** per client IP (behind a trusted proxy). Atomic counters (`INCR` + `EXPIRE` in one Lua call) | ✅ task 1.2 (`app/core/redis.py::incrementer_fenetre`; login also per IP) |
 | Sensitive profile changes | Changing email requires the current password and confirmation via a link sent to the new address | ✅ task 1.2 (`app/auth/email_change.py`; old address notified) |
-| SSRF (URL import) | Scheme allow-list, DNS check with `not ip.is_global`, manual redirect revalidation, size cap, **total** download deadline | ⚠️ uses a deny-list; timeout is per read |
+| SSRF (URL import) | Scheme allow-list, DNS check with `not ip.is_global`, manual redirect revalidation, size cap, **total** download deadline | ✅ task 4.3 (`not is_global` + IPv4 embedded in IPv6 checked; 60 s deadline across redirects and the whole stream). Residual: DNS rebinding between check and connection (documented in `app/company/url_fetch.py`) |
+| Search inputs | `%` and `_` typed by a user are characters, never LIKE wildcards | ✅ task 4.3 (`app/core/recherche.py::contient`, every `ilike`) |
+| Error detail | Public endpoints never return exception messages | ✅ task 4.3 (`/health` returns a fixed body, details in the logs) |
 | Secrets | Production refuses placeholder values and `*` CORS | ✅ in place |
 | Tenant scoping | Every query on tenant data filters by owner / assignment inside the owning module | ✅ in place; kept as a rule |
 

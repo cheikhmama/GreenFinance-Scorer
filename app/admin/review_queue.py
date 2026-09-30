@@ -14,7 +14,7 @@ from typing import Any
 import structlog
 from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, col, func, select
 
 from app.audit.models import AvisAudit
 from app.auth.avatar import construire_avatar_data_uri
@@ -24,6 +24,7 @@ from app.core.database import utcnow
 from app.core.enums import CompanyStatus, DevisePosition, ExtractionStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
+from app.core.recherche import contient
 from app.ingestion.models import ESGReport
 from app.scoring.engine import calculer_score, score_officiel
 from app.scoring.models import Score
@@ -402,14 +403,7 @@ def lister_entreprises_publiables(
         col(Company.published_at).is_(None),
     ]
     if recherche:
-        motif = f"%{recherche}%"
-        filtres.append(
-            or_(
-                col(Company.name).ilike(motif),
-                col(Company.sector).ilike(motif),
-                col(Company.country).ilike(motif),
-            )
-        )
+        filtres.append(contient(recherche, Company.name, Company.sector, Company.country))
 
     total = session.exec(select(func.count()).select_from(Company).where(*filtres)).one()
     items = list(
@@ -438,14 +432,7 @@ def lister_toutes_les_entreprises(
     offset/limit que les autres listes Admin."""
     filtres: list[ColumnElement[bool]] = []
     if recherche:
-        motif = f"%{recherche}%"
-        filtres.append(
-            or_(
-                col(Company.name).ilike(motif),
-                col(Company.sector).ilike(motif),
-                col(Company.country).ilike(motif),
-            )
-        )
+        filtres.append(contient(recherche, Company.name, Company.sector, Company.country))
 
     total = session.exec(select(func.count()).select_from(Company).where(*filtres)).one()
     entreprises = list(
@@ -651,8 +638,8 @@ def modifier_entreprise_admin(
 
 
 def televerser_logo_entreprise(session: Session, entreprise_id: uuid.UUID, contenu: bytes) -> Company:
-    """Valide et encode le logo en data URI via la même fonction que Utilisateur.avatar
-    (app/auth/avatar.py::construire_avatar_data_uri) — la vérification par signature binaire
+    """Valide et encode le logo en data URI via app/auth/avatar.py::construire_avatar_data_uri
+    (même validation par signature que les avatars) — la vérification par signature binaire
     réelle ne dépend d'aucune notion propre à un compte utilisateur, la réutiliser évite de
     dupliquer une règle de sécurité (frontière fichier non fiable) dans deux modules."""
     entreprise = consulter_entreprise_admin(session, entreprise_id)

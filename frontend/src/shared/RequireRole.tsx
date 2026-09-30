@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useCurrentUser } from "@/features/auth/api";
 import type { Role } from "@/features/auth/schemas";
 
@@ -21,6 +21,7 @@ interface RequireRoleProps {
  */
 export function RequireRole({ allowedRoles, children }: RequireRoleProps) {
   const { data: user, isLoading, isError } = useCurrentUser();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -31,7 +32,10 @@ export function RequireRole({ allowedRoles, children }: RequireRoleProps) {
   }
 
   if (isError || !user) {
-    return <Navigate to="/login" replace />;
+    // Page d'origine retenue : après reconnexion, l'utilisateur y revient (LoginPage).
+    return (
+      <Navigate to="/login" replace state={{ depuis: `${location.pathname}${location.search}` }} />
+    );
   }
 
   if (!allowedRoles.includes(user.role)) {

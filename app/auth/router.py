@@ -6,11 +6,14 @@ cookie __Host-, révocation Redis par génération de session, jeton CSRF signé
 périmètre, réservé à une phase dédiée (app/core/config.py, mfa_issuer_name).
 """
 
+import uuid
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
+from app.auth import avatar
 from app.auth.activation import activer_compte
-from app.auth.avatar import construire_avatar_data_uri
 from app.auth.csrf import generate_csrf_token
 from app.auth.email_change import confirmer_changement_email, demander_changement_email
 from app.auth.hashing import hash_password, verify_password
@@ -250,12 +253,9 @@ def televerser_mon_avatar(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> User:
-    contenu = fichier.file.read()
-    current_user.avatar = construire_avatar_data_uri(contenu)
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
-    return current_user
+    # Lecture bornée : un octet de plus que la limite suffit à refuser le fichier.
+    contenu = fichier.file.read(avatar.TAILLE_MAX_OCTETS + 1)
+    return avatar.remplacer_avatar(session, current_user, contenu)
 
 
 @router.delete(
@@ -268,11 +268,28 @@ def supprimer_mon_avatar(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> User:
-    current_user.avatar = None
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
-    return current_user
+    return avatar.retirer_avatar(session, current_user)
+
+
+@router.get(
+    "/auth/avatars/{user_id}/{nom_fichier}",
+    response_class=FileResponse,
+    operation_id="getUserAvatar",
+    summary="Photo de profil d'un utilisateur (URL fournie par le champ `avatar`)",
+)
+def lire_avatar(
+    user_id: uuid.UUID,
+    nom_fichier: str,
+    _current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    chemin, type_mime = avatar.fichier_avatar(session, user_id, nom_fichier)
+    # Le nom change à chaque envoi : l'URL désigne toujours le même contenu, cache sans fin.
+    return FileResponse(
+        chemin,
+        media_type=type_mime,
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )
 
 
 @router.post(

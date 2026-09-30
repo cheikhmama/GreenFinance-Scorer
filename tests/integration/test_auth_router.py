@@ -16,6 +16,7 @@ from app.auth.models import EmailChangeRequest, PasswordResetToken, User
 from app.auth.password_reset import _hash_token
 from app.auth.rate_limit import MAX_ATTEMPTS, MAX_ATTEMPTS_PAR_IP, clear_login_attempts
 from app.auth.tokens import COOKIE_NAME, CSRF_COOKIE_NAME, CSRF_HEADER_NAME
+from app.core import storage
 from app.core.database import utcnow
 from app.core.email import EmailDeliveryError
 from app.core.enums import Role
@@ -255,11 +256,34 @@ def test_televerser_puis_supprimer_mon_avatar(session) -> None:
         "/api/v1/auth/me/avatar", files={"fichier": ("avatar.png", _PNG_1X1, "image/png")}
     )
     assert upload.status_code == 200
-    assert upload.json()["avatar"].startswith("data:image/png;base64,")
+    # Tâche 4.3 : une URL vers le fichier, plus un data URI stocké dans la ligne utilisateur.
+    url = upload.json()["avatar"]
+    assert url.startswith(f"/api/v1/auth/avatars/{user.id}/") and url.endswith(".png")
+    image = authed_client.get(url)
+    assert image.status_code == 200
+    assert image.content == _PNG_1X1
+    assert image.headers["content-type"] == "image/png"
+    assert "immutable" in image.headers["cache-control"]
+    fichier = storage.resolve_path(f"avatars/{user.id}/{url.rsplit('/', 1)[1]}")
+    assert fichier.is_file()
+
+    # Un nouvel envoi change l'URL ; l'ancienne ne sert plus rien et son fichier disparaît.
+    remplacement = authed_client.post(
+        "/api/v1/auth/me/avatar", files={"fichier": ("avatar.png", _PNG_1X1, "image/png")}
+    )
+    assert remplacement.json()["avatar"] != url
+    assert authed_client.get(url).status_code == 404
+    assert not fichier.exists()
+    # Jamais un fichier arbitraire : seul le nom enregistré sur la ligne est servi.
+    assert authed_client.get(f"/api/v1/auth/avatars/{user.id}/..%2F..%2F.env").status_code == 404
+    assert TestClient(app, base_url="https://testserver").get(
+        remplacement.json()["avatar"]
+    ).status_code == 401
 
     delete = authed_client.delete("/api/v1/auth/me/avatar")
     assert delete.status_code == 200
     assert delete.json()["avatar"] is None
+    assert authed_client.get(remplacement.json()["avatar"]).status_code == 404
 
 
 def test_televerser_avatar_non_image_est_refuse_proprement(session) -> None:

@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, FlaskConical, LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isPrototypeEnabled } from "@/features/prototype/routes";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
@@ -11,6 +11,7 @@ import { Button } from "@/shared/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { useLogin } from "../api";
+import { pageDeRetour } from "../session";
 import { type LoginRequest, loginRequestSchema } from "../schemas";
 import { PasswordInput } from "./PasswordInput";
 
@@ -23,6 +24,7 @@ import { PasswordInput } from "./PasswordInput";
  */
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useLogin();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -35,7 +37,8 @@ export function LoginPage() {
     if (login.isPending) return;
     setServerError(null);
     login.mutate(values, {
-      onSuccess: () => navigate("/dashboard", { replace: true }),
+      // Retour à la page quittée pour cause de session expirée, sinon l'espace du rôle.
+      onSuccess: () => navigate(pageDeRetour(location.state) ?? "/dashboard", { replace: true }),
       onError: (error: ApiError) => {
         // 401 invalid_credentials est le seul cas métier attendu du contrat
         // POST /auth/login ; tout autre code (panne réseau, 500) reste un message

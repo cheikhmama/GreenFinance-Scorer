@@ -19,6 +19,7 @@ from app.core.database import utcnow
 from app.core.enums import ExtractionStatus, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
+from app.core.recherche import contient
 from app.ingestion.models import ESGReport
 
 logger = structlog.get_logger(__name__)
@@ -103,7 +104,7 @@ def lister_charge_auditeurs(
         col(User.active).is_(True),
     ]
     if recherche:
-        filtres.append(col(User.email).ilike(f"%{recherche}%"))
+        filtres.append(contient(recherche, User.email))
 
     total = session.exec(select(func.count()).select_from(User).where(*filtres)).one()
     auditeurs = list(
