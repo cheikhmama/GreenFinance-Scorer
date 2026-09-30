@@ -28,5 +28,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
+    // userEvent tape caractère par caractère : sous la charge de l'exécution parallèle (et sur les
+    // 2 cœurs d'un runner CI), un formulaire long dépasse les 5 s par défaut sans rien avoir de
+    // faux — ces dépassements étaient la cause des échecs intermittents (tâche 4.5).
+    testTimeout: 15_000,
   },
 });
