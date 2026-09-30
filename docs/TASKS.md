@@ -125,9 +125,10 @@ Rules for every task:
   - [x] Escape `%` and `_` in `ilike` search inputs: one helper (`app/core/recherche.py::contient`, `ESCAPE '\'`) for all 8 searches; integration test shows `100%` no longer matches `1000…`.
   - [x] Store avatars as files instead of base64 in the user row: `users.avatar_path`, file under `avatars/{user_id}/` with a random name, served by `GET /auth/avatars/{user_id}/{file}` (authenticated, only the current file, immutable cache); the JSON field `avatar` keeps its name and now holds that URL. Upload read is bounded. The migration moves existing avatars to files and drops any data URI that is not a PNG/JPEG/WEBP image; downgrade reads the files back. Company logos stay data URIs (not in this task).
   - [x] Frontend: global `401` handler that sends the user to the login page. On the QueryClient's query and mutation caches (`src/queryClient.ts`, `features/auth/session.ts`): only session codes (`not_authenticated`, `invalid_token`, `session_revoked`), never `invalid_credentials`; `/auth/me` itself is ignored (no refetch loop); the login page returns to the page that was left (internal paths only).
-- [ ] 4.4 CI **[review]**
-  - [ ] Run on `pull_request` + push to `main` only; add a `concurrency` group that cancels superseded runs; upgrade `setup-uv`.
-  - [ ] Fail when Alembic has more than one head.
+- [x] 4.4 CI **[review]**
+  - [x] Run on `pull_request` + push to `main` only; add a `concurrency` group that cancels superseded runs; upgrade `setup-uv`. `setup-uv` v3 → v10 with uv pinned to the images' version (0.11.15) and Python 3.11 (production), cache on `uv.lock`; `checkout` v7, `setup-node` v7; Node 20 (end of life) → 22; `permissions: contents: read`; `uv sync --frozen`.
+  - [x] Fail when Alembic has more than one head (verified both ways locally with a temporary forked migration).
+  - [x] Also: `alembic upgrade head` + `alembic check` on the CI database (a model changed without its migration fails; the 39 migrations apply from an empty database); mypy on `tests` as well as `app`; a second job builds the `api` image (task 4.2) and asserts it has no dev tools nor extraction stack. Workflow checked with `actionlint`.
 - [ ] 4.5 Test coverage **[review]**
   - [ ] Backend: extraction pipeline (with a stubbed LLM), semantic search, completeness, explainability, activation, avatar, CSRF middleware in isolation.
   - [ ] Frontend: at least one flow test per user space (currently only auth, contact, prototype, `RequireRole`).
