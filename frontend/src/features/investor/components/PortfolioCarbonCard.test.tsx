@@ -27,7 +27,7 @@ function position(excluded_reason: string | null) {
     data_quality: null,
     emissions_year: null,
     scope_2_basis: null,
-    enterprise_value_as_of: null,
+    evic_date: null,
     excluded_reason,
   };
 }

@@ -14,8 +14,13 @@ export const creerProjetSchema = z
   })
   .refine(
     (valeurs) =>
-      !valeurs.start_date || !valeurs.planned_end_date || valeurs.start_date <= valeurs.planned_end_date,
-    { message: "La date de début doit précéder la date de fin prévue.", path: ["planned_end_date"] },
+      !valeurs.start_date ||
+      !valeurs.planned_end_date ||
+      valeurs.start_date <= valeurs.planned_end_date,
+    {
+      message: "La date de début doit précéder la date de fin prévue.",
+      path: ["planned_end_date"],
+    },
   )
   .refine(
     (valeurs) => !valeurs.start_date || !valeurs.deadline || valeurs.deadline >= valeurs.start_date,

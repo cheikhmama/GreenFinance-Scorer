@@ -19,7 +19,7 @@ from app.auth.revocation import revoke_all_sessions
 from app.company.models import Company
 from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
-from app.core.enums import CompanyStatus, Role
+from app.core.enums import RegistrationStatus, Role
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 from app.core.recherche import contient
 
@@ -191,10 +191,11 @@ def renvoyer_lien_activation(
         raise ValidationError("Ce compte est déjà activé.", code="compte_deja_active")
     if (
         utilisateur.company is not None
-        and utilisateur.company.status == CompanyStatus.PENDING_ONBOARDING
+        and utilisateur.company.status not in (RegistrationStatus.ACTIVE, RegistrationStatus.SUSPENDED)
     ):
-        # Le lien part à la validation de l'inscription (tâche 1.4), jamais avant : sinon le
-        # titulaire se connecterait à une entreprise que personne n'a encore validée.
+        # Le lien part à la validation de l'inscription (tâche 1.4), jamais avant — ni pour une
+        # inscription refusée (tâche 5.2) : sinon le titulaire se connecterait à une entreprise que
+        # personne n'a validée.
         raise ValidationError(
             "L'inscription de cette entreprise n'est pas encore validée.",
             code="inscription_non_validee",

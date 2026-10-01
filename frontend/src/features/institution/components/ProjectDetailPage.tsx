@@ -56,7 +56,9 @@ export function ProjectDetailPage() {
         description={projet.objective ?? projet.description ?? "Aucune description."}
         action={
           <div className="flex items-center gap-2">
-            <Badge variant={variantStatutProjet(projet.status)}>{libelleStatutProjet(projet.status)}</Badge>
+            <Badge variant={variantStatutProjet(projet.status)}>
+              {libelleStatutProjet(projet.status)}
+            </Badge>
             {projet.status === "OUVERT" ? (
               <Button
                 variant="outline"
@@ -65,7 +67,8 @@ export function ProjectDetailPage() {
                 onClick={async () => {
                   const confirme = await confirm({
                     title: "Clôturer ce projet ?",
-                    description: "Aucune nouvelle affectation de chercheur ne sera possible ensuite. Cette action est irréversible.",
+                    description:
+                      "Aucune nouvelle affectation de chercheur ne sera possible ensuite. Cette action est irréversible.",
                     confirmLabel: "Clôturer",
                     destructive: true,
                   });
@@ -83,7 +86,9 @@ export function ProjectDetailPage() {
       {projet.start_date || projet.planned_end_date || projet.deadline ? (
         <Card>
           <CardContent className="flex flex-wrap gap-6 text-sm">
-            {projet.start_date ? <Champ label="Début" valeur={formatDate(projet.start_date)} /> : null}
+            {projet.start_date ? (
+              <Champ label="Début" valeur={formatDate(projet.start_date)} />
+            ) : null}
             {projet.planned_end_date ? (
               <Champ label="Fin prévue" valeur={formatDate(projet.planned_end_date)} />
             ) : null}
@@ -123,7 +128,9 @@ export function ProjectDetailPage() {
                     {
                       onSuccess: () => setChercheurASelectionner(""),
                       onError: (error) =>
-                        setErreur(error instanceof ApiError ? error.message : "Échec de l'affectation."),
+                        setErreur(
+                          error instanceof ApiError ? error.message : "Échec de l'affectation.",
+                        ),
                     },
                   )
                 }
@@ -138,10 +145,17 @@ export function ProjectDetailPage() {
             <EmptyState icon={UserPlus} message="Aucun chercheur affecté pour l'instant." />
           ) : (
             projet.assignments.map((affectation) => (
-              <div key={affectation.id} className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
+              <div
+                key={affectation.id}
+                className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
+              >
                 <InitialsAvatar nom={affectation.researcher_email} size="sm" />
-                <span className="flex-1 font-medium text-brand-blue">{affectation.researcher_email}</span>
-                <span className="text-brand-grey">depuis le {formatDate(affectation.assigned_at)}</span>
+                <span className="flex-1 font-medium text-brand-blue">
+                  {affectation.researcher_email}
+                </span>
+                <span className="text-brand-grey">
+                  depuis le {formatDate(affectation.assigned_at)}
+                </span>
               </div>
             ))
           )}
@@ -171,7 +185,10 @@ export function ProjectDetailPage() {
             />
           ) : (
             projet.companies.map((entreprise) => (
-              <div key={entreprise.id} className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
+              <div
+                key={entreprise.id}
+                className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
+              >
                 <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
                 <Link
                   to={`/institution/entreprises/${entreprise.company_id}`}
@@ -205,13 +222,18 @@ export function ProjectDetailPage() {
             />
           ) : (
             projet.documents.map((document) => (
-              <div key={document.id} className="flex items-center gap-3 border-b py-2 text-sm last:border-0">
+              <div
+                key={document.id}
+                className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
+              >
                 <CompanyAvatar nom={document.company_name} logo={null} className="size-8" />
                 <span className="flex-1 font-medium text-brand-blue">{document.company_name}</span>
                 {document.fiscal_year ? (
                   <span className="text-brand-grey">{document.fiscal_year}</span>
                 ) : null}
-                <span className="text-xs text-brand-grey">ajouté le {formatDate(document.added_at)}</span>
+                <span className="text-xs text-brand-grey">
+                  ajouté le {formatDate(document.added_at)}
+                </span>
               </div>
             ))
           )}
@@ -275,7 +297,9 @@ function BoutonMettreADisposition({
   const rapportId = entreprise.latest_report_id;
 
   if (!rapportId) {
-    return <span className="text-xs text-brand-grey">Aucun rapport publié à mettre à disposition.</span>;
+    return (
+      <span className="text-xs text-brand-grey">Aucun rapport publié à mettre à disposition.</span>
+    );
   }
 
   return (
@@ -359,7 +383,9 @@ function SelectionEntrepriseDialog({
                       { company_id: entreprise.id },
                       {
                         onError: (error) =>
-                          setErreur(error instanceof ApiError ? error.message : "Échec de l'ajout."),
+                          setErreur(
+                            error instanceof ApiError ? error.message : "Échec de l'ajout.",
+                          ),
                       },
                     )
                   }

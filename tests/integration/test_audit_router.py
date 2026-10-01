@@ -13,7 +13,6 @@ from app.core.database import utcnow
 from app.core.enums import (
     AuditDecision,
     DataMethod,
-    ExtractionStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -53,9 +52,9 @@ def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> ESGReport
         company_id=entreprise.id,
         type=ReportType.RAPPORT_ESG,
         channel=SubmissionChannel.ENTREPRISE,
-        status=ReportStatus.PENDING_AUDIT if auditeur_id else ReportStatus.SUBMITTED,
+        status=ReportStatus.IN_AUDIT if auditeur_id else ReportStatus.AWAITING_ASSIGNMENT,
         source_file="rapports/test/dummy.pdf",
-        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
         auditor_id=auditeur_id,
         submitted_at=utcnow(),
     )
@@ -156,11 +155,11 @@ def test_soumettre_avis_fait_passer_le_statut_en_validation(session) -> None:
     authed_client = _login(auditeur.email, "s3cret-pass")
     response = authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_VALIDATION", "comment": "Données cohérentes."},
+        json={"decision": "FAVORABLE", "comment": "Données cohérentes."},
     )
 
     assert response.status_code == 201
-    assert response.json()["decision"] == AuditDecision.RECOMMANDE_VALIDATION.value
+    assert response.json()["decision"] == AuditDecision.FAVORABLE.value
     assert response.json()["auditor_id"] == str(auditeur.id)
 
     session.refresh(rapport)
@@ -182,7 +181,7 @@ def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
 
     authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_REJET", "comment": "Données incohérentes."},
+        json={"decision": "UNFAVORABLE", "comment": "Données incohérentes."},
     )
 
     notification = session.exec(
@@ -191,7 +190,7 @@ def test_soumettre_avis_notifie_les_administrateurs_actifs(session) -> None:
         )
     ).one()
     assert notification.resource_id == rapport.id
-    assert "rejet" in notification.message
+    assert "défavorable" in notification.message
 
     notification_inactif = session.exec(
         select(Notification).where(
@@ -209,13 +208,13 @@ def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
 
     premiere = authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_VALIDATION"},
+        json={"decision": "FAVORABLE"},
     )
     assert premiere.status_code == 201
 
     deuxieme = authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": "RECOMMANDE_REJET"},
+        json={"decision": "UNFAVORABLE", "comment": "Changement d'avis."},
     )
 
     assert deuxieme.status_code == 422
@@ -223,20 +222,32 @@ def test_soumettre_avis_deux_fois_est_rejete(session) -> None:
 
 
 @pytest.mark.parametrize(
-    "decision", ["RECOMMANDE_VALIDATION", "RECOMMANDE_REJET", "DEMANDE_CLARIFICATION"]
+    "decision", ["FAVORABLE", "FAVORABLE_WITH_RESERVATIONS", "CORRECTION_REQUIRED", "UNFAVORABLE"]
 )
-def test_soumettre_avis_accepte_les_trois_recommandations(session, decision: str) -> None:
+def test_soumettre_avis_accepte_les_quatre_avis(session, decision: str) -> None:
     auditeur = _create_utilisateur(session, Role.AUDITOR)
     rapport = _create_rapport_affecte(session, auditeur.id)
     authed_client = _login(auditeur.email, "s3cret-pass")
 
     response = authed_client.post(
         f"/api/v1/audit/rapports/{rapport.id}/avis",
-        json={"decision": decision},
+        json={"decision": decision, "comment": "Motif de l'avis."},
     )
 
     assert response.status_code == 201
     assert response.json()["decision"] == decision
+
+
+@pytest.mark.parametrize("decision", ["FAVORABLE_WITH_RESERVATIONS", "CORRECTION_REQUIRED", "UNFAVORABLE"])
+def test_avis_non_favorable_exige_un_commentaire(session, decision: str) -> None:
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    rapport = _create_rapport_affecte(session, auditeur.id)
+
+    response = _login(auditeur.email, "s3cret-pass").post(
+        f"/api/v1/audit/rapports/{rapport.id}/avis", json={"decision": decision, "comment": "  "}
+    )
+
+    assert response.status_code == 422
 
 
 def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
@@ -248,14 +259,15 @@ def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
     authed_client = _login(auditeur.email, "s3cret-pass")
 
     authed_client.post(
-        f"/api/v1/audit/rapports/{rapport_a.id}/avis", json={"decision": "RECOMMANDE_VALIDATION"}
+        f"/api/v1/audit/rapports/{rapport_a.id}/avis", json={"decision": "FAVORABLE"}
     )
     authed_client.post(
-        f"/api/v1/audit/rapports/{rapport_b.id}/avis", json={"decision": "RECOMMANDE_REJET"}
+        f"/api/v1/audit/rapports/{rapport_b.id}/avis",
+        json={"decision": "UNFAVORABLE", "comment": "Données carbone sans preuve."},
     )
     _login(autre_auditeur.email, "s3cret-pass").post(
         f"/api/v1/audit/rapports/{rapport_dautrui.id}/avis",
-        json={"decision": "RECOMMANDE_VALIDATION"},
+        json={"decision": "FAVORABLE"},
     )
 
     response = authed_client.get("/api/v1/audit/historique")
@@ -278,7 +290,7 @@ def test_historique_sans_authentification_est_rejete() -> None:
 def test_soumettre_avis_sans_authentification_est_rejete() -> None:
     response = client.post(
         f"/api/v1/audit/rapports/{uuid.uuid4()}/avis",
-        json={"decision": "RECOMMANDE_VALIDATION"},
+        json={"decision": "FAVORABLE"},
     )
 
     assert response.status_code == 401

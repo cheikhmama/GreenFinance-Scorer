@@ -10,8 +10,7 @@ from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
-    ExtractionStatus,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -64,7 +63,7 @@ def test_ouvrir_une_declaration_cree_un_brouillon_sans_fichier(session, entrepri
     brouillon = _ouvrir(client)
 
     assert brouillon["status"] == ReportStatus.DRAFT.value
-    assert brouillon["extraction_status"] == ExtractionStatus.NOT_STARTED.value
+    assert "extraction_status" not in brouillon
     assert brouillon["company_id"] == str(user.company.id)
     assert brouillon["submitted_at"] is None
     # Les listes historiques de l'espace Entreprise l'affichent aussi (contrat rendu nullable).
@@ -75,16 +74,18 @@ def test_ouvrir_une_declaration_cree_un_brouillon_sans_fichier(session, entrepri
     assert ligne["source_file"] is None
 
 
-def test_un_seul_brouillon_par_exercice_et_type(session, entreprise) -> None:
+def test_une_seule_declaration_active_quel_que_soit_le_type(session, entreprise) -> None:
     _user, client = entreprise
     _ouvrir(client)
 
     doublon = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"})
     autre_type = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_CLIMAT"})
+    autre_exercice = client.post(URL, json={"fiscal_year": 2023, "report_type": "RAPPORT_ESG"})
 
-    assert doublon.status_code == 422
-    assert doublon.json()["error"]["code"] == "brouillon_existant"
-    assert autre_type.status_code == 201
+    # Tâche 5.9 : un brouillon ouvert retient l'entreprise, quel que soit l'exercice ou le type.
+    for refus in (doublon, autre_type, autre_exercice):
+        assert refus.status_code == 422
+        assert refus.json()["error"]["code"] == "declaration_en_cours"
 
 
 @pytest.mark.parametrize("annee", [1999, utcnow().year + 1])
@@ -96,7 +97,7 @@ def test_exercice_hors_bornes_refuse(session, entreprise, annee) -> None:
 
 def test_entreprise_suspendue_ne_declare_pas(session, entreprise) -> None:
     user, client = entreprise
-    user.company.status = CompanyStatus.SUSPENDED
+    user.company.status = RegistrationStatus.SUSPENDED
     session.add(user.company)
     session.commit()
 
@@ -131,7 +132,7 @@ def test_perimetre_entreprise_et_auditeur(session, entreprise) -> None:
         type=ReportType.RAPPORT_CLIMAT,
         channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=2023,
-        status=ReportStatus.PENDING_AUDIT,
+        status=ReportStatus.IN_AUDIT,
         source_file="rapports/test/affecte.pdf",
         submitted_at=utcnow(),
         auditor_id=auditeur.id,
@@ -160,28 +161,31 @@ def test_un_role_sans_rapports_est_refuse(session) -> None:
     assert client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"}).status_code == 403
 
 
-def test_soumettre_un_brouillon_le_depose_et_programme_lextraction(
+def test_joindre_le_fichier_dun_brouillon_programme_son_analyse_sans_le_soumettre(
     session, entreprise, _extraction_simulee
 ) -> None:
     _user, client = entreprise
     brouillon = _ouvrir(client)
 
-    soumis = client.post(
-        f"{URL}/{brouillon['id']}/submit",
+    joint = client.post(
+        f"{URL}/{brouillon['id']}/file",
         files={"file": ("rapport-2024.pdf", _minimal_pdf_bytes(), "application/pdf")},
     )
-    seconde = client.post(
-        f"{URL}/{brouillon['id']}/submit",
+    pendant_lanalyse = client.post(
+        f"{URL}/{brouillon['id']}/file",
         files={"file": ("rapport-2024.pdf", _minimal_pdf_bytes(), "application/pdf")},
     )
+    soumission_prematuree = client.post(f"{URL}/{brouillon['id']}/submit")
 
-    assert soumis.status_code == 200
-    corps = soumis.json()
+    assert joint.status_code == 200
+    corps = joint.json()
     assert corps["id"] == brouillon["id"]
-    assert corps["status"] == ReportStatus.SUBMITTED.value
-    assert corps["extraction_status"] == ExtractionStatus.QUEUED.value
-    assert corps["submitted_at"] is not None
+    assert corps["status"] == ReportStatus.EXTRACTING.value
+    assert "extraction_status" not in corps
+    # Analyse du brouillon (tâche 5.8) : pas encore soumis, donc pas verrouillé.
+    assert corps["submitted_at"] is None
     assert corps["original_filename"] == "rapport-2024.pdf"
+    assert len(corps["checksum_sha256"]) == 64
     assert [
         (fonction, str(args[0]), args[1], job_id, file)
         for fonction, args, job_id, file in _extraction_simulee
@@ -189,8 +193,12 @@ def test_soumettre_un_brouillon_le_depose_et_programme_lextraction(
     ] == [
         ("extract_report", brouillon["id"], 2024, f"extract:{brouillon['id']}", "arq:extraction")
     ]
-    assert seconde.status_code == 422
-    assert seconde.json()["error"]["code"] == "transition_invalide"
+    for refus in (pendant_lanalyse, soumission_prematuree):
+        assert refus.status_code == 422
+        assert refus.json()["error"]["code"] == "transition_invalide"
+    # Un brouillon en analyse occupe toujours sa période.
+    autre = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"})
+    assert autre.json()["error"]["code"] == "declaration_en_cours"
 
 
 def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> None:
@@ -198,7 +206,7 @@ def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> 
     brouillon = _ouvrir(client)
 
     reponse = client.post(
-        f"{URL}/{brouillon['id']}/submit",
+        f"{URL}/{brouillon['id']}/file",
         files={"file": ("faux.pdf", b"pas un PDF", "application/pdf")},
     )
 
@@ -211,16 +219,23 @@ def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> 
 
 
 def test_abandonner_seulement_un_brouillon(session, entreprise) -> None:
-    _user, client = entreprise
+    user, client = entreprise
     brouillon = _ouvrir(client)
-    soumis = _ouvrir(client, report_type="RAPPORT_CLIMAT")
-    client.post(
-        f"{URL}/{soumis['id']}/submit",
-        files={"file": ("climat.pdf", _minimal_pdf_bytes(), "application/pdf")},
+    # Un rapport clos de l'entreprise (une seule déclaration active à la fois, tâche 5.9).
+    clos = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_CLIMAT,
+        channel=SubmissionChannel.ENTREPRISE,
+        fiscal_year=2023,
+        status=ReportStatus.REJECTED,
+        source_file="rapports/test/clos.pdf",
+        submitted_at=utcnow(),
     )
+    session.add(clos)
+    session.commit()
 
     abandon = client.delete(f"{URL}/{brouillon['id']}")
-    refus = client.delete(f"{URL}/{soumis['id']}")
+    refus = client.delete(f"{URL}/{clos.id}")
 
     assert abandon.status_code == 204
     assert refus.status_code == 422

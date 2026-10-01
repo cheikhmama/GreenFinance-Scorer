@@ -103,13 +103,20 @@ function DistributionBars({ distribution }: { distribution: TrancheScorePublic[]
   const total = distribution.reduce((somme, tranche) => somme + tranche.company_count, 0);
 
   if (total === 0) {
-    return <p className="text-sm text-brand-grey">Aucune entreprise avec un score exploitable pour l'instant.</p>;
+    return (
+      <p className="text-sm text-brand-grey">
+        Aucune entreprise avec un score exploitable pour l'instant.
+      </p>
+    );
   }
 
   return (
     <div className="space-y-2">
       {distribution.map((tranche) => (
-        <div key={`${tranche.lower_bound}-${tranche.upper_bound}`} className="flex items-center gap-3">
+        <div
+          key={`${tranche.lower_bound}-${tranche.upper_bound}`}
+          className="flex items-center gap-3"
+        >
           <span className="w-16 shrink-0 text-xs text-brand-grey">
             {tranche.lower_bound}–{tranche.upper_bound}
           </span>

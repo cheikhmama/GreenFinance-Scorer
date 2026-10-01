@@ -23,7 +23,10 @@ export function AdminCompanyReportsPage() {
         title="Rapports de l'entreprise"
         description="Tous les rapports déposés, quel que soit leur statut."
       />
-      <Link to="/admin/entreprises" className="text-sm text-brand-green underline underline-offset-2">
+      <Link
+        to="/admin/entreprises"
+        className="text-sm text-brand-green underline underline-offset-2"
+      >
         ← Entreprises
       </Link>
 
@@ -41,13 +44,12 @@ export function AdminCompanyReportsPage() {
                   {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
                 </p>
                 <p className="text-xs text-brand-grey">
-                  {libelleDateRapport(rapport)} — version{" "}
-                  {rapport.version}
+                  {libelleDateRapport(rapport)} — version {rapport.version}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={variantStatutRapport(rapport.status)}>
-                  {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+                  {libelleStatutRapport(rapport.status)}
                 </Badge>
                 <Button asChild size="sm" variant="outline">
                   <Link to={`/admin/rapports/${rapport.id}`}>Ouvrir</Link>

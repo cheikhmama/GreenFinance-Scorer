@@ -74,7 +74,10 @@ function LigneAffectation({
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <Link to={`/admin/rapports/${rapportId}`} className="font-semibold text-brand-blue hover:underline">
+        <Link
+          to={`/admin/rapports/${rapportId}`}
+          className="font-semibold text-brand-blue hover:underline"
+        >
           {type}
         </Link>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

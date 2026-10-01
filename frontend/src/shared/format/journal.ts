@@ -17,11 +17,16 @@ const ACTIONS: Record<string, string> = {
   password_reset_requested: "Demande de réinitialisation du mot de passe",
   registration_approved: "Validation d'inscription",
   registration_rejected: "Refus d'inscription",
+  registration_resubmitted: "Nouvelle demande après refus",
+  registration_info_provided: "Informations complétées par le demandeur",
+  registration_info_requested: "Demande d'informations",
+  report_submitted: "Soumission d'un rapport (verrouillé)",
   role_changed: "Changement de rôle",
 };
 
 const TYPES_RESSOURCE: Record<string, string> = {
   Company: "Entreprise",
+  ESGReport: "Rapport",
   User: "Utilisateur",
 };
 

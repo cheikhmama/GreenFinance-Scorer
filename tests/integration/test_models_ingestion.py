@@ -8,7 +8,6 @@ from app.company.models import Company
 from app.core.database import utcnow
 from app.core.enums import (
     DataMethod,
-    ExtractionStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -52,8 +51,8 @@ def test_creation_rapport_lie_a_entreprise_statut_par_defaut(session) -> None:
     session.flush()
 
     assert rapport.id is not None
-    assert rapport.status == ReportStatus.SUBMITTED
-    assert rapport.extraction_status == ExtractionStatus.QUEUED
+    assert rapport.status == ReportStatus.EXTRACTING
+    assert rapport.extraction_started_at is None
     assert rapport.auditor_id is None
 
 

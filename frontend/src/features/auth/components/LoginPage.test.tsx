@@ -34,9 +34,17 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText("E-mail")).toBeInTheDocument();
     expect(screen.getByLabelText("Mot de passe")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Se connecter" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Mot de passe oublié ?" })).toHaveAttribute("href", "/mot-de-passe-oublie");
-    expect(screen.getByRole("link", { name: "Contactez-nous" })).toHaveAttribute("href", "/contact");
-    expect(screen.getByRole("link", { name: "GreenFinance-Scorer — connexion" }).querySelector("img")).toHaveAttribute("src", "/favicon.svg");
+    expect(screen.getByRole("link", { name: "Mot de passe oublié ?" })).toHaveAttribute(
+      "href",
+      "/mot-de-passe-oublie",
+    );
+    expect(screen.getByRole("link", { name: "Contactez-nous" })).toHaveAttribute(
+      "href",
+      "/contact",
+    );
+    expect(
+      screen.getByRole("link", { name: "GreenFinance-Scorer — connexion" }).querySelector("img"),
+    ).toHaveAttribute("src", "/favicon.svg");
   });
 
   it("permet de vérifier le mot de passe saisi sans soumettre le formulaire", async () => {
@@ -66,7 +74,12 @@ describe("LoginPage", () => {
     [429, "too_many_requests", "Trop de tentatives de connexion. Veuillez réessayer plus tard."],
     [500, "internal_error", "Une erreur inattendue est survenue. Veuillez réessayer."],
   ])("affiche une erreur adaptée au statut %s", async (status, code, message) => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { code, message: "Détail serveur privé", correlation_id: null } }), { status }));
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code, message: "Détail serveur privé", correlation_id: null } }),
+        { status },
+      ),
+    );
     const user = userEvent.setup();
     renderLoginPage();
     await user.type(screen.getByLabelText("E-mail"), "membre@example.org");
@@ -77,15 +90,22 @@ describe("LoginPage", () => {
   });
 
   it("ouvre le routeur de tableaux de bord après une connexion réussie", async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: "utilisateur", role: "INVESTOR" }), { status: 200 }));
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ id: "utilisateur", role: "INVESTOR" }), { status: 200 }),
+    );
     const user = userEvent.setup();
     renderLoginPage();
     await user.type(screen.getByLabelText("E-mail"), "membre@example.org");
     await user.type(screen.getByLabelText("Mot de passe"), "mon-secret");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
     expect(await screen.findByRole("heading", { name: "Espace connecté" })).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/api/v1/auth/login", expect.objectContaining({
-      method: "POST", credentials: "include", body: JSON.stringify({ email: "membre@example.org", password: "mon-secret" }),
-    }));
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      "/api/v1/auth/login",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ email: "membre@example.org", password: "mon-secret" }),
+      }),
+    );
   });
 });

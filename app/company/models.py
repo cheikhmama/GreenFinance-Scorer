@@ -12,14 +12,14 @@ Investisseur et Chercheur.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Column, Numeric
 from sqlmodel import Field, Relationship, SQLModel
 
-from app.core.enums import CompanyStatus, Currency, sa_enum_column
+from app.core.enums import Currency, RegistrationStatus, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import User
@@ -37,8 +37,8 @@ class Company(SQLModel, table=True):
     logo: str | None = None
     description: str | None = None
     website: str | None = None
-    status: CompanyStatus = Field(
-        default=CompanyStatus.ACTIVE, sa_column=sa_enum_column(CompanyStatus)
+    status: RegistrationStatus = Field(
+        default=RegistrationStatus.ACTIVE, sa_column=sa_enum_column(RegistrationStatus)
     )
     owner_user_id: uuid.UUID | None = Field(
         default=None, foreign_key="users.id", ondelete="SET NULL", index=True
@@ -54,17 +54,7 @@ class Company(SQLModel, table=True):
     # Données financières requises par PCAF (docs/WORKFLOWS.md §2.4) : chiffre d'affaires pour la
     # WACI, valeur d'entreprise trésorerie incluse (EVIC) pour le facteur d'attribution. Montants
     # en Decimal, jamais en float.
-    revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))
-    revenue_currency: Currency | None = Field(
-        default=None, sa_column=sa_enum_column(Currency, nullable=True)
-    )
-    enterprise_value: Decimal | None = Field(
-        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
-    )
-    enterprise_value_currency: Currency | None = Field(
-        default=None, sa_column=sa_enum_column(Currency, nullable=True)
-    )
-    enterprise_value_as_of: date | None = None
+    # Chiffre d'affaires et EVIC : par exercice, sur le rapport (esg_reports, tâche 5.4).
     minimum_investment_amount: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(20, 2), nullable=True)
     )
@@ -86,6 +76,18 @@ class Company(SQLModel, table=True):
     onboarded_by_id: uuid.UUID | None = Field(
         default=None, foreign_key="users.id", ondelete="SET NULL", index=True
     )
+
+    # Inscription publique (tâche 5.2). Le jeton de suivi n'est jamais stocké en clair : seule son
+    # empreinte SHA-256 l'est, le jeton lui-même ne part que par e-mail au demandeur.
+    registered_at: datetime | None = Field(default=None)
+    status_token_hash: str | None = Field(default=None, max_length=64, unique=True)
+    mandate_letter_path: str | None = Field(default=None, max_length=255)
+    mandate_letter_uploaded_at: datetime | None = Field(default=None)
+    info_request_message: str | None = Field(default=None)
+    info_requested_at: datetime | None = Field(default=None)
+    info_response_message: str | None = Field(default=None)
+    rejection_reason: str | None = Field(default=None)
+    rejected_at: datetime | None = Field(default=None)
 
     # Deux clés vers users (titulaire, valideur de l'inscription) : la relation désigne
     # explicitement celle du titulaire.

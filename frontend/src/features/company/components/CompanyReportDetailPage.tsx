@@ -3,29 +3,46 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type { RapportESGDetail } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  classeStatutRapportEntreprise,
+  libelleStatutRapportEntreprise,
+  variantStatutRapportEntreprise,
+} from "@/shared/format/statut";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
-import { useCompanyReport, useSubmitCorrection } from "../api";
+import { useCompanyReport, useReportChecklist, useSubmitCorrection } from "../api";
 import { type CorrectionForm, correctionSchema } from "../schemas";
+import { DraftPanel } from "../session/DraftPanel";
+import { etatBrouillon } from "../session/etat";
+import { LockBanner } from "../session/LockBanner";
+import { SessionStepper } from "../session/SessionStepper";
+import { SubmitDialog } from "../session/SubmitDialog";
 
 const ANNEE_COURANTE = new Date().getFullYear();
 
 export function CompanyReportDetailPage() {
   const { rapportId } = useParams<{ rapportId: string }>();
   const { data: rapport, isLoading, isError } = useCompanyReport(rapportId ?? "");
+  const [soumissionOuverte, setSoumissionOuverte] = useState(false);
+  const etat = rapport ? etatBrouillon(rapport) : null;
+  const liste = useReportChecklist(
+    rapportId ?? "",
+    etat === "PRET" ? (rapport?.extraction_finished_at ?? null) : null,
+  );
 
   if (isLoading) return <div className="p-8 text-brand-grey">Chargement...</div>;
   if (isError || !rapport) {
     return (
       <div className="p-8">
         <p className="text-destructive">Rapport introuvable.</p>
-        <Link to="/company/rapports" className="text-brand-green underline underline-offset-2">
+        <Link to="/company/declarations" className="text-brand-green underline underline-offset-2">
           Retour à la liste
         </Link>
       </div>
@@ -35,37 +52,69 @@ export function CompanyReportDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/company/rapports" className="text-sm text-brand-green underline underline-offset-2">
-          ← Mes rapports
+        <Link
+          to="/company/declarations"
+          className="text-sm text-brand-green underline underline-offset-2"
+        >
+          ← Mes déclarations
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
-          Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
-        </h1>
+        <h1 className="mt-2 text-2xl font-semibold text-brand-blue">{titreDeclaration(rapport)}</h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge variant={variantStatutRapport(rapport.status)}>
-            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+          <Badge
+            variant={variantStatutRapportEntreprise(rapport.status)}
+            className={classeStatutRapportEntreprise(rapport.status)}
+          >
+            {libelleStatutRapportEntreprise(rapport.status)}
           </Badge>
           <span className="text-sm text-brand-grey">
             version {rapport.version}
             {rapport.previous_report_id ? " (correction)" : ""}
           </span>
         </div>
-        {/* Même garde que CompanyReportsPage.tsx : une relance d'extraction peut échouer sur un
-            rapport déjà avancé dans le workflow -- n'afficher que tant que c'est encore
-            actionnable (rapport encore SUBMITTED). */}
-        {rapport.extraction_error &&
-        rapport.status === "SUBMITTED" &&
-        rapport.extraction_status === "FAILED" ? (
+        {/* Cause affichée seulement tant que l'échec est l'état courant du rapport. */}
+        {rapport.extraction_error && rapport.status === "EXTRACTION_FAILED" ? (
           <p className="mt-2 text-sm text-destructive">
             Échec d'extraction : {libelleCauseExtraction(rapport.extraction_error)}
           </p>
         ) : null}
       </div>
 
+      <SessionStepper rapport={rapport} />
+
+      {rapport.submitted_at ? (
+        <LockBanner submittedAt={rapport.submitted_at} checksum={rapport.checksum_sha256} />
+      ) : null}
+
+      {etat ? (
+        <DraftPanel
+          rapport={rapport}
+          etat={etat}
+          groupes={liste.data}
+          chargementListe={liste.isPending}
+          onSoumettre={() => setSoumissionOuverte(true)}
+        />
+      ) : null}
+      <SubmitDialog
+        rapport={rapport}
+        groupes={liste.data ?? []}
+        open={soumissionOuverte}
+        onOpenChange={setSoumissionOuverte}
+      />
+
       {rapport.status === "REVISION_REQUESTED" ? (
         <FormulaireCorrection rapportId={rapport.id} />
       ) : null}
 
+      {etat ? null : <ValeursExtraites rapport={rapport} />}
+    </div>
+  );
+}
+
+/** Indicateurs et données carbone d'un rapport soumis (un brouillon n'en montre aucun, tâche
+ * 5.8 : seule la liste de complétude, en comptes). */
+function ValeursExtraites({ rapport }: { rapport: RapportESGDetail }) {
+  return (
+    <>
       <Card>
         <CardHeader>
           <CardTitle>Indicateurs ESG</CardTitle>
@@ -161,7 +210,7 @@ export function CompanyReportDetailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }
 

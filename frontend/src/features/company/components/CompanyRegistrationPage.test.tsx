@@ -24,41 +24,55 @@ function renderPage() {
   );
 }
 
-async function remplirEtEnvoyer() {
+const MANDAT = new File(["%PDF-1.4"], "mandat.pdf", { type: "application/pdf" });
+
+async function remplirEtEnvoyer({ avecMandat = true } = {}) {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Nom de l’entreprise"), "Minière du Nord");
   await user.type(screen.getByLabelText("Secteur d’activité"), "Mines");
   await user.type(screen.getByLabelText("Pays"), "mr");
   await user.type(screen.getByLabelText("Votre nom"), "Aïcha Ba");
   await user.type(screen.getByLabelText("Votre e-mail professionnel"), "aicha@miniere.mr");
+  if (avecMandat) {
+    await user.upload(screen.getByLabelText("Lettre de mandat (PDF)"), MANDAT);
+  }
   await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
 }
 
 describe("CompanyRegistrationPage", () => {
-  it("envoie la demande (pays en majuscules, facultatifs à null) puis annonce l’e-mail", async () => {
+  it("envoie la demande en multipart avec la lettre de mandat, puis annonce l’e-mail", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
     renderPage();
     await remplirEtEnvoyer();
 
     expect(await screen.findByText("Demande envoyée")).toBeInTheDocument();
     expect(screen.getByText(/aicha@miniere\.mr/)).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
-      "/api/v1/companies/register",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          company_name: "Minière du Nord",
-          sector: "Mines",
-          country: "MR",
-          isin: null,
-          lei: null,
-          website: null,
-          contact_name: "Aïcha Ba",
-          contact_email: "aicha@miniere.mr",
-          company_fax: null,
-        }),
-      }),
-    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/v1/companies/register");
+    expect(init?.method).toBe("POST");
+    const corps = init?.body as FormData;
+    expect(corps).toBeInstanceOf(FormData);
+    expect(
+      Object.fromEntries([...corps.entries()].filter(([cle]) => cle !== "mandate_letter")),
+    ).toEqual({
+      company_name: "Minière du Nord",
+      sector: "Mines",
+      country: "MR",
+      contact_name: "Aïcha Ba",
+      contact_email: "aicha@miniere.mr",
+    });
+    // Facultatifs vides : absents du formulaire plutôt qu'envoyés vides.
+    expect(corps.has("isin")).toBe(false);
+    expect((corps.get("mandate_letter") as File).name).toBe("mandat.pdf");
+  });
+
+  it("exige la lettre de mandat avant tout envoi", async () => {
+    renderPage();
+    await remplirEtEnvoyer({ avecMandat: false });
+
+    expect(await screen.findByText("La lettre de mandat (PDF) est requise.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("n’expose pas le champ piège aux lecteurs d’écran", () => {

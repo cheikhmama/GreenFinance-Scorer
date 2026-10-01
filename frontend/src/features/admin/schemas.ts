@@ -2,8 +2,7 @@ import { z } from "zod";
 import { Currency, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
-export { Role };
-export { Currency };
+export { Currency, Role };
 export const DEVISES = Object.values(Currency);
 
 /** Jamais ADMIN — même règle déjà validée côté prototype (docs/PROTOTYPE_FRONTEND.md) et
@@ -87,7 +86,10 @@ export const modifierEntrepriseSchema = z
   })
   .superRefine((values, ctx) => {
     if (!values.impose_minimum) return;
-    if (values.minimum_investment_amount === undefined || Number.isNaN(values.minimum_investment_amount)) {
+    if (
+      values.minimum_investment_amount === undefined ||
+      Number.isNaN(values.minimum_investment_amount)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["minimum_investment_amount"],

@@ -31,7 +31,9 @@ logger = structlog.get_logger(__name__)
 # Plus long que password_reset.py::TOKEN_TTL (30 minutes) : une invitation à activer un compte
 # n'a pas l'urgence sécuritaire d'un mot de passe oublié, elle doit laisser le temps à la personne
 # de la voir passer dans sa boîte de réception.
-ACTIVATION_TOKEN_TTL = timedelta(days=7)
+# 72 heures (tâche 5.2) : assez pour un premier accès, assez court pour un lien qui dort.
+ACTIVATION_TOKEN_TTL_HEURES = 72
+ACTIVATION_TOKEN_TTL = timedelta(hours=ACTIVATION_TOKEN_TTL_HEURES)
 
 
 def _hash_token(jeton_clair: str) -> str:
@@ -51,7 +53,7 @@ def _envoyer_lien(email: str, jeton_clair: str) -> None:
             body=(
                 "Un compte GreenFinance-Scorer a été créé pour vous.\n\n"
                 f"{_construire_lien(jeton_clair)}\n\n"
-                f"Ce lien est valable {ACTIVATION_TOKEN_TTL.days} jours et ne peut être utilisé "
+                f"Ce lien est valable {ACTIVATION_TOKEN_TTL_HEURES} heures et ne peut être utilisé "
                 "qu'une fois. Il vous permettra de choisir votre mot de passe.\n"
             ),
         )

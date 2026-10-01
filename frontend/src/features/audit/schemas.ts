@@ -3,23 +3,18 @@ import { AuditDecision } from "@/shared/api/generated/greenFinanceScorerAPI.sche
 
 export { AuditDecision };
 
-/** Un commentaire est obligatoire pour recommander un rejet ou demander une clarification
- * (Phase 4 §4.5) — une simple recommandation de validation peut rester silencieuse. */
+/** Tout avis autre que favorable est motivé (tâche 5.6) — même règle que le backend
+ * (app/audit/schemas.py::SoumettreAvisRequest). */
 export const soumettreAvisSchema = z
   .object({
-    decision: z.enum([
-      AuditDecision.RECOMMANDE_VALIDATION,
-      AuditDecision.RECOMMANDE_REJET,
-      AuditDecision.DEMANDE_CLARIFICATION,
-    ]),
+    decision: z.enum(AuditDecision),
     comment: z.string().optional(),
   })
   .refine(
     (values) =>
-      values.decision === AuditDecision.RECOMMANDE_VALIDATION ||
-      (values.comment?.trim().length ?? 0) > 0,
+      values.decision === AuditDecision.FAVORABLE || (values.comment?.trim().length ?? 0) > 0,
     {
-      message: "Un commentaire est requis pour recommander un rejet ou demander une clarification.",
+      message: "Un commentaire est requis pour tout avis autre que favorable.",
       path: ["comment"],
     },
   );

@@ -48,7 +48,9 @@ export function AdminPortefeuillesPage() {
           </label>
 
           {isLoading ? <CardListSkeleton count={3} /> : null}
-          {isError ? <p className="text-destructive">Impossible de charger les portefeuilles.</p> : null}
+          {isError ? (
+            <p className="text-destructive">Impossible de charger les portefeuilles.</p>
+          ) : null}
           {!isLoading && !isError && portefeuilles.length === 0 ? (
             <EmptyState icon={Wallet} message="Aucun portefeuille pour ce filtre." />
           ) : null}
@@ -67,7 +69,9 @@ export function AdminPortefeuillesPage() {
               <TableBody>
                 {portefeuilles.map((portefeuille) => (
                   <TableRow key={portefeuille.id}>
-                    <TableCell className="font-medium text-brand-blue">{portefeuille.name}</TableCell>
+                    <TableCell className="font-medium text-brand-blue">
+                      {portefeuille.name}
+                    </TableCell>
                     <TableCell className="text-brand-grey">{portefeuille.investor_email}</TableCell>
                     <TableCell className="tabular-nums">{portefeuille.position_count}</TableCell>
                     <TableCell className="tabular-nums">

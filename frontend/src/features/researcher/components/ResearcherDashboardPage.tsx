@@ -12,7 +12,8 @@ export function ResearcherDashboardPage() {
   const { data: analyses } = useMyAnalyses();
 
   const invitationsEnAttente = rattachements?.filter((r) => r.status === "EN_ATTENTE").length ?? 0;
-  const correctionsAttendues = analyses?.filter((a) => a.status === "CORRECTION_DEMANDEE").length ?? 0;
+  const correctionsAttendues =
+    analyses?.filter((a) => a.status === "CORRECTION_DEMANDEE").length ?? 0;
 
   return (
     <div className="space-y-8">

@@ -107,8 +107,11 @@
 .dark {
   --color-brand-blue: #e7edf4;
   --color-brand-grey: #93a6ba;
-  --color-brand-green: #1f9d73;
+  /* #26ad80 : texte vert lisible (AA) sur les cartes et panneaux sombres ; le texte posé sur ce
+     vert devient le fond de page, le blanc n'y atteignait que 3,4:1 (tâche 5.9). */
+  --color-brand-green: #26ad80;
   --color-brand-green-light: #123326;
+  --primary-foreground: #0b1c2c;
 
   --background: #0b1c2c;
   --card: #122a3d;

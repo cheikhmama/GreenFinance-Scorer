@@ -83,7 +83,7 @@ _ROUTES: list[tuple[str, str, Role | None, dict[str, object] | None]] = [
     ("POST", f"/admin/entreprises/{_ID}/publier", Role.ADMIN, None),
     ("GET", "/audit/rapports", Role.AUDITOR, None),
     ("GET", f"/audit/rapports/{_ID}", Role.AUDITOR, None),
-    ("POST", f"/audit/rapports/{_ID}/avis", Role.AUDITOR, {"decision": "RECOMMANDE_VALIDATION"}),
+    ("POST", f"/audit/rapports/{_ID}/avis", Role.AUDITOR, {"decision": "FAVORABLE"}),
     ("GET", f"/company/rapports/{_ID}", Role.ENTERPRISE, None),
 ]
 

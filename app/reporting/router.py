@@ -13,7 +13,7 @@ from app.core.dependencies import get_current_user, get_session
 from app.core.enums import ReportStatus, ReportType
 from app.core.schemas import Page
 from app.reporting import sessions
-from app.reporting.schemas import ReportCreateRequest, ReportResponse
+from app.reporting.schemas import GroupeCompletude, ReportCreateRequest, ReportResponse
 
 router = APIRouter(tags=["reports"])
 
@@ -83,12 +83,12 @@ def get_report(
 
 
 @router.post(
-    "/reports/{report_id}/submit",
+    "/reports/{report_id}/file",
     response_model=ReportResponse,
-    operation_id="submitReport",
-    summary="Déposer le PDF d'un brouillon et le soumettre à l'extraction",
+    operation_id="attachReportFile",
+    summary="Joindre (ou remplacer) le PDF d'un brouillon et lancer son analyse",
 )
-def submit_report(
+def attach_report_file(
     report_id: uuid.UUID,
     file: UploadFile,
     background_tasks: BackgroundTasks,
@@ -98,10 +98,41 @@ def submit_report(
     # Lecture bornée : un octet de plus que la taille maximale suffit à la refuser, sans jamais
     # charger en mémoire un fichier arbitrairement gros.
     contenu = file.file.read(TAILLE_MAX_OCTETS + 1)
-    rapport = sessions.soumettre(
+    rapport = sessions.joindre_fichier(
         session, background_tasks, current_user, report_id, contenu, file.filename
     )
     return ReportResponse.depuis(rapport)
+
+
+@router.get(
+    "/reports/{report_id}/checklist",
+    response_model=list[GroupeCompletude],
+    operation_id="getReportChecklist",
+    summary="Liste de complétude : indicateurs trouvés / attendus par groupe, sans valeurs",
+)
+def get_report_checklist(
+    report_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> list[GroupeCompletude]:
+    return sessions.liste_de_completude(session, current_user, report_id)
+
+
+@router.post(
+    "/reports/{report_id}/submit",
+    response_model=ReportResponse,
+    operation_id="submitReport",
+    summary="Soumettre un brouillon analysé : le rapport est verrouillé",
+)
+def submit_report(
+    report_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> ReportResponse:
+    return ReportResponse.depuis(
+        sessions.soumettre(session, background_tasks, current_user, report_id)
+    )
 
 
 @router.delete(

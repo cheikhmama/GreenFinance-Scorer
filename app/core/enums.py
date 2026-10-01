@@ -24,12 +24,18 @@ def sa_enum_column(enum_cls: type[Enum], *, nullable: bool = False) -> Column:
 
 
 class ReportStatus(str, Enum):
-    """Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
-    d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne."""
+    """Cycle de vie d'un rapport (docs/WORKFLOWS.md §1.2), extraction comprise (tâche 5.1 : un
+    seul statut, l'ancien ExtractionStatus est fondu ici).
+
+    Pendant EXTRACTING, `extraction_started_at` distingue un job en file (NULL) d'un job en cours
+    (renseigné) — c'est la seule différence dont la supervision a besoin.
+    """
 
     DRAFT = "DRAFT"
-    SUBMITTED = "SUBMITTED"
-    PENDING_AUDIT = "PENDING_AUDIT"
+    EXTRACTING = "EXTRACTING"
+    EXTRACTION_FAILED = "EXTRACTION_FAILED"
+    AWAITING_ASSIGNMENT = "AWAITING_ASSIGNMENT"
+    IN_AUDIT = "IN_AUDIT"
     # Avis de l'auditeur rendu, décision de l'Administrateur attendue (décision D2).
     PENDING_DECISION = "PENDING_DECISION"
     REVISION_REQUESTED = "REVISION_REQUESTED"
@@ -37,21 +43,43 @@ class ReportStatus(str, Enum):
     REJECTED = "REJECTED"
 
 
-class ExtractionStatus(str, Enum):
-    NOT_STARTED = "NOT_STARTED"
-    QUEUED = "QUEUED"
+class ExtractionRunStatus(str, Enum):
+    """Issue d'une exécution du pipeline d'extraction sur un rapport (tâche 5.5, table
+    extraction_runs) — une ligne par tentative, jamais réécrite après sa clôture."""
+
     RUNNING = "RUNNING"
-    DONE = "DONE"
+    SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
+    # Échec passager (quota, réseau) : le job est remis en file, une nouvelle exécution suivra.
+    RETRY_SCHEDULED = "RETRY_SCHEDULED"
 
 
-class CompanyStatus(str, Enum):
-    """Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
-    score (Company.published_at)."""
+class RegistrationStatus(str, Enum):
+    """Cycle de vie de l'inscription puis du compte entreprise (KYC, décision D5, tâche 5.2) —
+    distinct de la publication de son score (Company.published_at).
+
+    PENDING_ONBOARDING et INFO_REQUESTED : demande en cours d'examen, entreprise invisible et
+    inactive. REJECTED : demande refusée, conservée avec son motif (plus supprimée). ACTIVE puis,
+    éventuellement, SUSPENDED : entreprise validée.
+    """
 
     PENDING_ONBOARDING = "PENDING_ONBOARDING"
+    INFO_REQUESTED = "INFO_REQUESTED"
     ACTIVE = "ACTIVE"
+    REJECTED = "REJECTED"
     SUSPENDED = "SUSPENDED"
+
+
+class KycCheckResult(str, Enum):
+    """Résultat d'un contrôle KYC (tâche 5.3) — un éclairage pour l'Administrateur, jamais une
+    décision automatique."""
+
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    # La source n'a pas répondu (GLEIF injoignable) : à refaire ou à vérifier à la main.
+    NOT_VERIFIABLE = "NOT_VERIFIABLE"
+    # Rien à contrôler (pas de LEI, pas de site web déclaré).
+    NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
 class ReportType(str, Enum):
@@ -95,9 +123,35 @@ class ConfidenceLevel(str, Enum):
 
 
 class AuditDecision(str, Enum):
-    RECOMMANDE_VALIDATION = "RECOMMANDE_VALIDATION"
-    RECOMMANDE_REJET = "RECOMMANDE_REJET"
-    DEMANDE_CLARIFICATION = "DEMANDE_CLARIFICATION"
+    """Avis de l'Auditeur (tâche 5.6) — une recommandation ; la décision finale reste à
+    l'Administrateur. Tout avis autre que FAVORABLE exige un commentaire."""
+
+    FAVORABLE = "FAVORABLE"
+    FAVORABLE_WITH_RESERVATIONS = "FAVORABLE_WITH_RESERVATIONS"
+    CORRECTION_REQUIRED = "CORRECTION_REQUIRED"
+    UNFAVORABLE = "UNFAVORABLE"
+
+
+class MetricReviewStatus(str, Enum):
+    """Revue d'une valeur extraite par l'Auditeur affecté (tâche 5.6)."""
+
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    # Valeur corrigée : la valeur auditée remplace la valeur extraite au calcul.
+    OVERRIDDEN = "OVERRIDDEN"
+    # Valeur absente de la source : retirée du calcul, comme un indicateur non communiqué.
+    NOT_FOUND = "NOT_FOUND"
+
+
+class ReviewReason(str, Enum):
+    """Catégorie de motif d'une correction ou d'un « non trouvé » (tâche 5.6)."""
+
+    EXTRACTION_ERROR = "EXTRACTION_ERROR"
+    UNIT_ERROR = "UNIT_ERROR"
+    WRONG_PERIOD = "WRONG_PERIOD"
+    WRONG_SCOPE = "WRONG_SCOPE"
+    NOT_IN_SOURCE = "NOT_IN_SOURCE"
+    OTHER = "OTHER"
 
 
 class Role(str, Enum):

@@ -16,9 +16,10 @@ from app.company.identifiers import isin_valide, lei_valide
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
     AnalysisStatus,
-    CompanyStatus,
     Currency,
+    KycCheckResult,
     ProjectStatus,
+    RegistrationStatus,
     ReportStatus,
     Role,
 )
@@ -322,32 +323,38 @@ class ProjetAdmin(BaseModel):
 
 class OnboardingDecision(str, Enum):
     APPROVE = "approve"
+    # Tâche 5.3 : la demande passe INFO_REQUESTED, le demandeur répond depuis sa page de suivi.
+    REQUEST_INFO = "request_info"
     REJECT = "reject"
 
 
 class CompanyOnboardingRequest(BaseModel):
-    """PATCH /admin/companies/{id}/onboard (tâche 1.4, contrat JSON en anglais). Un refus exige un
-    motif : il est transmis au demandeur par e-mail."""
+    """PATCH /admin/companies/{id}/onboard (tâches 1.4 et 5.3, contrat JSON en anglais). Un refus
+    exige un motif (`reason`), une demande d'informations un message (`message`) : l'un comme
+    l'autre est transmis au demandeur par e-mail et reste lisible sur sa page de suivi."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     decision: OnboardingDecision
     reason: str | None = Field(default=None, max_length=1000)
+    message: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
-    def _motif_si_refus(self) -> "CompanyOnboardingRequest":
+    def _texte_requis(self) -> "CompanyOnboardingRequest":
         if self.decision == OnboardingDecision.REJECT and not self.reason:
             raise ValueError("Un motif est requis pour refuser une inscription.")
+        if self.decision == OnboardingDecision.REQUEST_INFO and not self.message:
+            raise ValueError("Un message est requis pour demander des informations.")
         return self
 
 
 class CompanyOnboardingResult(BaseModel):
-    """`status` est None après un refus : l'inscription refusée est supprimée (le demandeur peut
-    en déposer une nouvelle), il n'y a plus d'entreprise à décrire."""
+    """`status` vaut ACTIVE après validation, INFO_REQUESTED après une demande d'informations,
+    REJECTED après refus (tâche 5.2 : l'inscription refusée est conservée, plus supprimée)."""
 
     company_id: uuid.UUID
     decision: OnboardingDecision
-    status: CompanyStatus | None
+    status: RegistrationStatus
     onboarded_at: datetime | None
 
 
@@ -401,13 +408,12 @@ class CompanyIdentifiers(BaseModel):
     ticker: str | None
 
 
-class CompanyFinancialsRequest(BaseModel):
-    """PUT /admin/companies/{id}/financials (tâche 2.3, contrat JSON en anglais) : les
-    données financières dont le moteur PCAF a besoin (docs/WORKFLOWS.md §2.4). Chiffre d'affaires
-    pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur d'attribution.
-    Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais affichée à
-    côté des émissions, pour juger de l'écart entre les deux exercices. Remplacement complet : un
-    champ omis vaut null."""
+class ReportFinancialsRequest(BaseModel):
+    """PUT /admin/reports/{id}/financials (tâches 2.3 et 5.4) : les données financières dont le
+    moteur PCAF a besoin (docs/WORKFLOWS.md §2.4), pour l'exercice de ce rapport. Chiffre
+    d'affaires pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur
+    d'attribution. Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais
+    affichée à côté des émissions. Remplacement complet : un champ omis vaut null."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -415,26 +421,62 @@ class CompanyFinancialsRequest(BaseModel):
     revenue_currency: Currency | None = None
     enterprise_value: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
     enterprise_value_currency: Currency | None = None
-    enterprise_value_as_of: date | None = None
+    evic_date: date | None = None
 
     @model_validator(mode="after")
-    def _montant_et_devise_ensemble(self) -> "CompanyFinancialsRequest":
+    def _montant_et_devise_ensemble(self) -> "ReportFinancialsRequest":
         if (self.revenue is None) != (self.revenue_currency is None):
             raise ValueError("revenue et revenue_currency vont ensemble.")
         if (self.enterprise_value is None) != (self.enterprise_value_currency is None):
             raise ValueError("enterprise_value et enterprise_value_currency vont ensemble.")
-        if self.enterprise_value is None and self.enterprise_value_as_of is not None:
-            raise ValueError("enterprise_value_as_of n'a de sens qu'avec enterprise_value.")
+        if self.enterprise_value is None and self.evic_date is not None:
+            raise ValueError("evic_date n'a de sens qu'avec enterprise_value.")
         return self
 
 
-class CompanyFinancials(BaseModel):
-    """Réponse de GET / PUT /admin/companies/{id}/financials : montants en nombres JSON (un
-    Decimal serait sérialisé en chaîne)."""
+class ReportFinancials(BaseModel):
+    """Réponse de GET / PUT /admin/reports/{id}/financials : montants en nombres JSON (un
+    Decimal serait sérialisé en chaîne). `fiscal_year` rappelle l'exercice auquel ils se
+    rapportent."""
 
+    report_id: uuid.UUID
     company_id: uuid.UUID
+    fiscal_year: int | None
+    status: ReportStatus
     revenue: float | None
     revenue_currency: Currency | None
     enterprise_value: float | None
     enterprise_value_currency: Currency | None
-    enterprise_value_as_of: date | None
+    evic_date: date | None
+
+
+class KycCheck(BaseModel):
+    """Un contrôle KYC (tâche 5.3) : son résultat, ce qui l'explique, et d'où vient l'information."""
+
+    code: str
+    label: str
+    result: KycCheckResult
+    detail: str
+    source: str
+
+
+class KycReport(BaseModel):
+    """GET /admin/companies/{id}/kyc — de quoi décider d'une inscription dans une seule fenêtre :
+    identité déclarée, contact, lettre de mandat, échanges avec le demandeur, contrôles."""
+
+    company_id: uuid.UUID
+    company_name: str
+    status: RegistrationStatus
+    lei: str | None
+    isin: str | None
+    website: str | None
+    contact_name: str | None
+    contact_email: str | None
+    registered_at: datetime | None
+    mandate_letter_available: bool
+    mandate_letter_uploaded_at: datetime | None
+    info_request_message: str | None
+    info_requested_at: datetime | None
+    info_response_message: str | None
+    checked_at: datetime
+    checks: list[KycCheck]

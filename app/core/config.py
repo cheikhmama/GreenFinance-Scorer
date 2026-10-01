@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # même principe de configuration que sla_audit_jours. Docling seul a pris ~9 min sur un rapport
     # de 25 pages (mesuré Phase 5) ; généreux pour éviter un faux positif sur un long rapport.
     extraction_timeout_minutes: int = 60
+    # Contrôle KYC d'une inscription (tâche 5.3) : fiche LEI publique de la GLEIF. Délai court —
+    # l'Administrateur attend la réponse ; GLEIF indisponible donne « non vérifiable », jamais une
+    # erreur ni un blocage de la décision.
+    gleif_api_url: str = "https://api.gleif.org/api/v1"
+    gleif_timeout_seconds: float = Field(default=5, gt=0, le=30)
 
     @property
     def gemini_api_key_is_placeholder(self) -> bool:

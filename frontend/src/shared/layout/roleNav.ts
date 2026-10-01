@@ -10,7 +10,7 @@ import {
   History,
   LayoutDashboard,
   Scale,
-  Upload,
+  Settings,
   UserPlus,
   Users,
   Wallet,
@@ -33,6 +33,9 @@ export interface RoleNavConfig {
    * AppShell.tsx), jamais mélangée aux `items` : le Profil n'est pas une page métier de
    * l'espace comme les autres, c'est le compte de la personne connectée. */
   profilTo: string;
+  /** Le Profil est déjà un lien de `items` : pas de carte Profil en bas de la sidebar
+   * (espace Entreprise, tâche 5.9). */
+  profilDansNavigation?: boolean;
 }
 
 /** Navigation réelle par rôle. */
@@ -50,11 +53,14 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
   },
   [Role.ENTERPRISE]: {
     label: "Entreprise",
-    profilTo: "/company/profil",
+    profilTo: "/company/profile",
+    // Trois liens de structure seulement (tâche 5.9) : l'action « Nouvelle déclaration » vit
+    // dans l'en-tête de « Mes déclarations », jamais en double dans la sidebar.
+    profilDansNavigation: true,
     items: [
       { to: "/company", label: "Tableau de bord", icon: LayoutDashboard, end: true },
-      { to: "/company/rapports", label: "Mes rapports", icon: FileText },
-      { to: "/company/deposer", label: "Déposer un rapport", icon: Upload },
+      { to: "/company/declarations", label: "Mes déclarations", icon: FileText },
+      { to: "/company/profile", label: "Profil entreprise", icon: Settings },
     ],
   },
   [Role.AUDITOR]: {

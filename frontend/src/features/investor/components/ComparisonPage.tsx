@@ -58,7 +58,9 @@ export function ComparisonPage() {
   }
 
   function entrepriseSelectionnee(id: string): { name: string; logo: string | null } | undefined {
-    return entreprisesConnues.find((e) => e.id === id) ?? entreprisesTrouvees.find((e) => e.id === id);
+    return (
+      entreprisesConnues.find((e) => e.id === id) ?? entreprisesTrouvees.find((e) => e.id === id)
+    );
   }
 
   return (
@@ -147,7 +149,9 @@ export function ComparisonPage() {
 
           {chargementRecherche ? <p className="text-sm text-brand-grey">Chargement...</p> : null}
           {!chargementRecherche && entreprisesTrouvees.length === 0 ? (
-            <p className="text-sm text-brand-grey">Aucune entreprise ne correspond à cette recherche.</p>
+            <p className="text-sm text-brand-grey">
+              Aucune entreprise ne correspond à cette recherche.
+            </p>
           ) : null}
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -160,7 +164,9 @@ export function ComparisonPage() {
                   disabled={
                     dejaSelectionnee ? false : selection.length >= MAX_SELECTION_COMPARAISON
                   }
-                  onClick={() => (dejaSelectionnee ? retirer(entreprise.id) : ajouter(entreprise.id))}
+                  onClick={() =>
+                    dejaSelectionnee ? retirer(entreprise.id) : ajouter(entreprise.id)
+                  }
                   className={`flex items-center gap-2 rounded-md border p-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     dejaSelectionnee
                       ? "border-brand-green bg-brand-green-light/40"
@@ -169,8 +175,12 @@ export function ComparisonPage() {
                 >
                   <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-brand-blue">{entreprise.name}</span>
-                    <span className="block truncate text-xs text-brand-grey">{entreprise.sector}</span>
+                    <span className="block truncate font-medium text-brand-blue">
+                      {entreprise.name}
+                    </span>
+                    <span className="block truncate text-xs text-brand-grey">
+                      {entreprise.sector}
+                    </span>
                   </span>
                   <span className="shrink-0 text-xs font-medium text-brand-blue">
                     {dejaSelectionnee ? "Retirer" : "Ajouter"}

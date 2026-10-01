@@ -1,13 +1,16 @@
-"""Inscription publique d'une entreprise (tâche 1.3, POST /api/v1/companies/register)."""
+"""Inscription publique d'une entreprise (tâches 1.3 et 5.2, POST /api/v1/companies/register)."""
 
 import hashlib
 import random
+import re
 import string
 import uuid
 from unittest.mock import Mock
 
+import pymupdf
 import pytest
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlmodel import col, select
 
 from app.auth.hashing import hash_password
@@ -15,7 +18,7 @@ from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
 from app.company.registration import MAX_DEMANDES_PAR_IP
-from app.core.enums import CompanyStatus, Role
+from app.core.enums import RegistrationStatus, Role
 from app.core.models import Notification
 from app.core.redis import get_redis_client
 from app.main import app
@@ -80,6 +83,25 @@ def _client() -> TestClient:
     return TestClient(app, base_url="https://testserver")
 
 
+def pdf_minimal() -> bytes:
+    document = pymupdf.open()
+    document.new_page()
+    contenu = document.tobytes()
+    document.close()
+    return contenu
+
+
+def inscrire_http(
+    demande: dict, *, mandat: bytes | None = None, client: TestClient | None = None
+) -> Response:
+    """POST multipart (tâche 5.2) : les champs à plat, la lettre de mandat en fichier."""
+    champs = {cle: valeur for cle, valeur in demande.items() if valeur is not None}
+    fichier = mandat if mandat is not None else pdf_minimal()
+    return (client or _client()).post(
+        URL, data=champs, files={"mandate_letter": ("mandat.pdf", fichier, "application/pdf")}
+    )
+
+
 def _entreprise_par_nom(session, nom: str) -> Company | None:
     session.expire_all()
     return session.exec(select(Company).where(col(Company.name) == nom)).first()
@@ -91,12 +113,12 @@ def test_inscription_cree_une_entreprise_en_attente_sans_mot_de_passe(session, _
     session.commit()
     demande = _demande()
 
-    response = _client().post(URL, json=demande)
+    response = inscrire_http(demande)
 
     assert response.status_code == 202
     entreprise = _entreprise_par_nom(session, demande["company_name"])
     assert entreprise is not None
-    assert entreprise.status == CompanyStatus.PENDING_ONBOARDING
+    assert entreprise.status == RegistrationStatus.PENDING_ONBOARDING
     assert entreprise.country == "MR"
     assert entreprise.isin == demande["isin"].upper()
     assert entreprise.published_at is None
@@ -105,6 +127,14 @@ def test_inscription_cree_une_entreprise_en_attente_sans_mot_de_passe(session, _
     assert titulaire.email == demande["contact_email"].lower()
     assert titulaire.role == Role.ENTERPRISE
     assert titulaire.password_hash is None  # aucune connexion possible avant validation (1.4)
+    assert entreprise.mandate_letter_path is not None
+    assert entreprise.mandate_letter_path.startswith(f"mandats/{entreprise.id}/")
+    assert entreprise.registered_at is not None
+    assert entreprise.status_token_hash is not None
+    jeton = re.search(r"token=([\w-]+)", _envoi_simule.call_args.kwargs["body"])
+    assert jeton is not None
+    assert hashlib.sha256(jeton[1].encode()).hexdigest() == entreprise.status_token_hash
+    assert jeton[1] not in response.text
     assert [appel.kwargs["recipient"] for appel in _envoi_simule.call_args_list] == [
         titulaire.email
     ]
@@ -129,16 +159,51 @@ def test_inscription_cree_une_entreprise_en_attente_sans_mot_de_passe(session, _
 def test_inscription_mal_formee_est_refusee(session, champ, valeur) -> None:
     demande = _demande(**{champ: valeur.replace("\\n", "\n")})
 
-    response = _client().post(URL, json=demande)
+    response = inscrire_http(demande)
 
     assert response.status_code == 422
     assert _entreprise_par_nom(session, demande["company_name"]) is None
 
 
-def test_champ_inconnu_refuse(session) -> None:
-    response = _client().post(URL, json={**_demande(), "status": "ACTIVE"})
+def test_un_champ_en_trop_ne_change_pas_le_statut(session) -> None:
+    """En multipart, un champ inconnu est ignoré : il ne peut en tout cas jamais activer
+    l'entreprise."""
+    demande = _demande()
+
+    response = inscrire_http({**demande, "status": "ACTIVE"})
+
+    assert response.status_code == 202
+    entreprise = _entreprise_par_nom(session, demande["company_name"])
+    assert entreprise is not None
+    assert entreprise.status == RegistrationStatus.PENDING_ONBOARDING
+
+
+@pytest.mark.parametrize(
+    ("fichier", "code"),
+    [
+        (b"", "fichier_vide"),
+        (b"pas un pdf", "signature_invalide"),
+        (b"%PDF-" + b"0" * (5 * 1024 * 1024), "fichier_trop_volumineux"),
+    ],
+    ids=["vide", "pas-un-pdf", "trop-gros"],
+)
+def test_lettre_de_mandat_invalide_refusee_sans_rien_creer(session, fichier, code) -> None:
+    demande = _demande()
+
+    response = inscrire_http(demande, mandat=fichier)
 
     assert response.status_code == 422
+    assert response.json()["error"]["code"] == code
+    assert _entreprise_par_nom(session, demande["company_name"]) is None
+
+
+def test_lettre_de_mandat_obligatoire(session) -> None:
+    demande = _demande()
+
+    response = _client().post(URL, data=demande)
+
+    assert response.status_code == 422
+    assert _entreprise_par_nom(session, demande["company_name"]) is None
 
 
 def test_email_deja_connu_repond_pareil_sans_rien_creer(session, _envoi_simule) -> None:
@@ -147,7 +212,7 @@ def test_email_deja_connu_repond_pareil_sans_rien_creer(session, _envoi_simule) 
     session.commit()
     demande = _demande(contact_email=existant.email.upper())
 
-    response = _client().post(URL, json=demande)
+    response = inscrire_http(demande)
 
     assert response.status_code == 202
     assert _entreprise_par_nom(session, demande["company_name"]) is None
@@ -158,10 +223,10 @@ def test_email_deja_connu_repond_pareil_sans_rien_creer(session, _envoi_simule) 
 
 def test_isin_deja_connu_repond_pareil_sans_rien_creer(session) -> None:
     premiere = _demande()
-    assert _client().post(URL, json=premiere).status_code == 202
+    assert inscrire_http(premiere).status_code == 202
     seconde = _demande(isin=premiere["isin"], lei=None)
 
-    response = _client().post(URL, json=seconde)
+    response = inscrire_http(seconde)
 
     assert response.status_code == 202
     assert _entreprise_par_nom(session, seconde["company_name"]) is None
@@ -170,7 +235,7 @@ def test_isin_deja_connu_repond_pareil_sans_rien_creer(session) -> None:
 def test_champ_piege_rempli_ignore_en_silence(session, _envoi_simule) -> None:
     demande = _demande(company_fax="+222 00 00 00")
 
-    response = _client().post(URL, json=demande)
+    response = inscrire_http(demande)
 
     assert response.status_code == 202
     assert _entreprise_par_nom(session, demande["company_name"]) is None
@@ -179,16 +244,16 @@ def test_champ_piege_rempli_ignore_en_silence(session, _envoi_simule) -> None:
 
 def test_inscription_limitee_par_ip(session) -> None:
     for _ in range(MAX_DEMANDES_PAR_IP):
-        assert _client().post(URL, json=_demande()).status_code == 202
+        assert inscrire_http(_demande()).status_code == 202
 
-    assert _client().post(URL, json=_demande()).status_code == 429
+    assert inscrire_http(_demande()).status_code == 429
 
 
 def test_une_inscription_en_attente_ne_se_contourne_pas_par_les_actions_admin(session) -> None:
     """Réactiver ou renvoyer un lien d'activation ne valide jamais une inscription : seule la
     validation d'inscription (tâche 1.4) le fera."""
     demande = _demande()
-    assert _client().post(URL, json=demande).status_code == 202
+    assert inscrire_http(demande).status_code == 202
     entreprise = _entreprise_par_nom(session, demande["company_name"])
     assert entreprise is not None
     admin = User(
@@ -212,5 +277,5 @@ def test_une_inscription_en_attente_ne_se_contourne_pas_par_les_actions_admin(se
     assert reactiver.json()["error"]["code"] == "transition_invalide"
     assert renvoyer.status_code == 422
     assert renvoyer.json()["error"]["code"] == "inscription_non_validee"
-    assert detail.json()["status"] == CompanyStatus.PENDING_ONBOARDING.value
+    assert detail.json()["status"] == RegistrationStatus.PENDING_ONBOARDING.value
     assert detail.json()["active"] is False

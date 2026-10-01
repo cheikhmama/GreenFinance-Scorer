@@ -44,8 +44,8 @@ export function AnalysesPage() {
 
       {projetsOuverts.length === 0 ? (
         <p className="text-brand-grey">
-          Aucun projet ouvert ne vous est encore affecté — une analyse ne peut être créée que dans le
-          cadre d'un projet.
+          Aucun projet ouvert ne vous est encore affecté — une analyse ne peut être créée que dans
+          le cadre d'un projet.
         </p>
       ) : null}
 
@@ -233,7 +233,11 @@ function FormulaireAnalyse({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Entreprises comparées</FormLabel>
-              <CompaniesPicker projetId={projetId} selectedIds={field.value} onChange={field.onChange} />
+              <CompaniesPicker
+                projetId={projetId}
+                selectedIds={field.value}
+                onChange={field.onChange}
+              />
               <FormMessage />
             </FormItem>
           )}

@@ -55,6 +55,15 @@ class PermissionDeniedError(GreenFinanceError):
         super().__init__(code=code, message=message)
 
 
+class ConflictError(GreenFinanceError):
+    """La requête est valide mais l'état courant de la ressource ne la permet pas encore."""
+
+    status_code = 409
+
+    def __init__(self, message: str, code: str = "conflict") -> None:
+        super().__init__(code=code, message=message)
+
+
 class TooManyRequestsError(GreenFinanceError):
     status_code = 429
 

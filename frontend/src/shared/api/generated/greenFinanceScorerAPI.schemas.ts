@@ -6,7 +6,7 @@
  */
 /**
  * POST /auth/activer-compte — jeton reçu via le lien envoyé à la création du compte
- * (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 7 jours, usage unique).
+ * (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 72 heures, usage unique).
  */
 export interface ActiverCompteRequest {
   /**
@@ -216,13 +216,18 @@ export interface ApercuActeursAdmin {
   institutions: StatistiquesInstitutionsAdmin;
 }
 
+/**
+ * Avis de l'Auditeur (tâche 5.6) — une recommandation ; la décision finale reste à
+ * l'Administrateur. Tout avis autre que FAVORABLE exige un commentaire.
+ */
 export type AuditDecision = typeof AuditDecision[keyof typeof AuditDecision];
 
 
 export const AuditDecision = {
-  RECOMMANDE_VALIDATION: 'RECOMMANDE_VALIDATION',
-  RECOMMANDE_REJET: 'RECOMMANDE_REJET',
-  DEMANDE_CLARIFICATION: 'DEMANDE_CLARIFICATION',
+  FAVORABLE: 'FAVORABLE',
+  FAVORABLE_WITH_RESERVATIONS: 'FAVORABLE_WITH_RESERVATIONS',
+  CORRECTION_REQUIRED: 'CORRECTION_REQUIRED',
+  UNFAVORABLE: 'UNFAVORABLE',
 } as const;
 
 /**
@@ -261,6 +266,10 @@ export interface BaselineInfo {
   peer_count: number;
 }
 
+export interface BodyAttachReportFile {
+  file: Blob;
+}
+
 export interface BodyImportPortfolioPositions {
   file: Blob;
   total_value?: number | string | null;
@@ -274,6 +283,29 @@ export interface BodyImportReferenceDataset {
   scale_min?: number;
   scale_max?: number;
   higher_is_better?: boolean;
+}
+
+export interface BodyRegisterCompany {
+  mandate_letter: Blob;
+  company_name: string;
+  sector: string;
+  country: string;
+  contact_name: string;
+  contact_email: string;
+  isin?: string | null;
+  lei?: string | null;
+  website?: string | null;
+  company_fax?: string | null;
+}
+
+export interface BodyReplyToRegistrationInfoRequest {
+  mandate_letter: Blob;
+  /**
+     * @minLength 20
+     * @maxLength 200
+     */
+  token: string;
+  message?: string | null;
 }
 
 export type ReportType = typeof ReportType[keyof typeof ReportType];
@@ -294,10 +326,6 @@ export interface BodySubmitCompanyReport {
 export interface BodySubmitCompanyReportCorrection {
   fichier: Blob;
   annee_reporting: number;
-}
-
-export interface BodySubmitReport {
-  file: Blob;
 }
 
 export interface BodyUploadCompanyLogo {
@@ -352,35 +380,6 @@ export interface ChercheurDisponible {
   name: string | null;
 }
 
-/**
- * Réponse de GET / PUT /admin/companies/{id}/financials : montants en nombres JSON (un
- * Decimal serait sérialisé en chaîne).
- */
-export interface CompanyFinancials {
-  company_id: string;
-  revenue: number | null;
-  revenue_currency: Currency | null;
-  enterprise_value: number | null;
-  enterprise_value_currency: Currency | null;
-  enterprise_value_as_of: string | null;
-}
-
-/**
- * PUT /admin/companies/{id}/financials (tâche 2.3, contrat JSON en anglais) : les
- * données financières dont le moteur PCAF a besoin (docs/WORKFLOWS.md §2.4). Chiffre d'affaires
- * pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur d'attribution.
- * Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais affichée à
- * côté des émissions, pour juger de l'écart entre les deux exercices. Remplacement complet : un
- * champ omis vaut null.
- */
-export interface CompanyFinancialsRequest {
-  revenue?: number | string | null;
-  revenue_currency?: Currency | null;
-  enterprise_value?: number | string | null;
-  enterprise_value_currency?: Currency | null;
-  enterprise_value_as_of?: string | null;
-}
-
 export interface CompanyIdentifiers {
   company_id: string;
   isin: string | null;
@@ -405,75 +404,49 @@ export type OnboardingDecision = typeof OnboardingDecision[keyof typeof Onboardi
 
 export const OnboardingDecision = {
   approve: 'approve',
+  request_info: 'request_info',
   reject: 'reject',
 } as const;
 
 /**
- * PATCH /admin/companies/{id}/onboard (tâche 1.4, contrat JSON en anglais). Un refus exige un
- * motif : il est transmis au demandeur par e-mail.
+ * PATCH /admin/companies/{id}/onboard (tâches 1.4 et 5.3, contrat JSON en anglais). Un refus
+ * exige un motif (`reason`), une demande d'informations un message (`message`) : l'un comme
+ * l'autre est transmis au demandeur par e-mail et reste lisible sur sa page de suivi.
  */
 export interface CompanyOnboardingRequest {
   decision: OnboardingDecision;
   reason?: string | null;
+  message?: string | null;
 }
 
 /**
- * Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
- * score (Company.published_at).
+ * Cycle de vie de l'inscription puis du compte entreprise (KYC, décision D5, tâche 5.2) —
+ * distinct de la publication de son score (Company.published_at).
+ *
+ * PENDING_ONBOARDING et INFO_REQUESTED : demande en cours d'examen, entreprise invisible et
+ * inactive. REJECTED : demande refusée, conservée avec son motif (plus supprimée). ACTIVE puis,
+ * éventuellement, SUSPENDED : entreprise validée.
  */
-export type CompanyStatus = typeof CompanyStatus[keyof typeof CompanyStatus];
+export type RegistrationStatus = typeof RegistrationStatus[keyof typeof RegistrationStatus];
 
 
-export const CompanyStatus = {
+export const RegistrationStatus = {
   PENDING_ONBOARDING: 'PENDING_ONBOARDING',
+  INFO_REQUESTED: 'INFO_REQUESTED',
   ACTIVE: 'ACTIVE',
+  REJECTED: 'REJECTED',
   SUSPENDED: 'SUSPENDED',
 } as const;
 
 /**
- * `status` est None après un refus : l'inscription refusée est supprimée (le demandeur peut
- * en déposer une nouvelle), il n'y a plus d'entreprise à décrire.
+ * `status` vaut ACTIVE après validation, INFO_REQUESTED après une demande d'informations,
+ * REJECTED après refus (tâche 5.2 : l'inscription refusée est conservée, plus supprimée).
  */
 export interface CompanyOnboardingResult {
   company_id: string;
   decision: OnboardingDecision;
-  status: CompanyStatus | null;
+  status: RegistrationStatus;
   onboarded_at: string | null;
-}
-
-/**
- * POST /companies/register — inscription publique d'une entreprise (tâche 1.3, décision D5).
- *
- * Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3, tâche 1.3) : nouvel endpoint, donc
- * directement dans les noms cibles. ISIN et LEI restent facultatifs (beaucoup d'entreprises non
- * cotées n'en ont pas) mais, fournis, leur chiffre de contrôle est vérifié.
- *
- * `company_fax` est un champ piège : invisible dans le formulaire, un humain le laisse vide ; un
- * robot qui remplit tous les champs est ignoré sans le savoir (voir app/company/registration.py).
- */
-export interface CompanyRegistrationRequest {
-  /**
-     * @minLength 2
-     * @maxLength 200
-     */
-  company_name: string;
-  /**
-     * @minLength 2
-     * @maxLength 100
-     */
-  sector: string;
-  /** Code pays ISO 3166-1 alpha-2, ex. MR */
-  country: string;
-  isin?: string | null;
-  lei?: string | null;
-  website?: string | null;
-  /**
-     * @minLength 2
-     * @maxLength 100
-     */
-  contact_name: string;
-  contact_email: string;
-  company_fax?: string | null;
 }
 
 /**
@@ -712,6 +685,31 @@ export interface PreuveDocumentairePublic {
   excerpt_pdf_path: string;
 }
 
+/**
+ * Où une valeur se lit sur sa page-preuve (tâche 5.5) : fractions de la page (0 à 1),
+ * origine en haut à gauche — indépendantes de l'échelle d'affichage.
+ */
+export interface ProofBox {
+  page: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Revue d'une valeur extraite par l'Auditeur affecté (tâche 5.6).
+ */
+export type MetricReviewStatus = typeof MetricReviewStatus[keyof typeof MetricReviewStatus];
+
+
+export const MetricReviewStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  OVERRIDDEN: 'OVERRIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+} as const;
+
 export interface DonneeCarboneDetail {
   id: string;
   scope: number;
@@ -726,6 +724,10 @@ export interface DonneeCarboneDetail {
   proof_text: string | null;
   value_year: number | null;
   confidence: ConfidenceLevel | null;
+  extraction_run_id?: string | null;
+  proof_boxes?: ProofBox[];
+  review_status?: MetricReviewStatus | null;
+  audited_value?: number | null;
 }
 
 export interface DonneesCarboneAgregees {
@@ -736,16 +738,21 @@ export interface DonneesCarboneAgregees {
 }
 
 /**
- * Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
- * d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne.
+ * Cycle de vie d'un rapport (docs/WORKFLOWS.md §1.2), extraction comprise (tâche 5.1 : un
+ * seul statut, l'ancien ExtractionStatus est fondu ici).
+ *
+ * Pendant EXTRACTING, `extraction_started_at` distingue un job en file (NULL) d'un job en cours
+ * (renseigné) — c'est la seule différence dont la supervision a besoin.
  */
 export type ReportStatus = typeof ReportStatus[keyof typeof ReportStatus];
 
 
 export const ReportStatus = {
   DRAFT: 'DRAFT',
-  SUBMITTED: 'SUBMITTED',
-  PENDING_AUDIT: 'PENDING_AUDIT',
+  EXTRACTING: 'EXTRACTING',
+  EXTRACTION_FAILED: 'EXTRACTION_FAILED',
+  AWAITING_ASSIGNMENT: 'AWAITING_ASSIGNMENT',
+  IN_AUDIT: 'IN_AUDIT',
   PENDING_DECISION: 'PENDING_DECISION',
   REVISION_REQUESTED: 'REVISION_REQUESTED',
   VALIDATED: 'VALIDATED',
@@ -768,7 +775,7 @@ export interface EntrepriseAdmin {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -833,6 +840,10 @@ export interface IndicateurESGDetail {
   proof_text: string | null;
   value_year: number | null;
   confidence: ConfidenceLevel | null;
+  extraction_run_id?: string | null;
+  proof_boxes?: ProofBox[];
+  review_status?: MetricReviewStatus | null;
+  audited_value?: number | null;
 }
 
 /**
@@ -849,7 +860,7 @@ export interface EntrepriseDetailInvestisseur {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -882,7 +893,7 @@ export interface EntreprisePublic {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -907,7 +918,7 @@ export interface EntreprisePublieePublic {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -942,19 +953,46 @@ export const EtatPosition = {
   ENTREPRISE_SUSPENDUE: 'ENTREPRISE_SUSPENDUE',
 } as const;
 
-export type ExtractionStatus = typeof ExtractionStatus[keyof typeof ExtractionStatus];
+/**
+ * Issue d'une exécution du pipeline d'extraction sur un rapport (tâche 5.5, table
+ * extraction_runs) — une ligne par tentative, jamais réécrite après sa clôture.
+ */
+export type ExtractionRunStatus = typeof ExtractionRunStatus[keyof typeof ExtractionRunStatus];
 
 
-export const ExtractionStatus = {
-  NOT_STARTED: 'NOT_STARTED',
-  QUEUED: 'QUEUED',
+export const ExtractionRunStatus = {
   RUNNING: 'RUNNING',
-  DONE: 'DONE',
+  SUCCEEDED: 'SUCCEEDED',
   FAILED: 'FAILED',
+  RETRY_SCHEDULED: 'RETRY_SCHEDULED',
 } as const;
+
+/**
+ * Une exécution du pipeline d'extraction (tâche 5.5) : ce qui a produit les valeurs.
+ */
+export interface ExtractionRunPublic {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: ExtractionRunStatus;
+  error: string | null;
+  docling_version: string;
+  llm_model: string;
+  prompt_version: string;
+}
 
 export interface FermerPositionRequest {
   end_date?: string | null;
+}
+
+/**
+ * Liste de complétude d'un brouillon (tâche 5.8) : des comptes, jamais de valeurs.
+ * `group` : `CARBON` ou un pilier (`ENVIRONNEMENT`, `SOCIAL`, `GOUVERNANCE`).
+ */
+export interface GroupeCompletude {
+  group: string;
+  expected: number;
+  found: number;
 }
 
 export type ValidationErrorCtx = { [key: string]: unknown };
@@ -1024,6 +1062,54 @@ export interface JournalAuditPublic {
   correlation_id: string | null;
 }
 
+/**
+ * Résultat d'un contrôle KYC (tâche 5.3) — un éclairage pour l'Administrateur, jamais une
+ * décision automatique.
+ */
+export type KycCheckResult = typeof KycCheckResult[keyof typeof KycCheckResult];
+
+
+export const KycCheckResult = {
+  PASSED: 'PASSED',
+  FAILED: 'FAILED',
+  NOT_VERIFIABLE: 'NOT_VERIFIABLE',
+  NOT_APPLICABLE: 'NOT_APPLICABLE',
+} as const;
+
+/**
+ * Un contrôle KYC (tâche 5.3) : son résultat, ce qui l'explique, et d'où vient l'information.
+ */
+export interface KycCheck {
+  code: string;
+  label: string;
+  result: KycCheckResult;
+  detail: string;
+  source: string;
+}
+
+/**
+ * GET /admin/companies/{id}/kyc — de quoi décider d'une inscription dans une seule fenêtre :
+ * identité déclarée, contact, lettre de mandat, échanges avec le demandeur, contrôles.
+ */
+export interface KycReport {
+  company_id: string;
+  company_name: string;
+  status: RegistrationStatus;
+  lei: string | null;
+  isin: string | null;
+  website: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  registered_at: string | null;
+  mandate_letter_available: boolean;
+  mandate_letter_uploaded_at: string | null;
+  info_request_message: string | null;
+  info_requested_at: string | null;
+  info_response_message: string | null;
+  checked_at: string;
+  checks: KycCheck[];
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -1049,6 +1135,51 @@ export interface MetricContribution {
   baseline_value: number | null;
   effective_weight: number;
   contribution: number;
+}
+
+/**
+ * Catégorie de motif d'une correction ou d'un « non trouvé » (tâche 5.6).
+ */
+export type ReviewReason = typeof ReviewReason[keyof typeof ReviewReason];
+
+
+export const ReviewReason = {
+  EXTRACTION_ERROR: 'EXTRACTION_ERROR',
+  UNIT_ERROR: 'UNIT_ERROR',
+  WRONG_PERIOD: 'WRONG_PERIOD',
+  WRONG_SCOPE: 'WRONG_SCOPE',
+  NOT_IN_SOURCE: 'NOT_IN_SOURCE',
+  OTHER: 'OTHER',
+} as const;
+
+/**
+ * Une entrée du journal des revues (tâche 5.6), jamais modifiée après coup.
+ */
+export interface MetricReviewEntry {
+  id: string;
+  metric_id: string | null;
+  emission_id: string | null;
+  decision: MetricReviewStatus;
+  original_value: number;
+  new_value: number | null;
+  reason: ReviewReason | null;
+  comment: string | null;
+  auditor_id: string;
+  created_at: string;
+}
+
+/**
+ * POST /audit/rapports/{id}/reviews (tâche 5.6) — décision de l'Auditeur affecté sur une valeur
+ * extraite : un indicateur (`metric_id`) ou une donnée carbone (`emission_id`), jamais les deux.
+ * Corriger exige la nouvelle valeur ; corriger ou déclarer non trouvée exige un motif.
+ */
+export interface MetricReviewRequest {
+  metric_id?: string | null;
+  emission_id?: string | null;
+  decision: MetricReviewStatus;
+  new_value?: number | null;
+  reason?: ReviewReason | null;
+  comment?: string | null;
 }
 
 export interface ModifierAnalyseRequest {
@@ -1270,7 +1401,6 @@ export interface RapportESGPublic {
   created_at: string;
   submitted_at: string | null;
   status: ReportStatus;
-  extraction_status: ExtractionStatus;
   source_file: string | null;
   original_filename: string | null;
   fiscal_year: number | null;
@@ -1279,6 +1409,12 @@ export interface RapportESGPublic {
   extraction_attempts: number;
   version: number;
   previous_report_id: string | null;
+  checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
 }
 
 export interface PageRapportESGPublic {
@@ -1295,13 +1431,15 @@ export interface ReportResponse {
   report_type: ReportType;
   fiscal_year: number | null;
   status: ReportStatus;
-  extraction_status: ExtractionStatus;
   version: number;
   previous_report_id: string | null;
   created_at: string;
   submitted_at: string | null;
   original_filename: string | null;
   official_score: number | null;
+  checksum_sha256: string | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
 }
 
 export interface PageReportResponse {
@@ -1415,7 +1553,7 @@ export interface PositionCarbon {
   data_quality: number | null;
   emissions_year: number | null;
   scope_2_basis: string | null;
-  enterprise_value_as_of: string | null;
+  evic_date: string | null;
   excluded_reason: CarbonExclusionReason | null;
 }
 
@@ -1450,6 +1588,20 @@ export interface PortfolioImportResult {
   matched: number;
   unmatched: number;
   ambiguous: number;
+}
+
+/**
+ * Score calculé sous la configuration de référence avec les valeurs revues (tâche 5.6) —
+ * jamais officiel. Montré à l'Auditeur seulement APRÈS son avis, pour que le chiffre n'oriente
+ * pas la revue.
+ */
+export interface PreScore {
+  computable: boolean;
+  global_score: number | null;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
+  coverage_rate: number | null;
 }
 
 export interface ProjetAffecte {
@@ -1523,7 +1675,6 @@ export interface RapportESGDetail {
   created_at: string;
   submitted_at: string | null;
   status: ReportStatus;
-  extraction_status: ExtractionStatus;
   source_file: string | null;
   original_filename: string | null;
   fiscal_year: number | null;
@@ -1532,11 +1683,17 @@ export interface RapportESGDetail {
   extraction_attempts: number;
   version: number;
   previous_report_id: string | null;
+  checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
   metrics: IndicateurESGDetail[];
   carbon_data: DonneeCarboneDetail[];
   declared_global_score: number | null;
   declared_global_score_proof: PreuveDocumentairePublic | null;
   official_score?: ScoreESGPublic | null;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
   readonly coverage: CouvertureResume;
 }
 
@@ -1564,6 +1721,33 @@ export interface ReferenceDatasetImportResult {
   imported: number;
   skipped: number;
   skipped_lines: SkippedLine[];
+}
+
+/**
+ * POST /companies/registration-status — le jeton reçu par e-mail, dans le corps (jamais dans
+ * l'URL d'une requête API, pour ne pas finir dans les journaux d'accès).
+ */
+export interface RegistrationStatusRequest {
+  /**
+     * @minLength 20
+     * @maxLength 200
+     */
+  token: string;
+}
+
+/**
+ * Ce que le demandeur voit de sa demande (tâche 5.2) — jamais l'identité de l'Administrateur
+ * qui l'examine, ni les contrôles KYC.
+ */
+export interface RegistrationStatusView {
+  company_name: string;
+  status: RegistrationStatus;
+  registered_at: string | null;
+  info_request_message: string | null;
+  info_requested_at: string | null;
+  rejection_reason: string | null;
+  rejected_at: string | null;
+  can_respond: boolean;
 }
 
 /**
@@ -1597,12 +1781,53 @@ export interface RepartitionSecteur {
  *
  * `company_id` n'est lu que pour un Administrateur ; une Entreprise déclare toujours pour la
  * sienne (même règle que l'import par URL, app/company/router.py).
+ *
+ * Données financières de l'exercice (tâche 5.9), facultatives : une devise pour le chiffre
+ * d'affaires et l'EVIC. Sans date, l'EVIC est datée de la clôture de l'exercice (31 décembre).
+ * Elles ne comptent pour PCAF qu'une fois le rapport validé (tâche 5.4) ; l'Administrateur peut
+ * toujours les corriger.
  */
 export interface ReportCreateRequest {
   /** @minimum 2000 */
   fiscal_year: number;
   report_type: ReportType;
   company_id?: string | null;
+  currency?: Currency | null;
+  revenue?: number | string | null;
+  enterprise_value?: number | string | null;
+  evic_date?: string | null;
+}
+
+/**
+ * Réponse de GET / PUT /admin/reports/{id}/financials : montants en nombres JSON (un
+ * Decimal serait sérialisé en chaîne). `fiscal_year` rappelle l'exercice auquel ils se
+ * rapportent.
+ */
+export interface ReportFinancials {
+  report_id: string;
+  company_id: string;
+  fiscal_year: number | null;
+  status: ReportStatus;
+  revenue: number | null;
+  revenue_currency: Currency | null;
+  enterprise_value: number | null;
+  enterprise_value_currency: Currency | null;
+  evic_date: string | null;
+}
+
+/**
+ * PUT /admin/reports/{id}/financials (tâches 2.3 et 5.4) : les données financières dont le
+ * moteur PCAF a besoin (docs/WORKFLOWS.md §2.4), pour l'exercice de ce rapport. Chiffre
+ * d'affaires pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur
+ * d'attribution. Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais
+ * affichée à côté des émissions. Remplacement complet : un champ omis vaut null.
+ */
+export interface ReportFinancialsRequest {
+  revenue?: number | string | null;
+  revenue_currency?: Currency | null;
+  enterprise_value?: number | string | null;
+  enterprise_value_currency?: Currency | null;
+  evic_date?: string | null;
 }
 
 /**
@@ -1649,6 +1874,9 @@ export interface ScoreVerificationAdmin {
   min_coverage?: number | null;
 }
 
+/**
+ * Avis de l'Auditeur (tâche 5.6) : tout avis autre que FAVORABLE est motivé.
+ */
 export interface SoumettreAvisRequest {
   decision: AuditDecision;
   comment?: string | null;
@@ -1699,6 +1927,17 @@ export interface UtilisateurCree {
   role: Role;
   created_at: string;
   active: boolean;
+}
+
+/**
+ * GET /company/lei-verification (tâche 5.9) : le LEI déclaré, confirmé ou non par la GLEIF.
+ * `result` vaut PASSED seulement si l'enregistrement est actif ET le nom légal correspond ;
+ * NOT_APPLICABLE sans LEI ; NOT_VERIFIABLE si la GLEIF n'a pas répondu. Rien n'est stocké.
+ */
+export interface VerificationLei {
+  lei: string | null;
+  result: KycCheckResult;
+  detail: string;
 }
 
 /**

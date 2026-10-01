@@ -20,8 +20,9 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.core.enums import (
     ConfidenceLevel,
     DataMethod,
-    ExtractionStatus,
+    ExtractionRunStatus,
     MetricCoverageStatus,
+    MetricReviewStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -92,11 +93,9 @@ class RapportESGPublic(BaseModel):
     # Nuls pour un brouillon (DRAFT, tâche 1.5) : ni fichier ni dépôt tant que la déclaration
     # n'est pas soumise.
     submitted_at: datetime | None
+    # Statut unique, extraction comprise (tâche 5.1). L'espace Entreprise regroupe les états
+    # d'examen en un seul libellé ; les rôles internes voient l'état détaillé.
     status: ReportStatus
-    # Avancement de l'extraction, distinct du statut métier (ExtractionStatus) — ajouté au
-    # contrat avec le découpage de l'ancien statut unique, pour que le frontend distingue un
-    # rapport en file, en cours, extrait ou en échec sans le déduire des horodatages.
-    extraction_status: ExtractionStatus
     source_file: str | None
     original_filename: str | None
     fiscal_year: int | None
@@ -105,6 +104,21 @@ class RapportESGPublic(BaseModel):
     extraction_attempts: int
     version: int
     previous_report_id: uuid.UUID | None
+    # Empreinte SHA-256 du fichier : le reçu de soumission (tâche 5.8).
+    checksum_sha256: str | None
+    # Résumé du score officiel, posé à la validation (tâches 1.6, 3.1) : nul avant. Lu sous un autre
+    # nom que `official_score`, que RapportESGDetail redéfinit en objet complet (tâche 5.9).
+    official_global_score: float | None = Field(default=None, validation_alias="official_score")
+    coverage_rate: float | None = None
+    config_hash: str | None = None
+    # Source du champ calculé ci-dessous, jamais sérialisée : un chemin de stockage reste interne.
+    synthesis_report_path: str | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def synthesis_available(self) -> bool:
+        """Le PDF de synthèse peut être téléchargé (tâche 5.9)."""
+        return self.synthesis_report_path is not None
 
 
 class PreuveDocumentairePublic(BaseModel):
@@ -117,6 +131,32 @@ class PreuveDocumentairePublic(BaseModel):
     page_start: int
     page_end: int
     excerpt_pdf_path: str
+
+
+class ProofBox(BaseModel):
+    """Où une valeur se lit sur sa page-preuve (tâche 5.5) : fractions de la page (0 à 1),
+    origine en haut à gauche — indépendantes de l'échelle d'affichage."""
+
+    page: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+class ExtractionRunPublic(BaseModel):
+    """Une exécution du pipeline d'extraction (tâche 5.5) : ce qui a produit les valeurs."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    started_at: datetime
+    finished_at: datetime | None
+    status: ExtractionRunStatus
+    error: str | None
+    docling_version: str
+    llm_model: str
+    prompt_version: str
 
 
 class IndicateurESGDetail(BaseModel):
@@ -134,6 +174,14 @@ class IndicateurESGDetail(BaseModel):
     proof_text: str | None
     value_year: int | None
     confidence: ConfidenceLevel | None
+    # Exécution qui a produit la valeur et boîtes de la valeur citée (tâche 5.5) ; vides pour une
+    # valeur antérieure, ou quand le texte cité n'a pas été retrouvé sur la page.
+    extraction_run_id: uuid.UUID | None = None
+    proof_boxes: list[ProofBox] = Field(default_factory=list)
+    # Revue de l'Auditeur (tâche 5.6) : état et valeur auditée. Masqués à l'Entreprise tant que son
+    # rapport n'est pas validé (app/company/router.py) ; publics ensuite.
+    review_status: MetricReviewStatus | None = None
+    audited_value: float | None = None
 
 
 class DonneeCarboneDetail(BaseModel):
@@ -153,6 +201,14 @@ class DonneeCarboneDetail(BaseModel):
     proof_text: str | None
     value_year: int | None
     confidence: ConfidenceLevel | None
+    # Exécution qui a produit la valeur et boîtes de la valeur citée (tâche 5.5) ; vides pour une
+    # valeur antérieure, ou quand le texte cité n'a pas été retrouvé sur la page.
+    extraction_run_id: uuid.UUID | None = None
+    proof_boxes: list[ProofBox] = Field(default_factory=list)
+    # Revue de l'Auditeur (tâche 5.6) : état et valeur auditée. Masqués à l'Entreprise tant que son
+    # rapport n'est pas validé (app/company/router.py) ; publics ensuite.
+    review_status: MetricReviewStatus | None = None
+    audited_value: float | None = None
 
 
 class CouvertureIndicateurPublic(BaseModel):

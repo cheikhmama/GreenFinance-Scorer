@@ -1,9 +1,9 @@
 import { type SyntheticEvent, useId, useState } from "react";
 import { ApiError } from "@/shared/api/errors";
 import {
-  type CompanyFinancials,
-  type CompanyFinancialsRequest,
   Currency,
+  type ReportFinancials,
+  type ReportFinancialsRequest,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -13,7 +13,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyFinancials, useUpdateCompanyFinancials } from "../api";
+import { useReportFinancials, useUpdateReportFinancials } from "../api";
 
 const DEVISES = Object.values(Currency);
 
@@ -22,16 +22,16 @@ type Valeurs = {
   revenue_currency: string;
   enterprise_value: string;
   enterprise_value_currency: string;
-  enterprise_value_as_of: string;
+  evic_date: string;
 };
 
-function depuisServeur(donnees: CompanyFinancials): Valeurs {
+function depuisServeur(donnees: ReportFinancials): Valeurs {
   return {
     revenue: donnees.revenue?.toString() ?? "",
     revenue_currency: donnees.revenue_currency ?? DEVISES[0],
     enterprise_value: donnees.enterprise_value?.toString() ?? "",
     enterprise_value_currency: donnees.enterprise_value_currency ?? DEVISES[0],
-    enterprise_value_as_of: donnees.enterprise_value_as_of ?? "",
+    evic_date: donnees.evic_date ?? "",
   };
 }
 
@@ -44,35 +44,41 @@ function lireMontant(texte: string): number | null | string {
   return valeur;
 }
 
-/** Chiffre d'affaires et EVIC d'une entreprise (tâche 2.3) : sans eux, le moteur PCAF exclut ses
- * positions (EVIC manquante) ou sa WACI. Remplacement complet — un montant vidé efface la donnée,
- * et sa devise avec elle. */
-export function CompanyFinancialsCard({ entrepriseId }: { entrepriseId: string }) {
-  const { data, isLoading, isError } = useCompanyFinancials(entrepriseId);
+/** Chiffre d'affaires et EVIC de l'exercice d'un rapport (tâches 2.3, 5.4) : sans eux, le moteur
+ * PCAF exclut les positions de l'entreprise (EVIC manquante) ou sa WACI. Seuls ceux de son dernier
+ * rapport validé comptent — ceux d'un rapport encore en examen attendent sa validation.
+ * Remplacement complet — un montant vidé efface la donnée, et sa devise avec elle. */
+export function ReportFinancialsCard({ rapportId }: { rapportId: string }) {
+  const { data, isLoading, isError } = useReportFinancials(rapportId);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Données financières (PCAF)</CardTitle>
+        <CardTitle>Données financières de l’exercice (PCAF)</CardTitle>
+        {data && data.status !== "VALIDATED" ? (
+          <p className="text-sm text-brand-grey">
+            Prises en compte dans l’empreinte carbone une fois ce rapport validé.
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent>
         {isLoading ? <Skeleton className="h-24 w-full" /> : null}
         {isError ? (
           <p className="text-destructive">Impossible de charger les données financières.</p>
         ) : null}
-        {data ? <FormulaireFinancier entrepriseId={entrepriseId} donnees={data} /> : null}
+        {data ? <FormulaireFinancier rapportId={rapportId} donnees={data} /> : null}
       </CardContent>
     </Card>
   );
 }
 
 function FormulaireFinancier({
-  entrepriseId,
+  rapportId,
   donnees,
 }: {
-  entrepriseId: string;
-  donnees: CompanyFinancials;
+  rapportId: string;
+  donnees: ReportFinancials;
 }) {
-  const mutation = useUpdateCompanyFinancials(entrepriseId);
+  const mutation = useUpdateReportFinancials(rapportId);
   const [valeurs, setValeurs] = useState(() => depuisServeur(donnees));
   const [erreurs, setErreurs] = useState<Partial<Record<keyof Valeurs, string>>>({});
   const ids = {
@@ -80,7 +86,7 @@ function FormulaireFinancier({
     revenue_currency: useId(),
     enterprise_value: useId(),
     enterprise_value_currency: useId(),
-    enterprise_value_as_of: useId(),
+    evic_date: useId(),
   };
 
   function changer(champ: keyof Valeurs, valeur: string) {
@@ -95,19 +101,19 @@ function FormulaireFinancier({
     const nouvellesErreurs: typeof erreurs = {};
     if (typeof revenue === "string") nouvellesErreurs.revenue = revenue;
     if (typeof enterpriseValue === "string") nouvellesErreurs.enterprise_value = enterpriseValue;
-    if (valeurs.enterprise_value_as_of && enterpriseValue === null) {
-      nouvellesErreurs.enterprise_value_as_of = "Renseignez l'EVIC avec sa date.";
+    if (valeurs.evic_date && enterpriseValue === null) {
+      nouvellesErreurs.evic_date = "Renseignez l'EVIC avec sa date.";
     }
     setErreurs(nouvellesErreurs);
     if (Object.keys(nouvellesErreurs).length > 0) return;
 
-    const payload: CompanyFinancialsRequest = {
+    const payload: ReportFinancialsRequest = {
       revenue: revenue as number | null,
       revenue_currency: revenue === null ? null : (valeurs.revenue_currency as Currency),
       enterprise_value: enterpriseValue as number | null,
       enterprise_value_currency:
         enterpriseValue === null ? null : (valeurs.enterprise_value_currency as Currency),
-      enterprise_value_as_of: valeurs.enterprise_value_as_of || null,
+      evic_date: valeurs.evic_date || null,
     };
     mutation.mutate(payload, { onSuccess: (resultat) => setValeurs(depuisServeur(resultat)) });
   }
@@ -148,17 +154,15 @@ function FormulaireFinancier({
         />
       </div>
       <div className="max-w-xs space-y-1">
-        <Label htmlFor={ids.enterprise_value_as_of}>Date de l’EVIC</Label>
+        <Label htmlFor={ids.evic_date}>Date de l’EVIC</Label>
         <Input
-          id={ids.enterprise_value_as_of}
+          id={ids.evic_date}
           type="date"
-          value={valeurs.enterprise_value_as_of}
-          onChange={(event) => changer("enterprise_value_as_of", event.target.value)}
-          aria-invalid={Boolean(erreurs.enterprise_value_as_of)}
+          value={valeurs.evic_date}
+          onChange={(event) => changer("evic_date", event.target.value)}
+          aria-invalid={Boolean(erreurs.evic_date)}
         />
-        {erreurs.enterprise_value_as_of ? (
-          <p className="text-xs text-destructive">{erreurs.enterprise_value_as_of}</p>
-        ) : null}
+        {erreurs.evic_date ? <p className="text-xs text-destructive">{erreurs.evic_date}</p> : null}
       </div>
       {erreurServeur ? (
         <Alert variant="destructive">

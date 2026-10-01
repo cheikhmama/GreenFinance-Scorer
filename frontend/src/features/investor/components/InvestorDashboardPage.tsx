@@ -1,12 +1,12 @@
 import { AlertTriangle, Building2, PieChart, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { formatPourcentage, formatScore, variantScore } from "@/shared/format/etatPosition";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { StatCard } from "@/shared/ui/stat-card";
-import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { useInvestorDashboard, usePublishedCompanies } from "../api";
 
 export function InvestorDashboardPage() {
@@ -113,7 +113,9 @@ function RepartitionSecteurCard({
 }) {
   const [secteurSelectionne, setSecteurSelectionne] = useState<string | null>(null);
   const secteurActif = secteurSelectionne ?? repartition?.[0]?.sector ?? null;
-  const { data: entreprisesDuSecteur } = usePublishedCompanies({ secteur: secteurActif ?? undefined });
+  const { data: entreprisesDuSecteur } = usePublishedCompanies({
+    secteur: secteurActif ?? undefined,
+  });
   const nombreDisponibles = entreprisesDuSecteur?.pages[0]?.total;
   const montantMax = repartition?.[0]?.amount_usd ?? 0;
 
@@ -126,7 +128,10 @@ function RepartitionSecteurCard({
         {!repartition || repartition.length === 0 ? (
           <p className="text-sm text-brand-grey">
             Aucune position pour l'instant —{" "}
-            <Link to="/investor/entreprises" className="text-brand-blue underline-offset-2 hover:underline">
+            <Link
+              to="/investor/entreprises"
+              className="text-brand-blue underline-offset-2 hover:underline"
+            >
               découvrez les entreprises publiées
             </Link>{" "}
             pour choisir un secteur.
@@ -148,7 +153,11 @@ function RepartitionSecteurCard({
                     }`}
                   >
                     <div className="flex items-center justify-between text-sm">
-                      <span className={selectionnee ? "font-semibold text-brand-blue" : "text-brand-grey"}>
+                      <span
+                        className={
+                          selectionnee ? "font-semibold text-brand-blue" : "text-brand-grey"
+                        }
+                      >
                         {ligne.sector}
                       </span>
                       <span className="font-medium tabular-nums text-brand-blue">
@@ -158,7 +167,9 @@ function RepartitionSecteurCard({
                     <div className="mt-1.5 h-1.5 rounded-full bg-slate-100">
                       <div
                         className="h-1.5 rounded-full bg-brand-green"
-                        style={{ width: `${montantMax ? (ligne.amount_usd / montantMax) * 100 : 0}%` }}
+                        style={{
+                          width: `${montantMax ? (ligne.amount_usd / montantMax) * 100 : 0}%`,
+                        }}
                       />
                     </div>
                   </button>
@@ -169,7 +180,8 @@ function RepartitionSecteurCard({
             {secteurActif ? (
               <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                 <span className="text-brand-grey">
-                  Entreprises disponibles dans <strong className="text-brand-blue">{secteurActif}</strong>
+                  Entreprises disponibles dans{" "}
+                  <strong className="text-brand-blue">{secteurActif}</strong>
                 </span>
                 <Link
                   to={`/investor/entreprises?secteur=${encodeURIComponent(secteurActif)}`}

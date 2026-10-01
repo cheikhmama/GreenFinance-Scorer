@@ -16,7 +16,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
 from app.admin.apercu import (
     calculer_performance_esg,
@@ -26,6 +26,7 @@ from app.admin.apercu import (
 )
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import lister_journal_audit
+from app.admin.kyc import rapport_kyc
 from app.admin.onboarding import decider_inscription
 from app.admin.review_queue import (
     consulter_entreprise_admin,
@@ -60,8 +61,6 @@ from app.admin.schemas import (
     AnalyseAdmin,
     ApercuActeursAdmin,
     ChargeAuditeurAdmin,
-    CompanyFinancials,
-    CompanyFinancialsRequest,
     CompanyIdentifiers,
     CompanyIdentifiersRequest,
     CompanyOnboardingRequest,
@@ -71,10 +70,13 @@ from app.admin.schemas import (
     EntrepriseAdmin,
     EntrepriseAvecScoreAdmin,
     JournalAuditPublic,
+    KycReport,
     ModifierEntrepriseAdminRequest,
     PerformanceESGAdmin,
     PortefeuilleAdmin,
     ProjetAdmin,
+    ReportFinancials,
+    ReportFinancialsRequest,
     ScoreRecalculeAdmin,
     ScoreVerificationAdmin,
     StatistiquesAuditeursAdmin,
@@ -94,8 +96,9 @@ from app.admin.utilisateurs import (
     renvoyer_lien_activation,
 )
 from app.audit.assignment import affecter_auditeur, lister_charge_auditeurs
-from app.audit.models import AuditOpinion
-from app.audit.schemas import AvisAuditAdmin
+from app.audit.models import AuditOpinion, MetricReview
+from app.audit.revue import lister_revues
+from app.audit.schemas import AvisAuditAdmin, MetricReviewEntry
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import User
 from app.auth.permissions import require_role
@@ -108,8 +111,12 @@ from app.core.dependencies import get_session
 from app.core.enums import AnalysisStatus, ProjectStatus, ReportStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.ingestion.models import ESGReport
-from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
+from app.ingestion.models import ESGReport, ExtractionRun
+from app.ingestion.schemas import (
+    ExtractionRunPublic,
+    RapportESGDetail,
+    RapportESGPublic,
+)
 from app.institution.projets import lister_projets_admin
 from app.investor.portfolio import lister_portefeuilles_admin
 from app.researcher.analyses import lister_analyses_admin
@@ -526,6 +533,22 @@ def lister_avis_route(
     return lister_avis(session, rapport_id)
 
 
+@router.get(
+    "/admin/rapports/{rapport_id}/reviews",
+    response_model=list[MetricReviewEntry],
+    operation_id="listReportReviews",
+    summary="Journal des revues de l'Auditeur sur un rapport (lecture seule)",
+)
+def list_report_reviews(
+    rapport_id: uuid.UUID,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> list[MetricReview]:
+    if session.get(ESGReport, rapport_id) is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return lister_revues(session, rapport_id)
+
+
 @router.post(
     "/admin/rapports/{rapport_id}/valider",
     response_model=RapportESGPublic,
@@ -724,8 +747,49 @@ def onboard_company(
     session: Session = Depends(get_session),
 ) -> CompanyOnboardingResult:
     return decider_inscription(
-        session, current_user.id, company_id, payload.decision, payload.reason, background_tasks
+        session,
+        current_user.id,
+        company_id,
+        payload.decision,
+        payload.reason,
+        background_tasks,
+        message=payload.message,
     )
+
+
+@router.get(
+    "/admin/companies/{company_id}/kyc",
+    response_model=KycReport,
+    operation_id="getCompanyKyc",
+    summary="Contrôles KYC d'une inscription (GLEIF, domaine du contact, lettre de mandat)",
+)
+def get_company_kyc(
+    company_id: uuid.UUID,
+    _admin: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> KycReport:
+    return rapport_kyc(session, company_id)
+
+
+@router.get(
+    "/admin/companies/{company_id}/mandate-letter",
+    operation_id="getCompanyMandateLetter",
+    summary="Télécharger la lettre de mandat d'une inscription",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def get_company_mandate_letter(
+    company_id: uuid.UUID,
+    _admin: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    entreprise = session.get(Company, company_id)
+    if entreprise is None or entreprise.mandate_letter_path is None:
+        raise NotFoundError("Lettre de mandat introuvable.", code="mandat_introuvable")
+    chemin = storage.resolve_path(entreprise.mandate_letter_path)
+    if not chemin.is_file():
+        raise NotFoundError("Lettre de mandat introuvable.", code="mandat_introuvable")
+    return FileResponse(chemin, media_type="application/pdf", filename="lettre-de-mandat.pdf")
 
 
 @router.post(
@@ -1083,43 +1147,70 @@ def lister_projets_admin_route(
     )
 
 
-def _donnees_financieres(entreprise: Company) -> CompanyFinancials:
-    return CompanyFinancials(
-        company_id=entreprise.id,
-        revenue=entreprise.revenue,
-        revenue_currency=entreprise.revenue_currency,
-        enterprise_value=entreprise.enterprise_value,
-        enterprise_value_currency=entreprise.enterprise_value_currency,
-        enterprise_value_as_of=entreprise.enterprise_value_as_of,
+def _donnees_financieres(rapport: ESGReport) -> ReportFinancials:
+    return ReportFinancials(
+        report_id=rapport.id,
+        company_id=rapport.company_id,
+        fiscal_year=rapport.fiscal_year,
+        status=rapport.status,
+        revenue=float(rapport.revenue) if rapport.revenue is not None else None,
+        revenue_currency=rapport.revenue_currency,
+        enterprise_value=float(rapport.enterprise_value) if rapport.enterprise_value is not None else None,
+        enterprise_value_currency=rapport.enterprise_value_currency,
+        evic_date=rapport.evic_date,
     )
 
 
 @router.get(
-    "/admin/companies/{company_id}/financials",
-    response_model=CompanyFinancials,
-    operation_id="getCompanyFinancials",
-    summary="Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)",
+    "/admin/reports/{report_id}/extraction-runs",
+    response_model=list[ExtractionRunPublic],
+    operation_id="listReportExtractionRuns",
+    summary="Exécutions du pipeline d'extraction d'un rapport (Docling, modèle LLM, prompt)",
 )
-def get_company_financials(
-    company_id: uuid.UUID,
+def list_report_extraction_runs(
+    report_id: uuid.UUID,
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> CompanyFinancials:
-    return _donnees_financieres(consulter_entreprise_admin(session, company_id))
+) -> list[ExtractionRun]:
+    if session.get(ESGReport, report_id) is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return list(
+        session.exec(
+            select(ExtractionRun)
+            .where(col(ExtractionRun.report_id) == report_id)
+            .order_by(col(ExtractionRun.started_at).desc())
+        ).all()
+    )
+
+
+@router.get(
+    "/admin/reports/{report_id}/financials",
+    response_model=ReportFinancials,
+    operation_id="getReportFinancials",
+    summary="Données financières PCAF de l'exercice d'un rapport (chiffre d'affaires, EVIC)",
+)
+def get_report_financials(
+    report_id: uuid.UUID,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> ReportFinancials:
+    rapport = session.get(ESGReport, report_id)
+    if rapport is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return _donnees_financieres(rapport)
 
 
 @router.put(
-    "/admin/companies/{company_id}/financials",
-    response_model=CompanyFinancials,
-    operation_id="updateCompanyFinancials",
-    summary="Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)",
+    "/admin/reports/{report_id}/financials",
+    response_model=ReportFinancials,
+    operation_id="updateReportFinancials",
+    summary="Renseigner le chiffre d'affaires et l'EVIC de l'exercice d'un rapport (PCAF)",
 )
-def update_company_financials(
-    company_id: uuid.UUID,
-    payload: CompanyFinancialsRequest,
+def update_report_financials(
+    report_id: uuid.UUID,
+    payload: ReportFinancialsRequest,
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> CompanyFinancials:
-    entreprise = modifier_donnees_financieres(session, company_id, payload.model_dump())
-    return _donnees_financieres(entreprise)
+) -> ReportFinancials:
+    return _donnees_financieres(modifier_donnees_financieres(session, report_id, payload.model_dump()))
 

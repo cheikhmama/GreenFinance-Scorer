@@ -47,10 +47,7 @@ export function PublishableCompaniesSection() {
         {isError ? <p className="text-destructive">Impossible de charger la liste.</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!isLoading && !isError && entreprises.length === 0 ? (
-          <EmptyState
-            icon={CheckCircle2}
-            message="Aucune entreprise en attente de publication."
-          />
+          <EmptyState icon={CheckCircle2} message="Aucune entreprise en attente de publication." />
         ) : null}
         {entreprises.length > 0 ? (
           <ul className="divide-y">

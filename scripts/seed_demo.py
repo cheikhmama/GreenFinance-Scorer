@@ -18,6 +18,7 @@ Comptes créés (mot de passe commun : MOT_DE_PASSE ci-dessous) : admin@, audite
 investisseur@, institution@, chercheur@ et une adresse par entreprise, tous @greenfinance-demo.com.
 """
 
+import hashlib
 import json
 import sys
 import uuid
@@ -32,6 +33,8 @@ import app.main  # noqa: F401  -- enregistre tous les modèles
 from app.admin.review_queue import publier_entreprise, valider_rapport
 from app.audit.assignment import affecter_auditeur
 from app.audit.opinion import soumettre_avis
+from app.audit.revue import enregistrer_revue
+from app.audit.schemas import MetricReviewRequest
 from app.auth.hashing import hash_password
 from app.auth.models import InstitutionProfile, User
 from app.carbon.pcaf import qualite_donnee_pcaf
@@ -41,14 +44,16 @@ from app.core.audit import auditer
 from app.core.database import engine, utcnow
 from app.core.enums import (
     AuditDecision,
-    CompanyStatus,
     Currency,
     DataMethod,
     DurationType,
-    ExtractionStatus,
     MetricCoverageStatus,
+    MetricReviewStatus,
+    Pillar,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
+    ReviewReason,
     Role,
     SubmissionChannel,
 )
@@ -105,28 +110,39 @@ def _compte(session: Session, email: str, nom: str, role: Role, admin_id=None) -
     return utilisateur
 
 
-def _rapport_extrait(session: Session, entreprise: Company, dossier: Path, scenario: dict) -> ESGReport:
+def _rapport_extrait(
+    session: Session, entreprise: Company, dossier: Path, scenario: dict, *, brouillon: bool = False
+) -> ESGReport:
     """Rapport déposé puis extrait : PDF copié dans le stockage, indicateurs et données carbone
-    avec page-preuve, couverture par code — ce que le pipeline aurait persisté."""
+    avec page-preuve, couverture par code — ce que le pipeline aurait persisté. `brouillon` : une
+    déclaration de l'exercice suivant, analysée mais pas encore soumise (tâche 5.8)."""
     meta = scenario["rapport"]
     annee = meta["annee_reporting"]
+    if brouillon:
+        annee = min(annee + 1, utcnow().year)
     source = dossier / meta["fichier"]
     nom_fichier = f"{dossier.name}_rapport_{annee}.pdf"
     rapport_id = uuid.uuid4()
+    contenu = source.read_bytes()
+    if brouillon:
+        # Le brouillon reprend le PDF de l'exercice précédent : un commentaire PDF final en fait un
+        # fichier distinct, car une empreinte est unique par entreprise (dépôt en double refusé).
+        contenu += b"\n% Brouillon de demonstration\n"
     depose_le = utcnow() - timedelta(days=12)
     rapport = ESGReport(
         id=rapport_id,
         company_id=entreprise.id,
-        source_file=storage.save_bytes(f"rapports/{rapport_id}.pdf", source.read_bytes()),
+        source_file=storage.save_bytes(f"rapports/{rapport_id}.pdf", contenu),
         created_at=depose_le,
         type=ReportType(meta["type"]),
         channel=SubmissionChannel.ENTREPRISE,
-        submitted_at=depose_le,
-        status=ReportStatus.SUBMITTED,
-        extraction_status=ExtractionStatus.DONE,
+        submitted_at=None if brouillon else depose_le,
+        status=ReportStatus.DRAFT if brouillon else ReportStatus.AWAITING_ASSIGNMENT,
         extraction_finished_at=depose_le,
         original_filename=nom_fichier,
         fiscal_year=annee,
+        # Empreinte du fichier stocké : reçu de soumission et historique (tâches 5.8, 5.9).
+        checksum_sha256=hashlib.sha256(contenu).hexdigest(),
     )
     session.add(rapport)
     session.flush()
@@ -193,6 +209,33 @@ def _rapport_extrait(session: Session, entreprise: Company, dossier: Path, scena
     return rapport
 
 
+def _revoir(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid.UUID) -> None:
+    """Revue complète par l'auditeur (tâche 5.6) : la première valeur sociale corrigée, toutes les
+    autres acceptées — l'avis exige un dossier entièrement revu (tâche 5.7)."""
+    indicateurs = session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport_id)).all()
+    emissions = session.exec(select(CarbonEmission).where(CarbonEmission.report_id == rapport_id)).all()
+    corrigee = next((i for i in indicateurs if i.pillar == Pillar.SOCIAL and i.unit == "%"), None)
+    for indicateur in indicateurs:
+        if indicateur is corrigee:
+            demande = MetricReviewRequest(
+                metric_id=indicateur.id,
+                decision=MetricReviewStatus.OVERRIDDEN,
+                new_value=round(indicateur.value + 1, 1),
+                reason=ReviewReason.UNIT_ERROR,
+                comment="Arrondi corrigé d'après le tableau de la page citée.",
+            )
+        else:
+            demande = MetricReviewRequest(metric_id=indicateur.id, decision=MetricReviewStatus.ACCEPTED)
+        enregistrer_revue(session, rapport_id, auditeur_id, demande)
+    for emission in emissions:
+        enregistrer_revue(
+            session,
+            rapport_id,
+            auditeur_id,
+            MetricReviewRequest(emission_id=emission.id, decision=MetricReviewStatus.ACCEPTED),
+        )
+
+
 def main() -> None:
     with Session(engine) as session:
         if session.exec(select(User)).first() is not None:
@@ -216,29 +259,36 @@ def main() -> None:
                 sector=profil["secteur"],
                 country=profil["pays"],
                 description=f"{profil['nom']} — entreprise synthétique du corpus de démonstration.",
-                status=CompanyStatus.ACTIVE,
+                status=RegistrationStatus.ACTIVE,
                 owner_user_id=titulaire.id,
                 onboarded_at=utcnow() - timedelta(days=30),
                 onboarded_by_id=admin.id,
-                revenue=Decimal(ca) * 1_000_000,
-                revenue_currency=Currency.EUR,
-                enterprise_value=Decimal(ve) * 1_000_000,
-                enterprise_value_currency=Currency.EUR,
-                enterprise_value_as_of=(utcnow() - timedelta(days=90)).date(),
             )
             session.add(entreprise)
             session.commit()
 
             rapport = _rapport_extrait(session, entreprise, dossier, scenario)
+            # Données financières PCAF de l'exercice, portées par le rapport (tâche 5.4).
+            rapport.revenue = Decimal(ca) * 1_000_000
+            rapport.revenue_currency = Currency.EUR
+            rapport.enterprise_value = Decimal(ve) * 1_000_000
+            rapport.enterprise_value_currency = Currency.EUR
+            rapport.evic_date = (utcnow() - timedelta(days=90)).date()
+            session.add(rapport)
+            session.commit()
             affecter_auditeur(session, rapport.id, auditeur.id)
+            if email == "atlas":
+                # Déclaration de l'exercice suivant, analysée, à soumettre (tâche 5.8).
+                _rapport_extrait(session, entreprise, dossier, scenario, brouillon=True)
             if etape == "audit":
                 continue
+            _revoir(session, rapport.id, auditeur.id)
             soumettre_avis(
                 session,
                 rapport.id,
                 auditeur.id,
-                AuditDecision.RECOMMANDE_VALIDATION,
-                "Indicateurs conformes aux pages citées ; périmètre carbone complet.",
+                AuditDecision.FAVORABLE_WITH_RESERVATIONS,
+                "Indicateurs conformes aux pages citées ; une valeur sociale corrigée (unité).",
             )
             if etape == "decision":
                 continue

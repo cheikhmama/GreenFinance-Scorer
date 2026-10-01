@@ -23,10 +23,11 @@ export function PortfoliosPage() {
   const [archiveFiltre, setArchiveFiltre] = useState<"actifs" | "archives" | "tous">("actifs");
   const [modaleOuverte, setModaleOuverte] = useState(false);
   const rechercheDebattue = useDebouncedValue(recherche);
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useMyPortfolios({
-    archive: archiveFiltre === "tous" ? undefined : archiveFiltre === "archives",
-    recherche: rechercheDebattue,
-  });
+  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useMyPortfolios({
+      archive: archiveFiltre === "tous" ? undefined : archiveFiltre === "archives",
+      recherche: rechercheDebattue,
+    });
 
   const portefeuilles = data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -72,7 +73,9 @@ export function PortfoliosPage() {
       </div>
 
       {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
-      {isError ? <p className="text-destructive">Impossible de charger les portefeuilles.</p> : null}
+      {isError ? (
+        <p className="text-destructive">Impossible de charger les portefeuilles.</p>
+      ) : null}
       {!isLoading && !isError && portefeuilles.length === 0 ? (
         <p className="text-brand-grey">Aucun portefeuille pour ce filtre.</p>
       ) : null}
@@ -87,7 +90,8 @@ export function PortfoliosPage() {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <p className="text-2xl font-semibold tabular-nums text-brand-blue">
-                  {portefeuille.total_amount.toLocaleString("fr-FR")} {portefeuille.reference_currency}
+                  {portefeuille.total_amount.toLocaleString("fr-FR")}{" "}
+                  {portefeuille.reference_currency}
                 </p>
                 <p className="text-brand-grey">{portefeuille.position_count} position(s)</p>
                 <div className="flex items-center gap-4 pt-1">
@@ -105,7 +109,12 @@ export function PortfoliosPage() {
       </div>
 
       {portefeuilles.length > 0 && hasNextPage ? (
-        <Button variant="outline" size="sm" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFetchingNextPage}
+          onClick={() => fetchNextPage()}
+        >
           {isFetchingNextPage ? "Chargement..." : "Voir plus"}
         </Button>
       ) : null}

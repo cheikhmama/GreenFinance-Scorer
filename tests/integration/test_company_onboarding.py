@@ -12,12 +12,11 @@ from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 from app.company.models import Company
-from app.core.enums import CompanyStatus, Role
+from app.core.enums import RegistrationStatus, Role
 from app.core.models import AuditLogEntry
 from app.core.redis import get_redis_client
 from app.main import app
-from tests.integration.test_company_registration import URL as URL_INSCRIPTION
-from tests.integration.test_company_registration import _demande
+from tests.integration.test_company_registration import _demande, inscrire_http
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +58,7 @@ def _admin(session) -> TestClient:
 
 def _inscrire(session) -> tuple[dict, Company]:
     demande = _demande()
-    reponse = TestClient(app, base_url="https://testserver").post(URL_INSCRIPTION, json=demande)
+    reponse = inscrire_http(demande)
     assert reponse.status_code == 202
     session.expire_all()
     entreprise = session.exec(
@@ -81,11 +80,11 @@ def test_parcours_complet_inscription_validation_activation_connexion(session, m
     validation = admin.patch(_url(entreprise.id), json={"decision": "approve"})
 
     assert validation.status_code == 200
-    assert validation.json()["status"] == CompanyStatus.ACTIVE.value
+    assert validation.json()["status"] == RegistrationStatus.ACTIVE.value
     session.expire_all()
     entreprise = session.get(Company, entreprise.id)
     assert entreprise is not None
-    assert entreprise.status == CompanyStatus.ACTIVE
+    assert entreprise.status == RegistrationStatus.ACTIVE
     assert entreprise.onboarded_at is not None
     assert entreprise.onboarded_by_id is not None
 
@@ -98,7 +97,7 @@ def test_parcours_complet_inscription_validation_activation_connexion(session, m
     titulaire = _client_connecte(demande["contact_email"].lower(), "premier-secret-12")
     profil = titulaire.get("/api/v1/company/profil")
     assert profil.status_code == 200
-    assert profil.json()["status"] == CompanyStatus.ACTIVE.value
+    assert profil.json()["status"] == RegistrationStatus.ACTIVE.value
 
 
 def test_le_lien_dactivation_part_seulement_a_la_validation(session, _envoi_simule) -> None:
@@ -113,7 +112,7 @@ def test_le_lien_dactivation_part_seulement_a_la_validation(session, _envoi_simu
     assert "/activer-compte?token=" in envois[0].kwargs["body"]
 
 
-def test_refus_supprime_linscription_et_transmet_le_motif(session, _envoi_simule) -> None:
+def test_refus_conserve_linscription_et_transmet_le_motif(session, _envoi_simule) -> None:
     demande, entreprise = _inscrire(session)
     admin = _admin(session)
     entreprise_id, titulaire_id = entreprise.id, entreprise.owner_user_id
@@ -126,10 +125,15 @@ def test_refus_supprime_linscription_et_transmet_le_motif(session, _envoi_simule
 
     assert sans_motif.status_code == 422
     assert refus.status_code == 200
-    assert refus.json()["status"] is None
+    assert refus.json()["status"] == RegistrationStatus.REJECTED.value
     session.expire_all()
-    assert session.get(Company, entreprise_id) is None
-    assert session.get(User, titulaire_id) is None
+    refusee = session.get(Company, entreprise_id)
+    assert refusee is not None
+    assert refusee.status == RegistrationStatus.REJECTED
+    assert refusee.rejection_reason == "Entreprise introuvable au registre."
+    assert refusee.rejected_at is not None
+    titulaire = session.get(User, titulaire_id)
+    assert titulaire is not None and titulaire.active is False and titulaire.password_hash is None
     assert "introuvable au registre" in _envoi_simule.call_args.kwargs["body"]
     trace = session.exec(
         select(AuditLogEntry).where(
@@ -138,15 +142,14 @@ def test_refus_supprime_linscription_et_transmet_le_motif(session, _envoi_simule
     ).one()
     assert trace.new_value == "Entreprise introuvable au registre."
 
-    # Le demandeur peut redéposer une demande avec la même adresse.
-    nouvelle = TestClient(app, base_url="https://testserver").post(
-        URL_INSCRIPTION, json={**_demande(), "contact_email": demande["contact_email"]}
-    )
+    # Une nouvelle demande à la même adresse rouvre cette même inscription.
+    nouvelle = inscrire_http({**_demande(), "contact_email": demande["contact_email"]})
     assert nouvelle.status_code == 202
     session.expire_all()
-    assert session.exec(
-        select(User).where(col(User.email) == demande["contact_email"].lower())
-    ).first() is not None
+    rouverte = session.get(Company, entreprise_id)
+    assert rouverte is not None
+    assert rouverte.status == RegistrationStatus.PENDING_ONBOARDING
+    assert rouverte.rejection_reason is None
 
 
 def test_une_inscription_ne_se_decide_quune_fois(session) -> None:

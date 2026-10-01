@@ -56,8 +56,10 @@ consultable par les investisseurs et les chercheurs.
   corrélation de Spearman avec les scores de la plateforme.
 
 **Plateforme**
-- Inscription publique des entreprises, soumise à validation de l'administrateur ; comptes activés
-  par lien e-mail, réinitialisation et changement d'e-mail par lien à usage unique.
+- Inscription publique des entreprises avec lettre de mandat, soumise à validation de
+  l'administrateur ; le demandeur suit sa demande sur une page publique (lien reçu par e-mail) et y
+  répond à une demande d'informations. Comptes activés par lien e-mail (72 h), réinitialisation et
+  changement d'e-mail par lien à usage unique.
 - Notifications dans l'application, journal d'audit des événements de compte, tableaux de bord par
   rôle.
 
@@ -115,18 +117,24 @@ flowchart LR
 - **Frontend** (`frontend/`) : client TypeScript généré par Orval depuis le schéma OpenAPI ; la CI
   échoue si le client n'est pas à jour.
 
-Le cycle de vie d'un rapport :
+Le cycle de vie d'un rapport (l'entreprise voit les quatre états d'examen, de `EXTRACTING` à
+`PENDING_DECISION`, comme un seul : « En cours d'examen 🔒 ») :
 
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT
-    DRAFT --> SUBMITTED : dépôt (extraction en file)
-    SUBMITTED --> PENDING_AUDIT : affectation d'un auditeur
-    PENDING_AUDIT --> PENDING_DECISION : avis d'audit
+    DRAFT --> EXTRACTING : fichier joint (analyse)
+    EXTRACTING --> DRAFT : analyse terminée (brouillon)
+    DRAFT --> AWAITING_ASSIGNMENT : soumission 🔒
+    EXTRACTING --> AWAITING_ASSIGNMENT : extraction terminée (dépôt direct)
+    EXTRACTING --> EXTRACTION_FAILED
+    EXTRACTION_FAILED --> EXTRACTING : relance (admin)
+    AWAITING_ASSIGNMENT --> IN_AUDIT : affectation d'un auditeur
+    IN_AUDIT --> PENDING_DECISION : avis d'audit
     PENDING_DECISION --> VALIDATED : validation + score
     PENDING_DECISION --> REJECTED
     PENDING_DECISION --> REVISION_REQUESTED
-    REVISION_REQUESTED --> SUBMITTED : nouvelle version
+    REVISION_REQUESTED --> EXTRACTING : nouvelle version
 ```
 
 Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (modèle de données, sécurité,

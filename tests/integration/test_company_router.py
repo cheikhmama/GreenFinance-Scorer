@@ -11,12 +11,11 @@ from app.company.models import Company
 from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
     ConfidenceLevel,
     DataMethod,
-    ExtractionStatus,
     MetricCoverageStatus,
     Pillar,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -113,8 +112,8 @@ def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, mon
     )
 
     assert response.status_code == 201
-    assert response.json()["status"] == ReportStatus.SUBMITTED.value
-    assert response.json()["extraction_status"] == ExtractionStatus.QUEUED.value
+    assert response.json()["status"] == ReportStatus.EXTRACTING.value
+    assert "extraction_status" not in response.json()
     assert response.json()["channel"] == SubmissionChannel.ENTREPRISE.value
 
 
@@ -202,7 +201,7 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
 def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatch) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     assert user.company is not None
-    user.company.status = CompanyStatus.SUSPENDED
+    user.company.status = RegistrationStatus.SUSPENDED
     session.add(user.company)
     session.commit()
     authed_client = _login(user.email, "s3cret-pass")
@@ -337,11 +336,18 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
         data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
     assert premier.status_code == 201
+    # Une seule déclaration active à la fois (tâche 5.9) : le premier rapport est clos, pour que
+    # seul le doublon de fichier explique le refus.
+    clos = session.get(ESGReport, uuid.UUID(premier.json()["id"]))
+    assert clos is not None
+    clos.status = ReportStatus.REJECTED
+    session.add(clos)
+    session.commit()
 
     deuxieme = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("copie.pdf", contenu, "application/pdf")},
-        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2023"},
     )
 
     assert deuxieme.status_code == 422
@@ -374,7 +380,7 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
     body = response.json()
     assert body["version"] == 2
     assert body["previous_report_id"] == str(original.id)
-    assert body["status"] == ReportStatus.SUBMITTED.value
+    assert body["status"] == ReportStatus.EXTRACTING.value
     assert body["id"] != str(original.id)
 
     # L'original n'est jamais réécrit — il reste DEMANDE_CORRECTION indéfiniment (Phase 0).
@@ -487,7 +493,7 @@ def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == str(rapport.id)
-    assert response.json()["status"] == ReportStatus.SUBMITTED.value
+    assert response.json()["status"] == ReportStatus.EXTRACTING.value
 
 
 def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(session, monkeypatch) -> None:
@@ -527,11 +533,12 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
     session.refresh(rapport)
     assert rapport.extraction_error == "docling_conversion_echouee"
     assert rapport.extraction_finished_at is None
-    assert rapport.status == ReportStatus.SUBMITTED
-    assert rapport.extraction_status == ExtractionStatus.FAILED
+    assert rapport.status == ReportStatus.EXTRACTION_FAILED
 
 
-def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) -> None:
+def _simuler_pipeline_extraction(
+    monkeypatch, extraction: ExtractionEntreprise, document: object | None = None
+) -> None:
     """Remplace Docling, l'indexation, le modèle d'embedding, le LLM et la génération de preuve
     par des doubles : run_extraction_pipeline ne dépend plus que de `extraction`, la réponse
     simulée du LLM (un seul passage, la relance groupée est court-circuitée)."""
@@ -539,7 +546,9 @@ def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) 
     from app.ingestion.docling_pipeline import ConversionResult
 
     fake_conversion = ConversionResult(
-        document=object(),  # type: ignore[arg-type]  # double minimal, jamais inspecté comme un vrai DoclingDocument ici
+        # Double minimal par défaut : la localisation des preuves (tâche 5.5) échoue alors sans
+        # conséquence ; un test qui la vérifie passe une vraie sortie Docling.
+        document=document if document is not None else object(),  # type: ignore[arg-type]
         status="ok",
         errors=[],
         pages_docling=5,
@@ -643,8 +652,7 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
     session.refresh(rapport)
     assert rapport.extraction_error is None
     assert rapport.extraction_finished_at is not None
-    assert rapport.extraction_status == ExtractionStatus.DONE
-    assert rapport.status == ReportStatus.SUBMITTED
+    assert rapport.status == ReportStatus.AWAITING_ASSIGNMENT
 
     donnees_carbone = session.exec(
         select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)
@@ -690,7 +698,7 @@ def test_pipeline_ne_persiste_quun_indicateur_par_code_meme_si_le_llm_le_repete(
     extractor.run_extraction_pipeline(rapport.id, 2024)
 
     session.refresh(rapport)
-    assert rapport.extraction_status == ExtractionStatus.DONE
+    assert rapport.status == ReportStatus.AWAITING_ASSIGNMENT
     indicateurs = session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport.id)).all()
     assert [(i.metric_code, i.value) for i in indicateurs] == [(code, 42.0)]
 
@@ -862,7 +870,7 @@ def test_importer_rapport_par_url_entreprise_happy_path_marque_canal_automatique
 
     assert response.status_code == 201
     assert response.json()["channel"] == SubmissionChannel.AUTOMATIQUE.value
-    assert response.json()["status"] == ReportStatus.SUBMITTED.value
+    assert response.json()["status"] == ReportStatus.EXTRACTING.value
 
 
 def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(

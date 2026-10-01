@@ -10,10 +10,13 @@ surface API directe) — la logique appelée ici invoque directement app.ingesti
 
 import uuid
 
+import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
+from app.admin.kyc import controles_gleif
 from app.auth.models import User
 from app.auth.permissions import require_role
 from app.company.import_rate_limit import enforce_url_import_rate_limit
@@ -25,21 +28,58 @@ from app.company.rapports import (
     lister_mes_rapports,
     rapport_de_lentreprise,
 )
-from app.company.registration import enregistrer_demande
+from app.company.registration import (
+    consulter_suivi,
+    enregistrer_demande,
+    repondre_demande_infos,
+)
 from app.company.schemas import (
     CompanyRegistrationRequest,
     EntreprisePublic,
     ImporterRapportParURLRequest,
+    RegistrationStatusRequest,
+    RegistrationStatusView,
+    VerificationLei,
 )
+from app.company.upload_validation import TAILLE_MAX_MANDAT_OCTETS
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import ReportType, Role
+from app.core.enums import KycCheckResult, ReportStatus, ReportType, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.scoring.engine import score_public
 
 router = APIRouter(tags=["company"])
+
+
+def _demande_inscription(
+    company_name: str = Form(),
+    sector: str = Form(),
+    country: str = Form(),
+    contact_name: str = Form(),
+    contact_email: str = Form(),
+    isin: str | None = Form(default=None),
+    lei: str | None = Form(default=None),
+    website: str | None = Form(default=None),
+    company_fax: str | None = Form(default=None),
+) -> CompanyRegistrationRequest:
+    """Champs à plat à côté de la lettre de mandat (tâche 5.2) ; CompanyRegistrationRequest reste
+    la seule validation, ses erreurs une 422 par champ comme toute validation de requête."""
+    try:
+        return CompanyRegistrationRequest(
+            company_name=company_name,
+            sector=sector,
+            country=country,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            isin=isin,
+            lei=lei,
+            website=website,
+            company_fax=company_fax,
+        )
+    except pydantic.ValidationError as exc:
+        raise RequestValidationError(exc.errors(include_url=False)) from exc
 
 
 @router.post(
@@ -54,13 +94,56 @@ router = APIRouter(tags=["company"])
     },
 )
 def register_company(
-    payload: CompanyRegistrationRequest,
     request: Request,
     background_tasks: BackgroundTasks,
+    mandate_letter: UploadFile,
+    payload: CompanyRegistrationRequest = Depends(_demande_inscription),
     session: Session = Depends(get_session),
 ) -> None:
+    # Lecture bornée : un fichier plus gros que la limite est refusé sans être lu en entier.
+    contenu = mandate_letter.file.read(TAILLE_MAX_MANDAT_OCTETS + 1)
     enregistrer_demande(
-        session, payload, request.client.host if request.client else None, background_tasks
+        session, payload, contenu, request.client.host if request.client else None, background_tasks
+    )
+
+
+@router.post(
+    "/companies/registration-status",
+    response_model=RegistrationStatusView,
+    operation_id="getRegistrationStatus",
+    summary="Suivre une demande d'inscription (jeton reçu par e-mail)",
+    responses={404: {"description": "Jeton inconnu ou remplacé par un plus récent."}},
+)
+def registration_status(
+    payload: RegistrationStatusRequest, session: Session = Depends(get_session)
+) -> RegistrationStatusView:
+    return consulter_suivi(session, payload.token)
+
+
+@router.post(
+    "/companies/registration-status/reply",
+    response_model=RegistrationStatusView,
+    operation_id="replyToRegistrationInfoRequest",
+    summary="Répondre à une demande d'informations : nouvelle lettre de mandat",
+    responses={
+        404: {"description": "Jeton inconnu ou remplacé par un plus récent."},
+        429: {"description": "Limite d'envois par adresse IP atteinte."},
+    },
+)
+def reply_to_registration_info_request(
+    request: Request,
+    mandate_letter: UploadFile,
+    token: str = Form(min_length=20, max_length=200),
+    message: str | None = Form(default=None, max_length=2000),
+    session: Session = Depends(get_session),
+) -> RegistrationStatusView:
+    contenu = mandate_letter.file.read(TAILLE_MAX_MANDAT_OCTETS + 1)
+    return repondre_demande_infos(
+        session,
+        token,
+        contenu,
+        (message or "").strip() or None,
+        request.client.host if request.client else None,
     )
 
 
@@ -84,6 +167,39 @@ def consulter_mon_profil_route(
     _entreprise_id(current_user)  # lève si aucune entreprise n'est rattachée
     assert current_user.company is not None
     return current_user.company
+
+
+@router.get(
+    "/company/lei-verification",
+    response_model=VerificationLei,
+    operation_id="getMyLeiVerification",
+    summary="Vérifier en direct le LEI de mon entreprise auprès de la GLEIF",
+)
+def verifier_mon_lei_route(
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
+) -> VerificationLei:
+    """Badge « GLEIF Validé » de l'en-tête Entreprise (tâche 5.9) : même contrôle que la fenêtre
+    KYC de l'Administrateur (app/admin/kyc.py), refait à chaque appel, jamais stocké."""
+    _entreprise_id(current_user)
+    entreprise = current_user.company
+    assert entreprise is not None
+    controles = controles_gleif(entreprise)
+    resultats = {controle.result for controle in controles}
+    if resultats == {KycCheckResult.PASSED}:
+        resultat = KycCheckResult.PASSED
+    else:
+        # Le plus parlant d'abord : un refus, puis une GLEIF muette, puis l'absence de LEI.
+        resultat = next(
+            r
+            for r in (
+                KycCheckResult.FAILED,
+                KycCheckResult.NOT_VERIFIABLE,
+                KycCheckResult.NOT_APPLICABLE,
+            )
+            if r in resultats
+        )
+    detail = " ".join(controle.detail for controle in controles if controle.result == resultat)
+    return VerificationLei(lei=entreprise.lei, result=resultat, detail=detail)
 
 
 @router.get(
@@ -204,6 +320,27 @@ def consulter_rapport(
 ) -> RapportESGDetail:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
     detail = RapportESGDetail.model_validate(rapport)
+    if rapport.submitted_at is None:
+        # Brouillon analysé (tâche 5.8) : la liste de complétude donne des comptes, jamais les
+        # valeurs extraites ni le score auto-déclaré relu — rien qui invite à ajuster le fichier
+        # à un résultat avant de soumettre.
+        return detail.model_copy(
+            update={
+                "metrics": [],
+                "carbon_data": [],
+                "declared_global_score": None,
+                "declared_global_score_proof": None,
+            }
+        )
+    if rapport.status != ReportStatus.VALIDATED:
+        # Pendant l'examen, l'Entreprise ne voit pas l'avancement de la revue (tâches 5.1, 5.6).
+        sans_revue = {"review_status": None, "audited_value": None}
+        detail = detail.model_copy(
+            update={
+                "metrics": [m.model_copy(update=sans_revue) for m in detail.metrics],
+                "carbon_data": [d.model_copy(update=sans_revue) for d in detail.carbon_data],
+            }
+        )
     return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 

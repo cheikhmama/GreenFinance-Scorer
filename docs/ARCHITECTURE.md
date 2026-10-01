@@ -74,9 +74,11 @@ companies 1───* esg_reports 1───* esg_metrics
 | `name` | text | |
 | `sector` | text | NACE / GICS code preferred over free text |
 | `country` | char(2) | ISO 3166-1 alpha-2 |
-| `revenue` | numeric(20,2) + `revenue_currency` | needed for carbon intensity (WACI) |
-| `enterprise_value` | numeric(20,2) + `ev_currency` + `ev_as_of` | **EVIC**, needed for the PCAF attribution factor |
-| `status` | enum `PENDING_ONBOARDING`, `ACTIVE`, `SUSPENDED` | account / KYC lifecycle; replaces the `actif` flag |
+| `status` | enum `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED` (task 5.2) | registration then account lifecycle; replaces the `actif` flag |
+| `registered_at`, `status_token_hash` (unique) | timestamp, char(64) | public registration (task 5.2): only the SHA-256 of the follow-up token is stored |
+| `mandate_letter_path`, `mandate_letter_uploaded_at` | | mandate letter PDF, stored like reports (`mandats/{company_id}/…`) |
+| `info_request_message`, `info_requested_at`, `info_response_message` | | info request (task 5.3) and the applicant's reply |
+| `rejection_reason`, `rejected_at` | | a rejected request is kept, with its reason |
 | `published_at` | timestamptz, nullable | last publication of the company's official score (was `date_publication`); a separate concept from onboarding |
 | `owner_user_id` | FK users, nullable | |
 
@@ -90,6 +92,10 @@ registration (task 1.3) validates ISO codes on input.
 Task 1.5 adds `created_at`, makes `source_file` / `submitted_at` nullable for `DRAFT` (a CHECK
 constraint requires both for every other status) and creates `app/reporting/` for the `/reports`
 API with its role-based scope.
+Task 5.8 lets a draft carry its file while its analysis runs: the CHECK constraint becomes
+`ck_esg_reports_file_and_submission` (a file outside `DRAFT`; no `submitted_at` only in `DRAFT` or
+`EXTRACTING`), and the one-draft-per-period index covers every unsubmitted report
+(`submitted_at IS NULL`). `submitted_at` is the lock: once set, nothing changes the file.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -97,8 +103,9 @@ API with its role-based scope.
 | `company_id` | FK companies | |
 | `fiscal_year` | int | indexed with `company_id` (not unique, see below) |
 | `version`, `previous_report_id` | int, FK self | correction chain (already exists) |
-| `status` | enum, see §3.2.1 | |
-| `extraction_status` | enum `NOT_STARTED`, `QUEUED`, `RUNNING`, `DONE`, `FAILED` | separates the pipeline state from the business status |
+| `revenue` | numeric(20,2) + `revenue_currency` | needed for carbon intensity (WACI); per fiscal year, moved from `companies` in task 5.4 |
+| `enterprise_value` | numeric(20,2) + `enterprise_value_currency` + `evic_date` | **EVIC**, needed for the PCAF attribution factor; per fiscal year (task 5.4) |
+| `status` | enum, see §3.2.1 | one status for the whole lifecycle, extraction included (task 5.1) |
 | `official_score` | numeric(5,2), nullable | denormalised from the official `scores` row, set in the validation transaction |
 | `coverage_rate` | numeric(5,4) | present indicators ÷ targeted indicators, weighted |
 | `config_hash` | char(64), nullable | SHA-256 of the scoring config used for `official_score` |
@@ -106,16 +113,17 @@ API with its role-based scope.
 
 #### 3.2.1 Status mapping
 
-| Current `StatutRapport` | Target `status` | Target `extraction_status` |
+*Task 5.1* folds the extraction state back into `status` (tasks 1.1–4.7 kept it in a separate
+`extraction_status` column; migration `a4c7e2d9b6f1` maps every pair and back):
+
+| `status` until 5.1 | `extraction_status` until 5.1 | `status` since 5.1 |
 |---|---|---|
-| — | `DRAFT` | `NOT_STARTED` |
-| `ENVOYE` | `SUBMITTED` | `QUEUED` |
-| `EN_EXTRACTION` | `SUBMITTED` | `RUNNING` / `DONE` / `FAILED` |
-| `AFFECTE_AUDITEUR` | `PENDING_AUDIT` | `DONE` |
-| `EN_VALIDATION` | `PENDING_DECISION` (D2) | `DONE` |
-| `DEMANDE_CORRECTION` | `REVISION_REQUESTED` | derived from the extraction timestamps |
-| `VALIDE` | `VALIDATED` | derived from the extraction timestamps |
-| `REJETE` | `REJECTED` | derived from the extraction timestamps |
+| `DRAFT` | `NOT_STARTED` | `DRAFT` |
+| `SUBMITTED` | `QUEUED` / `RUNNING` | `EXTRACTING` (queued = no `extraction_started_at`) |
+| `SUBMITTED` | `FAILED` | `EXTRACTION_FAILED` |
+| `SUBMITTED` | `DONE` | `AWAITING_ASSIGNMENT` |
+| `PENDING_AUDIT` | `DONE` | `IN_AUDIT` |
+| `PENDING_DECISION`, `REVISION_REQUESTED`, `VALIDATED`, `REJECTED` | `DONE` | unchanged |
 
 `(company_id, fiscal_year)` is **indexed, not unique**: a company can file several report types
 (annual, ESG, climate) for the same year, and each correction adds a version.
@@ -134,11 +142,17 @@ API with its role-based scope.
 | `value` | numeric | normalised numeric value |
 | `unit` | text | canonical unit per `metric_code` |
 | `proof_text`, `proof_page`, `proof_id` | | evidence (guarantee: no value without proof) |
-| `auditor_overridden` | bool | + `override_value`, `override_reason`, `overridden_by`, `overridden_at` |
+| `review_status`, `audited_value` | enum, float | auditor review (task 5.6): `PENDING`, `ACCEPTED`, `OVERRIDDEN` (audited value replaces the extracted one in the score), `NOT_FOUND` (left out); same columns on `carbon_emissions` |
 
 *Current:* `indicateur_esg`. There is **no** uniqueness on `(rapport_id, code)` today — the
-scoring engine silently keeps the last duplicate. Auditor overrides don't exist today: the
-auditor can only issue an opinion.
+scoring engine silently keeps the last duplicate.
+
+**Review log** (*task 5.6*). `metric_reviews` records every decision of the assigned auditor on a
+value — metric or carbon row: original value, new value (overrides), reason category, comment,
+auditor, time. It is **append-only**: a PostgreSQL trigger refuses `UPDATE`, `DELETE` and
+`TRUNCATE`, and every foreign key is `RESTRICT`, so a reviewed value, its report and its auditor
+can't disappear under the trail. The latest entry of a value is its current state, mirrored on the
+row in the same transaction. The former override columns (never written) are gone.
 
 Carbon data (`carbon_emissions`) keeps its structure: `scope` 1/2/3, `ghg_category`,
 `tonnes_co2e`, `year`, `pcaf_data_quality` (1–5, **nullable**, derived from the extraction
@@ -146,6 +160,15 @@ method — the old hard-coded placeholder `3` is gone). *Implemented in task 2.3
 `evidence`, `metric_coverage` and `discrepancy_flags` (renamed from `preuve_documentaire`,
 `couverture_indicateur`, `signalement_ecart`); their JSON fields take the same English names since
 task 4.7.
+
+**Provenance** (*task 5.5*). `extraction_runs`: one row per execution of the pipeline on a report
+— `docling_version`, `llm_model` (`demo-synthetique` in demo mode), `prompt_version`, start/end,
+outcome (`RUNNING`, `SUCCEEDED`, `FAILED`, `RETRY_SCHEDULED`) and classified error. Every
+`esg_metrics` / `carbon_emissions` row records its `extraction_run_id` (SET NULL) and
+`proof_boxes`: where the cited value reads on its page, as fractions of the page with a top-left
+origin, matched in the Docling output by the verbatim citation, else by the number itself
+(`app/ingestion/localisation.py`; no box rather than a wrong one). `PROMPT_VERSION` is pinned by a
+test on the prompt's fingerprint: the prompt can't change without a new version.
 
 ### 3.4 `portfolios` and `portfolio_positions` (module `app/investor`)
 
@@ -218,6 +241,7 @@ enum values are still French.
 | Rate limiting | Login, verify-password, **change-password**, email change, reset request, contact, URL import. Per account **and** per client IP (behind a trusted proxy). Atomic counters (`INCR` + `EXPIRE` in one Lua call) | ✅ task 1.2 (`app/core/redis.py::incrementer_fenetre`; login also per IP) |
 | Sensitive profile changes | Changing email requires the current password and confirmation via a link sent to the new address | ✅ task 1.2 (`app/auth/email_change.py`; old address notified) |
 | SSRF (URL import) | Scheme allow-list, DNS check with `not ip.is_global`, manual redirect revalidation, size cap, **total** download deadline | ✅ task 4.3 (`not is_global` + IPv4 embedded in IPv6 checked; 60 s deadline across redirects and the whole stream). Residual: DNS rebinding between check and connection (documented in `app/company/url_fetch.py`) |
+| KYC lookup (GLEIF) | Fixed host from configuration (`GLEIF_API_URL`), LEI validated then URL-encoded in the path, no redirects followed, 5 s timeout; any failure reads as `NOT_VERIFIABLE`, never an error | ✅ task 5.3 (`app/admin/kyc.py`); tests never reach the network (autouse fixture) |
 | Search inputs | `%` and `_` typed by a user are characters, never LIKE wildcards | ✅ task 4.3 (`app/core/recherche.py::contient`, every `ilike`) |
 | Error detail | Public endpoints never return exception messages | ✅ task 4.3 (`/health` returns a fixed body, details in the logs) |
 | Secrets | Production refuses placeholder values and `*` CORS | ✅ in place |
@@ -253,16 +277,16 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
      │                                        ├── generate_synthesis_pdf(report_id)
      │                                        ├── recompute_portfolio(portfolio_id)
      │                                        └── send_email(...)
-     └── reads extraction_status / job result
+     └── reads esg_reports.status / job result
 ```
 
 - Job IDs are deterministic (`extract:{report_id}`), so a double submission doesn't start two jobs.
 - Retries with backoff for transient errors (LLM 429/5xx); classified permanent errors set
-  `extraction_status=FAILED` with a fixed error code (never `str(exc)`).
+  `status=EXTRACTION_FAILED` with a fixed error code (never `str(exc)`).
 - The worker image contains torch/Docling/Paddle; the API image doesn't. *Done in task 4.2*
   (`Dockerfile` targets `api` and `worker`; the default worker runs on the `api` image).
-- A cron job in the worker marks `RUNNING` jobs stuck longer than `EXTRACTION_TIMEOUT_MINUTES`
-  as `FAILED`, replacing today's read-time detection.
+- A cron job in the worker marks started extractions stuck longer than
+  `EXTRACTION_TIMEOUT_MINUTES` as `EXTRACTION_FAILED`, replacing today's read-time detection.
 
 *Implemented in task 4.1*, with two queues so an e-mail never waits behind a long extraction:
 `arq:extraction` (one job at a time per worker) and `arq:queue` (e-mails, synthesis PDF, the cron).

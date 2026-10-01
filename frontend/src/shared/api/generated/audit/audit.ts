@@ -6,6 +6,9 @@
  */
 import type {
   AvisAuditAdmin,
+  MetricReviewEntry,
+  MetricReviewRequest,
+  PreScore,
   RapportESGDetail,
   RapportESGPublic,
   SoumettreAvisRequest
@@ -133,6 +136,82 @@ return apiFetch<AvisAuditAdmin>(getSubmitAuditOpinionUrl(rapportId),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(soumettreAvisRequest)
+  }
+);}
+
+
+export const getReviewReportValueUrl = (rapportId: string,) => {
+
+
+
+
+  return `/audit/rapports/${rapportId}/reviews`
+}
+
+/**
+ * @summary Accepter, corriger ou déclarer non trouvée une valeur extraite (Auditeur affecté)
+ */
+export const reviewReportValue = async (rapportId: string,
+    metricReviewRequest: MetricReviewRequest, options?: RequestInit): Promise<MetricReviewEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<MetricReviewEntry>(getReviewReportValueUrl(rapportId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(metricReviewRequest)
+  }
+);}
+
+
+export const getListAuditReviewsUrl = (rapportId: string,) => {
+
+
+
+
+  return `/audit/rapports/${rapportId}/reviews`
+}
+
+/**
+ * @summary Journal des revues d'un dossier affecté
+ */
+export const listAuditReviews = async (rapportId: string, options?: RequestInit): Promise<MetricReviewEntry[]> => {
+
+  return apiFetch<MetricReviewEntry[]>(getListAuditReviewsUrl(rapportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetAuditPreScoreUrl = (rapportId: string,) => {
+
+
+
+
+  return `/audit/rapports/${rapportId}/pre-score`
+}
+
+/**
+ * @summary Pré-score avec les valeurs revues — visible seulement après l'avis
+ */
+export const getAuditPreScore = async (rapportId: string, options?: RequestInit): Promise<PreScore> => {
+
+  return apiFetch<PreScore>(getGetAuditPreScoreUrl(rapportId),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 

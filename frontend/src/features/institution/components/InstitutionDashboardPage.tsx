@@ -1,10 +1,15 @@
-import { ArrowRight, FlaskConical, FolderKanban, Users, UserCheck } from "lucide-react";
+import { ArrowRight, FlaskConical, FolderKanban, UserCheck, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { ProgressBar } from "@/shared/ui/progress-bar";
 import { StatCard } from "@/shared/ui/stat-card";
-import { useAvailableResearchers, useMyAnalysesForInstitution, useMyProjects, useMyResearchers } from "../api";
+import {
+  useAvailableResearchers,
+  useMyAnalysesForInstitution,
+  useMyProjects,
+  useMyResearchers,
+} from "../api";
 
 /** Synthèse calculée côté client à partir des listes déjà exposées — aucune route de tableau de
  * bord dédiée côté backend, même logique que ResearcherDashboardPage. */
@@ -72,7 +77,9 @@ export function InstitutionDashboardPage() {
         <Card>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-brand-blue">Taux d'acceptation des invitations</span>
+              <span className="font-medium text-brand-blue">
+                Taux d'acceptation des invitations
+              </span>
               <span className="text-brand-grey">
                 {chercheursAcceptes}/{invitationsEnvoyees} accepté(s)
               </span>
@@ -87,7 +94,8 @@ export function InstitutionDashboardPage() {
           to="/institution/chercheurs"
           className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800 transition hover:border-amber-300"
         >
-          {invitationsEnAttente} invitation{invitationsEnAttente > 1 ? "s" : ""} en attente de réponse
+          {invitationsEnAttente} invitation{invitationsEnAttente > 1 ? "s" : ""} en attente de
+          réponse
           <ArrowRight className="size-4" />
         </Link>
       ) : null}

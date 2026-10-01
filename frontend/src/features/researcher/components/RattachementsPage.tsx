@@ -1,7 +1,10 @@
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "@/shared/api/errors";
-import { libelleStatutRattachement, variantStatutRattachement } from "@/shared/format/statutRattachement";
+import {
+  libelleStatutRattachement,
+  variantStatutRattachement,
+} from "@/shared/format/statutRattachement";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -72,7 +75,9 @@ export function RattachementsPage() {
                     onClick={() =>
                       accepter.mutate(rattachement.id, {
                         onError: (err) =>
-                          setErreur(err instanceof ApiError ? err.message : "Échec de l'acceptation."),
+                          setErreur(
+                            err instanceof ApiError ? err.message : "Échec de l'acceptation.",
+                          ),
                       })
                     }
                   >

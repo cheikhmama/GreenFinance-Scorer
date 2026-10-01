@@ -150,7 +150,7 @@ class ReinitialiserMotDePasseRequest(BaseModel):
 
 class ActiverCompteRequest(BaseModel):
     """POST /auth/activer-compte — jeton reçu via le lien envoyé à la création du compte
-    (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 7 jours, usage unique)."""
+    (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 72 heures, usage unique)."""
 
     token: str = Field(min_length=1, max_length=512)
     new_password: NouveauMotDePasse

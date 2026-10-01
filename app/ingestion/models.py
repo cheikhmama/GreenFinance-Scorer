@@ -1,7 +1,6 @@
 """Entités de persistance produites par le pipeline d'extraction documentaire.
 
-ESGReport porte le cycle de vie documentaire (ReportStatus) et l'avancement de son extraction
-(ExtractionStatus). Les entités qui en dérivent (ESGMetric, CarbonEmission, Evidence —
+ESGReport porte le cycle de vie du rapport, extraction comprise (ReportStatus, tâche 5.1). Les entités qui en dérivent (ESGMetric, CarbonEmission, Evidence —
 Prompt 3.5 ; DiscrepancyFlag — Prompt 3.8) sont exclusivement produites
 par le pipeline automatique (Étapes 4 à 7) : un Auditeur les consulte et
 les valide via AuditOpinion (app/audit/models.py), il ne les crée jamais
@@ -10,18 +9,23 @@ l'Auditeur.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, Column, Index, Numeric, UniqueConstraint, text
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
 from app.core.enums import (
     ConfidenceLevel,
+    Currency,
     DataMethod,
-    ExtractionStatus,
+    ExtractionRunStatus,
     MetricCoverageStatus,
+    MetricReviewStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -50,20 +54,24 @@ class ESGReport(SQLModel, table=True):
             "company_id", "checksum_sha256", name="uq_esg_reports_company_checksum"
         ),
         Index("ix_esg_reports_company_fiscal_year", "company_id", "fiscal_year"),
-        # Un seul brouillon ouvert par exercice et par type de rapport (tâche 1.5) : ouvrir deux
-        # sessions de déclaration pour la même période serait une erreur de saisie, jamais utile.
+        # Une seule déclaration non soumise par exercice et par type de rapport (tâche 1.5) :
+        # ouvrir deux sessions pour la même période serait une erreur de saisie, jamais utile.
+        # Depuis la tâche 5.8, un brouillon dont le fichier est en cours d'analyse (EXTRACTING,
+        # pas encore soumis) compte aussi.
         Index(
             "uq_esg_reports_one_draft_per_period",
             "company_id",
             "fiscal_year",
             "type",
             unique=True,
-            postgresql_where=text("status = 'DRAFT'"),
+            postgresql_where=text("submitted_at IS NULL"),
         ),
-        # Un brouillon n'a encore ni fichier ni date de dépôt ; tout autre statut en a toujours.
+        # Hors brouillon, toujours un fichier ; non soumis, seulement en brouillon ou pendant
+        # l'analyse du fichier joint au brouillon (tâche 5.8).
         CheckConstraint(
-            "status = 'DRAFT' OR (source_file IS NOT NULL AND submitted_at IS NOT NULL)",
-            name="ck_esg_reports_file_unless_draft",
+            "(status = 'DRAFT' OR source_file IS NOT NULL) "
+            "AND (submitted_at IS NOT NULL OR status IN ('DRAFT', 'EXTRACTING'))",
+            name="ck_esg_reports_file_and_submission",
         ),
     )
 
@@ -72,16 +80,11 @@ class ESGReport(SQLModel, table=True):
     type: ReportType = Field(sa_column=sa_enum_column(ReportType))
     channel: SubmissionChannel = Field(sa_column=sa_enum_column(SubmissionChannel))
     created_at: datetime = Field(default_factory=utcnow)
-    # Moment du dépôt du fichier : nul tant que le rapport est un brouillon (DRAFT, tâche 1.5).
+    # Moment de la soumission : nul tant que la déclaration est un brouillon (tâche 1.5), y compris
+    # pendant l'analyse du fichier joint (tâche 5.8). Une fois posé, le rapport est verrouillé.
     submitted_at: datetime | None = Field(default=None)
     status: ReportStatus = Field(
-        default=ReportStatus.SUBMITTED, sa_column=sa_enum_column(ReportStatus)
-    )
-    # Avancement du pipeline d'extraction, distinct du statut métier (docs/RENAME_PLAN.md §2.4) :
-    # un rapport reste SUBMITTED pendant toute l'extraction, qu'elle soit en file, en cours,
-    # terminée ou échouée.
-    extraction_status: ExtractionStatus = Field(
-        default=ExtractionStatus.QUEUED, sa_column=sa_enum_column(ExtractionStatus)
+        default=ReportStatus.EXTRACTING, sa_column=sa_enum_column(ReportStatus)
     )
     # Chemin de stockage du PDF déposé — nul tant que le rapport est un brouillon.
     source_file: str | None = Field(default=None)
@@ -104,8 +107,9 @@ class ESGReport(SQLModel, table=True):
     # Horodatages du pipeline d'extraction (Étape 5, Phase 6). extraction_error ne contient
     # jamais str(exception) (fuite potentielle de contenu sensible), seulement une chaîne de
     # classification fixe — voir app/ingestion/extractor.py. extraction_started_at est posé à
-    # chaque entrée dans le pipeline : RUNNING au-delà de settings.extraction_timeout_minutes
-    # signale un traitement interrompu.
+    # chaque entrée dans le pipeline et remis à NULL quand le job retourne en file : un rapport
+    # EXTRACTING avec un début plus ancien que settings.extraction_timeout_minutes signale un
+    # traitement interrompu.
     extraction_started_at: datetime | None = Field(default=None)
     extraction_finished_at: datetime | None = Field(default=None)
     extraction_error: str | None = Field(default=None)
@@ -133,6 +137,21 @@ class ESGReport(SQLModel, table=True):
     official_score: float | None = Field(default=None)
     coverage_rate: float | None = Field(default=None)
     config_hash: str | None = Field(default=None, max_length=64)
+    # Données financières PCAF de l'exercice (tâche 5.4, avant sur `companies`) : chiffre
+    # d'affaires pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur
+    # d'attribution — elles accompagnent les émissions du même rapport. Chaque montant avec sa
+    # devise ; evic_date dit à quelle date l'EVIC a été mesurée.
+    revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))
+    revenue_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
+    )
+    enterprise_value: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
+    )
+    enterprise_value_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
+    )
+    evic_date: date | None = None
 
     company: "Company" = Relationship(back_populates="reports")
     auditor: Optional["User"] = Relationship(back_populates="audited_reports")
@@ -142,6 +161,28 @@ class ESGReport(SQLModel, table=True):
     audit_opinions: list["AuditOpinion"] = Relationship(back_populates="report")
     declared_global_score_proof: Optional["Evidence"] = Relationship()
     coverages: list["MetricCoverage"] = Relationship(back_populates="report")
+
+
+class ExtractionRun(SQLModel, table=True):
+    """Une exécution du pipeline d'extraction sur un rapport (tâche 5.5) : ce qui a produit les
+    valeurs — version de Docling, modèle LLM, version du prompt — et comment l'exécution s'est
+    terminée. Une ligne par tentative ; les lignes d'un rapport disparaissent avec lui. Les
+    indicateurs et données carbone portent l'identifiant de l'exécution qui les a écrits."""
+
+    __tablename__ = "extraction_runs"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
+    started_at: datetime = Field(default_factory=utcnow)
+    finished_at: datetime | None = Field(default=None)
+    status: ExtractionRunStatus = Field(
+        default=ExtractionRunStatus.RUNNING, sa_column=sa_enum_column(ExtractionRunStatus)
+    )
+    # Cause classifiée (même vocabulaire qu'ESGReport.extraction_error), jamais str(exception).
+    error: str | None = Field(default=None, max_length=100)
+    docling_version: str = Field(max_length=50)
+    llm_model: str = Field(max_length=100)
+    prompt_version: str = Field(max_length=50)
 
 
 class Evidence(SQLModel, table=True):
@@ -196,13 +237,29 @@ class ESGMetric(SQLModel, table=True):
     )
     # Correction par l'Auditeur (docs/WORKFLOWS.md §1.2) : la valeur extraite reste intacte,
     # override_value la remplace au calcul du score quand auditor_overridden est vrai.
-    auditor_overridden: bool = Field(default=False)
-    override_value: float | None = Field(default=None)
-    override_reason: str | None = Field(default=None)
-    overridden_by_id: uuid.UUID | None = Field(
-        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
+    # Exécution du pipeline qui a écrit cette ligne (tâche 5.5) — nulle pour une ligne antérieure.
+    extraction_run_id: uuid.UUID | None = Field(
+        default=None, foreign_key="extraction_runs.id", ondelete="SET NULL", index=True
     )
-    overridden_at: datetime | None = Field(default=None)
+    # Où la valeur se lit sur sa page-preuve : boîtes {page, x0, y0, x1, y1} en fractions de la
+    # page, origine en haut à gauche (app/ingestion/localisation.py). Vide quand le texte cité n'a
+    # pas pu être retrouvé : la page reste la preuve, sans surlignage.
+    proof_boxes: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    )
+    # Revue de l'Auditeur (tâche 5.6) : état courant et valeur auditée, tenus dans la même
+    # transaction que l'entrée du journal append-only metric_reviews, qui en fait foi. La valeur
+    # extraite (`value` / `tonnes_co2e`) reste intacte.
+    review_status: MetricReviewStatus = Field(
+        default=MetricReviewStatus.PENDING,
+        sa_column=Column(
+            SAEnum(MetricReviewStatus, native_enum=False, length=64),
+            nullable=False,
+            server_default=MetricReviewStatus.PENDING.value,
+        ),
+    )
+    audited_value: float | None = Field(default=None)
 
     report: ESGReport = Relationship(back_populates="metrics")
     proof: Evidence = Relationship(back_populates="metrics")
@@ -246,6 +303,31 @@ class CarbonEmission(SQLModel, table=True):
     confidence: ConfidenceLevel | None = Field(
         default=None, sa_column=sa_enum_column(ConfidenceLevel, nullable=True)
     )
+
+    # Exécution du pipeline qui a écrit cette ligne (tâche 5.5) — nulle pour une ligne antérieure.
+    extraction_run_id: uuid.UUID | None = Field(
+        default=None, foreign_key="extraction_runs.id", ondelete="SET NULL", index=True
+    )
+    # Où la valeur se lit sur sa page-preuve : boîtes {page, x0, y0, x1, y1} en fractions de la
+    # page, origine en haut à gauche (app/ingestion/localisation.py). Vide quand le texte cité n'a
+    # pas pu être retrouvé : la page reste la preuve, sans surlignage.
+    proof_boxes: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    )
+
+    # Revue de l'Auditeur (tâche 5.6) : état courant et valeur auditée, tenus dans la même
+    # transaction que l'entrée du journal append-only metric_reviews, qui en fait foi. La valeur
+    # extraite (`value` / `tonnes_co2e`) reste intacte.
+    review_status: MetricReviewStatus = Field(
+        default=MetricReviewStatus.PENDING,
+        sa_column=Column(
+            SAEnum(MetricReviewStatus, native_enum=False, length=64),
+            nullable=False,
+            server_default=MetricReviewStatus.PENDING.value,
+        ),
+    )
+    audited_value: float | None = Field(default=None)
 
     report: ESGReport = Relationship(back_populates="carbon_data")
     proof: Evidence = Relationship(back_populates="carbon_emissions")

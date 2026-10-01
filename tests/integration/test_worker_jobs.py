@@ -13,7 +13,7 @@ from sqlmodel import select
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.email import EmailDeliveryError, envoyer_email_differe
-from app.core.enums import ExtractionStatus, ReportStatus, Role
+from app.core.enums import ReportStatus, Role
 from app.core.models import Notification
 from app.ingestion import extractor
 from app.ingestion.models import ESGReport
@@ -54,19 +54,21 @@ def test_echec_transitoire_remis_en_file_puis_definitif_a_la_derniere_tentative(
 ) -> None:
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.QUEUED, fiscal_year=2024
+        session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2024
     )
     _pipeline_qui_echoue(monkeypatch, ConnectionError("réseau"))
 
     with pytest.raises(extractor.ExtractionTransitoire):
         extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=False)
     remis_en_file = _relire(session, rapport.id)
-    assert remis_en_file.extraction_status == ExtractionStatus.QUEUED
+    assert remis_en_file.status == ReportStatus.EXTRACTING
+    # De retour en file : début remis à NULL, la supervision le redéposera s'il est perdu.
+    assert remis_en_file.extraction_started_at is None
     assert remis_en_file.extraction_attempts == 0
 
     extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=True)
     echoue = _relire(session, rapport.id)
-    assert echoue.extraction_status == ExtractionStatus.FAILED
+    assert echoue.status == ReportStatus.EXTRACTION_FAILED
     assert echoue.extraction_error == "chargement_modele_embedding_echoue"
     assert echoue.extraction_attempts == 1
 
@@ -74,13 +76,34 @@ def test_echec_transitoire_remis_en_file_puis_definitif_a_la_derniere_tentative(
 def test_erreur_non_transitoire_jamais_retentee(session, monkeypatch) -> None:
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     rapport = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.QUEUED, fiscal_year=2024
+        session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2024
     )
     _pipeline_qui_echoue(monkeypatch, ValueError("PDF corrompu"))
 
     extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=False)
 
-    assert _relire(session, rapport.id).extraction_status == ExtractionStatus.FAILED
+    assert _relire(session, rapport.id).status == ReportStatus.EXTRACTION_FAILED
+
+
+@pytest.mark.parametrize(
+    "statut",
+    [ReportStatus.AWAITING_ASSIGNMENT, ReportStatus.IN_AUDIT, ReportStatus.VALIDATED],
+)
+def test_pipeline_rejoue_sur_un_rapport_avance_ne_le_fait_jamais_regresser(
+    session, monkeypatch, statut
+) -> None:
+    """Un job rejoué (doublon dans la file) sur un rapport déjà sorti d'EXTRACTING ne touche à rien
+    — ni statut, ni horodatage, ni appel au pipeline."""
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport(session, entreprise.id, status=statut, fiscal_year=2024)
+    _pipeline_qui_echoue(monkeypatch, AssertionError("le pipeline ne doit pas démarrer"))
+
+    extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=True)
+
+    relu = _relire(session, rapport.id)
+    assert relu.status == statut
+    assert relu.extraction_started_at is None
+    assert relu.extraction_attempts == 0
 
 
 # --- jobs ---------------------------------------------------------------------------------------
@@ -164,23 +187,23 @@ def test_tache_planifiee_echoue_les_bloquees_et_redepose_les_jobs_perdus(session
     entreprise, proprietaire = _create_entreprise_avec_utilisateur(session)
     delai = timedelta(minutes=get_settings().extraction_timeout_minutes + 1)
     bloque = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.RUNNING,
+        session, entreprise.id, status=ReportStatus.EXTRACTING,
         extraction_started_at=utcnow() - delai, fiscal_year=2024,
     )
     en_cours = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.RUNNING,
+        session, entreprise.id, status=ReportStatus.EXTRACTING,
         extraction_started_at=utcnow(), fiscal_year=2023,
     )
     perdu = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.QUEUED, fiscal_year=2022
+        session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2022
     )
     redis = _RedisEnregistreur()
 
     _executer(jobs.reprendre_extractions({"redis": redis}))
 
-    assert _relire(session, bloque.id).extraction_status == ExtractionStatus.FAILED
+    assert _relire(session, bloque.id).status == ReportStatus.EXTRACTION_FAILED
     assert _relire(session, bloque.id).extraction_error == "delai_depasse"
-    assert _relire(session, en_cours.id).extraction_status == ExtractionStatus.RUNNING
+    assert _relire(session, en_cours.id).status == ReportStatus.EXTRACTING
     assert ("extract_report", (perdu.id, 2022), f"extract:{perdu.id}", "arq:extraction") in redis.jobs
     notifications = session.exec(
         select(Notification).where(Notification.user_id == proprietaire.id)
@@ -220,11 +243,11 @@ def test_validation_programme_la_synthese_et_relance_programme_l_extraction(
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     en_validation = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
     en_echec = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.FAILED, fiscal_year=2024,
+        session, entreprise.id, status=ReportStatus.EXTRACTION_FAILED, fiscal_year=2024,
         extraction_error="appel_llm_echoue",
     )
     en_cours = _create_rapport(
-        session, entreprise.id, extraction_status=ExtractionStatus.RUNNING,
+        session, entreprise.id, status=ReportStatus.EXTRACTING,
         extraction_started_at=utcnow() - timedelta(days=2), fiscal_year=2023,
     )
 
@@ -234,7 +257,7 @@ def test_validation_programme_la_synthese_et_relance_programme_l_extraction(
 
     assert valide.status_code == 200 and valide.json()["status"] == ReportStatus.VALIDATED.value
     assert relance.status_code == 200
-    # Une extraction encore RUNNING n'est plus relancée à la main : la tâche planifiée la passe
+    # Une extraction encore en cours n'est plus relancée à la main : la tâche planifiée la passe
     # d'abord en échec (`delai_depasse`).
     assert refus.status_code == 422 and refus.json()["error"]["code"] == "relance_impossible"
     assert ("generate_synthesis_pdf", (en_validation.id,), None, "arq:queue") in jobs_enfiles

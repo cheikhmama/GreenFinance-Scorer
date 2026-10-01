@@ -1,11 +1,10 @@
 from app.core.enums import (
     AuditDecision,
-    CompanyStatus,
     Currency,
     DataMethod,
     DurationType,
-    ExtractionStatus,
     Pillar,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -14,29 +13,27 @@ from app.core.enums import (
 
 
 def test_report_status_values() -> None:
-    assert {s.value for s in ReportStatus} == {
+    assert [s.value for s in ReportStatus] == [
         "DRAFT",
-        "SUBMITTED",
-        "PENDING_AUDIT",
+        "EXTRACTING",
+        "EXTRACTION_FAILED",
+        "AWAITING_ASSIGNMENT",
+        "IN_AUDIT",
         "PENDING_DECISION",
         "REVISION_REQUESTED",
         "VALIDATED",
         "REJECTED",
-    }
+    ]
 
 
-def test_extraction_status_values() -> None:
-    assert {s.value for s in ExtractionStatus} == {
-        "NOT_STARTED",
-        "QUEUED",
-        "RUNNING",
-        "DONE",
-        "FAILED",
-    }
-
-
-def test_company_status_values() -> None:
-    assert {s.value for s in CompanyStatus} == {"PENDING_ONBOARDING", "ACTIVE", "SUSPENDED"}
+def test_registration_status_values() -> None:
+    assert [s.value for s in RegistrationStatus] == [
+        "PENDING_ONBOARDING",
+        "INFO_REQUESTED",
+        "ACTIVE",
+        "REJECTED",
+        "SUSPENDED",
+    ]
 
 
 def test_type_rapport_values() -> None:
@@ -60,11 +57,12 @@ def test_methode_donnee_values() -> None:
 
 
 def test_decision_audit_values() -> None:
-    assert {d.value for d in AuditDecision} == {
-        "RECOMMANDE_VALIDATION",
-        "RECOMMANDE_REJET",
-        "DEMANDE_CLARIFICATION",
-    }
+    assert [d.value for d in AuditDecision] == [
+        "FAVORABLE",
+        "FAVORABLE_WITH_RESERVATIONS",
+        "CORRECTION_REQUIRED",
+        "UNFAVORABLE",
+    ]
 
 
 def test_role_values() -> None:

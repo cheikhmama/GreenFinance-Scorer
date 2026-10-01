@@ -54,7 +54,11 @@ export function AnalyseDetailPage() {
         eyebrow={`Version ${analyse.version}`}
         title={analyse.title}
         description={`${analyse.company_ids.length} entreprise(s) comparée(s).`}
-        action={<Badge variant={variantStatutAnalyse(analyse.status)}>{libelleStatutAnalyse(analyse.status)}</Badge>}
+        action={
+          <Badge variant={variantStatutAnalyse(analyse.status)}>
+            {libelleStatutAnalyse(analyse.status)}
+          </Badge>
+        }
       />
 
       <HistoriqueVersions analyseId={analyse.id} versionActuelle={analyse.version} />
@@ -85,7 +89,9 @@ export function AnalyseDetailPage() {
         <CardHeader>
           <CardTitle className="text-base text-brand-blue">Contenu</CardTitle>
         </CardHeader>
-        <CardContent className="whitespace-pre-wrap text-sm text-brand-grey">{analyse.content}</CardContent>
+        <CardContent className="whitespace-pre-wrap text-sm text-brand-grey">
+          {analyse.content}
+        </CardContent>
       </Card>
 
       {enAttenteDeDecision ? (
@@ -108,7 +114,9 @@ export function AnalyseDetailPage() {
                     { comment: commentaire || undefined },
                     {
                       onError: (error) =>
-                        setErreur(error instanceof ApiError ? error.message : "Échec de la validation."),
+                        setErreur(
+                          error instanceof ApiError ? error.message : "Échec de la validation.",
+                        ),
                     },
                   )
                 }
@@ -123,7 +131,11 @@ export function AnalyseDetailPage() {
                     { comment: commentaire },
                     {
                       onError: (error) =>
-                        setErreur(error instanceof ApiError ? error.message : "Échec de la demande de correction."),
+                        setErreur(
+                          error instanceof ApiError
+                            ? error.message
+                            : "Échec de la demande de correction.",
+                        ),
                     },
                   )
                 }
@@ -191,7 +203,13 @@ function HistoriqueVersions({
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
           >
             <div className="flex items-center gap-2">
-              <span className={version.version === versionActuelle ? "font-semibold text-brand-blue" : "text-brand-grey"}>
+              <span
+                className={
+                  version.version === versionActuelle
+                    ? "font-semibold text-brand-blue"
+                    : "text-brand-grey"
+                }
+              >
                 Version {version.version}
               </span>
               {version.version === versionActuelle ? (

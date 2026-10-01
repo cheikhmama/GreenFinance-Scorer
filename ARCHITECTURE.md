@@ -10,7 +10,7 @@ même commit, jamais dans un wiki externe.
 >
 > Renommage anglais du domaine (décision D3) en cours, module par module : les tables, colonnes
 > et classes déjà renommées sont listées dans `docs/RENAME_PLAN.md` (§2 : `Company`, `ESGReport`,
-> `ESGMetric`, `ReportStatus`/`ExtractionStatus`/`CompanyStatus`). Pendant la transition, les
+> `ESGMetric`, `ReportStatus`/`CompanyStatus`). Pendant la transition, les
 > schémas de réponse gardent leurs champs JSON français et traduisent explicitement les modèles
 > anglais (règle 3 du plan) — un nouveau code utilise toujours les noms anglais côté modèle.
 

@@ -31,6 +31,8 @@ import {
   useRequestReportCorrection,
   useValidateReport,
 } from "../api";
+import { ExtractionRunsCard } from "./ExtractionRunsCard";
+import { ReportFinancialsCard } from "./ReportFinancialsCard";
 
 /** Fiche de détail Admin d'un rapport — identité de l'entreprise toujours visible en tête (on
  * arrive ici depuis plusieurs points de la plateforme : file d'affectation, file de décision,
@@ -106,7 +108,7 @@ export function AdminReportDetailPage() {
             <span className="text-sm text-brand-grey">Entreprise…</span>
           )}
           <Badge variant={variantStatutRapport(rapport.status)}>
-            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+            {libelleStatutRapport(rapport.status)}
           </Badge>
         </CardContent>
       </Card>
@@ -128,9 +130,7 @@ export function AdminReportDetailPage() {
                   <p className="font-medium text-brand-blue">
                     {libelleDecisionAudit(item.decision)}
                   </p>
-                  {item.comment ? (
-                    <p className="text-sm text-brand-grey">{item.comment}</p>
-                  ) : null}
+                  {item.comment ? <p className="text-sm text-brand-grey">{item.comment}</p> : null}
                 </li>
               ))}
             </ul>
@@ -233,6 +233,10 @@ export function AdminReportDetailPage() {
         </CardContent>
       </Card>
 
+      <ReportFinancialsCard rapportId={rapport.id} />
+
+      <ExtractionRunsCard rapportId={rapport.id} />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
@@ -253,7 +257,7 @@ export function AdminReportDetailPage() {
                       {version.id === rapport.id ? " (celle-ci)" : ""}
                     </p>
                     <p className="text-sm text-brand-grey">
-                      {libelleStatutRapport(version.status, version.extraction_status)} —{" "}
+                      {libelleStatutRapport(version.status)} —{" "}
                       {libelleDateRapport(version).toLowerCase()}
                     </p>
                   </div>
@@ -287,9 +291,7 @@ function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
     return (
       <Alert>
         <AlertTitle>Score recalculé</AlertTitle>
-        <AlertDescription>
-          Valeur globale : {recalculer.data.global_score}/100.
-        </AlertDescription>
+        <AlertDescription>Valeur globale : {recalculer.data.global_score}/100.</AlertDescription>
       </Alert>
     );
   }
@@ -298,7 +300,9 @@ function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
     <Card className="shadow-none">
       <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
         <div>
-          <p className="text-sm font-medium text-brand-blue">Score manquant sur ce rapport validé ?</p>
+          <p className="text-sm font-medium text-brand-blue">
+            Score manquant sur ce rapport validé ?
+          </p>
           <p className="text-sm text-brand-grey">
             À utiliser uniquement si l'entreprise reste bloquée en publication faute de score.
           </p>
@@ -382,8 +386,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
           <Alert variant="destructive">
             <AlertTitle>Score non calculable</AlertTitle>
             <AlertDescription>
-              {verificationScore.coverage_rate != null &&
-              verificationScore.min_coverage != null
+              {verificationScore.coverage_rate != null && verificationScore.min_coverage != null
                 ? `Couverture des indicateurs de ${formatPourcentage(verificationScore.coverage_rate * 100)}, sous le minimum de ${formatPourcentage(verificationScore.min_coverage * 100)} exigé par la méthodologie — valider échouera.`
                 : "Le vocabulaire d'indicateurs de ce rapport ne recoupe aucun indicateur de la méthodologie de référence — valider échouera tant que ce n'est pas résolu."}
             </AlertDescription>
@@ -415,10 +418,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
             disabled={pending}
             onClick={() => {
               setError(null);
-              requestCorrection.mutate(
-                { comment: commentaire || null },
-                { onError: surErreur },
-              );
+              requestCorrection.mutate({ comment: commentaire || null }, { onError: surErreur });
             }}
           >
             Demander une correction

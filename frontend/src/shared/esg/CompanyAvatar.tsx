@@ -34,7 +34,9 @@ export function CompanyAvatar({
   className?: string;
 }) {
   if (logo) {
-    return <img src={logo} alt={`Logo ${nom}`} className={`${className} rounded-lg object-contain`} />;
+    return (
+      <img src={logo} alt={`Logo ${nom}`} className={`${className} rounded-lg object-contain`} />
+    );
   }
   return (
     <div

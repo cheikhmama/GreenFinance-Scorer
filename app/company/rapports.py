@@ -19,8 +19,7 @@ from app.company.upload_validation import (
 from app.company.url_fetch import telecharger_pdf_depuis_url
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
-    ExtractionStatus,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     SubmissionChannel,
@@ -57,11 +56,16 @@ def lister_mes_rapports(session: Session, entreprise_id: uuid.UUID) -> list[ESGR
     )
 
 
-def _verifier_doublon(session: Session, entreprise_id: uuid.UUID, checksum: str) -> None:
+def _verifier_doublon(
+    session: Session, entreprise_id: uuid.UUID, checksum: str, rapport_id: uuid.UUID
+) -> None:
+    # Le rapport lui-même est exclu : joindre de nouveau le même fichier à un brouillon (après un
+    # échec d'analyse, tâche 5.8) n'est pas un doublon.
     existant = session.exec(
         select(ESGReport.id).where(
             ESGReport.company_id == entreprise_id,
             ESGReport.checksum_sha256 == checksum,
+            col(ESGReport.id) != rapport_id,
         )
     ).first()
     if existant is not None:
@@ -83,15 +87,64 @@ def _enregistrer_fichier(entreprise_id: uuid.UUID, rapport_id: uuid.UUID, conten
 
 
 def verifier_entreprise_active(entreprise: Company | None) -> None:
-    """Seule une entreprise ACTIVE dépose ou ouvre une déclaration — une inscription en attente
-    (tâche 1.3) ou une entreprise suspendue ne le peut pas."""
-    if entreprise is not None and entreprise.status == CompanyStatus.PENDING_ONBOARDING:
+    """Seule une entreprise ACTIVE dépose ou ouvre une déclaration — une inscription en attente,
+    en demande d'informations ou refusée (tâches 1.3, 5.2), ou une entreprise suspendue, ne le peut
+    pas."""
+    if entreprise is not None and entreprise.status in (
+        RegistrationStatus.PENDING_ONBOARDING,
+        RegistrationStatus.INFO_REQUESTED,
+        RegistrationStatus.REJECTED,
+    ):
         raise ValidationError(
             "L'inscription de cette entreprise n'est pas encore validée.",
             code="inscription_non_validee",
         )
-    if entreprise is not None and entreprise.status != CompanyStatus.ACTIVE:
+    if entreprise is not None and entreprise.status != RegistrationStatus.ACTIVE:
         raise ValidationError("Cette entreprise est suspendue.", code="entreprise_suspendue")
+
+
+# États qui ne retiennent plus l'entreprise (tâche 5.9) : décision rendue, ou extraction d'un dépôt
+# direct en échec — l'Administrateur la relance, l'Entreprise peut déclarer à nouveau.
+STATUTS_SANS_SESSION = (
+    ReportStatus.VALIDATED,
+    ReportStatus.REJECTED,
+    ReportStatus.EXTRACTION_FAILED,
+)
+
+
+def verifier_regles_exercice(session: Session, entreprise_id: uuid.UUID, exercice: int) -> None:
+    """Règles d'une nouvelle déclaration (tâche 5.9), communes à tous les chemins qui créent un
+    rapport — ouverture d'un brouillon, dépôt en une étape, import par URL ; jamais une
+    correction, qui poursuit la déclaration en cours :
+    - une seule déclaration active à la fois (brouillon, examen, ou correction demandée et pas
+      encore déposée) : la terminer avant d'ouvrir un autre exercice ;
+    - un exercice déjà validé ne se déclare plus, quel que soit le type de rapport.
+    La ligne de l'entreprise est verrouillée jusqu'au commit : deux ouvertures simultanées ne
+    passent pas toutes les deux."""
+    session.exec(select(Company).where(col(Company.id) == entreprise_id).with_for_update()).first()
+    rapports = session.exec(
+        select(ESGReport).where(col(ESGReport.company_id) == entreprise_id)
+    ).all()
+    remplaces = {r.previous_report_id for r in rapports if r.previous_report_id is not None}
+    actif = next(
+        (
+            r
+            for r in rapports
+            if r.status not in STATUTS_SANS_SESSION and r.id not in remplaces
+        ),
+        None,
+    )
+    if actif is not None:
+        raise ValidationError(
+            f"Une déclaration est déjà en cours (exercice {actif.fiscal_year}) : terminez-la "
+            "avant d'en ouvrir une autre.",
+            code="declaration_en_cours",
+        )
+    if any(r.status == ReportStatus.VALIDATED and r.fiscal_year == exercice for r in rapports):
+        raise ValidationError(
+            f"L'exercice {exercice} a déjà été validé : il ne peut plus être déclaré.",
+            code="exercice_deja_valide",
+        )
 
 
 def deposer_fichier(
@@ -100,29 +153,37 @@ def deposer_fichier(
     rapport: ESGReport,
     contenu: bytes,
     nom_fichier_origine: str | None,
+    *,
+    soumettre: bool = True,
 ) -> ESGReport:
-    """Dépose le PDF d'un rapport — nouveau (dépôt en une étape) ou brouillon existant (tâche 1.5,
-    POST /reports/{id}/submit) — et le soumet à l'extraction : validation du PDF, détection de
-    doublon, stockage, statut SUBMITTED + extraction QUEUED, notification, un seul commit, puis
-    extraction en tâche de fond. Point unique : les deux chemins de dépôt appliquent exactement
-    les mêmes règles."""
+    """Dépose le PDF d'un rapport — nouveau (dépôt en une étape) ou brouillon existant (tâche 5.8,
+    POST /reports/{id}/file) — et le passe à l'extraction : validation du PDF, détection de
+    doublon, stockage, statut EXTRACTING (job en file), un seul commit, puis extraction en tâche
+    de fond. Point unique : les deux chemins de dépôt appliquent exactement les mêmes règles.
+
+    `soumettre=False` (brouillon) : le rapport reste non soumis — l'extraction le ramène en DRAFT
+    avec sa liste de complétude, et seule la soumission explicite le verrouille
+    (app/reporting/sessions.py::soumettre)."""
     entreprise = session.get(Company, rapport.company_id)
     verifier_entreprise_active(entreprise)
 
     valider_pdf(contenu)
     checksum = calculer_checksum(contenu)
-    _verifier_doublon(session, rapport.company_id, checksum)
+    _verifier_doublon(session, rapport.company_id, checksum, rapport.id)
 
     chemin_relatif = _enregistrer_fichier(rapport.company_id, rapport.id, contenu)
     rapport.source_file = chemin_relatif
     rapport.original_filename = nettoyer_nom_fichier(nom_fichier_origine)
     rapport.checksum_sha256 = checksum
-    rapport.status = ReportStatus.SUBMITTED
-    rapport.extraction_status = ExtractionStatus.QUEUED
-    rapport.submitted_at = utcnow()
+    rapport.status = ReportStatus.EXTRACTING
+    rapport.extraction_started_at = None
+    rapport.extraction_finished_at = None
+    rapport.extraction_error = None
+    if soumettre:
+        rapport.submitted_at = utcnow()
     try:
         session.add(rapport)
-        if entreprise is not None and entreprise.owner_user_id is not None:
+        if soumettre and entreprise is not None and entreprise.owner_user_id is not None:
             notifier(
                 session,
                 entreprise.owner_user_id,
@@ -167,6 +228,9 @@ def _creer_rapport(
     nom_fichier_origine: str | None,
     canal: SubmissionChannel = SubmissionChannel.ENTREPRISE,
 ) -> ESGReport:
+    if rapport_precedent_id is None:
+        # Nouvelle déclaration (pas une correction) : mêmes règles qu'une ouverture de brouillon.
+        verifier_regles_exercice(session, entreprise_id, annee_reporting)
     rapport = ESGReport(
         company_id=entreprise_id,
         type=type_rapport,

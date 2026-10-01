@@ -13,6 +13,8 @@ Docling/bge-m3 CPU de plusieurs heures en parallèle n'apportent rien et leur th
 documentée.
 """
 
+import hashlib
+import importlib.metadata
 import os
 
 # Ceinture-bretelles : ce module importe aussi FlagEmbedding/torch (bge-m3), même garde-fou qu'en
@@ -25,7 +27,7 @@ import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import faiss
 import httpx
@@ -38,21 +40,27 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from sqlmodel import Session, col, select
 
-from app.auth.models import User
 from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import DataMethod, ExtractionStatus, Pillar, Role
+from app.core.enums import DataMethod, ExtractionRunStatus, ReportStatus
 from app.core.notifications import notifier
-from app.ingestion import docling_pipeline, proof_generator
+from app.ingestion import docling_pipeline, localisation, proof_generator
+from app.ingestion.cibles import INDICATEURS_CIBLES
 from app.ingestion.completeness import calculer_couverture
-from app.ingestion.etat_extraction import ExtractionTransitoire, marquer_echec
+from app.ingestion.etat_extraction import (
+    ExtractionTransitoire,
+    cloturer_executions,
+    marquer_echec,
+    notifier_pret_a_affecter,
+)
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
     ESGReport,
     Evidence,
+    ExtractionRun,
     MetricCoverage,
 )
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
@@ -146,6 +154,8 @@ TABLE_SCORE_BOOST = 1.15
 # valeurs, ≥85% pages, 0% hallucination, data_test/ground_truth.yaml) a été mesurée avec Claude à
 # l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
 EXTRACTION_MODEL = "gemini-3.6-flash"
+# Modèle enregistré sur une exécution en mode démonstration (clé GEMINI_API_KEY factice).
+MODELE_DEMO = "demo-synthetique"
 
 EXTRACTION_TOOL = genai_types.FunctionDeclaration(
     name="extraction_indicateurs",
@@ -160,86 +170,11 @@ EXTRACTION_TOOL = genai_types.FunctionDeclaration(
 )
 
 
-@dataclass(frozen=True)
-class CibleIndicateur:
-    code: str
-    # "rapport_score_global" : score transversal auto-déclaré par l'entreprise (ex. "Score global
-    # ESG : 66/100"), écrit directement sur ESGReport.declared_global_score — aucun pilier E/S/G
-    # ne convient à une valeur transversale aux trois.
-    cible: Literal["donnee_carbone", "indicateur_esg", "rapport_score_global"]
-    scope: int | None = None
-    categorie_ges: str | None = None
-    pilier: Pillar | None = None
-
-
-# Les 7 codes carbone/environnement déjà validés sur le corpus pilote (voir
-# data_test/ground_truth.yaml), plus le socle Social/Gouvernance harmonisé retenu en Phase 5 §9
-# (voir config/weights/default.yaml et le diagnostic associé — analyse de couverture sur
-# data_test/reference_esg_8_entreprises.json), plus un second lot (ci-dessous) ajouté pour la
-# transparence humaine (Admin/Auditeur/Investisseur consultant un rapport doit voir ce qui y est
-# réellement écrit, avec preuve page par page — garantie G1) : un consommateur légitime distinct
-# du moteur de scoring, qui continue de ne lire que les codes présents dans
-# config/weights/default.yaml (app/scoring/engine.py ignore silencieusement tout code inconnu du
-# YAML — confirmé par lecture directe, aucun risque de modifier un score déjà calculé).
-INDICATEURS_CIBLES: list[CibleIndicateur] = [
-    CibleIndicateur("scope_1", "donnee_carbone", scope=1),
-    # Scope 2 non différencié marché/localisation — le cas le plus courant en pratique (voir
-    # data_test/reference_esg_8_entreprises.json, "Scope 2 communiqué comme une valeur unique...
-    # pour les 8 entreprises") : sans ce code, un Scope 2 pourtant explicite dans le rapport ne
-    # matche jamais scope_2_market_based/location_based et disparaît silencieusement.
-    CibleIndicateur("scope_2", "donnee_carbone", scope=2),
-    CibleIndicateur(
-        "scope_2_market_based", "donnee_carbone", scope=2, categorie_ges="market_based"
-    ),
-    CibleIndicateur(
-        "scope_2_location_based", "donnee_carbone", scope=2, categorie_ges="location_based"
-    ),
-    CibleIndicateur("scope_3", "donnee_carbone", scope=3),
-    CibleIndicateur(
-        "intensite_scope_1_2_marketbased", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur(
-        "intensite_scope_1_2_3_hors_cat11", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur(
-        "intensite_scope_1_2_3_total", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
-    # Second lot — transparence humaine, repris du catalogue déjà pensé dans
-    # data_test/reference_esg_8_entreprises.json (codes déjà nommés, jamais branchés jusqu'ici).
-    # Liste non exhaustive : le pattern (un CibleIndicateur par fait numérique avec page-preuve)
-    # se répète, d'autres codes pourront s'ajouter au fil des rapports rencontrés.
-    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
-    CibleIndicateur(
-        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE
-    ),
-    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur(
-        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur(
-        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    # Scores auto-déclarés par l'entreprise dans sa propre synthèse ESG — par pilier uniquement
-    # (pas de "global" : Pilier n'a que 3 valeurs, et la plateforme calcule déjà son propre score
-    # officiel via Score/config/weights/default.yaml ; ajouter un score global auto-déclaré à
-    # côté créerait une confusion entre "ce que l'entreprise prétend" et "ce que la plateforme
-    # calcule" — décision produit à part entière, pas un ajout silencieux ici).
-    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT),
-    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
-    CibleIndicateur("score_global_declare", "rapport_score_global"),
-]
-
 assert {c.code for c in INDICATEURS_CIBLES} == set(REQUETES_PAR_CODE), (
     "Chaque code de INDICATEURS_CIBLES doit avoir exactement une requête sémantique dédiée "
     "dans REQUETES_PAR_CODE."
 )
+
 
 @lru_cache
 def _get_embed_model() -> BGEM3FlagModel:
@@ -439,22 +374,15 @@ def _build_context(
     return context, pages_finales, pages_par_code
 
 
-# Nombre de tentatives face à une erreur serveur transitoire (503, surcharge du palier gratuit) —
-# jamais sur une ClientError (4xx : clé invalide, modèle inconnu, quota dépassé), qui ne se
-# résoudra pas en réessayant. Constaté en pratique sur gemini-3.6-flash, pas hypothétique.
-_TENTATIVES_APPEL_LLM = 3
+# Version du prompt d'extraction (tâche 5.5), enregistrée sur chaque exécution
+# (ExtractionRun.prompt_version). À changer à chaque modification du gabarit ci-dessous ou de
+# l'outil EXTRACTION_TOOL : tests/unit/test_extraction_provenance.py fige l'empreinte de cette
+# version et échoue tant qu'elle n'est pas montée.
+PROMPT_VERSION = "2026-10-01"
 
 
-def _call_llm_extraction(
-    *, nom_entreprise: str, context: str, codes: list[str]
-) -> ExtractionEntreprise:
-    """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
-    Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
-    toute erreur non transitoire du fournisseur telle quelle — run_extraction_pipeline la classe,
-    ne la masque jamais. Signature inchangée par le passage à la sélection adaptative (Phase 6) :
-    c'est ce qui permet d'appeler cette fonction une seconde fois pour la relance groupée sans la
-    modifier (voir run_extraction_pipeline)."""
-    prompt = f"""Tu es un extracteur de donnees ESG/carbone. Voici des extraits d'un rapport d'entreprise
+def construire_prompt(*, nom_entreprise: str, context: str, codes: list[str]) -> str:
+    return f"""Tu es un extracteur de donnees ESG/carbone. Voici des extraits d'un rapport d'entreprise
 ({nom_entreprise}), avec le numero de page physique indique avant chaque extrait.
 
 Pour CHACUN des indicateurs suivants, trouve sa valeur numerique la plus recente dans les extraits fournis :
@@ -483,6 +411,40 @@ Regles strictes :
 Extraits du rapport :
 {context}
 """
+
+
+def empreinte_prompt() -> str:
+    """SHA-256 du gabarit du prompt et de l'outil déclaré, hors parties variables."""
+    gabarit = construire_prompt(
+        nom_entreprise="{nom_entreprise}", context="{context}", codes=["{codes}"]
+    )
+    outil = EXTRACTION_TOOL.model_dump_json(exclude_none=True)
+    return hashlib.sha256(f"{gabarit}\n{outil}".encode()).hexdigest()
+
+
+def version_docling() -> str:
+    try:
+        return importlib.metadata.version("docling")
+    except importlib.metadata.PackageNotFoundError:
+        return "absent"
+
+
+# Nombre de tentatives face à une erreur serveur transitoire (503, surcharge du palier gratuit) —
+# jamais sur une ClientError (4xx : clé invalide, modèle inconnu, quota dépassé), qui ne se
+# résoudra pas en réessayant. Constaté en pratique sur gemini-3.6-flash, pas hypothétique.
+_TENTATIVES_APPEL_LLM = 3
+
+
+def _call_llm_extraction(
+    *, nom_entreprise: str, context: str, codes: list[str]
+) -> ExtractionEntreprise:
+    """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
+    Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
+    toute erreur non transitoire du fournisseur telle quelle — run_extraction_pipeline la classe,
+    ne la masque jamais. Signature inchangée par le passage à la sélection adaptative (Phase 6) :
+    c'est ce qui permet d'appeler cette fonction une seconde fois pour la relance groupée sans la
+    modifier (voir run_extraction_pipeline)."""
+    prompt = construire_prompt(nom_entreprise=nom_entreprise, context=context, codes=codes)
     config = genai_types.GenerateContentConfig(
         tools=[genai_types.Tool(function_declarations=[EXTRACTION_TOOL])],
         tool_config=genai_types.ToolConfig(
@@ -548,15 +510,45 @@ def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> Ex
     )
 
 
+def _boites_de_la_valeur(
+    document: Any, page: int, indicateur: IndicateurExtrait, rapport_id: uuid.UUID
+) -> list[dict]:
+    """Best-effort : une localisation impossible laisse la valeur sans surlignage, elle ne fait
+    jamais échouer l'extraction (la page reste la preuve)."""
+    try:
+        return [
+            boite.en_dict()
+            for boite in localisation.localiser(
+                document,
+                page,
+                citation=indicateur.citation_source,
+                valeur_brute=indicateur.valeur_brute,
+                valeur=indicateur.valeur,
+            )
+        ]
+    except Exception as exc:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+        logger.warning(
+            "localisation_preuve_echouee",
+            rapport_id=str(rapport_id),
+            code=indicateur.code,
+            error_type=type(exc).__name__,
+        )
+        return []
+
+
 def run_extraction_pipeline(
     rapport_id: uuid.UUID, annee_reporting: int, *, derniere_tentative: bool = True
 ) -> None:
     """Exécuté par le worker (app/worker/jobs.py::extract_report, file d'extraction à un job à la
     fois — plus de verrou applicatif). Ouvre sa propre session DB.
 
-    derniere_tentative=False : un échec transitoire (_est_transitoire) remet le rapport en QUEUED
-    et lève ExtractionTransitoire pour que le worker retente plus tard ; toute autre erreur, ou un
-    échec transitoire à la dernière tentative, marque le rapport FAILED comme avant."""
+    derniere_tentative=False : un échec transitoire (_est_transitoire) remet le job en file (rapport
+    EXTRACTING, début nul, exécution RETRY_SCHEDULED) et lève ExtractionTransitoire pour que le
+    worker retente plus tard ; toute autre erreur, ou un échec transitoire à la dernière tentative,
+    passe le rapport en EXTRACTION_FAILED et l'exécution en FAILED.
+
+    Chaque passage crée une ExtractionRun (tâche 5.5) : version de Docling, modèle LLM, version
+    du prompt ; chaque valeur écrite porte son identifiant et les boîtes de son texte cité."""
     with Session(engine) as session:
         rapport = session.get(ESGReport, rapport_id)
         if rapport is None:
@@ -569,27 +561,44 @@ def run_extraction_pipeline(
             return
         fichier_source = rapport.source_file
 
-        # Seul extraction_status avance ici, jamais le statut métier (ReportStatus) : rejouer
-        # l'extraction (ex. après élargissement d'INDICATEURS_CIBLES) sur un rapport déjà affecté
-        # à un auditeur ne doit jamais le faire régresser dans le workflow — un vrai bug rencontré
-        # en pratique avec l'ancien statut unique (SMH/SNDE repassés en extraction alors que déjà
-        # affectés).
+        # Le pipeline n'agit que sur un rapport EXTRACTING (tâche 5.1) : rejouer un job (ex.
+        # doublon dans la file, ou relance après élargissement d'INDICATEURS_CIBLES) sur un rapport
+        # déjà affecté à un auditeur ne doit jamais le faire régresser dans le workflow — un vrai
+        # bug rencontré en pratique avec le premier statut unique (SMH/SNDE repassés en extraction
+        # alors que déjà affectés).
+        if rapport.status != ReportStatus.EXTRACTING:
+            logger.warning(
+                "extraction_ignoree_hors_extracting",
+                rapport_id=str(rapport_id),
+                statut=rapport.status.value,
+            )
+            return
         #
         # extraction_started_at est posé à CHAQUE entrée dans le pipeline (dépôt initial ou
         # relance manuelle après échec) — sert de référence à la tâche planifiée
         # (app/ingestion/supervision.py) pour détecter un traitement interrompu ; une relance doit
         # repartir d'un chronomètre frais, pas de celui de la toute première tentative.
-        rapport.extraction_status = ExtractionStatus.RUNNING
         rapport.extraction_started_at = utcnow()
         session.add(rapport)
+        # Une ligne par exécution (tâche 5.5) : ce qui produit les valeurs, enregistré avant de
+        # commencer pour qu'une exécution interrompue laisse aussi sa trace.
+        demo = get_settings().gemini_api_key_is_placeholder
+        execution = ExtractionRun(
+            report_id=rapport_id,
+            started_at=rapport.extraction_started_at,
+            docling_version=version_docling(),
+            llm_model=MODELE_DEMO if demo else EXTRACTION_MODEL,
+            prompt_version=PROMPT_VERSION,
+        )
+        session.add(execution)
         session.commit()
+        execution_id = execution.id
 
         etape = "erreur_inattendue"
         try:
             source_path = storage.resolve_path(fichier_source)
             nom_entreprise = rapport.company.name
             nom_document = Path(fichier_source).name
-            demo = get_settings().gemini_api_key_is_placeholder
             if demo:
                 nom_document = f"[DEMO] {nom_document}"
 
@@ -752,6 +761,8 @@ def run_extraction_pipeline(
                     session.flush()
                     preuves_par_page[page] = preuve
                 preuve = preuves_par_page[page]
+                # Où la valeur se lit sur la page (surlignage de l'espace Auditeur, tâche 5.7).
+                boites = _boites_de_la_valeur(conversion.document, page, indicateur, rapport_id)
 
                 if cible.cible == "donnee_carbone":
                     assert cible.scope is not None  # invariant garanti par INDICATEURS_CIBLES
@@ -770,6 +781,8 @@ def run_extraction_pipeline(
                             proof_text=indicateur.citation_source,
                             value_year=indicateur.annee_valeur,
                             confidence=indicateur.confiance,
+                            extraction_run_id=execution_id,
+                            proof_boxes=boites,
                         )
                     )
                 elif cible.cible == "indicateur_esg":
@@ -788,6 +801,8 @@ def run_extraction_pipeline(
                             proof_text=indicateur.citation_source,
                             value_year=indicateur.annee_valeur,
                             confidence=indicateur.confiance,
+                            extraction_run_id=execution_id,
+                            proof_boxes=boites,
                         )
                     )
                 else:  # "rapport_score_global"
@@ -817,45 +832,52 @@ def run_extraction_pipeline(
 
             rapport.extraction_finished_at = utcnow()
             rapport.extraction_error = None
-            rapport.extraction_status = ExtractionStatus.DONE
+            # Brouillon (fichier joint avant soumission, tâche 5.8) : retour en DRAFT avec sa
+            # liste de complétude ; l'Entreprise soumet ensuite. Sinon, file d'affectation.
+            brouillon = rapport.submitted_at is None
+            rapport.status = ReportStatus.DRAFT if brouillon else ReportStatus.AWAITING_ASSIGNMENT
             session.add(rapport)
+            execution_reussie = session.get(ExtractionRun, execution_id)
+            assert execution_reussie is not None  # créée et commitée plus haut
+            execution_reussie.status = ExtractionRunStatus.SUCCEEDED
+            execution_reussie.finished_at = rapport.extraction_finished_at
+            session.add(execution_reussie)
 
-            # Import différé : app.ingestion.synthesis_report importe
-            # CODES_AUTO_DECLARES_PAR_PILIER depuis ce module -- un import en tête de fichier
-            # créerait un cycle (ce module ne serait pas encore entièrement chargé au moment où
-            # synthesis_report tenterait de lire cette constante).
-            from app.ingestion import synthesis_report
+            if brouillon:
+                if rapport.company.owner_user_id is not None:
+                    notifier(
+                        session,
+                        rapport.company.owner_user_id,
+                        "RAPPORT_ANALYSE_TERMINEE",
+                        f"Le fichier de votre déclaration {rapport.type.value} "
+                        f"({rapport.fiscal_year}) a été lu : vérifiez la liste de complétude "
+                        "avant de soumettre.",
+                        id_ressource=rapport_id,
+                    )
+            else:
+                # Import différé : app.ingestion.synthesis_report importe
+                # CODES_AUTO_DECLARES_PAR_PILIER depuis ce module -- un import en tête de fichier
+                # créerait un cycle (ce module ne serait pas encore entièrement chargé au moment où
+                # synthesis_report tenterait de lire cette constante).
+                from app.ingestion import synthesis_report
 
-            # Best-effort, délibérément (Phase 6) : un échec de génération du PDF de synthèse ne
-            # doit jamais faire échouer l'extraction elle-même -- les indicateurs sont le résultat
-            # porteur, le PDF de synthèse n'en est qu'une présentation dérivée, régénérable plus
-            # tard (voir aussi app/admin/review_queue.py::valider_rapport, second déclencheur).
-            try:
-                contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
-                storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
-                rapport.synthesis_report_path = f"synthese/{rapport_id}.pdf"
-                session.add(rapport)
-            except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
-                logger.error(
-                    "synthese_pdf_generation_echouee",
-                    rapport_id=str(rapport_id),
-                    error_type=type(exc_synthese).__name__,
-                )
+                # Best-effort, délibérément (Phase 6) : un échec de génération du PDF de synthèse ne
+                # doit jamais faire échouer l'extraction elle-même -- les indicateurs sont le résultat
+                # porteur, le PDF de synthèse n'en est qu'une présentation dérivée, régénérable plus
+                # tard (voir aussi app/admin/review_queue.py::valider_rapport, second déclencheur).
+                try:
+                    contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
+                    storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
+                    rapport.synthesis_report_path = f"synthese/{rapport_id}.pdf"
+                    session.add(rapport)
+                except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+                    logger.error(
+                        "synthese_pdf_generation_echouee",
+                        rapport_id=str(rapport_id),
+                        error_type=type(exc_synthese).__name__,
+                    )
 
-            admins = session.exec(
-                select(User).where(
-                    col(User.role) == Role.ADMIN, col(User.active).is_(True)
-                )
-            ).all()
-            for admin in admins:
-                notifier(
-                    session,
-                    admin.id,
-                    "RAPPORT_PRET_A_AFFECTER",
-                    f"Le rapport {rapport.type.value} ({rapport.fiscal_year}) de "
-                    f"{nom_entreprise} est prêt à être affecté à un auditeur.",
-                    id_ressource=rapport_id,
-                )
+                notifier_pret_a_affecter(session, rapport)
             session.commit()
             logger.info("extraction_pipeline_reussie", rapport_id=str(rapport_id))
 
@@ -864,8 +886,13 @@ def run_extraction_pipeline(
             # remonter silencieusement dans une BackgroundTask sans observateur.
             session.rollback()
             if not derniere_tentative and _est_transitoire(exc):
-                rapport.extraction_status = ExtractionStatus.QUEUED
+                # Retour en file : un début nul est ce qui distingue un job en attente d'un job en
+                # cours (app/ingestion/supervision.py).
+                rapport.extraction_started_at = None
                 session.add(rapport)
+                cloturer_executions(
+                    session, rapport_id, ExtractionRunStatus.RETRY_SCHEDULED, etape
+                )
                 session.commit()
                 logger.warning(
                     "extraction_echec_transitoire",

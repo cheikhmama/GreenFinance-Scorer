@@ -10,6 +10,8 @@ import {
   getAdminESGPerformance,
   getAdminReport,
   getCompanyAdmin,
+  getCompanyKyc,
+  getReportFinancials,
   listAdminCompanyReports,
   listAllCompanies,
   listAllReports,
@@ -24,12 +26,14 @@ import {
   listPortfoliosAdmin,
   listProjectsAdmin,
   listPublishableCompanies,
+  listReportExtractionRuns,
   listReportOpinions,
   listReportsInValidation,
   listReportsToAssign,
   listReportVersions,
   listUsersAwaitingActivation,
   listUsersByRole,
+  onboardCompany,
   publishCompany,
   reactivateCompany,
   reactivateUser,
@@ -37,51 +41,51 @@ import {
   rejectReport,
   requestReportCorrection,
   retryExtraction,
-  onboardCompany,
   suspendCompany,
-  getCompanyFinancials,
-  updateCompanyFinancials,
   updateCompanyIdentifiers,
   updateCompanyProfile,
+  updateReportFinancials,
   uploadCompanyLogo,
   validateReport,
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
-  CompanyFinancials,
-  CompanyFinancialsRequest,
+  AffecterAuditeurRequest,
+  AnalysisStatus,
+  ApercuActeursAdmin,
+  AvisAuditAdmin,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
   CompanyOnboardingResult,
-  AffecterAuditeurRequest,
-  ApercuActeursAdmin,
-  AvisAuditAdmin,
   CreerUtilisateurRequest,
   DecisionAdminRequest,
   EntrepriseAdmin,
   EntreprisePublic,
+  ExtractionRunPublic,
+  KycReport,
   ListAuditLogParams,
   ModifierEntrepriseAdminRequest,
   PageAnalyseAdmin,
   PageChargeAuditeurAdmin,
   PageEntrepriseAdmin,
-  PageEntreprisePublic,
   PageEntrepriseAvecScoreAdmin,
+  PageEntreprisePublic,
   PageJournalAuditPublic,
   PagePortefeuilleAdmin,
   PageProjetAdmin,
   PageRapportESGPublic,
   PageUtilisateurPublic,
   PerformanceESGAdmin,
+  ProjectStatus,
   RapportESGDetail,
   RapportESGPublic,
+  ReportFinancials,
+  ReportFinancialsRequest,
+  ReportStatus,
   Role,
   ScoreRecalculeAdmin,
-  ReportStatus,
   ScoreVerificationAdmin,
-  AnalysisStatus,
-  ProjectStatus,
   TableauDeBordAdmin,
   UtilisateurCree,
   UtilisateurPublic,
@@ -120,7 +124,9 @@ const companyReportsKey = (entrepriseId: string) =>
   ["admin", "entreprises", entrepriseId, "rapports"] as const;
 const companyDetailKey = (entrepriseId: string) => ["admin", "entreprises", entrepriseId] as const;
 
-function pageSuivante<T extends { page: number; pages: number }>(dernierePage: T): number | undefined {
+function pageSuivante<T extends { page: number; pages: number }>(
+  dernierePage: T,
+): number | undefined {
   return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
 }
 
@@ -358,6 +364,20 @@ export function useSuspendCompany() {
 
 /** PATCH /admin/companies/{id}/onboard — valide (lien d'activation envoyé au titulaire) ou refuse
  * (inscription supprimée, motif envoyé) une inscription en attente (app/admin/onboarding.py). */
+const kycKey = (entrepriseId: string) => ["admin", "entreprises", entrepriseId, "kyc"] as const;
+
+/** GET /admin/companies/{id}/kyc (tâche 5.3) — contrôles recalculés à chaque ouverture de la
+ * fenêtre (la fiche GLEIF peut changer), jamais mis en cache longtemps. */
+export function useCompanyKyc(entrepriseId: string, enabled: boolean) {
+  return useQuery<KycReport, ApiError>({
+    queryKey: kycKey(entrepriseId),
+    queryFn: () => getCompanyKyc(entrepriseId),
+    enabled,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
 export function useOnboardCompany() {
   const queryClient = useQueryClient();
   return useMutation<
@@ -369,6 +389,7 @@ export function useOnboardCompany() {
     onSuccess: (_resultat, { entrepriseId }) => {
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
       queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
+      queryClient.invalidateQueries({ queryKey: kycKey(entrepriseId) });
     },
   });
 }
@@ -421,26 +442,36 @@ export function useUpdateCompanyIdentifiers(entrepriseId: string) {
   });
 }
 
-const financialsKey = (entrepriseId: string) =>
-  [...companyDetailKey(entrepriseId), "financials"] as const;
-
-/** GET /admin/companies/{id}/financials (tâche 2.3) — chiffre d'affaires et EVIC, dont le moteur
- * PCAF a besoin. */
-export function useCompanyFinancials(entrepriseId: string) {
-  return useQuery<CompanyFinancials, ApiError>({
-    queryKey: financialsKey(entrepriseId),
-    queryFn: () => getCompanyFinancials(entrepriseId),
-    enabled: entrepriseId.length > 0,
+/** GET /admin/reports/{id}/extraction-runs (tâche 5.5) — exécutions du pipeline, plus récente
+ * d'abord. */
+export function useReportExtractionRuns(rapportId: string) {
+  return useQuery<ExtractionRunPublic[], ApiError>({
+    queryKey: ["admin", "rapports", rapportId, "extraction-runs"],
+    queryFn: () => listReportExtractionRuns(rapportId),
+    enabled: rapportId.length > 0,
   });
 }
 
-/** PUT /admin/companies/{id}/financials — remplacement complet (un champ omis vaut null). */
-export function useUpdateCompanyFinancials(entrepriseId: string) {
+const financialsKey = (rapportId: string) =>
+  ["admin", "rapports", rapportId, "financials"] as const;
+
+/** GET /admin/reports/{id}/financials (tâches 2.3, 5.4) — chiffre d'affaires et EVIC de l'exercice
+ * du rapport, dont le moteur PCAF a besoin. */
+export function useReportFinancials(rapportId: string) {
+  return useQuery<ReportFinancials, ApiError>({
+    queryKey: financialsKey(rapportId),
+    queryFn: () => getReportFinancials(rapportId),
+    enabled: rapportId.length > 0,
+  });
+}
+
+/** PUT /admin/reports/{id}/financials — remplacement complet (un champ omis vaut null). */
+export function useUpdateReportFinancials(rapportId: string) {
   const queryClient = useQueryClient();
-  return useMutation<CompanyFinancials, ApiError, CompanyFinancialsRequest>({
-    mutationFn: (payload) => updateCompanyFinancials(entrepriseId, payload),
+  return useMutation<ReportFinancials, ApiError, ReportFinancialsRequest>({
+    mutationFn: (payload) => updateReportFinancials(rapportId, payload),
     onSuccess: (financieres) => {
-      queryClient.setQueryData(financialsKey(entrepriseId), financieres);
+      queryClient.setQueryData(financialsKey(rapportId), financieres);
     },
   });
 }

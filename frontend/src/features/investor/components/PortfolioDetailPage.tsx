@@ -3,6 +3,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type {
+  EntreprisePublieePublic,
+  PositionDetail,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import {
   formatMontant,
@@ -15,11 +19,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
-import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Select } from "@/shared/ui/select";
 import {
   exportPortfolioFile,
@@ -38,16 +42,12 @@ import {
   type AjouterPositionForm,
   ajouterPositionSchema,
   DEVISES,
+  DurationType,
   type RenommerPortefeuilleForm,
   renommerPortefeuilleSchema,
   TYPES_DUREE,
-  DurationType,
 } from "../schemas";
 import { EntrepriseCombobox } from "./EntrepriseCombobox";
-import type {
-  EntreprisePublieePublic,
-  PositionDetail,
-} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { ImportPositionsForm } from "./ImportPositionsForm";
 import { PortfolioCarbonCard } from "./PortfolioCarbonCard";
 
@@ -66,7 +66,8 @@ export function PortfolioDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
-  if (isError || !portefeuille) return <p className="text-destructive">Portefeuille introuvable.</p>;
+  if (isError || !portefeuille)
+    return <p className="text-destructive">Portefeuille introuvable.</p>;
 
   async function supprimerPortefeuille() {
     if (!portefeuille || portefeuille.position_count > 0) return;
@@ -130,7 +131,10 @@ export function PortfolioDetailPage() {
               label="Montant total"
               value={formatMontant(portefeuille.total_amount, portefeuille.reference_currency)}
             />
-            <Synthese label="Score ESG agrégé" value={formatScore(portefeuille.aggregated_esg_score)} />
+            <Synthese
+              label="Score ESG agrégé"
+              value={formatScore(portefeuille.aggregated_esg_score)}
+            />
             <Synthese label="Couverture ESG" value={formatPourcentage(portefeuille.esg_coverage)} />
             <Synthese
               label="Positions"
@@ -143,8 +147,14 @@ export function PortfolioDetailPage() {
               label="Environnement (E)"
               value={formatScore(portefeuille.aggregated_environmental_score)}
             />
-            <Synthese label="Social (S)" value={formatScore(portefeuille.aggregated_social_score)} />
-            <Synthese label="Gouvernance (G)" value={formatScore(portefeuille.aggregated_governance_score)} />
+            <Synthese
+              label="Social (S)"
+              value={formatScore(portefeuille.aggregated_social_score)}
+            />
+            <Synthese
+              label="Gouvernance (G)"
+              value={formatScore(portefeuille.aggregated_governance_score)}
+            />
           </div>
 
           <PortfolioCarbonCard portefeuilleId={portefeuille.id} />
@@ -218,11 +228,17 @@ export function PortfolioDetailPage() {
                         <p>{formatMontant(position.outstanding_amount, position.currency)}</p>
                         {position.fx_rate_used ? (
                           <p className="text-xs text-brand-grey">
-                            = {formatMontant(position.converted_amount, portefeuille.reference_currency)}
+                            ={" "}
+                            {formatMontant(
+                              position.converted_amount,
+                              portefeuille.reference_currency,
+                            )}
                           </p>
                         ) : null}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">{formatPourcentage(position.weight * 100)}</td>
+                      <td className="py-2 pr-4 tabular-nums">
+                        {formatPourcentage(position.weight * 100)}
+                      </td>
                       <td className="py-2 pr-4">
                         {position.duration_type === DurationType.FIXE ? "Fixe" : "Ouverte"}
                       </td>
@@ -241,7 +257,9 @@ export function PortfolioDetailPage() {
                         <div className="flex flex-wrap gap-2">
                           {position.company ? (
                             <Button size="sm" variant="outline" asChild>
-                              <Link to={`/investor/entreprises/${position.company.id}`}>Détails</Link>
+                              <Link to={`/investor/entreprises/${position.company.id}`}>
+                                Détails
+                              </Link>
                             </Button>
                           ) : null}
                           {position.state === "PLANIFIEE" && position.company ? (
@@ -262,7 +280,11 @@ export function PortfolioDetailPage() {
                           ) : null}
                           {position.duration_type === DurationType.OUVERTE &&
                           position.end_date === null ? (
-                            <Button size="sm" variant="outline" onClick={() => setPositionAFermer(position)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPositionAFermer(position)}
+                            >
                               Fermer
                             </Button>
                           ) : null}
@@ -365,7 +387,8 @@ function SupprimerPositionButton({
       onClick={async () => {
         const confirme = await confirm({
           title: "Supprimer cette position ?",
-          description: "Cette position planifiée sera définitivement supprimée. Cette action est irréversible.",
+          description:
+            "Cette position planifiée sera définitivement supprimée. Cette action est irréversible.",
           confirmLabel: "Supprimer",
           destructive: true,
         });
@@ -486,7 +509,9 @@ function FormulaireFermeture({
             {
               onSuccess: onDone,
               onError: (error) =>
-                setServerError(error instanceof ApiError ? error.message : "Échec de la fermeture."),
+                setServerError(
+                  error instanceof ApiError ? error.message : "Échec de la fermeture.",
+                ),
             },
           )
         }
@@ -508,9 +533,8 @@ function FormulairePosition({
 }) {
   const addPosition = useAddPosition(portefeuilleId);
   const updatePosition = useUpdatePosition(portefeuilleId);
-  const [entrepriseSelectionnee, setEntrepriseSelectionnee] = useState<EntreprisePublieePublic | null>(
-    null,
-  );
+  const [entrepriseSelectionnee, setEntrepriseSelectionnee] =
+    useState<EntreprisePublieePublic | null>(null);
   // En modification, l'entreprise est figée sur la position existante (jamais changeable, voir
   // le formulaire plus bas) — on récupère son montant minimum pré-converti via la même route que
   // la fiche détaillée, plutôt que de le dupliquer dans PositionDetail.entreprise.
