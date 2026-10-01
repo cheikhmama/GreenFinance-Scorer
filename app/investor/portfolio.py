@@ -23,7 +23,7 @@ from app.auth.models import User
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, Currency, DurationType
+from app.core.enums import Currency, DurationType, RegistrationStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.recherche import contient
 from app.ingestion.models import ESGMetric
@@ -209,7 +209,7 @@ def position_detail(
         start_date=position.start_date,
         end_date=position.end_date,
         # Sans entreprise, seul l'état temporel compte (jamais « entreprise suspendue »).
-        state=etat_position(position, entreprise is None or entreprise.status == CompanyStatus.ACTIVE),
+        state=etat_position(position, entreprise is None or entreprise.status == RegistrationStatus.ACTIVE),
         score=score,
         published_at_used=entreprise.published_at if entreprise else None,
         evidence_available=preuves_disponibles,
@@ -387,7 +387,7 @@ def ajouter_position(
     entreprise = session.get(Company, payload.company_id)
     if entreprise is None or entreprise.published_at is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-    if entreprise.status != CompanyStatus.ACTIVE:
+    if entreprise.status != RegistrationStatus.ACTIVE:
         raise ValidationError(
             "Cette entreprise est suspendue — aucune nouvelle position ne peut y être ouverte.",
             code="entreprise_suspendue",
@@ -445,7 +445,7 @@ def modifier_position(
     entreprise = session.get(Company, position.company_id)
     assert entreprise is not None
 
-    if etat_position(position, entreprise.status == CompanyStatus.ACTIVE) != EtatPosition.PLANIFIEE:
+    if etat_position(position, entreprise.status == RegistrationStatus.ACTIVE) != EtatPosition.PLANIFIEE:
         raise ValidationError(
             "Seule une position encore planifiée peut être modifiée.",
             code="position_non_modifiable",
@@ -520,7 +520,7 @@ def supprimer_position(
     position = _position_du_portefeuille(session, portefeuille_id, position_id)
     entreprise = session.get(Company, position.company_id) if position.company_id else None
     # Sans entreprise (ligne non rapprochée), seul l'état temporel compte.
-    entreprise_active = entreprise is None or entreprise.status == CompanyStatus.ACTIVE
+    entreprise_active = entreprise is None or entreprise.status == RegistrationStatus.ACTIVE
     if etat_position(position, entreprise_active) != EtatPosition.PLANIFIEE:
         raise ValidationError(
             "Seule une position encore planifiée peut être supprimée.",

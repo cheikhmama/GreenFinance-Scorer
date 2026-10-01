@@ -33,6 +33,15 @@ export const correctionSchema = z.object({
 
 export type CorrectionForm = z.infer<typeof correctionSchema>;
 
+/** Lettre de mandat (tâche 5.2) : PDF de 5 Mo au plus — le backend vérifie seul la signature
+ * binaire du fichier. */
+const TAILLE_MAX_MANDAT = 5 * 1024 * 1024;
+
+export const lettreDeMandatSchema = z
+  .instanceof(File, { message: "La lettre de mandat (PDF) est requise." })
+  .refine((f) => f.size > 0, "Le fichier est vide.")
+  .refine((f) => f.size <= TAILLE_MAX_MANDAT, "La lettre de mandat dépasse 5 Mo.");
+
 /** Formulaire d'inscription publique (POST /companies/register) — mêmes règles que le backend
  * (app/company/schemas.py::CompanyRegistrationRequest), qui reste seul juge des chiffres de
  * contrôle ISIN/LEI : ici, seulement la forme, pour un retour immédiat. */
@@ -56,8 +65,21 @@ export const companyRegistrationFormSchema = z.object({
     .trim()
     .regex(/^$|^https?:\/\//, "Adresse web attendue (https://…)."),
   contact_name: z.string().trim().min(2, "Votre nom est requis.").max(100),
-  contact_email: z.string().trim().min(1, "L’adresse e-mail est requise").email("Adresse e-mail invalide"),
+  contact_email: z
+    .string()
+    .trim()
+    .min(1, "L’adresse e-mail est requise")
+    .email("Adresse e-mail invalide"),
   company_fax: z.string(),
+  mandate_letter: lettreDeMandatSchema,
 });
 
 export type CompanyRegistrationForm = z.infer<typeof companyRegistrationFormSchema>;
+
+/** Réponse à une demande d'informations, depuis la page de suivi publique. */
+export const reponseDemandeInfosSchema = z.object({
+  mandate_letter: lettreDeMandatSchema,
+  message: z.string().trim().max(2000, "2 000 caractères au plus."),
+});
+
+export type ReponseDemandeInfosForm = z.infer<typeof reponseDemandeInfosSchema>;

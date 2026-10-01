@@ -76,7 +76,11 @@ companies 1───* esg_reports 1───* esg_metrics
 | `country` | char(2) | ISO 3166-1 alpha-2 |
 | `revenue` | numeric(20,2) + `revenue_currency` | needed for carbon intensity (WACI) |
 | `enterprise_value` | numeric(20,2) + `ev_currency` + `ev_as_of` | **EVIC**, needed for the PCAF attribution factor |
-| `status` | enum `PENDING_ONBOARDING`, `ACTIVE`, `SUSPENDED` | account / KYC lifecycle; replaces the `actif` flag |
+| `status` | enum `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED` (task 5.2) | registration then account lifecycle; replaces the `actif` flag |
+| `registered_at`, `status_token_hash` (unique) | timestamp, char(64) | public registration (task 5.2): only the SHA-256 of the follow-up token is stored |
+| `mandate_letter_path`, `mandate_letter_uploaded_at` | | mandate letter PDF, stored like reports (`mandats/{company_id}/…`) |
+| `info_request_message`, `info_requested_at`, `info_response_message` | | info request (task 5.3) and the applicant's reply |
+| `rejection_reason`, `rejected_at` | | a rejected request is kept, with its reason |
 | `published_at` | timestamptz, nullable | last publication of the company's official score (was `date_publication`); a separate concept from onboarding |
 | `owner_user_id` | FK users, nullable | |
 

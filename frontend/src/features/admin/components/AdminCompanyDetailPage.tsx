@@ -1,18 +1,21 @@
-import type { CompanyStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, CheckCircle2, FileText, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
-import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { ApiError } from "@/shared/api/errors";
+import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  inscriptionEnExamen,
+  libelleStatutInscription,
+  variantStatutInscription,
+} from "@/shared/format/statutInscription";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
-import { OnboardingPanel } from "./OnboardingPanel";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -32,6 +35,7 @@ import {
 import { DEVISES, type ModifierEntrepriseForm, modifierEntrepriseSchema } from "../schemas";
 import { CompanyFinancialsCard } from "./CompanyFinancialsCard";
 import { CompanyIdentifiersCard } from "./CompanyIdentifiersCard";
+import { OnboardingPanel } from "./OnboardingPanel";
 
 function LogoEditor({
   entrepriseId,
@@ -52,7 +56,8 @@ function LogoEditor({
   async function retirerLogo() {
     const confirme = await confirm({
       title: "Retirer le logo ?",
-      description: "L'entreprise apparaîtra avec ses initiales à la place, jusqu'à l'envoi d'un nouveau logo.",
+      description:
+        "L'entreprise apparaîtra avec ses initiales à la place, jusqu'à l'envoi d'un nouveau logo.",
       confirmLabel: "Retirer",
       destructive: true,
     });
@@ -115,18 +120,6 @@ function LogoEditor({
  * publiée (logo, nom, secteur, pays, description, site officiel, montant minimum) pour que ces
  * données soient consultées ET modifiées depuis un seul endroit, plutôt que dispersées entre le
  * profil auto-déclaré de l'Entreprise et les seuls logo/montant jusqu'ici gérables ici. */
-const LIBELLE_STATUT: Record<CompanyStatus, string> = {
-  PENDING_ONBOARDING: "Inscription à valider",
-  ACTIVE: "Active",
-  SUSPENDED: "Suspendue",
-};
-
-const VARIANTE_STATUT: Record<CompanyStatus, "warning" | "success" | "destructive"> = {
-  PENDING_ONBOARDING: "warning",
-  ACTIVE: "success",
-  SUSPENDED: "destructive",
-};
-
 export function AdminCompanyDetailPage() {
   const { entrepriseId = "" } = useParams<{ entrepriseId: string }>();
   const { data: entreprise, isLoading, isError } = useCompanyDetail(entrepriseId);
@@ -178,7 +171,8 @@ export function AdminCompanyDetailPage() {
     if (!confirme) return;
     setActionError(null);
     suspend.mutate(entrepriseId, {
-      onError: (err) => setActionError(err instanceof ApiError ? err.message : "Échec de la suspension."),
+      onError: (err) =>
+        setActionError(err instanceof ApiError ? err.message : "Échec de la suspension."),
     });
   }
 
@@ -194,7 +188,9 @@ export function AdminCompanyDetailPage() {
         minimum_investment_amount: values.impose_minimum
           ? (values.minimum_investment_amount ?? null)
           : null,
-        minimum_investment_currency: values.impose_minimum ? (values.minimum_investment_currency ?? null) : null,
+        minimum_investment_currency: values.impose_minimum
+          ? (values.minimum_investment_currency ?? null)
+          : null,
       },
       {
         onError: (error) => {
@@ -211,11 +207,14 @@ export function AdminCompanyDetailPage() {
         title={entreprise.name}
         description="Profil complet de l'entreprise, tel que présenté à l'Investisseur une fois publiée."
       />
-      <Link to="/admin/entreprises" className="text-sm text-brand-green underline underline-offset-2">
+      <Link
+        to="/admin/entreprises"
+        className="text-sm text-brand-green underline underline-offset-2"
+      >
         ← Entreprises
       </Link>
 
-      {entreprise.status === "PENDING_ONBOARDING" ? (
+      {inscriptionEnExamen(entreprise.status) ? (
         <OnboardingPanel entrepriseId={entrepriseId} nom={entreprise.name} />
       ) : null}
 
@@ -228,8 +227,8 @@ export function AdminCompanyDetailPage() {
             <LogoEditor entrepriseId={entrepriseId} nom={entreprise.name} logo={entreprise.logo} />
             <div className="flex flex-col items-center gap-1.5 sm:items-start">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <Badge variant={VARIANTE_STATUT[entreprise.status]}>
-                  {LIBELLE_STATUT[entreprise.status]}
+                <Badge variant={variantStatutInscription(entreprise.status)}>
+                  {libelleStatutInscription(entreprise.status)}
                 </Badge>
                 <Badge variant={entreprise.published_at ? "success" : "outline"}>
                   {entreprise.published_at ? "Publiée" : "Non publiée"}
@@ -262,7 +261,8 @@ export function AdminCompanyDetailPage() {
                 </Link>
               </Button>
             ) : null}
-            {entreprise.latest_report_status === "PENDING_DECISION" && entreprise.latest_report_id ? (
+            {entreprise.latest_report_status === "PENDING_DECISION" &&
+            entreprise.latest_report_id ? (
               <Button
                 size="sm"
                 disabled={validate.isPending}
@@ -272,7 +272,9 @@ export function AdminCompanyDetailPage() {
                     { comment: null },
                     {
                       onError: (err) =>
-                        setActionError(err instanceof ApiError ? err.message : "Échec de la validation."),
+                        setActionError(
+                          err instanceof ApiError ? err.message : "Échec de la validation.",
+                        ),
                     },
                   );
                 }}
@@ -289,7 +291,9 @@ export function AdminCompanyDetailPage() {
                   setActionError(null);
                   publish.mutate(entrepriseId, {
                     onError: (err) =>
-                      setActionError(err instanceof ApiError ? err.message : "Échec de la publication."),
+                      setActionError(
+                        err instanceof ApiError ? err.message : "Échec de la publication.",
+                      ),
                   });
                 }}
               >
@@ -311,7 +315,9 @@ export function AdminCompanyDetailPage() {
                   setActionError(null);
                   reactivate.mutate(entrepriseId, {
                     onError: (err) =>
-                      setActionError(err instanceof ApiError ? err.message : "Échec de la réactivation."),
+                      setActionError(
+                        err instanceof ApiError ? err.message : "Échec de la réactivation.",
+                      ),
                   });
                 }}
               >

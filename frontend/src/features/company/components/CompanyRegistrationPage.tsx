@@ -27,13 +27,13 @@ function messageErreur(error: unknown) {
     return "Le service d’inscription est momentanément indisponible. Réessayez plus tard.";
   }
   if (error instanceof ApiError && error.status === 422) {
-    return "Certaines informations sont invalides : vérifiez notamment l’ISIN et le LEI.";
+    return "Certaines informations sont invalides : vérifiez notamment l’ISIN, le LEI et la lettre de mandat (PDF).";
   }
   return "La demande n’a pas pu être envoyée. Vérifiez votre connexion et réessayez.";
 }
 
 const CHAMPS: {
-  name: Exclude<keyof CompanyRegistrationForm, "company_fax">;
+  name: Exclude<keyof CompanyRegistrationForm, "company_fax" | "mandate_letter">;
   label: string;
   description?: string;
   autoComplete?: string;
@@ -41,17 +41,32 @@ const CHAMPS: {
 }[] = [
   { name: "company_name", label: "Nom de l’entreprise", autoComplete: "organization" },
   { name: "sector", label: "Secteur d’activité" },
-  { name: "country", label: "Pays", description: "Code à deux lettres, ex. MR.", autoComplete: "country" },
+  {
+    name: "country",
+    label: "Pays",
+    description: "Code à deux lettres, ex. MR.",
+    autoComplete: "country",
+  },
   { name: "website", label: "Site web (facultatif)", autoComplete: "url", type: "url" },
   { name: "isin", label: "ISIN (facultatif)", description: "Pour une entreprise cotée." },
-  { name: "lei", label: "LEI (facultatif)", description: "Legal Entity Identifier, 20 caractères." },
+  {
+    name: "lei",
+    label: "LEI (facultatif)",
+    description: "Legal Entity Identifier, 20 caractères.",
+  },
   { name: "contact_name", label: "Votre nom", autoComplete: "name" },
-  { name: "contact_email", label: "Votre e-mail professionnel", autoComplete: "email", type: "email" },
+  {
+    name: "contact_email",
+    label: "Votre e-mail professionnel",
+    autoComplete: "email",
+    type: "email",
+  },
 ];
 
-/** Inscription publique d'une entreprise (POST /companies/register, décision D5). La réponse est
- * la même que la demande aboutisse ou non : le résultat arrive par e-mail, et le lien pour créer
- * un mot de passe n'est envoyé qu'après validation par un administrateur. */
+/** Inscription publique d'une entreprise (POST /companies/register, décision D5). Champs
+ * d'identité, contact et lettre de mandat (tâche 5.2). La réponse est la même que la demande
+ * aboutisse ou non : le résultat arrive par e-mail avec un lien de suivi, et le lien pour créer un
+ * mot de passe n'est envoyé qu'après validation par un administrateur. */
 export function CompanyRegistrationPage() {
   const register = useRegisterCompany();
   const form = useForm<CompanyRegistrationForm>({
@@ -66,6 +81,7 @@ export function CompanyRegistrationPage() {
       contact_name: "",
       contact_email: "",
       company_fax: "",
+      mandate_letter: undefined,
     },
   });
 
@@ -93,8 +109,9 @@ export function CompanyRegistrationPage() {
             <CheckCircle2 aria-hidden="true" className="text-brand-green" />
             <AlertTitle>Demande envoyée</AlertTitle>
             <AlertDescription>
-              Nous vous écrivons à {register.variables?.contact_email}. Après validation de votre
-              entreprise, vous recevrez un lien pour créer votre mot de passe.
+              Nous vous écrivons à {register.variables?.contact_email}, avec un lien pour suivre
+              votre demande. Après validation de votre entreprise, vous recevrez un lien pour créer
+              votre mot de passe.
             </AlertDescription>
           </Alert>
           <Button asChild className="h-12 w-full rounded-xl">
@@ -135,9 +152,37 @@ export function CompanyRegistrationPage() {
                   )}
                 />
               ))}
+              <FormField
+                control={form.control}
+                name="mandate_letter"
+                render={({ field: { onChange, onBlur, name, ref } }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Lettre de mandat (PDF)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="file"
+                        accept="application/pdf"
+                        className="h-11 rounded-xl"
+                        name={name}
+                        ref={ref}
+                        onBlur={onBlur}
+                        onChange={(event) => onChange(event.target.files?.[0])}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Signée par un représentant légal, elle vous autorise à inscrire l’entreprise.
+                      5 Mo au plus.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               {/* Champ piège (app/company/registration.py) : hors écran, jamais atteint au clavier
                   ni annoncé par un lecteur d'écran — seul un robot le remplit. */}
-              <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
+              <div
+                aria-hidden="true"
+                className="absolute -left-[10000px] h-px w-px overflow-hidden"
+              >
                 <label>
                   Fax
                   <input tabIndex={-1} autoComplete="off" {...form.register("company_fax")} />

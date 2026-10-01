@@ -5,6 +5,10 @@ import { ApiError } from "@/shared/api/errors";
 import type { EntrepriseAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleStatutInscription,
+  variantStatutInscription,
+} from "@/shared/format/statutInscription";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -13,7 +17,12 @@ import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Input } from "@/shared/ui/input";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { useAllCompanies, useReactivateCompany, useSuspendCompany, useValidateReport } from "../api";
+import {
+  useAllCompanies,
+  useReactivateCompany,
+  useSuspendCompany,
+  useValidateReport,
+} from "../api";
 
 /** Vue de suivi de TOUTES les entreprises pour l'Administrateur — contrairement à
  * PublishableCompaniesSection (uniquement celles prêtes à publier), inclut aussi une entreprise
@@ -110,7 +119,11 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
     <Card className="shadow-none">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-14 shrink-0" />
+          <CompanyAvatar
+            nom={entreprise.name}
+            logo={entreprise.logo}
+            className="size-14 shrink-0"
+          />
           <div className="min-w-0">
             <Link
               to={`/admin/entreprises/${entreprise.id}`}
@@ -122,10 +135,11 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
               {entreprise.sector} — {entreprise.country}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {entreprise.status === "PENDING_ONBOARDING" ? (
-                <Badge variant="warning">Inscription à valider</Badge>
+              {entreprise.status !== "ACTIVE" ? (
+                <Badge variant={variantStatutInscription(entreprise.status)}>
+                  {libelleStatutInscription(entreprise.status)}
+                </Badge>
               ) : null}
-              {entreprise.status === "SUSPENDED" ? <Badge variant="destructive">Suspendue</Badge> : null}
               {entreprise.latest_report_status ? (
                 <Badge variant={variantStatutRapport(entreprise.latest_report_status)}>
                   {libelleStatutRapport(entreprise.latest_report_status)}
@@ -160,7 +174,9 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
                   { comment: null },
                   {
                     onError: (err) =>
-                      setActionError(err instanceof ApiError ? err.message : "Échec de la validation."),
+                      setActionError(
+                        err instanceof ApiError ? err.message : "Échec de la validation.",
+                      ),
                   },
                 );
               }}
@@ -185,7 +201,9 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
                 setActionError(null);
                 reactivate.mutate(entreprise.id, {
                   onError: (err) =>
-                    setActionError(err instanceof ApiError ? err.message : "Échec de la réactivation."),
+                    setActionError(
+                      err instanceof ApiError ? err.message : "Échec de la réactivation.",
+                    ),
                 });
               }}
             >

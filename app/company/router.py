@@ -10,7 +10,9 @@ surface API directe) — la logique appelée ici invoque directement app.ingesti
 
 import uuid
 
+import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
@@ -25,12 +27,19 @@ from app.company.rapports import (
     lister_mes_rapports,
     rapport_de_lentreprise,
 )
-from app.company.registration import enregistrer_demande
+from app.company.registration import (
+    consulter_suivi,
+    enregistrer_demande,
+    repondre_demande_infos,
+)
 from app.company.schemas import (
     CompanyRegistrationRequest,
     EntreprisePublic,
     ImporterRapportParURLRequest,
+    RegistrationStatusRequest,
+    RegistrationStatusView,
 )
+from app.company.upload_validation import TAILLE_MAX_MANDAT_OCTETS
 from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import ReportType, Role
@@ -40,6 +49,35 @@ from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
 from app.scoring.engine import score_public
 
 router = APIRouter(tags=["company"])
+
+
+def _demande_inscription(
+    company_name: str = Form(),
+    sector: str = Form(),
+    country: str = Form(),
+    contact_name: str = Form(),
+    contact_email: str = Form(),
+    isin: str | None = Form(default=None),
+    lei: str | None = Form(default=None),
+    website: str | None = Form(default=None),
+    company_fax: str | None = Form(default=None),
+) -> CompanyRegistrationRequest:
+    """Champs à plat à côté de la lettre de mandat (tâche 5.2) ; CompanyRegistrationRequest reste
+    la seule validation, ses erreurs une 422 par champ comme toute validation de requête."""
+    try:
+        return CompanyRegistrationRequest(
+            company_name=company_name,
+            sector=sector,
+            country=country,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            isin=isin,
+            lei=lei,
+            website=website,
+            company_fax=company_fax,
+        )
+    except pydantic.ValidationError as exc:
+        raise RequestValidationError(exc.errors(include_url=False)) from exc
 
 
 @router.post(
@@ -54,13 +92,56 @@ router = APIRouter(tags=["company"])
     },
 )
 def register_company(
-    payload: CompanyRegistrationRequest,
     request: Request,
     background_tasks: BackgroundTasks,
+    mandate_letter: UploadFile,
+    payload: CompanyRegistrationRequest = Depends(_demande_inscription),
     session: Session = Depends(get_session),
 ) -> None:
+    # Lecture bornée : un fichier plus gros que la limite est refusé sans être lu en entier.
+    contenu = mandate_letter.file.read(TAILLE_MAX_MANDAT_OCTETS + 1)
     enregistrer_demande(
-        session, payload, request.client.host if request.client else None, background_tasks
+        session, payload, contenu, request.client.host if request.client else None, background_tasks
+    )
+
+
+@router.post(
+    "/companies/registration-status",
+    response_model=RegistrationStatusView,
+    operation_id="getRegistrationStatus",
+    summary="Suivre une demande d'inscription (jeton reçu par e-mail)",
+    responses={404: {"description": "Jeton inconnu ou remplacé par un plus récent."}},
+)
+def registration_status(
+    payload: RegistrationStatusRequest, session: Session = Depends(get_session)
+) -> RegistrationStatusView:
+    return consulter_suivi(session, payload.token)
+
+
+@router.post(
+    "/companies/registration-status/reply",
+    response_model=RegistrationStatusView,
+    operation_id="replyToRegistrationInfoRequest",
+    summary="Répondre à une demande d'informations : nouvelle lettre de mandat",
+    responses={
+        404: {"description": "Jeton inconnu ou remplacé par un plus récent."},
+        429: {"description": "Limite d'envois par adresse IP atteinte."},
+    },
+)
+def reply_to_registration_info_request(
+    request: Request,
+    mandate_letter: UploadFile,
+    token: str = Form(min_length=20, max_length=200),
+    message: str | None = Form(default=None, max_length=2000),
+    session: Session = Depends(get_session),
+) -> RegistrationStatusView:
+    contenu = mandate_letter.file.read(TAILLE_MAX_MANDAT_OCTETS + 1)
+    return repondre_demande_infos(
+        session,
+        token,
+        contenu,
+        (message or "").strip() or None,
+        request.client.host if request.client else None,
     )
 
 

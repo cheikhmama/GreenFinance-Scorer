@@ -17,6 +17,8 @@ const ACTIONS: Record<string, string> = {
   password_reset_requested: "Demande de réinitialisation du mot de passe",
   registration_approved: "Validation d'inscription",
   registration_rejected: "Refus d'inscription",
+  registration_resubmitted: "Nouvelle demande après refus",
+  registration_info_provided: "Informations complétées par le demandeur",
   role_changed: "Changement de rôle",
 };
 

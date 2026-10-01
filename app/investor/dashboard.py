@@ -13,7 +13,7 @@ from sqlmodel import Session, col, select
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, Currency
+from app.core.enums import Currency, RegistrationStatus
 from app.investor import entreprises as entreprises_investisseur
 from app.investor import fx
 from app.investor.models import Portfolio, PortfolioPosition
@@ -110,7 +110,7 @@ def construire_tableau_de_bord(
     entreprises_suivies_suspendues = [
         EntrepriseSommaire.model_validate(e)
         for e in entreprises_publiees
-        if e.id in entreprises_suivies_ids and e.status != CompanyStatus.ACTIVE
+        if e.id in entreprises_suivies_ids and e.status != RegistrationStatus.ACTIVE
     ]
 
     return TableauDeBordInvestisseur(

@@ -41,11 +41,11 @@ from app.core.audit import auditer
 from app.core.database import engine, utcnow
 from app.core.enums import (
     AuditDecision,
-    CompanyStatus,
     Currency,
     DataMethod,
     DurationType,
     MetricCoverageStatus,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -214,7 +214,7 @@ def main() -> None:
                 sector=profil["secteur"],
                 country=profil["pays"],
                 description=f"{profil['nom']} — entreprise synthétique du corpus de démonstration.",
-                status=CompanyStatus.ACTIVE,
+                status=RegistrationStatus.ACTIVE,
                 owner_user_id=titulaire.id,
                 onboarded_at=utcnow() - timedelta(days=30),
                 onboarded_by_id=admin.id,

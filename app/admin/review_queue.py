@@ -21,7 +21,7 @@ from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, Currency, ReportStatus
+from app.core.enums import Currency, RegistrationStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
@@ -526,12 +526,12 @@ def suspendre_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
     entreprise = session.get(Company, entreprise_id)
     if entreprise is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-    if entreprise.status != CompanyStatus.ACTIVE:
+    if entreprise.status != RegistrationStatus.ACTIVE:
         raise ValidationError(
             "Seule une entreprise active peut être suspendue.", code="transition_invalide"
         )
 
-    entreprise.status = CompanyStatus.SUSPENDED
+    entreprise.status = RegistrationStatus.SUSPENDED
     session.add(entreprise)
     if entreprise.owner_user_id is not None:
         notifier(
@@ -552,12 +552,12 @@ def reactiver_entreprise(session: Session, entreprise_id: uuid.UUID) -> Company:
     if entreprise is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
     # Jamais depuis PENDING_ONBOARDING : réactiver n'est pas valider une inscription (tâche 1.4).
-    if entreprise.status != CompanyStatus.SUSPENDED:
+    if entreprise.status != RegistrationStatus.SUSPENDED:
         raise ValidationError(
             "Seule une entreprise suspendue peut être réactivée.", code="transition_invalide"
         )
 
-    entreprise.status = CompanyStatus.ACTIVE
+    entreprise.status = RegistrationStatus.ACTIVE
     session.add(entreprise)
     if entreprise.owner_user_id is not None:
         notifier(

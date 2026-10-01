@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.auth.schemas import EmailNormalise
 from app.company.identifiers import isin_valide, lei_valide
 from app.company.models import Company
-from app.core.enums import CompanyStatus, Currency, ReportType
+from app.core.enums import Currency, RegistrationStatus, ReportType
 
 
 def company_vers_contrat(company: Company) -> dict[str, Any]:
@@ -29,7 +29,7 @@ def company_vers_contrat(company: Company) -> dict[str, Any]:
         "logo": company.logo,
         "description": company.description,
         "website": company.website,
-        "active": company.status == CompanyStatus.ACTIVE,
+        "active": company.status == RegistrationStatus.ACTIVE,
         "status": company.status,
         "minimum_investment_amount": company.minimum_investment_amount,
         "minimum_investment_currency": company.minimum_investment_currency,
@@ -66,7 +66,7 @@ class EntreprisePublic(CompanyContractMixin):
     active: bool
     # Cycle de vie du compte (tâche 1.3) : distingue une entreprise en attente d'inscription
     # (PENDING_ONBOARDING) d'une entreprise suspendue — `actif` est faux dans les deux cas.
-    status: CompanyStatus
+    status: RegistrationStatus
     minimum_investment_amount: float | None
     minimum_investment_currency: Currency | None
     published_at: datetime | None
@@ -157,3 +157,27 @@ class CompanyRegistrationRequest(BaseModel):
         if not valeur.startswith(("https://", "http://")):
             raise ValueError("Adresse web attendue (https://…).")
         return valeur
+
+
+class RegistrationStatusRequest(BaseModel):
+    """POST /companies/registration-status — le jeton reçu par e-mail, dans le corps (jamais dans
+    l'URL d'une requête API, pour ne pas finir dans les journaux d'accès)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=20, max_length=200)
+
+
+class RegistrationStatusView(BaseModel):
+    """Ce que le demandeur voit de sa demande (tâche 5.2) — jamais l'identité de l'Administrateur
+    qui l'examine, ni les contrôles KYC."""
+
+    company_name: str
+    status: RegistrationStatus
+    registered_at: datetime | None
+    info_request_message: str | None
+    info_requested_at: datetime | None
+    rejection_reason: str | None
+    rejected_at: datetime | None
+    # Vrai seulement en INFO_REQUESTED : le demandeur peut alors envoyer une nouvelle lettre.
+    can_respond: bool

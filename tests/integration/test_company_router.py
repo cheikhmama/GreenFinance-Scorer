@@ -11,11 +11,11 @@ from app.company.models import Company
 from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
     ConfidenceLevel,
     DataMethod,
     MetricCoverageStatus,
     Pillar,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -201,7 +201,7 @@ def test_deposer_rapport_sans_entreprise_associee_est_rejete(session) -> None:
 def test_deposer_rapport_sur_entreprise_suspendue_est_rejete(session, monkeypatch) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     assert user.company is not None
-    user.company.status = CompanyStatus.SUSPENDED
+    user.company.status = RegistrationStatus.SUSPENDED
     session.add(user.company)
     session.commit()
     authed_client = _login(user.email, "s3cret-pass")

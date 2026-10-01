@@ -5,13 +5,16 @@
  * OpenAPI spec version: v1
  */
 import type {
+  BodyRegisterCompany,
+  BodyReplyToRegistrationInfoRequest,
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
-  CompanyRegistrationRequest,
   EntreprisePublic,
   ImporterRapportParURLRequest,
   RapportESGDetail,
-  RapportESGPublic
+  RapportESGPublic,
+  RegistrationStatusRequest,
+  RegistrationStatusView
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
@@ -27,7 +30,49 @@ export const getRegisterCompanyUrl = () => {
 /**
  * @summary Demander l'inscription d'une entreprise (validation par l'Administrateur)
  */
-export const registerCompany = async (companyRegistrationRequest: CompanyRegistrationRequest, options?: RequestInit): Promise<unknown> => {
+export const registerCompany = async (bodyRegisterCompany: BodyRegisterCompany, options?: RequestInit): Promise<unknown> => {
+    const formData = new FormData();
+formData.append(`mandate_letter`, bodyRegisterCompany.mandate_letter);
+formData.append(`company_name`, bodyRegisterCompany.company_name);
+formData.append(`sector`, bodyRegisterCompany.sector);
+formData.append(`country`, bodyRegisterCompany.country);
+formData.append(`contact_name`, bodyRegisterCompany.contact_name);
+formData.append(`contact_email`, bodyRegisterCompany.contact_email);
+if(bodyRegisterCompany.isin !== undefined && bodyRegisterCompany.isin !== null) {
+ formData.append(`isin`, bodyRegisterCompany.isin);
+ }
+if(bodyRegisterCompany.lei !== undefined && bodyRegisterCompany.lei !== null) {
+ formData.append(`lei`, bodyRegisterCompany.lei);
+ }
+if(bodyRegisterCompany.website !== undefined && bodyRegisterCompany.website !== null) {
+ formData.append(`website`, bodyRegisterCompany.website);
+ }
+if(bodyRegisterCompany.company_fax !== undefined && bodyRegisterCompany.company_fax !== null) {
+ formData.append(`company_fax`, bodyRegisterCompany.company_fax);
+ }
+
+  return apiFetch<unknown>(getRegisterCompanyUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+export const getGetRegistrationStatusUrl = () => {
+
+
+
+
+  return `/companies/registration-status`
+}
+
+/**
+ * @summary Suivre une demande d'inscription (jeton reçu par e-mail)
+ */
+export const getRegistrationStatus = async (registrationStatusRequest: RegistrationStatusRequest, options?: RequestInit): Promise<RegistrationStatusView> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -35,12 +80,41 @@ export const registerCompany = async (companyRegistrationRequest: CompanyRegistr
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return apiFetch<unknown>(getRegisterCompanyUrl(),
+return apiFetch<RegistrationStatusView>(getGetRegistrationStatusUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(companyRegistrationRequest)
+    body: JSON.stringify(registrationStatusRequest)
+  }
+);}
+
+
+export const getReplyToRegistrationInfoRequestUrl = () => {
+
+
+
+
+  return `/companies/registration-status/reply`
+}
+
+/**
+ * @summary Répondre à une demande d'informations : nouvelle lettre de mandat
+ */
+export const replyToRegistrationInfoRequest = async (bodyReplyToRegistrationInfoRequest: BodyReplyToRegistrationInfoRequest, options?: RequestInit): Promise<RegistrationStatusView> => {
+    const formData = new FormData();
+formData.append(`mandate_letter`, bodyReplyToRegistrationInfoRequest.mandate_letter);
+formData.append(`token`, bodyReplyToRegistrationInfoRequest.token);
+if(bodyReplyToRegistrationInfoRequest.message !== undefined && bodyReplyToRegistrationInfoRequest.message !== null) {
+ formData.append(`message`, bodyReplyToRegistrationInfoRequest.message);
+ }
+
+  return apiFetch<RegistrationStatusView>(getReplyToRegistrationInfoRequestUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
   }
 );}
 

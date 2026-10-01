@@ -56,8 +56,10 @@ consultable par les investisseurs et les chercheurs.
   corrélation de Spearman avec les scores de la plateforme.
 
 **Plateforme**
-- Inscription publique des entreprises, soumise à validation de l'administrateur ; comptes activés
-  par lien e-mail, réinitialisation et changement d'e-mail par lien à usage unique.
+- Inscription publique des entreprises avec lettre de mandat, soumise à validation de
+  l'administrateur ; le demandeur suit sa demande sur une page publique (lien reçu par e-mail) et y
+  répond à une demande d'informations. Comptes activés par lien e-mail (72 h), réinitialisation et
+  changement d'e-mail par lien à usage unique.
 - Notifications dans l'application, journal d'audit des événements de compte, tableaux de bord par
   rôle.
 

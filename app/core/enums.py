@@ -43,12 +43,19 @@ class ReportStatus(str, Enum):
     REJECTED = "REJECTED"
 
 
-class CompanyStatus(str, Enum):
-    """Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
-    score (Company.published_at)."""
+class RegistrationStatus(str, Enum):
+    """Cycle de vie de l'inscription puis du compte entreprise (KYC, décision D5, tâche 5.2) —
+    distinct de la publication de son score (Company.published_at).
+
+    PENDING_ONBOARDING et INFO_REQUESTED : demande en cours d'examen, entreprise invisible et
+    inactive. REJECTED : demande refusée, conservée avec son motif (plus supprimée). ACTIVE puis,
+    éventuellement, SUSPENDED : entreprise validée.
+    """
 
     PENDING_ONBOARDING = "PENDING_ONBOARDING"
+    INFO_REQUESTED = "INFO_REQUESTED"
     ACTIVE = "ACTIVE"
+    REJECTED = "REJECTED"
     SUSPENDED = "SUSPENDED"
 
 

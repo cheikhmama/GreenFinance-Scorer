@@ -3,18 +3,22 @@ import type { ApiError } from "@/shared/api/errors";
 import {
   getCompanyReport,
   getMyCompanyProfile,
+  getRegistrationStatus,
   listCompanyReports,
   registerCompany,
+  replyToRegistrationInfoRequest,
   submitCompanyReport,
   submitCompanyReportCorrection,
 } from "@/shared/api/generated/company/company";
 import type {
+  BodyRegisterCompany,
+  BodyReplyToRegistrationInfoRequest,
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
-  CompanyRegistrationRequest,
   EntreprisePublic,
   RapportESGDetail,
   RapportESGPublic,
+  RegistrationStatusView,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 const REPORTS_QUERY_KEY = ["company", "rapports"] as const;
@@ -72,11 +76,39 @@ export function useSubmitCorrection(rapportId: string) {
   });
 }
 
-/** POST /companies/register — public. Réponse 202 identique que la demande aboutisse ou non
- * (app/company/registration.py) : le demandeur est informé par e-mail. */
+/** POST /companies/register — public, multipart (lettre de mandat, tâche 5.2). Réponse 202
+ * identique que la demande aboutisse ou non (app/company/registration.py) : le demandeur est
+ * informé par e-mail, avec son lien de suivi. */
 export function useRegisterCompany() {
-  return useMutation<unknown, ApiError, CompanyRegistrationRequest>({
+  return useMutation<unknown, ApiError, BodyRegisterCompany>({
     mutationFn: (payload) => registerCompany(payload),
     retry: false,
+  });
+}
+
+/** POST /companies/registration-status — public : le jeton reçu par e-mail, dans le corps. */
+export function useRegistrationStatus(token: string | null) {
+  return useQuery<RegistrationStatusView, ApiError>({
+    queryKey: ["company", "registration-status", token],
+    queryFn: () => getRegistrationStatus({ token: token ?? "" }),
+    enabled: token !== null,
+    retry: false,
+  });
+}
+
+/** POST /companies/registration-status/reply — nouvelle lettre de mandat en réponse à une
+ * demande d'informations. */
+export function useReplyToRegistrationInfoRequest(token: string) {
+  const queryClient = useQueryClient();
+  return useMutation<
+    RegistrationStatusView,
+    ApiError,
+    Omit<BodyReplyToRegistrationInfoRequest, "token">
+  >({
+    mutationFn: (payload) => replyToRegistrationInfoRequest({ ...payload, token }),
+    retry: false,
+    onSuccess: (vue) => {
+      queryClient.setQueryData(["company", "registration-status", token], vue);
+    },
   });
 }

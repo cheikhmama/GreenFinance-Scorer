@@ -6,7 +6,7 @@
  */
 /**
  * POST /auth/activer-compte — jeton reçu via le lien envoyé à la création du compte
- * (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 7 jours, usage unique).
+ * (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 72 heures, usage unique).
  */
 export interface ActiverCompteRequest {
   /**
@@ -276,6 +276,29 @@ export interface BodyImportReferenceDataset {
   higher_is_better?: boolean;
 }
 
+export interface BodyRegisterCompany {
+  mandate_letter: Blob;
+  company_name: string;
+  sector: string;
+  country: string;
+  contact_name: string;
+  contact_email: string;
+  isin?: string | null;
+  lei?: string | null;
+  website?: string | null;
+  company_fax?: string | null;
+}
+
+export interface BodyReplyToRegistrationInfoRequest {
+  mandate_letter: Blob;
+  /**
+     * @minLength 20
+     * @maxLength 200
+     */
+  token: string;
+  message?: string | null;
+}
+
 export type ReportType = typeof ReportType[keyof typeof ReportType];
 
 
@@ -418,62 +441,33 @@ export interface CompanyOnboardingRequest {
 }
 
 /**
- * Cycle de vie du compte entreprise (KYC, décision D5) — distinct de la publication de son
- * score (Company.published_at).
+ * Cycle de vie de l'inscription puis du compte entreprise (KYC, décision D5, tâche 5.2) —
+ * distinct de la publication de son score (Company.published_at).
+ *
+ * PENDING_ONBOARDING et INFO_REQUESTED : demande en cours d'examen, entreprise invisible et
+ * inactive. REJECTED : demande refusée, conservée avec son motif (plus supprimée). ACTIVE puis,
+ * éventuellement, SUSPENDED : entreprise validée.
  */
-export type CompanyStatus = typeof CompanyStatus[keyof typeof CompanyStatus];
+export type RegistrationStatus = typeof RegistrationStatus[keyof typeof RegistrationStatus];
 
 
-export const CompanyStatus = {
+export const RegistrationStatus = {
   PENDING_ONBOARDING: 'PENDING_ONBOARDING',
+  INFO_REQUESTED: 'INFO_REQUESTED',
   ACTIVE: 'ACTIVE',
+  REJECTED: 'REJECTED',
   SUSPENDED: 'SUSPENDED',
 } as const;
 
 /**
- * `status` est None après un refus : l'inscription refusée est supprimée (le demandeur peut
- * en déposer une nouvelle), il n'y a plus d'entreprise à décrire.
+ * `status` vaut ACTIVE après validation, REJECTED après refus (tâche 5.2 : l'inscription
+ * refusée est conservée, plus supprimée).
  */
 export interface CompanyOnboardingResult {
   company_id: string;
   decision: OnboardingDecision;
-  status: CompanyStatus | null;
+  status: RegistrationStatus;
   onboarded_at: string | null;
-}
-
-/**
- * POST /companies/register — inscription publique d'une entreprise (tâche 1.3, décision D5).
- *
- * Premier contrat HTTP en anglais (docs/RENAME_PLAN.md §1, règle 3, tâche 1.3) : nouvel endpoint, donc
- * directement dans les noms cibles. ISIN et LEI restent facultatifs (beaucoup d'entreprises non
- * cotées n'en ont pas) mais, fournis, leur chiffre de contrôle est vérifié.
- *
- * `company_fax` est un champ piège : invisible dans le formulaire, un humain le laisse vide ; un
- * robot qui remplit tous les champs est ignoré sans le savoir (voir app/company/registration.py).
- */
-export interface CompanyRegistrationRequest {
-  /**
-     * @minLength 2
-     * @maxLength 200
-     */
-  company_name: string;
-  /**
-     * @minLength 2
-     * @maxLength 100
-     */
-  sector: string;
-  /** Code pays ISO 3166-1 alpha-2, ex. MR */
-  country: string;
-  isin?: string | null;
-  lei?: string | null;
-  website?: string | null;
-  /**
-     * @minLength 2
-     * @maxLength 100
-     */
-  contact_name: string;
-  contact_email: string;
-  company_fax?: string | null;
 }
 
 /**
@@ -773,7 +767,7 @@ export interface EntrepriseAdmin {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -854,7 +848,7 @@ export interface EntrepriseDetailInvestisseur {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -887,7 +881,7 @@ export interface EntreprisePublic {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -912,7 +906,7 @@ export interface EntreprisePublieePublic {
   description: string | null;
   website: string | null;
   active: boolean;
-  status: CompanyStatus;
+  status: RegistrationStatus;
   minimum_investment_amount: number | null;
   minimum_investment_currency: Currency | null;
   published_at: string | null;
@@ -1555,6 +1549,33 @@ export interface ReferenceDatasetImportResult {
   imported: number;
   skipped: number;
   skipped_lines: SkippedLine[];
+}
+
+/**
+ * POST /companies/registration-status — le jeton reçu par e-mail, dans le corps (jamais dans
+ * l'URL d'une requête API, pour ne pas finir dans les journaux d'accès).
+ */
+export interface RegistrationStatusRequest {
+  /**
+     * @minLength 20
+     * @maxLength 200
+     */
+  token: string;
+}
+
+/**
+ * Ce que le demandeur voit de sa demande (tâche 5.2) — jamais l'identité de l'Administrateur
+ * qui l'examine, ni les contrôles KYC.
+ */
+export interface RegistrationStatusView {
+  company_name: string;
+  status: RegistrationStatus;
+  registered_at: string | null;
+  info_request_message: string | null;
+  info_requested_at: string | null;
+  rejection_reason: string | null;
+  rejected_at: string | null;
+  can_respond: boolean;
 }
 
 /**

@@ -36,11 +36,11 @@ from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
     Currency,
     DurationType,
     IdentifierType,
     MatchStatus,
+    RegistrationStatus,
 )
 from app.core.exceptions import ValidationError
 from app.investor import fx
@@ -264,7 +264,7 @@ def importer_positions(
             converti, taux = fx.convertir(montant, devise, devise_ref, chemin_taux)
             statut, entreprise = _rapprocher(session, ligne)
             if entreprise is not None:
-                if entreprise.status != CompanyStatus.ACTIVE:
+                if entreprise.status != RegistrationStatus.ACTIVE:
                     erreurs[f"line_{ligne.numero}"] = "entreprise suspendue : aucune nouvelle position"
                     continue
                 try:

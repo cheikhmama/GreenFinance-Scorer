@@ -19,23 +19,32 @@ Conventions used below:
 ### 1.1 Company lifecycle
 
 ```
-            register (public)           onboard (ADMIN)
-   ∅ ─────────────────────────> PENDING_ONBOARDING ──────────────> ACTIVE
-                                        │                           │  ▲
-                                        │ reject (ADMIN)   suspend  │  │ reactivate
-                                        ▼                  (ADMIN)  ▼  │ (ADMIN)
-                                     (deleted)                   SUSPENDED
+            register (public)               approve (ADMIN)
+   ∅ ─────────────────────────> PENDING_ONBOARDING ────────────────> ACTIVE
+                                 │   ▲       │                          │  ▲
+                request info     │   │ reply │ reject       suspend     │  │ reactivate
+                (ADMIN, 5.3)     ▼   │       ▼ (ADMIN)      (ADMIN)     ▼  │ (ADMIN)
+                           INFO_REQUESTED   REJECTED                SUSPENDED
+                                 │   (reject / approve      │
+                                 │    also from here)       │ register again, same identifiers
+                                 └──────────────────────────┴──────────> PENDING_ONBOARDING
 ```
+
+*Task 5.2*: a rejected request is kept (`REJECTED`, reason) instead of deleted, and the applicant
+follows the request on a public page opened with a token received by e-mail.
 
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|
-| register (*task 1.3*) | public | Valid ISIN/LEI check digits if given (both optional); email, ISIN and LEI not already known; 3 requests per IP per hour; trap field empty. Same `202` answer whatever the outcome — the requester learns it by e-mail | company `PENDING_ONBOARDING` + owner user `ENTERPRISE` **without password** + audit log + admin notification `ENTREPRISE_INSCRITE` | acknowledgment e-mail (or "not processed" e-mail on a duplicate). The activation link is sent at onboarding, never before |
-| onboard — approve (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING` (row locked); owner account present. **No ISIN/LEI or financial data required** — many unlisted companies have none; the admin may complete the profile first, and PCAF (task 2.3) asks for figures when it needs them | status `ACTIVE`, onboarded_by/at, activation token, audit log | activation e-mail to the owner |
-| onboard — reject (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING`; a reason is required | company and owner account deleted (the owner never had a password), audit log keeps the decision and the reason | e-mail with the reason; the requester may register again |
+| register (*tasks 1.3, 5.2*, multipart) | public | Identity (legal name, sector, country, ISIN/LEI with valid check digits if given, website), contact name and e-mail, **mandate letter PDF** (≤ 5 MB, PDF signature, not encrypted); email, ISIN and LEI not already known — or all of them pointing to one `REJECTED` request, which is then reopened; 3 requests per IP per hour; trap field empty. Same `202` answer whatever the outcome — the requester learns it by e-mail | company `PENDING_ONBOARDING` (or the reopened one) + owner user `ENTERPRISE` **without password** + mandate letter stored + follow-up token (SHA-256 stored, previous token invalidated) + audit log (`company_registered` / `registration_resubmitted`) + admin notification `ENTREPRISE_INSCRITE` | acknowledgment e-mail **with the follow-up link** (or "not processed" e-mail on a duplicate). The activation link is sent at onboarding, never before |
+| follow request (*task 5.2*, `POST /companies/registration-status`) | public, token in the body | token known | — (read only: status, info request, rejection reason) | — |
+| reply to an info request (*task 5.2*, `POST /companies/registration-status/reply`) | public, token | `INFO_REQUESTED` (row locked); new mandate letter PDF; optional message ≤ 2 000 characters; 3 replies per IP per hour | status `PENDING_ONBOARDING`, new mandate letter, message kept, audit log `registration_info_provided`, admin notification `ENTREPRISE_INFOS_COMPLETEES` | — |
+| onboard — approve (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING` or `INFO_REQUESTED` (row locked); owner account present. **No ISIN/LEI or financial data required** — many unlisted companies have none; the admin may complete the profile first, and PCAF (task 2.3) asks for figures when it needs them | status `ACTIVE`, onboarded_by/at, activation token (valid **72 hours** since task 5.2), audit log | activation e-mail to the owner |
+| onboard — reject (*tasks 1.4, 5.2*) | ADMIN | status `PENDING_ONBOARDING` or `INFO_REQUESTED`; a reason is required | status `REJECTED` with `rejection_reason` / `rejected_at`, owner account deactivated (it never had a password), audit log | e-mail with the reason; the reason stays on the follow-up page; registering again with the same identifiers reopens the request |
 | suspend / reactivate | ADMIN | — | status change, audit log, sessions of the owner revoked on suspend | — |
 
 **Rules:**
-- A `PENDING_ONBOARDING` company is invisible to every role except `ADMIN` and its owner.
+- A `PENDING_ONBOARDING`, `INFO_REQUESTED` or `REJECTED` company is invisible to every role except
+  `ADMIN`; its applicant only sees it through the follow-up page.
 - Only an `ACTIVE` company can submit reports or receive new investments.
 - A `SUSPENDED` company stays visible to investors who already hold it (so they see the
   warning), but can't receive new positions.

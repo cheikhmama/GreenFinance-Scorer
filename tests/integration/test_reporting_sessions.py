@@ -10,7 +10,7 @@ from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -95,7 +95,7 @@ def test_exercice_hors_bornes_refuse(session, entreprise, annee) -> None:
 
 def test_entreprise_suspendue_ne_declare_pas(session, entreprise) -> None:
     user, client = entreprise
-    user.company.status = CompanyStatus.SUSPENDED
+    user.company.status = RegistrationStatus.SUSPENDED
     session.add(user.company)
     session.commit()
 

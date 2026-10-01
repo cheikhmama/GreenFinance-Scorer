@@ -10,9 +10,9 @@ from app.company.models import Company
 from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
     Currency,
     DataMethod,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -68,7 +68,7 @@ def _entreprise_publiee(
         name=f"Cible {uuid.uuid4()}",
         sector=secteur,
         country=pays,
-        status=CompanyStatus.ACTIVE if actif else CompanyStatus.SUSPENDED,
+        status=RegistrationStatus.ACTIVE if actif else RegistrationStatus.SUSPENDED,
         minimum_investment_amount=montant_minimum,
         minimum_investment_currency=Currency.USD if montant_minimum is not None else None,
         published_at=utcnow(),
@@ -610,7 +610,7 @@ def test_tableau_de_bord_compte_portefeuilles_et_entreprises_suivies_suspendues(
     )
 
     # Suspendue APRÈS la prise de position (voir "position conservée, nouvelle opération bloquée").
-    suspendue.status = CompanyStatus.SUSPENDED
+    suspendue.status = RegistrationStatus.SUSPENDED
     session.add(suspendue)
     session.commit()
 

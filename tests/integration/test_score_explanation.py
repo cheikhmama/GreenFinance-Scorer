@@ -10,9 +10,9 @@ from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
     DataMethod,
     Pillar,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -42,7 +42,7 @@ def _entreprise_scoree(
         name=f"Pair {uuid.uuid4()}",
         sector=secteur,
         country="MR",
-        status=CompanyStatus.ACTIVE,
+        status=RegistrationStatus.ACTIVE,
         published_at=utcnow() if publiee else None,
         owner_user_id=proprietaire,
     )

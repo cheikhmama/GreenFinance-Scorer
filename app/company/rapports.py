@@ -19,7 +19,7 @@ from app.company.upload_validation import (
 from app.company.url_fetch import telecharger_pdf_depuis_url
 from app.core.database import utcnow
 from app.core.enums import (
-    CompanyStatus,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     SubmissionChannel,
@@ -82,14 +82,19 @@ def _enregistrer_fichier(entreprise_id: uuid.UUID, rapport_id: uuid.UUID, conten
 
 
 def verifier_entreprise_active(entreprise: Company | None) -> None:
-    """Seule une entreprise ACTIVE dépose ou ouvre une déclaration — une inscription en attente
-    (tâche 1.3) ou une entreprise suspendue ne le peut pas."""
-    if entreprise is not None and entreprise.status == CompanyStatus.PENDING_ONBOARDING:
+    """Seule une entreprise ACTIVE dépose ou ouvre une déclaration — une inscription en attente,
+    en demande d'informations ou refusée (tâches 1.3, 5.2), ou une entreprise suspendue, ne le peut
+    pas."""
+    if entreprise is not None and entreprise.status in (
+        RegistrationStatus.PENDING_ONBOARDING,
+        RegistrationStatus.INFO_REQUESTED,
+        RegistrationStatus.REJECTED,
+    ):
         raise ValidationError(
             "L'inscription de cette entreprise n'est pas encore validée.",
             code="inscription_non_validee",
         )
-    if entreprise is not None and entreprise.status != CompanyStatus.ACTIVE:
+    if entreprise is not None and entreprise.status != RegistrationStatus.ACTIVE:
         raise ValidationError("Cette entreprise est suspendue.", code="entreprise_suspendue")
 
 

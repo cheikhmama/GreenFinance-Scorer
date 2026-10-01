@@ -1,15 +1,17 @@
 """Validation des inscriptions d'entreprises par l'Administrateur (tâche 1.4, décision D5).
 
-Une inscription publique (app/company/registration.py) attend en PENDING_ONBOARDING. Deux issues,
+Une inscription publique (app/company/registration.py) attend en PENDING_ONBOARDING (ou
+INFO_REQUESTED, tâche 5.3). Deux issues,
 chacune dans une seule transaction, l'entreprise verrouillée (SELECT ... FOR UPDATE) pour que deux
 Administrateurs ne décident jamais deux fois :
 
 - VALIDER : l'entreprise passe ACTIVE (onboarded_at / onboarded_by_id renseignés) et le lien
   d'activation part vers le titulaire — c'est seulement maintenant qu'il peut créer son mot de
   passe (app/auth/activation.py). Jeton et changement de statut commitent ensemble.
-- REFUSER : l'inscription est supprimée (entreprise et compte titulaire, qui n'a jamais eu de mot de
-  passe), le motif est envoyé au demandeur. Il peut en déposer une nouvelle ; la trace de la
-  décision reste dans le journal d'audit.
+- REFUSER : l'inscription passe REJECTED avec son motif (tâche 5.2 : plus supprimée), le compte
+  titulaire — qui n'a jamais eu de mot de passe — est désactivé, le motif est envoyé au demandeur
+  et reste lisible sur sa page de suivi. Une nouvelle demande aux mêmes identifiants rouvre cette
+  même inscription (app/company/registration.py).
 
 Aucune donnée financière n'est exigée pour valider (ISIN/LEI, chiffre d'affaires, EVIC) : beaucoup
 d'entreprises non cotées n'en ont pas. L'Administrateur peut compléter le profil avant de valider
@@ -27,6 +29,7 @@ from app.admin.schemas import CompanyOnboardingResult, OnboardingDecision
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import User
 from app.company.models import Company
+from app.company.registration import STATUTS_EN_EXAMEN
 from app.core.audit import auditer
 from app.core.database import utcnow
 from app.core.email import (
@@ -34,7 +37,7 @@ from app.core.email import (
     ensure_email_configured,
     envoyer_email_differe,
 )
-from app.core.enums import CompanyStatus
+from app.core.enums import RegistrationStatus
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 
 logger = structlog.get_logger(__name__)
@@ -47,8 +50,8 @@ def _prevenir_refus(email: str, nom_entreprise: str, motif: str) -> None:
             subject="Votre demande d'inscription — GreenFinance-Scorer",
             body=(
                 f"Nous ne pouvons pas donner suite à la demande d'inscription de {nom_entreprise}."
-                f"\n\nMotif : {motif}\n\nVous pouvez déposer une nouvelle demande, ou nous écrire "
-                "via le formulaire de contact.\n"
+                f"\n\nMotif : {motif}\n\nVous pouvez déposer une nouvelle demande avec les "
+                "mêmes identifiants, ou nous écrire via le formulaire de contact.\n"
             ),
         )
     except EmailDeliveryError as exc:
@@ -66,7 +69,7 @@ def decider_inscription(
     entreprise = session.get(Company, entreprise_id, with_for_update=True)
     if entreprise is None:
         raise NotFoundError("Entreprise introuvable.", code="entreprise_introuvable")
-    if entreprise.status != CompanyStatus.PENDING_ONBOARDING:
+    if entreprise.status not in STATUTS_EN_EXAMEN:
         raise ValidationError(
             "Cette entreprise n'a pas d'inscription en attente.", code="transition_invalide"
         )
@@ -85,7 +88,7 @@ def decider_inscription(
         ) from exc
 
     if decision == OnboardingDecision.APPROVE:
-        entreprise.status = CompanyStatus.ACTIVE
+        entreprise.status = RegistrationStatus.ACTIVE
         entreprise.onboarded_at = utcnow()
         entreprise.onboarded_by_id = acteur_id
         session.add(entreprise)
@@ -101,7 +104,12 @@ def decider_inscription(
         )
 
     assert motif is not None  # garanti par CompanyOnboardingRequest
-    email, nom = titulaire.email, entreprise.name
+    entreprise.status = RegistrationStatus.REJECTED
+    entreprise.rejection_reason = motif
+    entreprise.rejected_at = utcnow()
+    session.add(entreprise)
+    titulaire.active = False
+    session.add(titulaire)
     auditer(
         session,
         acteur_id,
@@ -111,12 +119,12 @@ def decider_inscription(
         "success",
         new_value=motif,
     )
-    session.delete(entreprise)
-    session.flush()  # l'entreprise d'abord : elle référence son titulaire
-    session.delete(titulaire)
     session.commit()
-    background_tasks.add_task(_prevenir_refus, email, nom, motif)
+    background_tasks.add_task(_prevenir_refus, titulaire.email, entreprise.name, motif)
     logger.info("company_registration_rejected", company_id=str(entreprise_id))
     return CompanyOnboardingResult(
-        company_id=entreprise_id, decision=decision, status=None, onboarded_at=None
+        company_id=entreprise_id,
+        decision=decision,
+        status=RegistrationStatus.REJECTED,
+        onboarded_at=None,
     )

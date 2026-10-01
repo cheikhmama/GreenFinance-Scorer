@@ -14,15 +14,20 @@ from app.core.exceptions import ValidationError
 # Le plus gros rapport du pilote documentaire (Schneider Electric, 290 pages) pèse une fraction
 # de cette limite — large marge sans autoriser un dépôt disproportionné.
 TAILLE_MAX_OCTETS = 50 * 1024 * 1024
+# Lettre de mandat de l'inscription publique (tâche 5.2) : quelques pages au plus.
+TAILLE_MAX_MANDAT_OCTETS = 5 * 1024 * 1024
 
 
-def valider_pdf(contenu: bytes) -> None:
+def valider_pdf(contenu: bytes, taille_max: int | None = None) -> None:
+    # Limite lue à l'appel (pas en valeur par défaut figée à l'import) : TAILLE_MAX_OCTETS reste
+    # la seule source pour les rapports.
+    taille_max = TAILLE_MAX_OCTETS if taille_max is None else taille_max
     if len(contenu) == 0:
         raise ValidationError("Le fichier est vide.", code="fichier_vide")
-    if len(contenu) > TAILLE_MAX_OCTETS:
+    if len(contenu) > taille_max:
         raise ValidationError(
             f"Le fichier dépasse la taille maximale autorisée "
-            f"({TAILLE_MAX_OCTETS // (1024 * 1024)} Mo).",
+            f"({taille_max // (1024 * 1024)} Mo).",
             code="fichier_trop_volumineux",
         )
     if not contenu.startswith(b"%PDF-"):

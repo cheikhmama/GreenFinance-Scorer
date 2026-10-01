@@ -163,10 +163,11 @@ Decisions taken before starting (2026-10-01):
   - [x] API: `status` only. Enterprise views show one collapsed label, "En cours d'examen 🔒", for `EXTRACTING`, `AWAITING_ASSIGNMENT`, `IN_AUDIT` and `PENDING_DECISION` (`shared/format/statut.ts`, `…Entreprise` variants); internal roles see the detailed state. Enterprise notifications still name the step (assignment, end of audit) — left as is.
   - [x] `docs/WORKFLOWS.md` §1.2 state machine, `docs/ARCHITECTURE.md` §3.2.1, README diagram updated.
   - [x] Also: a flaky admin test (two reports created in the same clock tick, ordered by `created_at`) fixed. 668 backend tests, 84 frontend tests.
-- [ ] 5.2 Company registration lifecycle
-  - [ ] `CompanyStatus` → `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED` (today a refusal deletes the request — it now stays as `REJECTED` with its reason).
-  - [ ] Columns: `status_token` (hashed, lets the applicant follow the request without an account), `rejection_reason`, `info_request_message`, `info_requested_at`; activation link valid 72 h (was 7 days).
-  - [ ] Public registration: identity fields only (legal name, LEI, ISIN, sector, country) + contact e-mail + mandate letter PDF (size/type checked, stored like reports). Public status page reached with the token; the applicant can answer an info request by uploading a new mandate letter.
+- [x] 5.2 Company registration lifecycle
+  - [x] `CompanyStatus` → `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED`. A refusal no longer deletes the request: it stays `REJECTED` with its reason, the owner account (never activated) is deactivated. Registering again with the same identifiers reopens that request (new token, previous one invalidated); if any identifier belongs to something else, the request is not processed — same `202`, explained by e-mail.
+  - [x] Columns (migration `b8d3f1a6c2e4`, round trip with a rejected and an info-requested company, `alembic check` clean): `registered_at`, `status_token_hash` (SHA-256, unique — the token itself only goes out by e-mail, never in an HTTP answer), `mandate_letter_path` / `_uploaded_at`, `info_request_message` / `info_requested_at` / `info_response_message`, `rejection_reason` / `rejected_at`. Activation link valid 72 h (was 7 days). Downgrade deletes rejected requests, as a refusal did before.
+  - [x] Public registration (multipart): identity fields, contact and mandate letter PDF (≤ 5 MB, read bounded, same PDF checks as reports, validated before any lookup so its refusal reveals nothing). Kept beyond the brief's five identity fields: the website (needed by 5.3's domain check) and the contact name (the account holder). Public follow-up page `/inscription-entreprise/suivi` (token in the request body, never in an API URL); reply to an info request with a new mandate letter and a message (`INFO_REQUESTED` → `PENDING_ONBOARDING`, admins notified, rate-limited per IP).
+  - [x] Admin screens show the five registration states (`shared/format/statutInscription.ts`); the "resend activation" action and report submission also refuse `INFO_REQUESTED` and `REJECTED` companies. Journal labels for the two new actions.
 - [ ] 5.3 KYC verification
   - [ ] Automated checks computed on demand and shown with their result and source: GLEIF (LEI exists and is `ISSUED`, legal name match), domain match (contact e-mail vs website), mandate letter present.
   - [ ] Admin actions: `Approve` (→ `ACTIVE`, activation e-mail), `Request info` (→ `INFO_REQUESTED`, message e-mailed), `Reject` (→ `REJECTED`, reason required, e-mailed). Each action audit-logged.
@@ -187,6 +188,6 @@ Decisions taken before starting (2026-10-01):
   - [ ] Keyboard: `A` accept, `E` edit/override, `N` not found, `J`/`K` previous/next; never active while typing in a field.
   - [ ] Opinion form with the four values; pre-score shown only after submission.
 - [ ] 5.8 Enterprise portal
-  - [ ] Registration form (5.2) and public status page.
+  - [x] Registration form and public status page — done in 5.2 (the acknowledgment e-mail links to the status page, so both had to land together).
   - [ ] `DRAFT` completeness checklist: detected / missing indicator counts per pillar, never values or scores.
   - [ ] Submission: status stepper, confirmation modal, receipt with the file's SHA-256 and submission time, lock banner "🔒 Soumis le …" on a submitted session.

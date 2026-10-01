@@ -16,9 +16,9 @@ from app.company.identifiers import isin_valide, lei_valide
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
     AnalysisStatus,
-    CompanyStatus,
     Currency,
     ProjectStatus,
+    RegistrationStatus,
     ReportStatus,
     Role,
 )
@@ -342,12 +342,12 @@ class CompanyOnboardingRequest(BaseModel):
 
 
 class CompanyOnboardingResult(BaseModel):
-    """`status` est None après un refus : l'inscription refusée est supprimée (le demandeur peut
-    en déposer une nouvelle), il n'y a plus d'entreprise à décrire."""
+    """`status` vaut ACTIVE après validation, REJECTED après refus (tâche 5.2 : l'inscription
+    refusée est conservée, plus supprimée)."""
 
     company_id: uuid.UUID
     decision: OnboardingDecision
-    status: CompanyStatus | None
+    status: RegistrationStatus
     onboarded_at: datetime | None
 
 

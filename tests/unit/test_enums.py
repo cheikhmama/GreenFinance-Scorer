@@ -1,10 +1,10 @@
 from app.core.enums import (
     AuditDecision,
-    CompanyStatus,
     Currency,
     DataMethod,
     DurationType,
     Pillar,
+    RegistrationStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -26,8 +26,14 @@ def test_report_status_values() -> None:
     ]
 
 
-def test_company_status_values() -> None:
-    assert {s.value for s in CompanyStatus} == {"PENDING_ONBOARDING", "ACTIVE", "SUSPENDED"}
+def test_registration_status_values() -> None:
+    assert [s.value for s in RegistrationStatus] == [
+        "PENDING_ONBOARDING",
+        "INFO_REQUESTED",
+        "ACTIVE",
+        "REJECTED",
+        "SUSPENDED",
+    ]
 
 
 def test_type_rapport_values() -> None:
