@@ -100,10 +100,9 @@ describe("Espace Entreprise — Mes déclarations", () => {
     // Aucun code technique à l’écran : titres lisibles.
     expect(document.body.textContent).not.toMatch(/RAPPORT_ESG|· v1/);
     expect(within(enCours).getByText("Rapport ESG — Exercice 2025")).toBeInTheDocument();
-    // En-tête partagé : le nom de l’entreprise.
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "Atlas Industries" }),
-    ).toBeInTheDocument();
+    // La page commence par son propre titre, sans en-tête d’identité.
+    expect(screen.getByRole("heading", { level: 1, name: "Mes déclarations" })).toBeInTheDocument();
+    expect(screen.queryByText("Atlas Industries")).not.toBeInTheDocument();
 
     const historique = screen.getByRole("table");
     const lignes = within(historique).getAllByRole("row").slice(1);

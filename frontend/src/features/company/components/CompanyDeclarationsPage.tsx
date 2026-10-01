@@ -16,7 +16,6 @@ import { useCompanyReports } from "../api";
 import { libelleExercice, separerDeclarations } from "../session/etat";
 import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
 import { SessionStepper } from "../session/SessionStepper";
-import { CompanyIdentityHeader } from "./CompanyIdentityHeader";
 
 function StatutEntreprise({ rapport }: { rapport: RapportESGPublic }) {
   return (
@@ -46,11 +45,9 @@ export function CompanyDeclarationsPage() {
 
   return (
     <div className="space-y-6">
-      <CompanyIdentityHeader />
-
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">Mes déclarations</h2>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Mes déclarations</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Préparez, soumettez et suivez vos déclarations ESG par exercice.
           </p>
