@@ -1,27 +1,17 @@
 import type { ReportStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutRapportEntreprise } from "@/shared/format/statut";
 
-/** Présentation d'une session sur le tableau de bord Entreprise : un libellé sobre, une teinte
- * pastel avec sa pastille, une phrase par état — jamais le nom d'une étape interne. */
+/** État d'une session sur la carte « Session active » du tableau de bord Entreprise : un libellé
+ * et une phrase, jamais le nom d'une étape interne. */
 export interface PresentationSession {
   libelle: string;
-  /** Classes de la pastille d'état (fond clair, texte foncé, bordure fine). */
-  ton: string;
-  /** Classe de couleur de la pastille ronde devant le libellé. */
-  point: string;
   description: string;
 }
 
-const NEUTRE = {
-  ton: "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
-  point: "bg-slate-400",
-};
-
 const EN_EXAMEN: PresentationSession = {
-  libelle: "En cours d'examen",
-  ton: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300",
-  point: "bg-blue-500",
-  description: "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
+  libelle: "En cours d'examen d'audit",
+  description:
+    "Votre rapport a été transmis. Vous serez notifié dès la validation finale de l'auditeur.",
 };
 
 const PRESENTATIONS: Partial<Record<ReportStatus, PresentationSession>> = {
@@ -31,31 +21,25 @@ const PRESENTATIONS: Partial<Record<ReportStatus, PresentationSession>> = {
   PENDING_DECISION: EN_EXAMEN,
   DRAFT: {
     libelle: "Brouillon",
-    ...NEUTRE,
     description:
       "Brouillon en cours de préparation. Remplissez la déclaration et soumettez-la pour examen.",
   },
   REVISION_REQUESTED: {
     libelle: "Correction demandée",
-    ton: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300",
-    point: "bg-amber-500",
     description: "L'auditeur a demandé des précisions ou corrections sur votre rapport.",
   },
   VALIDATED: {
     libelle: "Validé & Publié",
-    ton: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300",
-    point: "bg-emerald-500",
     description: "Votre rapport a été validé et votre score officiel est disponible.",
   },
 };
 
 /** États hors de la table (échec d'extraction d'un dépôt direct, rejet) : libellé Entreprise
- * habituel, teinte neutre. */
+ * habituel. */
 export function presentationSession(statut: ReportStatus): PresentationSession {
   return (
     PRESENTATIONS[statut] ?? {
       libelle: libelleStatutRapportEntreprise(statut),
-      ...NEUTRE,
       description: "Consultez votre déclaration pour en connaître le détail.",
     }
   );

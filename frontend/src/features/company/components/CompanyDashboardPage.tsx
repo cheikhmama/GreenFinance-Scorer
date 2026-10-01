@@ -1,18 +1,16 @@
-import { ArrowRight, Award, FileClock, History } from "lucide-react";
+import { ArrowRight, Award, History } from "lucide-react";
 import { Link } from "react-router-dom";
 import type {
   NotificationPublic,
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { useMyNotifications } from "@/shared/notifications/api";
-import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useCompanyReports, useReportChecklist } from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
 import { dernierScoreAffichable, presentationSession } from "../session/presentation";
-import { StatusPill } from "../session/StatusPill";
 
 /** Jalons montrés dans le fil d'activité : les étapes internes de l'examen (affectation, avis)
  * restent hors du fil, comme du badge (tâches 5.1, 5.9). */
@@ -74,56 +72,68 @@ export function CompanyDashboardPage() {
   );
 }
 
+function dateCourte(iso: string) {
+  return new Date(iso).toLocaleDateString("fr-FR");
+}
+
+/** Carte « Session active » (tâche 5.9) : sobre, sans pastille ni bouton plein — l'exercice, sa
+ * date, un encadré d'état en une phrase, et un lien vers le suivi. */
 function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
   const analyseReussie =
     rapport && rapport.extraction_error === null ? rapport.extraction_finished_at : null;
   const liste = useReportChecklist(rapport?.id ?? "", analyseReussie ?? null);
   const total = liste.data ? totaux(liste.data) : null;
   const presentation = rapport ? presentationSession(rapport.status) : null;
+  const exercice = rapport ? libelleExercice(rapport.fiscal_year) : null;
 
   return (
-    <Card aria-label="Session active" role="region">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
-          <FileClock className="size-4" aria-hidden="true" />
+    <section
+      aria-label="Session active"
+      className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+    >
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
           Session active
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {rapport && presentation ? (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-2xl font-semibold text-brand-blue">
-                {libelleExercice(rapport.fiscal_year)}
-              </span>
-              <StatusPill presentation={presentation} />
+        </span>
+        {exercice ? <span className="text-xs text-slate-400">Exercice {exercice}</span> : null}
+      </div>
+
+      {rapport && presentation ? (
+        <div className="py-4">
+          <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+            {exercice}
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            {rapport.submitted_at
+              ? `Transmission effectuée le ${dateCourte(rapport.submitted_at)}`
+              : `Brouillon ouvert le ${dateCourte(rapport.created_at)}`}
+          </p>
+          <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div className="text-xs font-medium text-slate-700 dark:text-slate-200">
+              Statut : {presentation.libelle}
             </div>
-            <p className="text-sm text-brand-grey">{presentation.description}</p>
+            <div className="mt-0.5 text-xs text-slate-500">{presentation.description}</div>
             {total ? (
-              <p className="text-sm font-medium text-brand-blue">
+              <div className="mt-2 text-xs text-slate-500">
                 {total.found}/{total.expected} indicateurs détectés
-              </p>
+              </div>
             ) : null}
-            <Button asChild>
-              <Link to="/company/declarations">
-                Accéder à ma déclaration en cours
-                <ArrowRight />
-              </Link>
-            </Button>
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-brand-grey">Aucune déclaration en cours.</p>
-            <Button asChild variant="outline">
-              <Link to="/company/declarations">
-                Ouvrir une déclaration
-                <ArrowRight />
-              </Link>
-            </Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+        </div>
+      ) : (
+        <p className="py-4 text-sm text-slate-500">Aucune déclaration en cours.</p>
+      )}
+
+      <div className="pt-2">
+        <Link
+          to="/company/declarations"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
+        >
+          {rapport ? "Voir le suivi de la déclaration" : "Ouvrir une déclaration"}
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </div>
+    </section>
   );
 }
 

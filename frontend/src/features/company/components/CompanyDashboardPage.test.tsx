@@ -67,8 +67,10 @@ describe("Espace Entreprise — tableau de bord", () => {
     renderPage();
 
     const session = await screen.findByRole("region", { name: "Session active" });
-    expect(within(session).getByText("FY2025")).toBeInTheDocument();
-    expect(within(session).getByText("Brouillon")).toBeInTheDocument();
+    expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
+    expect(within(session).getByText("Exercice FY2025")).toBeInTheDocument();
+    expect(within(session).getByText("Brouillon ouvert le 01/09/2026")).toBeInTheDocument();
+    expect(within(session).getByText("Statut : Brouillon")).toBeInTheDocument();
     expect(
       within(session).getByText(
         "Brouillon en cours de préparation. Remplissez la déclaration et soumettez-la pour examen.",
@@ -76,7 +78,7 @@ describe("Espace Entreprise — tableau de bord", () => {
     ).toBeInTheDocument();
     expect(await within(session).findByText("18/22 indicateurs détectés")).toBeInTheDocument();
     expect(
-      within(session).getByRole("link", { name: /Accéder à ma déclaration en cours/ }),
+      within(session).getByRole("link", { name: /Voir le suivi de la déclaration/ }),
     ).toHaveAttribute("href", "/company/declarations");
 
     const score = screen.getByRole("region", { name: "Dernier score officiel" });
@@ -94,24 +96,24 @@ describe("Espace Entreprise — tableau de bord", () => {
     [
       "EXTRACTING",
       null,
-      "En cours d'examen",
-      "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
+      "Statut : En cours d'examen d'audit",
+      "Votre rapport a été transmis. Vous serez notifié dès la validation finale de l'auditeur.",
     ],
     [
       "IN_AUDIT",
       "2026-09-02T10:00:00Z",
-      "En cours d'examen",
-      "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
+      "Statut : En cours d'examen d'audit",
+      "Votre rapport a été transmis. Vous serez notifié dès la validation finale de l'auditeur.",
     ],
     [
       "REVISION_REQUESTED",
       "2026-09-02T10:00:00Z",
-      "Correction demandée",
+      "Statut : Correction demandée",
       "L'auditeur a demandé des précisions ou corrections sur votre rapport.",
     ],
   ])(
     "présente une session %s sans nommer d’étape interne",
-    async (statut, soumis, badge, texte) => {
+    async (statut, soumis, statutAffiche, texte) => {
       fetchMock.mockImplementation(async (url) =>
         String(url).includes("/notifications")
           ? Response.json({ items: [], page: 1, page_size: 20, total: 0, pages: 0 })
@@ -128,12 +130,19 @@ describe("Espace Entreprise — tableau de bord", () => {
       renderPage();
 
       const session = await screen.findByRole("region", { name: "Session active" });
-      expect(within(session).getByText("FY2025")).toBeInTheDocument();
-      expect(within(session).getByText(badge)).toBeInTheDocument();
+      expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
+      expect(within(session).getByText(statutAffiche)).toBeInTheDocument();
+      if (soumis) {
+        expect(
+          within(session).getByText("Transmission effectuée le 02/09/2026"),
+        ).toBeInTheDocument();
+      }
+      // Ni pastille ni bouton plein : un encadré d'état et un lien.
+      expect(within(session).queryByRole("button")).not.toBeInTheDocument();
       expect(within(session).getByText(texte)).toBeInTheDocument();
       expect(session).not.toHaveTextContent("Analyse du fichier");
       expect(
-        within(session).getByRole("link", { name: /Accéder à ma déclaration en cours/ }),
+        within(session).getByRole("link", { name: /Voir le suivi de la déclaration/ }),
       ).toHaveAttribute("href", "/company/declarations");
     },
   );

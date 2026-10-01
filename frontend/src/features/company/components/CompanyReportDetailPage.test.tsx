@@ -167,7 +167,9 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     expect(await screen.findByText(/Analyse de « rapport-2025.pdf » en cours/)).toBeInTheDocument();
     const envoi = appels("POST", "/file")[0];
     expect(envoi?.[0]).toBe(`/api/v1/reports/${ID}/file`);
-    expect(((envoi?.[1]?.body as FormData).get("file") as File).name).toBe("rapport-2025.pdf");
+    const corps = envoi?.[1]?.body;
+    expect(corps).toBeInstanceOf(FormData);
+    expect(((corps as FormData).get("file") as File).name).toBe("rapport-2025.pdf");
     expect(screen.getByText("Analyse du fichier")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
   });

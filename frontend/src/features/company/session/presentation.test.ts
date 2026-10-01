@@ -2,15 +2,14 @@ import { describe, expect, it } from "vitest";
 import { dernierScoreAffichable, presentationSession } from "./presentation";
 
 describe("présentation de la session active (tableau de bord Entreprise)", () => {
-  it("regroupe les étapes d’examen et donne un libellé sobre à chaque état", () => {
+  it("regroupe les étapes d’examen et donne un libellé et une phrase à chaque état", () => {
     for (const statut of [
       "EXTRACTING",
       "AWAITING_ASSIGNMENT",
       "IN_AUDIT",
       "PENDING_DECISION",
     ] as const) {
-      expect(presentationSession(statut).libelle).toBe("En cours d'examen");
-      expect(presentationSession(statut).point).toBe("bg-blue-500");
+      expect(presentationSession(statut).libelle).toBe("En cours d'examen d'audit");
     }
     expect(presentationSession("DRAFT").libelle).toBe("Brouillon");
     expect(presentationSession("REVISION_REQUESTED").libelle).toBe("Correction demandée");
