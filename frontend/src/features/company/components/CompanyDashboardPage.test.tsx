@@ -69,6 +69,11 @@ describe("Espace Entreprise — tableau de bord", () => {
     const session = await screen.findByRole("region", { name: "Session active" });
     expect(within(session).getByText("FY2025")).toBeInTheDocument();
     expect(within(session).getByText("Brouillon")).toBeInTheDocument();
+    expect(
+      within(session).getByText(
+        "Brouillon en cours de préparation. Remplissez la déclaration et soumettez-la pour examen.",
+      ),
+    ).toBeInTheDocument();
     expect(await within(session).findByText("18/22 indicateurs détectés")).toBeInTheDocument();
     expect(
       within(session).getByRole("link", { name: /Accéder à ma déclaration en cours/ }),
@@ -84,6 +89,54 @@ describe("Espace Entreprise — tableau de bord", () => {
     expect(within(fil).getByText("Rapport transmis")).toBeInTheDocument();
     expect(within(fil).queryByText(/auditeur/)).not.toBeInTheDocument();
   });
+
+  it.each([
+    [
+      "EXTRACTING",
+      null,
+      "En cours d'examen 🔒",
+      "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
+    ],
+    [
+      "IN_AUDIT",
+      "2026-09-02T10:00:00Z",
+      "En cours d'examen 🔒",
+      "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
+    ],
+    [
+      "REVISION_REQUESTED",
+      "2026-09-02T10:00:00Z",
+      "Précisions requises ⚠️",
+      "L'auditeur a demandé des précisions ou corrections sur votre rapport.",
+    ],
+  ])(
+    "présente une session %s sans nommer d’étape interne",
+    async (statut, soumis, badge, texte) => {
+      fetchMock.mockImplementation(async (url) =>
+        String(url).includes("/notifications")
+          ? Response.json({ items: [], page: 1, page_size: 20, total: 0, pages: 0 })
+          : Response.json([
+              rapportListe("session", {
+                fiscal_year: 2025,
+                status: statut,
+                submitted_at: soumis,
+                extraction_finished_at: null,
+                official_global_score: null,
+              }),
+            ]),
+      );
+      renderPage();
+
+      const session = await screen.findByRole("region", { name: "Session active" });
+      expect(within(session).getByText("FY2025")).toBeInTheDocument();
+      expect(within(session).getByText(badge)).toBeInTheDocument();
+      expect(within(session).getByText(texte)).toBeInTheDocument();
+      expect(session).not.toHaveTextContent("Analyse du fichier");
+      expect(
+        within(session).getByRole("link", { name: /Accéder à ma déclaration en cours/ }),
+      ).toHaveAttribute("href", "/company/declarations");
+    },
+  );
 
   it("sans déclaration ni score, invite à en ouvrir une", async () => {
     fetchMock.mockImplementation(async (url) =>

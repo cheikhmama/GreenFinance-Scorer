@@ -4,10 +4,6 @@ import type {
   NotificationPublic,
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import {
-  libelleStatutRapportEntreprise,
-  variantStatutRapportEntreprise,
-} from "@/shared/format/statut";
 import { useMyNotifications } from "@/shared/notifications/api";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -16,6 +12,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useCompanyReports, useReportChecklist } from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
+import { presentationSession } from "../session/presentation";
 
 /** Jalons montrés dans le fil d'activité : les étapes internes de l'examen (affectation, avis)
  * restent hors du fil, comme du badge (tâches 5.1, 5.9). */
@@ -83,6 +80,7 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
     rapport && rapport.extraction_error === null ? rapport.extraction_finished_at : null;
   const liste = useReportChecklist(rapport?.id ?? "", analyseReussie ?? null);
   const total = liste.data ? totaux(liste.data) : null;
+  const presentation = rapport ? presentationSession(rapport.status) : null;
 
   return (
     <Card aria-label="Session active" role="region">
@@ -93,30 +91,20 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {rapport ? (
+        {rapport && presentation ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-2xl font-semibold text-brand-blue">
                 {libelleExercice(rapport.fiscal_year)}
               </span>
-              <Badge
-                variant={variantStatutRapportEntreprise(
-                  rapport.status,
-                  rapport.submitted_at !== null,
-                )}
-              >
-                {libelleStatutRapportEntreprise(rapport.status, rapport.submitted_at !== null)}
-              </Badge>
+              <Badge className={presentation.ton}>{presentation.libelle}</Badge>
             </div>
-            <p className="text-sm text-brand-grey">
-              {total
-                ? `${total.found}/${total.expected} indicateurs détectés`
-                : rapport.status === "EXTRACTING" && rapport.submitted_at === null
-                  ? "Analyse du fichier en cours"
-                  : rapport.source_file === null
-                    ? "Aucun fichier joint"
-                    : "Complétude indisponible"}
-            </p>
+            <p className="text-sm text-brand-grey">{presentation.description}</p>
+            {total ? (
+              <p className="text-sm font-medium text-brand-blue">
+                {total.found}/{total.expected} indicateurs détectés
+              </p>
+            ) : null}
             <Button asChild>
               <Link to="/company/declarations">
                 Accéder à ma déclaration en cours
