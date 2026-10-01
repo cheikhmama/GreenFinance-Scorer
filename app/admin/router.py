@@ -26,6 +26,7 @@ from app.admin.apercu import (
 )
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import lister_journal_audit
+from app.admin.kyc import rapport_kyc
 from app.admin.onboarding import decider_inscription
 from app.admin.review_queue import (
     consulter_entreprise_admin,
@@ -71,6 +72,7 @@ from app.admin.schemas import (
     EntrepriseAdmin,
     EntrepriseAvecScoreAdmin,
     JournalAuditPublic,
+    KycReport,
     ModifierEntrepriseAdminRequest,
     PerformanceESGAdmin,
     PortefeuilleAdmin,
@@ -724,8 +726,49 @@ def onboard_company(
     session: Session = Depends(get_session),
 ) -> CompanyOnboardingResult:
     return decider_inscription(
-        session, current_user.id, company_id, payload.decision, payload.reason, background_tasks
+        session,
+        current_user.id,
+        company_id,
+        payload.decision,
+        payload.reason,
+        background_tasks,
+        message=payload.message,
     )
+
+
+@router.get(
+    "/admin/companies/{company_id}/kyc",
+    response_model=KycReport,
+    operation_id="getCompanyKyc",
+    summary="Contrôles KYC d'une inscription (GLEIF, domaine du contact, lettre de mandat)",
+)
+def get_company_kyc(
+    company_id: uuid.UUID,
+    _admin: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> KycReport:
+    return rapport_kyc(session, company_id)
+
+
+@router.get(
+    "/admin/companies/{company_id}/mandate-letter",
+    operation_id="getCompanyMandateLetter",
+    summary="Télécharger la lettre de mandat d'une inscription",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def get_company_mandate_letter(
+    company_id: uuid.UUID,
+    _admin: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    entreprise = session.get(Company, company_id)
+    if entreprise is None or entreprise.mandate_letter_path is None:
+        raise NotFoundError("Lettre de mandat introuvable.", code="mandat_introuvable")
+    chemin = storage.resolve_path(entreprise.mandate_letter_path)
+    if not chemin.is_file():
+        raise NotFoundError("Lettre de mandat introuvable.", code="mandat_introuvable")
+    return FileResponse(chemin, media_type="application/pdf", filename="lettre-de-mandat.pdf")
 
 
 @router.post(

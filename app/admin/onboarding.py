@@ -1,13 +1,17 @@
 """Validation des inscriptions d'entreprises par l'Administrateur (tâche 1.4, décision D5).
 
 Une inscription publique (app/company/registration.py) attend en PENDING_ONBOARDING (ou
-INFO_REQUESTED, tâche 5.3). Deux issues,
+INFO_REQUESTED). Trois décisions (tâche 5.3 : la fenêtre KYC les présente avec les contrôles
+d'app/admin/kyc.py),
 chacune dans une seule transaction, l'entreprise verrouillée (SELECT ... FOR UPDATE) pour que deux
 Administrateurs ne décident jamais deux fois :
 
 - VALIDER : l'entreprise passe ACTIVE (onboarded_at / onboarded_by_id renseignés) et le lien
   d'activation part vers le titulaire — c'est seulement maintenant qu'il peut créer son mot de
   passe (app/auth/activation.py). Jeton et changement de statut commitent ensemble.
+- DEMANDER DES INFORMATIONS : la demande passe INFO_REQUESTED avec le message de l'Administrateur ;
+  un nouveau lien de suivi (l'ancien jeton n'est connu que par son empreinte) part avec le message,
+  et le demandeur répond depuis sa page de suivi (nouvelle lettre de mandat, message).
 - REFUSER : l'inscription passe REJECTED avec son motif (tâche 5.2 : plus supprimée), le compte
   titulaire — qui n'a jamais eu de mot de passe — est désactivé, le motif est envoyé au demandeur
   et reste lisible sur sa page de suivi. Une nouvelle demande aux mêmes identifiants rouvre cette
@@ -29,7 +33,11 @@ from app.admin.schemas import CompanyOnboardingResult, OnboardingDecision
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import User
 from app.company.models import Company
-from app.company.registration import STATUTS_EN_EXAMEN
+from app.company.registration import (
+    STATUTS_EN_EXAMEN,
+    lien_de_suivi,
+    nouveau_jeton_de_suivi,
+)
 from app.core.audit import auditer
 from app.core.database import utcnow
 from app.core.email import (
@@ -58,6 +66,23 @@ def _prevenir_refus(email: str, nom_entreprise: str, motif: str) -> None:
         logger.error("onboarding_rejection_notice_failed", error_type=type(exc.__cause__ or exc).__name__)
 
 
+def _demander_informations(email: str, nom_entreprise: str, message: str, jeton: str) -> None:
+    try:
+        envoyer_email_differe(
+            recipient=email,
+            subject="Votre demande d'inscription — informations demandées",
+            body=(
+                f"Pour poursuivre l'examen de la demande d'inscription de {nom_entreprise}, nous "
+                f"avons besoin d'informations complémentaires :\n\n{message}\n\n"
+                "Répondez depuis votre page de suivi (nouvelle lettre de mandat, message) :\n"
+                f"{lien_de_suivi(jeton)}\n\n"
+                "Ce lien remplace celui reçu précédemment.\n"
+            ),
+        )
+    except EmailDeliveryError as exc:
+        logger.error("onboarding_info_request_notice_failed", error_type=type(exc.__cause__ or exc).__name__)
+
+
 def decider_inscription(
     session: Session,
     acteur_id: uuid.UUID,
@@ -65,6 +90,7 @@ def decider_inscription(
     decision: OnboardingDecision,
     motif: str | None,
     background_tasks: BackgroundTasks,
+    message: str | None = None,
 ) -> CompanyOnboardingResult:
     entreprise = session.get(Company, entreprise_id, with_for_update=True)
     if entreprise is None:
@@ -101,6 +127,35 @@ def decider_inscription(
             decision=decision,
             status=entreprise.status,
             onboarded_at=entreprise.onboarded_at,
+        )
+
+    if decision == OnboardingDecision.REQUEST_INFO:
+        assert message is not None  # garanti par CompanyOnboardingRequest
+        entreprise.status = RegistrationStatus.INFO_REQUESTED
+        entreprise.info_request_message = message
+        entreprise.info_requested_at = utcnow()
+        entreprise.info_response_message = None
+        jeton = nouveau_jeton_de_suivi(entreprise)
+        session.add(entreprise)
+        auditer(
+            session,
+            acteur_id,
+            "registration_info_requested",
+            "Company",
+            entreprise.id,
+            "success",
+            new_value=message,
+        )
+        session.commit()
+        background_tasks.add_task(
+            _demander_informations, titulaire.email, entreprise.name, message, jeton
+        )
+        logger.info("company_registration_info_requested", company_id=str(entreprise_id))
+        return CompanyOnboardingResult(
+            company_id=entreprise_id,
+            decision=decision,
+            status=RegistrationStatus.INFO_REQUESTED,
+            onboarded_at=None,
         )
 
     assert motif is not None  # garanti par CompanyOnboardingRequest

@@ -19,6 +19,7 @@ import type {
   DecisionAdminRequest,
   EntrepriseAdmin,
   EntreprisePublic,
+  KycReport,
   ListAllCompaniesParams,
   ListAllReportsParams,
   ListAnalysesAdminParams,
@@ -839,6 +840,52 @@ return apiFetch<CompanyOnboardingResult>(getOnboardCompanyUrl(companyId),
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(companyOnboardingRequest)
+  }
+);}
+
+
+export const getGetCompanyKycUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/kyc`
+}
+
+/**
+ * @summary Contrôles KYC d'une inscription (GLEIF, domaine du contact, lettre de mandat)
+ */
+export const getCompanyKyc = async (companyId: string, options?: RequestInit): Promise<KycReport> => {
+
+  return apiFetch<KycReport>(getGetCompanyKycUrl(companyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetCompanyMandateLetterUrl = (companyId: string,) => {
+
+
+
+
+  return `/admin/companies/${companyId}/mandate-letter`
+}
+
+/**
+ * @summary Télécharger la lettre de mandat d'une inscription
+ */
+export const getCompanyMandateLetter = async (companyId: string, options?: RequestInit): Promise<Blob> => {
+
+  return apiFetch<Blob>(getGetCompanyMandateLetterUrl(companyId),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 

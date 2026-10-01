@@ -19,6 +19,7 @@ const ACTIONS: Record<string, string> = {
   registration_rejected: "Refus d'inscription",
   registration_resubmitted: "Nouvelle demande après refus",
   registration_info_provided: "Informations complétées par le demandeur",
+  registration_info_requested: "Demande d'informations",
   role_changed: "Changement de rôle",
 };
 

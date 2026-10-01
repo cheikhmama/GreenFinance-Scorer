@@ -23,7 +23,7 @@ Conventions used below:
    ∅ ─────────────────────────> PENDING_ONBOARDING ────────────────> ACTIVE
                                  │   ▲       │                          │  ▲
                 request info     │   │ reply │ reject       suspend     │  │ reactivate
-                (ADMIN, 5.3)     ▼   │       ▼ (ADMIN)      (ADMIN)     ▼  │ (ADMIN)
+                (ADMIN)          ▼   │       ▼ (ADMIN)      (ADMIN)     ▼  │ (ADMIN)
                            INFO_REQUESTED   REJECTED                SUSPENDED
                                  │   (reject / approve      │
                                  │    also from here)       │ register again, same identifiers
@@ -40,6 +40,8 @@ follows the request on a public page opened with a token received by e-mail.
 | reply to an info request (*task 5.2*, `POST /companies/registration-status/reply`) | public, token | `INFO_REQUESTED` (row locked); new mandate letter PDF; optional message ≤ 2 000 characters; 3 replies per IP per hour | status `PENDING_ONBOARDING`, new mandate letter, message kept, audit log `registration_info_provided`, admin notification `ENTREPRISE_INFOS_COMPLETEES` | — |
 | onboard — approve (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING` or `INFO_REQUESTED` (row locked); owner account present. **No ISIN/LEI or financial data required** — many unlisted companies have none; the admin may complete the profile first, and PCAF (task 2.3) asks for figures when it needs them | status `ACTIVE`, onboarded_by/at, activation token (valid **72 hours** since task 5.2), audit log | activation e-mail to the owner |
 | onboard — reject (*tasks 1.4, 5.2*) | ADMIN | status `PENDING_ONBOARDING` or `INFO_REQUESTED`; a reason is required | status `REJECTED` with `rejection_reason` / `rejected_at`, owner account deactivated (it never had a password), audit log | e-mail with the reason; the reason stays on the follow-up page; registering again with the same identifiers reopens the request |
+| KYC review (*task 5.3*, `GET /admin/companies/{id}/kyc`) | ADMIN | — | read only, recomputed on every call: GLEIF registration (`ISSUED`, entity `ACTIVE`) and legal-name match (legal or other known name; legal forms, accents and case ignored), contact e-mail domain vs declared website (public webmail always a gap), mandate letter present. Each check: result `PASSED` / `FAILED` / `NOT_VERIFIABLE` (GLEIF unreachable, 5 s timeout) / `NOT_APPLICABLE`, detail, source. **Checks inform the decision, they never block it** | — |
+| request info (*task 5.3*) | ADMIN | status `PENDING_ONBOARDING` or `INFO_REQUESTED`; a message is required | status `INFO_REQUESTED`, message and date stored, previous reply cleared, **new follow-up token** (the old one stops working), audit log `registration_info_requested` | e-mail with the message and the new follow-up link |
 | suspend / reactivate | ADMIN | — | status change, audit log, sessions of the owner revoked on suspend | — |
 
 **Rules:**

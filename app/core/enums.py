@@ -59,6 +59,18 @@ class RegistrationStatus(str, Enum):
     SUSPENDED = "SUSPENDED"
 
 
+class KycCheckResult(str, Enum):
+    """Résultat d'un contrôle KYC (tâche 5.3) — un éclairage pour l'Administrateur, jamais une
+    décision automatique."""
+
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    # La source n'a pas répondu (GLEIF injoignable) : à refaire ou à vérifier à la main.
+    NOT_VERIFIABLE = "NOT_VERIFIABLE"
+    # Rien à contrôler (pas de LEI, pas de site web déclaré).
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
 class ReportType(str, Enum):
     RAPPORT_ANNUEL = "RAPPORT_ANNUEL"
     RAPPORT_ESG = "RAPPORT_ESG"

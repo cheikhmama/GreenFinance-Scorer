@@ -428,16 +428,19 @@ export type OnboardingDecision = typeof OnboardingDecision[keyof typeof Onboardi
 
 export const OnboardingDecision = {
   approve: 'approve',
+  request_info: 'request_info',
   reject: 'reject',
 } as const;
 
 /**
- * PATCH /admin/companies/{id}/onboard (tâche 1.4, contrat JSON en anglais). Un refus exige un
- * motif : il est transmis au demandeur par e-mail.
+ * PATCH /admin/companies/{id}/onboard (tâches 1.4 et 5.3, contrat JSON en anglais). Un refus
+ * exige un motif (`reason`), une demande d'informations un message (`message`) : l'un comme
+ * l'autre est transmis au demandeur par e-mail et reste lisible sur sa page de suivi.
  */
 export interface CompanyOnboardingRequest {
   decision: OnboardingDecision;
   reason?: string | null;
+  message?: string | null;
 }
 
 /**
@@ -460,8 +463,8 @@ export const RegistrationStatus = {
 } as const;
 
 /**
- * `status` vaut ACTIVE après validation, REJECTED après refus (tâche 5.2 : l'inscription
- * refusée est conservée, plus supprimée).
+ * `status` vaut ACTIVE après validation, INFO_REQUESTED après une demande d'informations,
+ * REJECTED après refus (tâche 5.2 : l'inscription refusée est conservée, plus supprimée).
  */
 export interface CompanyOnboardingResult {
   company_id: string;
@@ -1010,6 +1013,54 @@ export interface JournalAuditPublic {
   old_value: string | null;
   new_value: string | null;
   correlation_id: string | null;
+}
+
+/**
+ * Résultat d'un contrôle KYC (tâche 5.3) — un éclairage pour l'Administrateur, jamais une
+ * décision automatique.
+ */
+export type KycCheckResult = typeof KycCheckResult[keyof typeof KycCheckResult];
+
+
+export const KycCheckResult = {
+  PASSED: 'PASSED',
+  FAILED: 'FAILED',
+  NOT_VERIFIABLE: 'NOT_VERIFIABLE',
+  NOT_APPLICABLE: 'NOT_APPLICABLE',
+} as const;
+
+/**
+ * Un contrôle KYC (tâche 5.3) : son résultat, ce qui l'explique, et d'où vient l'information.
+ */
+export interface KycCheck {
+  code: string;
+  label: string;
+  result: KycCheckResult;
+  detail: string;
+  source: string;
+}
+
+/**
+ * GET /admin/companies/{id}/kyc — de quoi décider d'une inscription dans une seule fenêtre :
+ * identité déclarée, contact, lettre de mandat, échanges avec le demandeur, contrôles.
+ */
+export interface KycReport {
+  company_id: string;
+  company_name: string;
+  status: RegistrationStatus;
+  lei: string | null;
+  isin: string | null;
+  website: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  registered_at: string | null;
+  mandate_letter_available: boolean;
+  mandate_letter_uploaded_at: string | null;
+  info_request_message: string | null;
+  info_requested_at: string | null;
+  info_response_message: string | null;
+  checked_at: string;
+  checks: KycCheck[];
 }
 
 export interface LoginRequest {

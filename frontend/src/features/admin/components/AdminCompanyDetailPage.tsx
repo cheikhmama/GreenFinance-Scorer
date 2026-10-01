@@ -215,7 +215,7 @@ export function AdminCompanyDetailPage() {
       </Link>
 
       {inscriptionEnExamen(entreprise.status) ? (
-        <OnboardingPanel entrepriseId={entrepriseId} nom={entreprise.name} />
+        <OnboardingPanel entrepriseId={entrepriseId} statut={entreprise.status} />
       ) : null}
 
       <Card>

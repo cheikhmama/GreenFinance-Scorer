@@ -105,3 +105,16 @@ def jobs_enfiles(monkeypatch) -> list[tuple[str, tuple, str | None, str]]:
 
     monkeypatch.setattr("app.worker.queue._envoyer_a_redis", _enregistrer)
     return depots
+
+
+@pytest.fixture(autouse=True)
+def gleif_hors_ligne(monkeypatch) -> None:
+    """Aucun test n'appelle la vraie GLEIF (tâche 5.3) : par défaut, l'appel échoue comme un réseau
+    coupé — le contrôle KYC répond alors « non vérifiable ». Un test qui veut une fiche GLEIF
+    remplace app.admin.kyc.recuperer_fiche_gleif (ou httpx.get, pour tester le client lui-même)."""
+    import httpx
+
+    def _reseau_interdit(*_args, **_kwargs):
+        raise httpx.ConnectError("réseau interdit pendant les tests")
+
+    monkeypatch.setattr("app.admin.kyc.httpx.get", _reseau_interdit)

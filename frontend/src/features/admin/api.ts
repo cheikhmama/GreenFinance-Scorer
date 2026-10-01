@@ -10,6 +10,8 @@ import {
   getAdminESGPerformance,
   getAdminReport,
   getCompanyAdmin,
+  getCompanyFinancials,
+  getCompanyKyc,
   listAdminCompanyReports,
   listAllCompanies,
   listAllReports,
@@ -30,6 +32,7 @@ import {
   listReportVersions,
   listUsersAwaitingActivation,
   listUsersByRole,
+  onboardCompany,
   publishCompany,
   reactivateCompany,
   reactivateUser,
@@ -37,9 +40,7 @@ import {
   rejectReport,
   requestReportCorrection,
   retryExtraction,
-  onboardCompany,
   suspendCompany,
-  getCompanyFinancials,
   updateCompanyFinancials,
   updateCompanyIdentifiers,
   updateCompanyProfile,
@@ -48,40 +49,41 @@ import {
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
+  AffecterAuditeurRequest,
+  AnalysisStatus,
+  ApercuActeursAdmin,
+  AvisAuditAdmin,
   CompanyFinancials,
   CompanyFinancialsRequest,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
   CompanyOnboardingResult,
-  AffecterAuditeurRequest,
-  ApercuActeursAdmin,
-  AvisAuditAdmin,
   CreerUtilisateurRequest,
   DecisionAdminRequest,
   EntrepriseAdmin,
   EntreprisePublic,
+  KycReport,
   ListAuditLogParams,
   ModifierEntrepriseAdminRequest,
   PageAnalyseAdmin,
   PageChargeAuditeurAdmin,
   PageEntrepriseAdmin,
-  PageEntreprisePublic,
   PageEntrepriseAvecScoreAdmin,
+  PageEntreprisePublic,
   PageJournalAuditPublic,
   PagePortefeuilleAdmin,
   PageProjetAdmin,
   PageRapportESGPublic,
   PageUtilisateurPublic,
   PerformanceESGAdmin,
+  ProjectStatus,
   RapportESGDetail,
   RapportESGPublic,
+  ReportStatus,
   Role,
   ScoreRecalculeAdmin,
-  ReportStatus,
   ScoreVerificationAdmin,
-  AnalysisStatus,
-  ProjectStatus,
   TableauDeBordAdmin,
   UtilisateurCree,
   UtilisateurPublic,
@@ -120,7 +122,9 @@ const companyReportsKey = (entrepriseId: string) =>
   ["admin", "entreprises", entrepriseId, "rapports"] as const;
 const companyDetailKey = (entrepriseId: string) => ["admin", "entreprises", entrepriseId] as const;
 
-function pageSuivante<T extends { page: number; pages: number }>(dernierePage: T): number | undefined {
+function pageSuivante<T extends { page: number; pages: number }>(
+  dernierePage: T,
+): number | undefined {
   return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
 }
 
@@ -358,6 +362,20 @@ export function useSuspendCompany() {
 
 /** PATCH /admin/companies/{id}/onboard — valide (lien d'activation envoyé au titulaire) ou refuse
  * (inscription supprimée, motif envoyé) une inscription en attente (app/admin/onboarding.py). */
+const kycKey = (entrepriseId: string) => ["admin", "entreprises", entrepriseId, "kyc"] as const;
+
+/** GET /admin/companies/{id}/kyc (tâche 5.3) — contrôles recalculés à chaque ouverture de la
+ * fenêtre (la fiche GLEIF peut changer), jamais mis en cache longtemps. */
+export function useCompanyKyc(entrepriseId: string, enabled: boolean) {
+  return useQuery<KycReport, ApiError>({
+    queryKey: kycKey(entrepriseId),
+    queryFn: () => getCompanyKyc(entrepriseId),
+    enabled,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
 export function useOnboardCompany() {
   const queryClient = useQueryClient();
   return useMutation<
@@ -369,6 +387,7 @@ export function useOnboardCompany() {
     onSuccess: (_resultat, { entrepriseId }) => {
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
       queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
+      queryClient.invalidateQueries({ queryKey: kycKey(entrepriseId) });
     },
   });
 }

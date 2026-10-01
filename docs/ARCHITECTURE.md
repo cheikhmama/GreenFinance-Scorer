@@ -222,6 +222,7 @@ enum values are still French.
 | Rate limiting | Login, verify-password, **change-password**, email change, reset request, contact, URL import. Per account **and** per client IP (behind a trusted proxy). Atomic counters (`INCR` + `EXPIRE` in one Lua call) | ✅ task 1.2 (`app/core/redis.py::incrementer_fenetre`; login also per IP) |
 | Sensitive profile changes | Changing email requires the current password and confirmation via a link sent to the new address | ✅ task 1.2 (`app/auth/email_change.py`; old address notified) |
 | SSRF (URL import) | Scheme allow-list, DNS check with `not ip.is_global`, manual redirect revalidation, size cap, **total** download deadline | ✅ task 4.3 (`not is_global` + IPv4 embedded in IPv6 checked; 60 s deadline across redirects and the whole stream). Residual: DNS rebinding between check and connection (documented in `app/company/url_fetch.py`) |
+| KYC lookup (GLEIF) | Fixed host from configuration (`GLEIF_API_URL`), LEI validated then URL-encoded in the path, no redirects followed, 5 s timeout; any failure reads as `NOT_VERIFIABLE`, never an error | ✅ task 5.3 (`app/admin/kyc.py`); tests never reach the network (autouse fixture) |
 | Search inputs | `%` and `_` typed by a user are characters, never LIKE wildcards | ✅ task 4.3 (`app/core/recherche.py::contient`, every `ilike`) |
 | Error detail | Public endpoints never return exception messages | ✅ task 4.3 (`/health` returns a fixed body, details in the logs) |
 | Secrets | Production refuses placeholder values and `*` CORS | ✅ in place |
