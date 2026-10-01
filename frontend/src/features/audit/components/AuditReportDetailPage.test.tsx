@@ -47,7 +47,7 @@ function renderPage() {
 }
 
 describe("Espace Auditeur — rendre un avis sur un dossier", () => {
-  it("exige un commentaire pour recommander le rejet, puis transmet l’avis", async () => {
+  it("exige un commentaire pour un avis défavorable, puis transmet l’avis", async () => {
     fetchMock.mockImplementation(async (_url, init) =>
       init?.method === "POST" ? new Response(null, { status: 204 }) : Response.json(DOSSIER),
     );
@@ -55,7 +55,7 @@ describe("Espace Auditeur — rendre un avis sur un dossier", () => {
     renderPage();
 
     expect(await screen.findByText("Dossier RAPPORT_ESG — 2025")).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("Décision"), "RECOMMANDE_REJET");
+    await user.selectOptions(screen.getByLabelText("Décision"), "UNFAVORABLE");
     await user.click(screen.getByRole("button", { name: "Envoyer l'avis" }));
 
     // Le même texte figure dans la description de la carte : vérifier le champ lui-même.
@@ -71,7 +71,7 @@ describe("Espace Auditeur — rendre un avis sur un dossier", () => {
     const envoi = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(envoi?.[0]).toBe(`/api/v1/audit/rapports/${ID}/avis`);
     expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({
-      decision: "RECOMMANDE_REJET",
+      decision: "UNFAVORABLE",
       comment: "Scope 3 sans preuve.",
     });
   });

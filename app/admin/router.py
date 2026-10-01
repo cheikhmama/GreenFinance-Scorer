@@ -96,8 +96,9 @@ from app.admin.utilisateurs import (
     renvoyer_lien_activation,
 )
 from app.audit.assignment import affecter_auditeur, lister_charge_auditeurs
-from app.audit.models import AuditOpinion
-from app.audit.schemas import AvisAuditAdmin
+from app.audit.models import AuditOpinion, MetricReview
+from app.audit.revue import lister_revues
+from app.audit.schemas import AvisAuditAdmin, MetricReviewEntry
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import User
 from app.auth.permissions import require_role
@@ -530,6 +531,22 @@ def lister_avis_route(
     session: Session = Depends(get_session),
 ) -> list[AuditOpinion]:
     return lister_avis(session, rapport_id)
+
+
+@router.get(
+    "/admin/rapports/{rapport_id}/reviews",
+    response_model=list[MetricReviewEntry],
+    operation_id="listReportReviews",
+    summary="Journal des revues de l'Auditeur sur un rapport (lecture seule)",
+)
+def list_report_reviews(
+    rapport_id: uuid.UUID,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> list[MetricReview]:
+    if session.get(ESGReport, rapport_id) is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return lister_revues(session, rapport_id)
 
 
 @router.post(

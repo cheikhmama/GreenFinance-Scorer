@@ -22,6 +22,7 @@ from app.core.enums import (
     DataMethod,
     ExtractionRunStatus,
     MetricCoverageStatus,
+    MetricReviewStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -162,6 +163,10 @@ class IndicateurESGDetail(BaseModel):
     # valeur antérieure, ou quand le texte cité n'a pas été retrouvé sur la page.
     extraction_run_id: uuid.UUID | None = None
     proof_boxes: list[ProofBox] = Field(default_factory=list)
+    # Revue de l'Auditeur (tâche 5.6) : état et valeur auditée. Masqués à l'Entreprise tant que son
+    # rapport n'est pas validé (app/company/router.py) ; publics ensuite.
+    review_status: MetricReviewStatus | None = None
+    audited_value: float | None = None
 
 
 class DonneeCarboneDetail(BaseModel):
@@ -185,6 +190,10 @@ class DonneeCarboneDetail(BaseModel):
     # valeur antérieure, ou quand le texte cité n'a pas été retrouvé sur la page.
     extraction_run_id: uuid.UUID | None = None
     proof_boxes: list[ProofBox] = Field(default_factory=list)
+    # Revue de l'Auditeur (tâche 5.6) : état et valeur auditée. Masqués à l'Entreprise tant que son
+    # rapport n'est pas validé (app/company/router.py) ; publics ensuite.
+    review_status: MetricReviewStatus | None = None
+    audited_value: float | None = None
 
 
 class CouvertureIndicateurPublic(BaseModel):

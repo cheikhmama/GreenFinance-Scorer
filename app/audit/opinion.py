@@ -20,9 +20,10 @@ from app.ingestion.models import ESGReport
 logger = structlog.get_logger(__name__)
 
 _LIBELLES_DECISION = {
-    AuditDecision.RECOMMANDE_VALIDATION: "recommande la validation",
-    AuditDecision.RECOMMANDE_REJET: "recommande le rejet",
-    AuditDecision.DEMANDE_CLARIFICATION: "demande une clarification",
+    AuditDecision.FAVORABLE: "rend un avis favorable",
+    AuditDecision.FAVORABLE_WITH_RESERVATIONS: "rend un avis favorable avec réserves",
+    AuditDecision.CORRECTION_REQUIRED: "demande une correction",
+    AuditDecision.UNFAVORABLE: "rend un avis défavorable",
 }
 
 

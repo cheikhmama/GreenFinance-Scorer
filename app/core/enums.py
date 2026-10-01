@@ -123,9 +123,35 @@ class ConfidenceLevel(str, Enum):
 
 
 class AuditDecision(str, Enum):
-    RECOMMANDE_VALIDATION = "RECOMMANDE_VALIDATION"
-    RECOMMANDE_REJET = "RECOMMANDE_REJET"
-    DEMANDE_CLARIFICATION = "DEMANDE_CLARIFICATION"
+    """Avis de l'Auditeur (tâche 5.6) — une recommandation ; la décision finale reste à
+    l'Administrateur. Tout avis autre que FAVORABLE exige un commentaire."""
+
+    FAVORABLE = "FAVORABLE"
+    FAVORABLE_WITH_RESERVATIONS = "FAVORABLE_WITH_RESERVATIONS"
+    CORRECTION_REQUIRED = "CORRECTION_REQUIRED"
+    UNFAVORABLE = "UNFAVORABLE"
+
+
+class MetricReviewStatus(str, Enum):
+    """Revue d'une valeur extraite par l'Auditeur affecté (tâche 5.6)."""
+
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    # Valeur corrigée : la valeur auditée remplace la valeur extraite au calcul.
+    OVERRIDDEN = "OVERRIDDEN"
+    # Valeur absente de la source : retirée du calcul, comme un indicateur non communiqué.
+    NOT_FOUND = "NOT_FOUND"
+
+
+class ReviewReason(str, Enum):
+    """Catégorie de motif d'une correction ou d'un « non trouvé » (tâche 5.6)."""
+
+    EXTRACTION_ERROR = "EXTRACTION_ERROR"
+    UNIT_ERROR = "UNIT_ERROR"
+    WRONG_PERIOD = "WRONG_PERIOD"
+    WRONG_SCOPE = "WRONG_SCOPE"
+    NOT_IN_SOURCE = "NOT_IN_SOURCE"
+    OTHER = "OTHER"
 
 
 class Role(str, Enum):

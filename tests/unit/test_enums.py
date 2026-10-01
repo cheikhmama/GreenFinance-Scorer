@@ -57,11 +57,12 @@ def test_methode_donnee_values() -> None:
 
 
 def test_decision_audit_values() -> None:
-    assert {d.value for d in AuditDecision} == {
-        "RECOMMANDE_VALIDATION",
-        "RECOMMANDE_REJET",
-        "DEMANDE_CLARIFICATION",
-    }
+    assert [d.value for d in AuditDecision] == [
+        "FAVORABLE",
+        "FAVORABLE_WITH_RESERVATIONS",
+        "CORRECTION_REQUIRED",
+        "UNFAVORABLE",
+    ]
 
 
 def test_role_values() -> None:

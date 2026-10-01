@@ -25,6 +25,7 @@ from app.investor import fx
 from app.investor.models import Portfolio, PortfolioPosition
 from app.investor.portfolio import etat_temporel
 from app.investor.schemas import EtatPosition, PortfolioCarbon, PositionCarbon
+from app.scoring.engine import valeur_effective
 
 
 def _emissions(session: Session, rapport: ESGReport | None) -> pcaf.EmissionsEntreprise | None:
@@ -35,8 +36,13 @@ def _emissions(session: Session, rapport: ESGReport | None) -> pcaf.EmissionsEnt
     ).all()
     par_scope: dict[int, dict[str | None, pcaf.Emission]] = {1: {}, 2: {}, 3: {}}
     for ligne in lignes:
+        # Revue de l'Auditeur (tâche 5.6) : valeur auditée si corrigée, ligne écartée si non
+        # trouvée dans la source — jamais comptée comme zéro.
+        tonnes = valeur_effective(ligne.review_status, ligne.tonnes_co2e, ligne.audited_value)
+        if tonnes is None:
+            continue
         par_scope[ligne.scope][ligne.ghg_category] = pcaf.Emission(
-            tonnes_co2e=ligne.tonnes_co2e, qualite=ligne.pcaf_data_quality
+            tonnes_co2e=tonnes, qualite=ligne.pcaf_data_quality
         )
     scope_2, base_scope_2 = pcaf.choisir_scope_2(par_scope[2])
     return pcaf.EmissionsEntreprise(

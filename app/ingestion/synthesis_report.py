@@ -42,6 +42,7 @@ from sqlmodel import Session, col, select
 
 from app.core import storage
 from app.core.database import utcnow
+from app.core.enums import MetricReviewStatus
 from app.ingestion.models import CarbonEmission, ESGMetric, ESGReport
 from app.ingestion.vocabulaire import CODES_AUTO_DECLARES_PAR_PILIER
 from app.scoring.engine import score_officiel
@@ -94,6 +95,16 @@ def _section_score_officiel(score: Score | None) -> list:
     return elements
 
 
+def _valeur_affichee(review_status: MetricReviewStatus, valeur: float, valeur_auditee: float | None) -> str:
+    """Valeur retenue après revue de l'Auditeur (tâche 5.6) : la valeur auditée est signalée,
+    une valeur non trouvée dans la source n'apparaît plus comme un chiffre."""
+    if review_status == MetricReviewStatus.NOT_FOUND:
+        return "non trouvée"
+    if review_status == MetricReviewStatus.OVERRIDDEN and valeur_auditee is not None:
+        return f"{valeur_auditee:g} (auditée)"
+    return f"{valeur:g}"
+
+
 def _section_indicateurs(indicateurs: list[ESGMetric]) -> list:
     reels = [i for i in indicateurs if i.metric_code not in CODES_AUTO_DECLARES_PAR_PILIER]
     elements: list = [Paragraph("Indicateurs ESG extraits", _STYLE_SECTION)]
@@ -107,7 +118,7 @@ def _section_indicateurs(indicateurs: list[ESGMetric]) -> list:
             [
                 indicateur.metric_code,
                 indicateur.pillar.value,
-                f"{indicateur.value:g}",
+                _valeur_affichee(indicateur.review_status, indicateur.value, indicateur.audited_value),
                 indicateur.unit or "-",
                 str(indicateur.value_year) if indicateur.value_year else "-",
                 f"p. {indicateur.proof.page_start}",
@@ -140,7 +151,7 @@ def _section_carbone(donnees_carbone: list[CarbonEmission]) -> list:
             [
                 str(dc.scope),
                 dc.ghg_category or "-",
-                f"{dc.tonnes_co2e:g}",
+                _valeur_affichee(dc.review_status, dc.tonnes_co2e, dc.audited_value),
                 str(dc.value_year or dc.year),
                 f"p. {dc.proof.page_start}",
             ]

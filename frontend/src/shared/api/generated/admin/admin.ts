@@ -30,6 +30,7 @@ import type {
   ListProjectsAdminParams,
   ListPublishableCompaniesParams,
   ListUsersByRoleParams,
+  MetricReviewEntry,
   ModifierEntrepriseAdminRequest,
   PageAnalyseAdmin,
   PageChargeAuditeurAdmin,
@@ -566,6 +567,29 @@ export const getListReportOpinionsUrl = (rapportId: string,) => {
 export const listReportOpinions = async (rapportId: string, options?: RequestInit): Promise<AvisAuditAdmin[]> => {
 
   return apiFetch<AvisAuditAdmin[]>(getListReportOpinionsUrl(rapportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListReportReviewsUrl = (rapportId: string,) => {
+
+
+
+
+  return `/admin/rapports/${rapportId}/reviews`
+}
+
+/**
+ * @summary Journal des revues de l'Auditeur sur un rapport (lecture seule)
+ */
+export const listReportReviews = async (rapportId: string, options?: RequestInit): Promise<MetricReviewEntry[]> => {
+
+  return apiFetch<MetricReviewEntry[]>(getListReportReviewsUrl(rapportId),
   {
     ...options,
     method: 'GET'

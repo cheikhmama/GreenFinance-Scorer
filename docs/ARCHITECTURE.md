@@ -138,11 +138,17 @@ API with its role-based scope.
 | `value` | numeric | normalised numeric value |
 | `unit` | text | canonical unit per `metric_code` |
 | `proof_text`, `proof_page`, `proof_id` | | evidence (guarantee: no value without proof) |
-| `auditor_overridden` | bool | + `override_value`, `override_reason`, `overridden_by`, `overridden_at` |
+| `review_status`, `audited_value` | enum, float | auditor review (task 5.6): `PENDING`, `ACCEPTED`, `OVERRIDDEN` (audited value replaces the extracted one in the score), `NOT_FOUND` (left out); same columns on `carbon_emissions` |
 
 *Current:* `indicateur_esg`. There is **no** uniqueness on `(rapport_id, code)` today — the
-scoring engine silently keeps the last duplicate. Auditor overrides don't exist today: the
-auditor can only issue an opinion.
+scoring engine silently keeps the last duplicate.
+
+**Review log** (*task 5.6*). `metric_reviews` records every decision of the assigned auditor on a
+value — metric or carbon row: original value, new value (overrides), reason category, comment,
+auditor, time. It is **append-only**: a PostgreSQL trigger refuses `UPDATE`, `DELETE` and
+`TRUNCATE`, and every foreign key is `RESTRICT`, so a reviewed value, its report and its auditor
+can't disappear under the trail. The latest entry of a value is its current state, mirrored on the
+row in the same transaction. The former override columns (never written) are gone.
 
 Carbon data (`carbon_emissions`) keeps its structure: `scope` 1/2/3, `ghg_category`,
 `tonnes_co2e`, `year`, `pcaf_data_quality` (1–5, **nullable**, derived from the extraction

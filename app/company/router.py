@@ -42,7 +42,7 @@ from app.company.schemas import (
 from app.company.upload_validation import TAILLE_MAX_MANDAT_OCTETS
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import ReportType, Role
+from app.core.enums import ReportStatus, ReportType, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
@@ -285,6 +285,15 @@ def consulter_rapport(
 ) -> RapportESGDetail:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
     detail = RapportESGDetail.model_validate(rapport)
+    if rapport.status != ReportStatus.VALIDATED:
+        # Pendant l'examen, l'Entreprise ne voit pas l'avancement de la revue (tâches 5.1, 5.6).
+        sans_revue = {"review_status": None, "audited_value": None}
+        detail = detail.model_copy(
+            update={
+                "metrics": [m.model_copy(update=sans_revue) for m in detail.metrics],
+                "carbon_data": [d.model_copy(update=sans_revue) for d in detail.carbon_data],
+            }
+        )
     return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 

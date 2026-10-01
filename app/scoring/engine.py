@@ -32,7 +32,7 @@ from sqlmodel import Session, col, select
 
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import Pillar
+from app.core.enums import MetricReviewStatus, Pillar
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGMetric, ESGReport
 from app.scoring.config_schema import (
@@ -126,12 +126,15 @@ def obtenir_configuration_reference(session: Session) -> ScoringConfig:
     return enregistrer_configuration(session, _contenu_reference())
 
 
-def _valeur_effective(indicateur: ESGMetric) -> float:
-    """La correction de l'Auditeur, quand il y en a une, remplace la valeur extraite — qui reste
-    intacte en base pour la traçabilité (docs/WORKFLOWS.md §1.3)."""
-    if indicateur.auditor_overridden and indicateur.override_value is not None:
-        return indicateur.override_value
-    return indicateur.value
+def valeur_effective(review_status: MetricReviewStatus, valeur: float, valeur_auditee: float | None) -> float | None:
+    """Revue de l'Auditeur (tâche 5.6) : sa correction remplace la valeur extraite — qui reste
+    intacte en base pour la traçabilité —, et une valeur déclarée non trouvée sort du calcul
+    (None), comme un indicateur non communiqué. Partagé par le score et le module carbone."""
+    if review_status == MetricReviewStatus.NOT_FOUND:
+        return None
+    if review_status == MetricReviewStatus.OVERRIDDEN and valeur_auditee is not None:
+        return valeur_auditee
+    return valeur
 
 
 def _score_pilier(pilier_config: PilierConfig, valeurs_par_code: dict[str, float]) -> float | None:
@@ -222,9 +225,11 @@ def valeurs_des_rapports(
         for indicateur in session.exec(
             select(ESGMetric).where(col(ESGMetric.report_id).in_(rapport_ids))
         ).all():
-            valeurs[indicateur.report_id][indicateur.pillar][indicateur.metric_code] = (
-                _valeur_effective(indicateur)
+            valeur = valeur_effective(
+                indicateur.review_status, indicateur.value, indicateur.audited_value
             )
+            if valeur is not None:
+                valeurs[indicateur.report_id][indicateur.pillar][indicateur.metric_code] = valeur
     return valeurs
 
 
@@ -326,6 +331,14 @@ class ApercuScore:
     calculable: bool
     coverage_rate: float | None
     min_coverage: float | None
+
+
+def calculer_apercu_complet(session: Session, rapport_id: uuid.UUID) -> ResultatScore | None:
+    """Score de référence avec les valeurs revues, sans rien écrire (pré-score de l'Auditeur,
+    tâche 5.6). Même calcul que calculer_score, sous la référence décrite par le fichier courant ;
+    None si aucun pilier n'est calculable."""
+    schema = _schema_depuis_contenu(_contenu_reference())
+    return _calculer(schema, _valeurs_du_rapport(session, rapport_id))
 
 
 def apercu_score(session: Session, rapport_id: uuid.UUID) -> ApercuScore:

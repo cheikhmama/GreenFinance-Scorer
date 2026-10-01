@@ -239,7 +239,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
     avis = AuditOpinion(
         report_id=rapport.id,
         auditor_id=auditeur.id,
-        decision=AuditDecision.RECOMMANDE_VALIDATION,
+        decision=AuditDecision.FAVORABLE,
         comment="Données cohérentes avec le rapport annuel.",
     )
     session.add(avis)

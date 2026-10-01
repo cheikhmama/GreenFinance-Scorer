@@ -238,7 +238,7 @@ def main() -> None:
                 session,
                 rapport.id,
                 auditeur.id,
-                AuditDecision.RECOMMANDE_VALIDATION,
+                AuditDecision.FAVORABLE,
                 "Indicateurs conformes aux pages citées ; périmètre carbone complet.",
             )
             if etape == "decision":

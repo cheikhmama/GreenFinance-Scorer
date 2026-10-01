@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import CheckConstraint, Column, Index, Numeric, UniqueConstraint, text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -24,6 +25,7 @@ from app.core.enums import (
     DataMethod,
     ExtractionRunStatus,
     MetricCoverageStatus,
+    MetricReviewStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -241,13 +243,18 @@ class ESGMetric(SQLModel, table=True):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     )
-    auditor_overridden: bool = Field(default=False)
-    override_value: float | None = Field(default=None)
-    override_reason: str | None = Field(default=None)
-    overridden_by_id: uuid.UUID | None = Field(
-        default=None, foreign_key="users.id", ondelete="SET NULL", index=True
+    # Revue de l'Auditeur (tâche 5.6) : état courant et valeur auditée, tenus dans la même
+    # transaction que l'entrée du journal append-only metric_reviews, qui en fait foi. La valeur
+    # extraite (`value` / `tonnes_co2e`) reste intacte.
+    review_status: MetricReviewStatus = Field(
+        default=MetricReviewStatus.PENDING,
+        sa_column=Column(
+            SAEnum(MetricReviewStatus, native_enum=False, length=64),
+            nullable=False,
+            server_default=MetricReviewStatus.PENDING.value,
+        ),
     )
-    overridden_at: datetime | None = Field(default=None)
+    audited_value: float | None = Field(default=None)
 
     report: ESGReport = Relationship(back_populates="metrics")
     proof: Evidence = Relationship(back_populates="metrics")
@@ -303,6 +310,19 @@ class CarbonEmission(SQLModel, table=True):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     )
+
+    # Revue de l'Auditeur (tâche 5.6) : état courant et valeur auditée, tenus dans la même
+    # transaction que l'entrée du journal append-only metric_reviews, qui en fait foi. La valeur
+    # extraite (`value` / `tonnes_co2e`) reste intacte.
+    review_status: MetricReviewStatus = Field(
+        default=MetricReviewStatus.PENDING,
+        sa_column=Column(
+            SAEnum(MetricReviewStatus, native_enum=False, length=64),
+            nullable=False,
+            server_default=MetricReviewStatus.PENDING.value,
+        ),
+    )
+    audited_value: float | None = Field(default=None)
 
     report: ESGReport = Relationship(back_populates="carbon_data")
     proof: Evidence = Relationship(back_populates="carbon_emissions")

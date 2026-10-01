@@ -6,10 +6,14 @@ import type { AuditDecision } from "@/shared/api/generated/greenFinanceScorerAPI
  * réels distincts, ici deux, dans deux features différentes).
  */
 const LIBELLES: Record<AuditDecision, string> = {
-  RECOMMANDE_VALIDATION: "Validation recommandée",
-  RECOMMANDE_REJET: "Rejet recommandé",
-  DEMANDE_CLARIFICATION: "Clarification demandée",
+  FAVORABLE: "Favorable",
+  FAVORABLE_WITH_RESERVATIONS: "Favorable avec réserves",
+  CORRECTION_REQUIRED: "Correction requise",
+  UNFAVORABLE: "Défavorable",
 };
+
+/** Les quatre avis, dans l'ordre du formulaire (tâche 5.6). */
+export const DECISIONS_AUDIT = Object.keys(LIBELLES) as AuditDecision[];
 
 export function libelleDecisionAudit(decision: AuditDecision): string {
   return LIBELLES[decision];

@@ -216,13 +216,18 @@ export interface ApercuActeursAdmin {
   institutions: StatistiquesInstitutionsAdmin;
 }
 
+/**
+ * Avis de l'Auditeur (tâche 5.6) — une recommandation ; la décision finale reste à
+ * l'Administrateur. Tout avis autre que FAVORABLE exige un commentaire.
+ */
 export type AuditDecision = typeof AuditDecision[keyof typeof AuditDecision];
 
 
 export const AuditDecision = {
-  RECOMMANDE_VALIDATION: 'RECOMMANDE_VALIDATION',
-  RECOMMANDE_REJET: 'RECOMMANDE_REJET',
-  DEMANDE_CLARIFICATION: 'DEMANDE_CLARIFICATION',
+  FAVORABLE: 'FAVORABLE',
+  FAVORABLE_WITH_RESERVATIONS: 'FAVORABLE_WITH_RESERVATIONS',
+  CORRECTION_REQUIRED: 'CORRECTION_REQUIRED',
+  UNFAVORABLE: 'UNFAVORABLE',
 } as const;
 
 /**
@@ -692,6 +697,19 @@ export interface ProofBox {
   y1: number;
 }
 
+/**
+ * Revue d'une valeur extraite par l'Auditeur affecté (tâche 5.6).
+ */
+export type MetricReviewStatus = typeof MetricReviewStatus[keyof typeof MetricReviewStatus];
+
+
+export const MetricReviewStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  OVERRIDDEN: 'OVERRIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+} as const;
+
 export interface DonneeCarboneDetail {
   id: string;
   scope: number;
@@ -708,6 +726,8 @@ export interface DonneeCarboneDetail {
   confidence: ConfidenceLevel | null;
   extraction_run_id?: string | null;
   proof_boxes?: ProofBox[];
+  review_status?: MetricReviewStatus | null;
+  audited_value?: number | null;
 }
 
 export interface DonneesCarboneAgregees {
@@ -822,6 +842,8 @@ export interface IndicateurESGDetail {
   confidence: ConfidenceLevel | null;
   extraction_run_id?: string | null;
   proof_boxes?: ProofBox[];
+  review_status?: MetricReviewStatus | null;
+  audited_value?: number | null;
 }
 
 /**
@@ -1103,6 +1125,51 @@ export interface MetricContribution {
   baseline_value: number | null;
   effective_weight: number;
   contribution: number;
+}
+
+/**
+ * Catégorie de motif d'une correction ou d'un « non trouvé » (tâche 5.6).
+ */
+export type ReviewReason = typeof ReviewReason[keyof typeof ReviewReason];
+
+
+export const ReviewReason = {
+  EXTRACTION_ERROR: 'EXTRACTION_ERROR',
+  UNIT_ERROR: 'UNIT_ERROR',
+  WRONG_PERIOD: 'WRONG_PERIOD',
+  WRONG_SCOPE: 'WRONG_SCOPE',
+  NOT_IN_SOURCE: 'NOT_IN_SOURCE',
+  OTHER: 'OTHER',
+} as const;
+
+/**
+ * Une entrée du journal des revues (tâche 5.6), jamais modifiée après coup.
+ */
+export interface MetricReviewEntry {
+  id: string;
+  metric_id: string | null;
+  emission_id: string | null;
+  decision: MetricReviewStatus;
+  original_value: number;
+  new_value: number | null;
+  reason: ReviewReason | null;
+  comment: string | null;
+  auditor_id: string;
+  created_at: string;
+}
+
+/**
+ * POST /audit/rapports/{id}/reviews (tâche 5.6) — décision de l'Auditeur affecté sur une valeur
+ * extraite : un indicateur (`metric_id`) ou une donnée carbone (`emission_id`), jamais les deux.
+ * Corriger exige la nouvelle valeur ; corriger ou déclarer non trouvée exige un motif.
+ */
+export interface MetricReviewRequest {
+  metric_id?: string | null;
+  emission_id?: string | null;
+  decision: MetricReviewStatus;
+  new_value?: number | null;
+  reason?: ReviewReason | null;
+  comment?: string | null;
 }
 
 export interface ModifierAnalyseRequest {
@@ -1504,6 +1571,20 @@ export interface PortfolioImportResult {
   ambiguous: number;
 }
 
+/**
+ * Score calculé sous la configuration de référence avec les valeurs revues (tâche 5.6) —
+ * jamais officiel. Montré à l'Auditeur seulement APRÈS son avis, pour que le chiffre n'oriente
+ * pas la revue.
+ */
+export interface PreScore {
+  computable: boolean;
+  global_score: number | null;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
+  coverage_rate: number | null;
+}
+
 export interface ProjetAffecte {
   id: string;
   name: string;
@@ -1759,6 +1840,9 @@ export interface ScoreVerificationAdmin {
   min_coverage?: number | null;
 }
 
+/**
+ * Avis de l'Auditeur (tâche 5.6) : tout avis autre que FAVORABLE est motivé.
+ */
 export interface SoumettreAvisRequest {
   decision: AuditDecision;
   comment?: string | null;

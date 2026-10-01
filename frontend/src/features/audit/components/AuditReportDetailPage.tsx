@@ -3,8 +3,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { CarbonTable, IndicatorsTable, PreuveLien } from "@/shared/esg/EvidenceTables";
+import { DECISIONS_AUDIT, libelleDecisionAudit } from "@/shared/format/decisionAudit";
+import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -65,7 +66,10 @@ export function AuditReportDetailPage() {
                   —{" "}
                   <PreuveLien
                     preuve={dossier.declared_global_score_proof}
-                    url={construireUrlPreuveAudit(dossier.id, dossier.declared_global_score_proof.id)}
+                    url={construireUrlPreuveAudit(
+                      dossier.id,
+                      dossier.declared_global_score_proof.id,
+                    )}
                   />
                 </span>
               ) : null}
@@ -105,7 +109,7 @@ function FormulaireAvis({ rapportId }: { rapportId: string }) {
 
   const form = useForm<SoumettreAvisForm>({
     resolver: zodResolver(soumettreAvisSchema),
-    defaultValues: { decision: AuditDecision.RECOMMANDE_VALIDATION, comment: "" },
+    defaultValues: { decision: AuditDecision.FAVORABLE, comment: "" },
   });
 
   function onSubmit(values: SoumettreAvisForm) {
@@ -159,13 +163,11 @@ function FormulaireAvis({ rapportId }: { rapportId: string }) {
                   <FormLabel>Décision</FormLabel>
                   <FormControl>
                     <Select {...field}>
-                      <option value={AuditDecision.RECOMMANDE_VALIDATION}>
-                        Recommande la validation
-                      </option>
-                      <option value={AuditDecision.RECOMMANDE_REJET}>Recommande le rejet</option>
-                      <option value={AuditDecision.DEMANDE_CLARIFICATION}>
-                        Demande une clarification
-                      </option>
+                      {DECISIONS_AUDIT.map((decision) => (
+                        <option key={decision} value={decision}>
+                          {libelleDecisionAudit(decision)}
+                        </option>
+                      ))}
                     </Select>
                   </FormControl>
                   <FormMessage />

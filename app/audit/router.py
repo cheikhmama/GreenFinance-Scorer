@@ -12,10 +12,17 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from sqlmodel import Session, col, select
 
-from app.audit.models import AuditOpinion
+from app.audit.models import AuditOpinion, MetricReview
 from app.audit.opinion import soumettre_avis
 from app.audit.preuves import fichier_preuve
-from app.audit.schemas import AvisAuditAdmin, SoumettreAvisRequest
+from app.audit.revue import enregistrer_revue, lister_revues_de_l_auditeur, pre_score
+from app.audit.schemas import (
+    AvisAuditAdmin,
+    MetricReviewEntry,
+    MetricReviewRequest,
+    PreScore,
+    SoumettreAvisRequest,
+)
 from app.auth.models import User
 from app.auth.permissions import require_role
 from app.core import storage
@@ -119,3 +126,48 @@ def soumettre_avis_route(
     return soumettre_avis(
         session, rapport_id, current_user.id, payload.decision, payload.comment
     )
+
+
+@router.post(
+    "/audit/rapports/{rapport_id}/reviews",
+    response_model=MetricReviewEntry,
+    status_code=201,
+    operation_id="reviewReportValue",
+    summary="Accepter, corriger ou déclarer non trouvée une valeur extraite (Auditeur affecté)",
+)
+def review_report_value(
+    rapport_id: uuid.UUID,
+    payload: MetricReviewRequest,
+    current_user: User = Depends(require_role(Role.AUDITOR)),
+    session: Session = Depends(get_session),
+) -> MetricReview:
+    return enregistrer_revue(session, rapport_id, current_user.id, payload)
+
+
+@router.get(
+    "/audit/rapports/{rapport_id}/reviews",
+    response_model=list[MetricReviewEntry],
+    operation_id="listAuditReviews",
+    summary="Journal des revues d'un dossier affecté",
+)
+def list_audit_reviews(
+    rapport_id: uuid.UUID,
+    current_user: User = Depends(require_role(Role.AUDITOR)),
+    session: Session = Depends(get_session),
+) -> list[MetricReview]:
+    return lister_revues_de_l_auditeur(session, rapport_id, current_user.id)
+
+
+@router.get(
+    "/audit/rapports/{rapport_id}/pre-score",
+    response_model=PreScore,
+    operation_id="getAuditPreScore",
+    summary="Pré-score avec les valeurs revues — visible seulement après l'avis",
+    responses={409: {"description": "Avis pas encore rendu (code avis_requis)."}},
+)
+def get_audit_pre_score(
+    rapport_id: uuid.UUID,
+    current_user: User = Depends(require_role(Role.AUDITOR)),
+    session: Session = Depends(get_session),
+) -> PreScore:
+    return pre_score(session, rapport_id, current_user.id)

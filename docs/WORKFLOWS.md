@@ -96,7 +96,9 @@ Internal roles see the detailed state.
 | extraction | worker | `EXTRACTING` | an `extraction_runs` row (Docling version, LLM model, prompt version — *task 5.5*) opened at the start and closed with the outcome; metrics + carbon rows (each with its run id and the boxes of its cited value) + evidence replaced as a whole, coverage rows, status `AWAITING_ASSIGNMENT` (or `EXTRACTION_FAILED` with a fixed cause), **pre-score** (non-official score with the reference config) | `generate_synthesis_pdf` |
 | retry extraction | ADMIN | `EXTRACTION_FAILED` | status `EXTRACTING` (queued), error cleared | job `extract_report` |
 | assign auditor | ADMIN | `AWAITING_ASSIGNMENT` | `auditor_id`, `assigned_at`, status `IN_AUDIT`, notification | — |
-| audit opinion | AUDITOR (assigned) | `IN_AUDIT` | opinion row, optional metric overrides (`auditor_overridden=true` + reason), status `PENDING_DECISION` | — |
+| review a value (*task 5.6*, `POST /audit/rapports/{id}/reviews`) | AUDITOR (assigned) | `IN_AUDIT`; the value belongs to this report; `OVERRIDDEN` needs the new value, `OVERRIDDEN` / `NOT_FOUND` a reason category | an **append-only** `metric_reviews` row (original value, new value, reason, comment, auditor) + the value's current `review_status` / `audited_value`; deciding again adds a row | — |
+| audit opinion | AUDITOR (assigned) | `IN_AUDIT`; a comment unless `FAVORABLE` | opinion row (`FAVORABLE`, `FAVORABLE_WITH_RESERVATIONS`, `CORRECTION_REQUIRED`, `UNFAVORABLE` — *task 5.6*), status `PENDING_DECISION`; the review is closed | — |
+| pre-score (*task 5.6*, `GET /audit/rapports/{id}/pre-score`) | AUDITOR (assigned) | opinion already submitted (`409 avis_requis` before) | — (reference score with the reviewed values, never official) | — |
 | **validate** | ADMIN | `PENDING_DECISION`; score computable; coverage ≥ config threshold | see §1.3 | `generate_synthesis_pdf`, notification email |
 | reject | ADMIN | `PENDING_DECISION` | status `REJECTED`, reason, notification | — |
 | request revision | ADMIN | `PENDING_DECISION` | status `REVISION_REQUESTED`, reason, notification | — |
@@ -106,6 +108,13 @@ Internal roles see the detailed state.
 no draft state; no auditor overrides. Extraction ran as a FastAPI `BackgroundTasks` in the API
 process until task 4.1; it now runs in the extraction worker.
 
+**Separation of duties** (*task 5.6*): only the assigned auditor reviews values and issues the
+opinion, and only while the report is `IN_AUDIT` — the opinion closes the review. The admin reads
+the review log (`GET /admin/rapports/{id}/reviews`) but never writes to it, and decides only from
+`PENDING_DECISION`. The auditor sees the pre-score only after the opinion, so the number never
+steers the review. The enterprise doesn't see review states or audited values until the report is
+validated.
+
 ### 1.3 Atomic score publication
 
 All of the following happen in **one** transaction. If any step raises, nothing is committed and
@@ -114,8 +123,8 @@ the report stays in `PENDING_DECISION`.
 1. Lock the report row (`SELECT … FOR UPDATE`) and re-check the status.
 2. Resolve the reference `scoring_configs` row by content hash (get-or-create with
    `flush()` / `ON CONFLICT`, **never** `commit()`).
-3. Compute the score from the effective metric values (auditor override if present, else the
-   extracted value).
+3. Compute the score from the effective metric values: the audited value of an `OVERRIDDEN` value,
+   nothing for a `NOT_FOUND` one (it counts as not reported), else the extracted value.
 4. Insert the `scores` row; set `official_score`, `coverage_rate`, `config_hash` on the report.
 5. Set status `VALIDATED`; write the audit log entry and the in-app notification.
 6. `COMMIT`.

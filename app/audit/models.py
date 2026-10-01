@@ -10,10 +10,16 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import CheckConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
-from app.core.enums import AuditDecision, sa_enum_column
+from app.core.enums import (
+    AuditDecision,
+    MetricReviewStatus,
+    ReviewReason,
+    sa_enum_column,
+)
 
 if TYPE_CHECKING:
     from app.auth.models import User
@@ -39,3 +45,52 @@ class AuditOpinion(SQLModel, table=True):
 
     report: "ESGReport" = Relationship(back_populates="audit_opinions")
     auditor: "User" = Relationship(back_populates="audit_opinions")
+
+
+class MetricReview(SQLModel, table=True):
+    """Journal append-only des revues de l'Auditeur sur les valeurs extraites (tâche 5.6) : une
+    ligne par décision — accepter, corriger, déclarer non trouvée —, jamais modifiée ni effacée
+    (un déclencheur PostgreSQL refuse UPDATE, DELETE et TRUNCATE, voir la migration). La dernière
+    entrée d'une valeur fait foi ; ESGMetric / CarbonEmission en portent l'état courant.
+
+    Toutes les clés sont RESTRICT : une valeur revue, son rapport et son auditeur ne disparaissent
+    pas sous leur trace."""
+
+    __tablename__ = "metric_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "(metric_id IS NULL) <> (emission_id IS NULL)",
+            name="ck_metric_reviews_one_target",
+        ),
+        CheckConstraint(
+            "(decision = 'OVERRIDDEN') = (new_value IS NOT NULL)",
+            name="ck_metric_reviews_new_value_iff_overridden",
+        ),
+        CheckConstraint(
+            "decision = 'ACCEPTED' OR reason IS NOT NULL",
+            name="ck_metric_reviews_reason_unless_accepted",
+        ),
+        CheckConstraint(
+            "decision <> 'PENDING'",
+            name="ck_metric_reviews_decision_not_pending",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="RESTRICT", index=True)
+    metric_id: uuid.UUID | None = Field(
+        default=None, foreign_key="esg_metrics.id", ondelete="RESTRICT", index=True
+    )
+    emission_id: uuid.UUID | None = Field(
+        default=None, foreign_key="carbon_emissions.id", ondelete="RESTRICT", index=True
+    )
+    decision: MetricReviewStatus = Field(sa_column=sa_enum_column(MetricReviewStatus))
+    # Valeur extraite au moment de la revue, et valeur corrigée (OVERRIDDEN seulement).
+    original_value: float
+    new_value: float | None = None
+    reason: ReviewReason | None = Field(
+        default=None, sa_column=sa_enum_column(ReviewReason, nullable=True)
+    )
+    comment: str | None = Field(default=None, max_length=2000)
+    auditor_id: uuid.UUID = Field(foreign_key="users.id", ondelete="RESTRICT", index=True)
+    created_at: datetime = Field(default_factory=utcnow)

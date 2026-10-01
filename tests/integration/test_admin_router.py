@@ -116,7 +116,7 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
         AuditOpinion(
             report_id=rapport.id,
             auditor_id=auditeur_id,
-            decision=AuditDecision.RECOMMANDE_VALIDATION,
+            decision=AuditDecision.FAVORABLE,
         )
     )
     # Au moins un ESGMetric (Phase 5 §9) : valider_rapport calcule désormais un score dans la
@@ -694,7 +694,7 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
     )
     session.add(
         AuditOpinion(
-            report_id=rapport.id, auditor_id=auditeur.id, decision=AuditDecision.RECOMMANDE_VALIDATION
+            report_id=rapport.id, auditor_id=auditeur.id, decision=AuditDecision.FAVORABLE
         )
     )
     session.commit()
@@ -1550,7 +1550,7 @@ def test_premiere_validation_incalculable_sous_une_nouvelle_version_ne_valide_ri
     )
     session.add(
         AuditOpinion(
-            report_id=rapport.id, auditor_id=auditeur.id, decision=AuditDecision.RECOMMANDE_VALIDATION
+            report_id=rapport.id, auditor_id=auditeur.id, decision=AuditDecision.FAVORABLE
         )
     )
     session.commit()

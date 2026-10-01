@@ -79,7 +79,7 @@ def test_creation_avis_audit(session) -> None:
     avis = AuditOpinion(
         report_id=rapport.id,
         auditor_id=auditeur.id,
-        decision=AuditDecision.RECOMMANDE_VALIDATION,
+        decision=AuditDecision.FAVORABLE,
         comment="Données cohérentes avec le rapport annuel.",
     )
     session.add(avis)
