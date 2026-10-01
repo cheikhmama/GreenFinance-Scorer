@@ -65,7 +65,16 @@ export function libelleStatutRapportEntreprise(statut: ReportStatus): string {
 }
 
 export function variantStatutRapportEntreprise(statut: ReportStatus): Variante {
+  if (statut === "DRAFT") return "secondary";
+  if (statut === "VALIDATED") return "outline";
   return estEnExamen(statut) ? "secondary" : VARIANTES[statut];
+}
+
+/** Teinte ajoutée au badge Entreprise (tâche 5.9) : « Validé » en contour vert. */
+export function classeStatutRapportEntreprise(statut: ReportStatus): string | undefined {
+  return statut === "VALIDATED"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
+    : undefined;
 }
 
 /** Date affichée pour un rapport : son dépôt, ou — pour un brouillon (DRAFT, tâche 1.5), qui n'a

@@ -62,22 +62,42 @@ export function dateHeure(iso: string): string {
 interface RapportListe {
   id: string;
   status: ReportStatus;
+  fiscal_year: number | null;
   previous_report_id: string | null;
   created_at: string;
 }
 
-const STATUTS_CLOS: readonly ReportStatus[] = ["VALIDATED", "REJECTED"];
+/** États qui ne retiennent plus l'entreprise — même règle que le serveur
+ * (app/company/rapports.py::STATUTS_SANS_SESSION). */
+const STATUTS_SANS_SESSION: readonly ReportStatus[] = [
+  "VALIDATED",
+  "REJECTED",
+  "EXTRACTION_FAILED",
+];
 
-/** Sépare les déclarations en cours (brouillon, examen, correction demandée non encore déposée)
- * de l'historique (validées, rejetées, et versions remplacées par une correction). Chaque groupe
- * est trié de la plus récente à la plus ancienne. */
+/** Range les déclarations (tâche 5.9), chaque groupe de la plus récente à la plus ancienne :
+ * - `enCours` : au plus une session, la plus récente, jamais d'un exercice déjà validé ;
+ * - `historique` : décisions rendues, extractions en échec et versions remplacées par une
+ *   correction ;
+ * - `sessionBloquante` : la déclaration active qui empêche d'en ouvrir une autre (le serveur
+ *   refuse alors l'ouverture : `declaration_en_cours`). */
 export function separerDeclarations<T extends RapportListe>(rapports: T[]) {
   const remplaces = new Set(rapports.map((r) => r.previous_report_id).filter(Boolean));
   const tries = [...rapports].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
-  const close = (r: T) => STATUTS_CLOS.includes(r.status) || remplaces.has(r.id);
-  return { enCours: tries.filter((r) => !close(r)), historique: tries.filter(close) };
+  const close = (r: T) => STATUTS_SANS_SESSION.includes(r.status) || remplaces.has(r.id);
+  const exercicesValides = new Set(
+    rapports.filter((r) => r.status === "VALIDATED").map((r) => r.fiscal_year),
+  );
+  const actifs = tries.filter((r) => !close(r));
+  const enCours = actifs.filter((r) => !exercicesValides.has(r.fiscal_year)).slice(0, 1);
+  return {
+    enCours,
+    historique: tries.filter(close),
+    // La session montrée d'abord : nommer une déclaration masquée (donnée héritée) dérouterait.
+    sessionBloquante: enCours[0] ?? actifs[0],
+  };
 }
 
 export function libelleExercice(annee: number | null): string {

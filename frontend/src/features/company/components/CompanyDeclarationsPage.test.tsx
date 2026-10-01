@@ -59,25 +59,34 @@ function renderPage() {
 }
 
 describe("Espace Entreprise — Mes déclarations", () => {
-  it("sépare les déclarations en cours de l’historique, avec score, empreinte et synthèse", async () => {
+  it("une seule session en cours, l’historique avec score, empreinte et synthèse", async () => {
     fetchMock.mockImplementation(async () => Response.json(RAPPORTS));
     renderPage();
 
+    // Données héritées : deux déclarations actives ; seule la plus récente est montrée.
     const enCours = await screen.findByRole("region", { name: "En cours" });
     expect(within(enCours).getByText("FY2025")).toBeInTheDocument();
-    expect(within(enCours).getByText("FY2023")).toBeInTheDocument();
-    expect(within(enCours).getByText("En cours d'examen")).toBeInTheDocument();
+    expect(within(enCours).queryByText("FY2023")).not.toBeInTheDocument();
+    expect(within(enCours).getByText("Brouillon")).toBeInTheDocument();
     expect(within(enCours).getAllByRole("list", { name: "Étapes de la déclaration" })).toHaveLength(
-      2,
+      1,
     );
+
+    // Une déclaration est active : pas d’ouverture d’une autre, et la raison est dite.
+    expect(screen.getByRole("button", { name: "Nouvelle déclaration" })).toBeDisabled();
+    expect(
+      screen.getByText(/Une seule déclaration à la fois : terminez FY2025/),
+    ).toBeInTheDocument();
 
     const historique = screen.getByRole("table");
     const lignes = within(historique).getAllByRole("row").slice(1);
     expect(lignes).toHaveLength(2);
     expect(lignes[0]).toHaveTextContent("FY2024");
+    expect(lignes[0]).toHaveTextContent("Validé");
     expect(lignes[0]).toHaveTextContent("74,5/100");
     expect(lignes[0]).toHaveTextContent("couverture 88 %");
-    expect(within(lignes[0] as HTMLElement).getByTitle(SHA)).toBeInTheDocument();
+    // Empreinte tronquée : 8 premiers et 4 derniers caractères, complète au survol.
+    expect(within(lignes[0] as HTMLElement).getByTitle(SHA)).toHaveTextContent("ffffffff…ffff");
     expect(within(lignes[0] as HTMLElement).getByRole("link", { name: "PDF" })).toHaveAttribute(
       "href",
       "/api/v1/company/rapports/valide/synthese/fichier",
@@ -85,18 +94,48 @@ describe("Espace Entreprise — Mes déclarations", () => {
     expect(lignes[1]).toHaveTextContent("FY2023");
   });
 
+  it("n’affiche jamais en cours un exercice déjà validé, et ne le propose plus", async () => {
+    fetchMock.mockImplementation(async () =>
+      Response.json([
+        rapportListe("valide2025", { fiscal_year: 2025 }),
+        // Donnée héritée d'avant la règle : un brouillon du même exercice.
+        rapportListe("doublon", {
+          fiscal_year: 2025,
+          type: "RAPPORT_ANNUEL",
+          status: "DRAFT",
+          submitted_at: null,
+          created_at: "2026-09-20T08:00:00Z",
+          official_global_score: null,
+        }),
+      ]),
+    );
+    renderPage();
+
+    const enCours = await screen.findByRole("region", { name: "En cours" });
+    expect(within(enCours).queryByText("FY2025")).not.toBeInTheDocument();
+    expect(within(enCours).getByText(/Aucune déclaration en cours/)).toBeInTheDocument();
+    expect(screen.getAllByText("FY2025")).toHaveLength(1);
+    // Le serveur compte encore ce brouillon hérité : ouverture bloquée, et dite.
+    expect(screen.getByRole("button", { name: "Nouvelle déclaration" })).toBeDisabled();
+  });
+
   it("ouvre un exercice avec ses données financières depuis la modale, puis mène au brouillon", async () => {
     fetchMock.mockImplementation(async (_url, init) =>
       init?.method === "POST"
         ? Response.json({ id: "nouveau" }, { status: 201 })
-        : Response.json([]),
+        : Response.json([rapportListe("valide")]),
     );
     const user = userEvent.setup();
     renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Nouvelle déclaration" }));
     const modale = await screen.findByRole("dialog");
-    const annee = new Date().getFullYear() - 2;
+    expect(
+      within(within(modale).getByLabelText("Exercice fiscal")).queryByRole("option", {
+        name: "FY2024",
+      }),
+    ).not.toBeInTheDocument();
+    const annee = new Date().getFullYear() - 3;
     await user.selectOptions(within(modale).getByLabelText("Exercice fiscal"), String(annee));
     await user.selectOptions(within(modale).getByLabelText("Devise"), "MRU");
     await user.type(within(modale).getByLabelText("Chiffre d’affaires"), "820000000");

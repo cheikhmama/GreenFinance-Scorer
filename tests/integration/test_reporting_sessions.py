@@ -74,16 +74,18 @@ def test_ouvrir_une_declaration_cree_un_brouillon_sans_fichier(session, entrepri
     assert ligne["source_file"] is None
 
 
-def test_un_seul_brouillon_par_exercice_et_type(session, entreprise) -> None:
+def test_une_seule_declaration_active_quel_que_soit_le_type(session, entreprise) -> None:
     _user, client = entreprise
     _ouvrir(client)
 
     doublon = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"})
     autre_type = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_CLIMAT"})
+    autre_exercice = client.post(URL, json={"fiscal_year": 2023, "report_type": "RAPPORT_ESG"})
 
-    assert doublon.status_code == 422
-    assert doublon.json()["error"]["code"] == "brouillon_existant"
-    assert autre_type.status_code == 201
+    # Tâche 5.9 : un brouillon ouvert retient l'entreprise, quel que soit l'exercice ou le type.
+    for refus in (doublon, autre_type, autre_exercice):
+        assert refus.status_code == 422
+        assert refus.json()["error"]["code"] == "declaration_en_cours"
 
 
 @pytest.mark.parametrize("annee", [1999, utcnow().year + 1])
@@ -196,7 +198,7 @@ def test_joindre_le_fichier_dun_brouillon_programme_son_analyse_sans_le_soumettr
         assert refus.json()["error"]["code"] == "transition_invalide"
     # Un brouillon en analyse occupe toujours sa période.
     autre = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"})
-    assert autre.json()["error"]["code"] == "brouillon_existant"
+    assert autre.json()["error"]["code"] == "declaration_en_cours"
 
 
 def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> None:
@@ -217,16 +219,23 @@ def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> 
 
 
 def test_abandonner_seulement_un_brouillon(session, entreprise) -> None:
-    _user, client = entreprise
+    user, client = entreprise
     brouillon = _ouvrir(client)
-    soumis = _ouvrir(client, report_type="RAPPORT_CLIMAT")
-    client.post(
-        f"{URL}/{soumis['id']}/file",
-        files={"file": ("climat.pdf", _minimal_pdf_bytes(), "application/pdf")},
+    # Un rapport clos de l'entreprise (une seule déclaration active à la fois, tâche 5.9).
+    clos = ESGReport(
+        company_id=user.company.id,
+        type=ReportType.RAPPORT_CLIMAT,
+        channel=SubmissionChannel.ENTREPRISE,
+        fiscal_year=2023,
+        status=ReportStatus.REJECTED,
+        source_file="rapports/test/clos.pdf",
+        submitted_at=utcnow(),
     )
+    session.add(clos)
+    session.commit()
 
     abandon = client.delete(f"{URL}/{brouillon['id']}")
-    refus = client.delete(f"{URL}/{soumis['id']}")
+    refus = client.delete(f"{URL}/{clos.id}")
 
     assert abandon.status_code == 204
     assert refus.status_code == 422

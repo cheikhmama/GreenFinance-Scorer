@@ -336,11 +336,18 @@ def test_deposer_rapport_doublon_est_rejete(session, monkeypatch) -> None:
         data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
     )
     assert premier.status_code == 201
+    # Une seule déclaration active à la fois (tâche 5.9) : le premier rapport est clos, pour que
+    # seul le doublon de fichier explique le refus.
+    clos = session.get(ESGReport, uuid.UUID(premier.json()["id"]))
+    assert clos is not None
+    clos.status = ReportStatus.REJECTED
+    session.add(clos)
+    session.commit()
 
     deuxieme = authed_client.post(
         "/api/v1/company/rapports",
         files={"fichier": ("copie.pdf", contenu, "application/pdf")},
-        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2024"},
+        data={"type": ReportType.RAPPORT_ESG.value, "annee_reporting": "2023"},
     )
 
     assert deuxieme.status_code == 422

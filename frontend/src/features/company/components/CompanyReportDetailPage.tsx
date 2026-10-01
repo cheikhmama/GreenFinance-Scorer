@@ -6,6 +6,7 @@ import { ApiError } from "@/shared/api/errors";
 import type { RapportESGDetail } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import {
+  classeStatutRapportEntreprise,
   libelleStatutRapportEntreprise,
   variantStatutRapportEntreprise,
 } from "@/shared/format/statut";
@@ -60,7 +61,10 @@ export function CompanyReportDetailPage() {
           Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
         </h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
+          <Badge
+            variant={variantStatutRapportEntreprise(rapport.status)}
+            className={classeStatutRapportEntreprise(rapport.status)}
+          >
             {libelleStatutRapportEntreprise(rapport.status)}
           </Badge>
           <span className="text-sm text-brand-grey">

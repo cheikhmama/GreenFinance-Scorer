@@ -33,10 +33,14 @@ const EXERCICES = Array.from({ length: 6 }, (_, i) => ANNEE_COURANTE - i);
 export function NewDeclarationDialog({
   open,
   onOpenChange,
+  exercicesExclus = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Exercices déjà validés : ils ne se déclarent plus (tâche 5.9). */
+  exercicesExclus?: number[];
 }) {
+  const exercices = EXERCICES.filter((annee) => !exercicesExclus.includes(annee));
   const navigate = useNavigate();
   const ouvrir = useOpenDeclaration();
   const [erreur, setErreur] = useState<string | null>(null);
@@ -44,7 +48,8 @@ export function NewDeclarationDialog({
     resolver: zodResolver(ouvrirDeclarationSchema),
     defaultValues: {
       report_type: "RAPPORT_ESG",
-      fiscal_year: ANNEE_COURANTE - 1,
+      fiscal_year:
+        EXERCICES.find((annee) => !exercicesExclus.includes(annee)) ?? ANNEE_COURANTE - 1,
       currency: "EUR",
     },
   });
@@ -99,7 +104,7 @@ export function NewDeclarationDialog({
                         {...field}
                         onChange={(event) => field.onChange(Number(event.target.value))}
                       >
-                        {EXERCICES.map((annee) => (
+                        {exercices.map((annee) => (
                           <option key={annee} value={annee}>
                             FY{annee}
                           </option>

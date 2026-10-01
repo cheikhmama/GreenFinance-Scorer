@@ -103,6 +103,50 @@ def verifier_entreprise_active(entreprise: Company | None) -> None:
         raise ValidationError("Cette entreprise est suspendue.", code="entreprise_suspendue")
 
 
+# États qui ne retiennent plus l'entreprise (tâche 5.9) : décision rendue, ou extraction d'un dépôt
+# direct en échec — l'Administrateur la relance, l'Entreprise peut déclarer à nouveau.
+STATUTS_SANS_SESSION = (
+    ReportStatus.VALIDATED,
+    ReportStatus.REJECTED,
+    ReportStatus.EXTRACTION_FAILED,
+)
+
+
+def verifier_regles_exercice(session: Session, entreprise_id: uuid.UUID, exercice: int) -> None:
+    """Règles d'une nouvelle déclaration (tâche 5.9), communes à tous les chemins qui créent un
+    rapport — ouverture d'un brouillon, dépôt en une étape, import par URL ; jamais une
+    correction, qui poursuit la déclaration en cours :
+    - une seule déclaration active à la fois (brouillon, examen, ou correction demandée et pas
+      encore déposée) : la terminer avant d'ouvrir un autre exercice ;
+    - un exercice déjà validé ne se déclare plus, quel que soit le type de rapport.
+    La ligne de l'entreprise est verrouillée jusqu'au commit : deux ouvertures simultanées ne
+    passent pas toutes les deux."""
+    session.exec(select(Company).where(col(Company.id) == entreprise_id).with_for_update()).first()
+    rapports = session.exec(
+        select(ESGReport).where(col(ESGReport.company_id) == entreprise_id)
+    ).all()
+    remplaces = {r.previous_report_id for r in rapports if r.previous_report_id is not None}
+    actif = next(
+        (
+            r
+            for r in rapports
+            if r.status not in STATUTS_SANS_SESSION and r.id not in remplaces
+        ),
+        None,
+    )
+    if actif is not None:
+        raise ValidationError(
+            f"Une déclaration est déjà en cours (exercice {actif.fiscal_year}) : terminez-la "
+            "avant d'en ouvrir une autre.",
+            code="declaration_en_cours",
+        )
+    if any(r.status == ReportStatus.VALIDATED and r.fiscal_year == exercice for r in rapports):
+        raise ValidationError(
+            f"L'exercice {exercice} a déjà été validé : il ne peut plus être déclaré.",
+            code="exercice_deja_valide",
+        )
+
+
 def deposer_fichier(
     session: Session,
     background_tasks: BackgroundTasks,
@@ -184,6 +228,9 @@ def _creer_rapport(
     nom_fichier_origine: str | None,
     canal: SubmissionChannel = SubmissionChannel.ENTREPRISE,
 ) -> ESGReport:
+    if rapport_precedent_id is None:
+        # Nouvelle déclaration (pas une correction) : mêmes règles qu'une ouverture de brouillon.
+        verifier_regles_exercice(session, entreprise_id, annee_reporting)
     rapport = ESGReport(
         company_id=entreprise_id,
         type=type_rapport,

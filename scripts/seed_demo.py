@@ -123,11 +123,16 @@ def _rapport_extrait(
     source = dossier / meta["fichier"]
     nom_fichier = f"{dossier.name}_rapport_{annee}.pdf"
     rapport_id = uuid.uuid4()
+    contenu = source.read_bytes()
+    if brouillon:
+        # Le brouillon reprend le PDF de l'exercice précédent : un commentaire PDF final en fait un
+        # fichier distinct, car une empreinte est unique par entreprise (dépôt en double refusé).
+        contenu += b"\n% Brouillon de demonstration\n"
     depose_le = utcnow() - timedelta(days=12)
     rapport = ESGReport(
         id=rapport_id,
         company_id=entreprise.id,
-        source_file=storage.save_bytes(f"rapports/{rapport_id}.pdf", source.read_bytes()),
+        source_file=storage.save_bytes(f"rapports/{rapport_id}.pdf", contenu),
         created_at=depose_le,
         type=ReportType(meta["type"]),
         channel=SubmissionChannel.ENTREPRISE,
@@ -136,12 +141,9 @@ def _rapport_extrait(
         extraction_finished_at=depose_le,
         original_filename=nom_fichier,
         fiscal_year=annee,
+        # Empreinte du fichier stocké : reçu de soumission et historique (tâches 5.8, 5.9).
+        checksum_sha256=hashlib.sha256(contenu).hexdigest(),
     )
-    if brouillon:
-        # Empreinte du fichier joint : le reçu de soumission l'affiche (tâche 5.8). Seulement sur
-        # le brouillon — il reprend le PDF de l'exercice précédent, et une empreinte est unique
-        # par entreprise.
-        rapport.checksum_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     session.add(rapport)
     session.flush()
 

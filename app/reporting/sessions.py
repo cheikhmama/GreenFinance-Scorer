@@ -25,7 +25,11 @@ from sqlmodel import Session, col, func, select
 
 from app.auth.models import User
 from app.company.models import Company
-from app.company.rapports import deposer_fichier, verifier_entreprise_active
+from app.company.rapports import (
+    deposer_fichier,
+    verifier_entreprise_active,
+    verifier_regles_exercice,
+)
 from app.core.audit import auditer
 from app.core.database import utcnow
 from app.core.enums import (
@@ -110,6 +114,7 @@ def ouvrir(session: Session, user: User, demande: ReportCreateRequest) -> ESGRep
     else:
         raise PermissionDeniedError(f"Rôle {user.role.value} non autorisé pour cette action.")
     verifier_entreprise_active(entreprise)
+    verifier_regles_exercice(session, entreprise.id, demande.fiscal_year)
 
     brouillon = ESGReport(
         company_id=entreprise.id,

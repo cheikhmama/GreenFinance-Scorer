@@ -213,8 +213,8 @@ describe("Espace Entreprise — tableau de bord", () => {
   it("n’affiche jamais le score de l’exercice en cours, mais le dernier exercice antérieur validé", async () => {
     servir({
       rapports: [
-        rapportListe("v2023", { fiscal_year: 2023, official_global_score: 61.2 }),
-        rapportListe("v2025", { fiscal_year: 2025, official_global_score: 66.7 }),
+        rapportListe("v2024", { fiscal_year: 2024, official_global_score: 61.2 }),
+        rapportListe("v2026", { fiscal_year: 2026, official_global_score: 66.7 }),
         rapportListe("enCours", {
           fiscal_year: 2025,
           type: "RAPPORT_ANNUEL",
@@ -227,7 +227,7 @@ describe("Espace Entreprise — tableau de bord", () => {
     renderPage();
 
     const score = await screen.findByRole("region", { name: "Dernier score officiel" });
-    expect(within(score).getByRole("heading", { name: "FY2023" })).toBeInTheDocument();
+    expect(within(score).getByRole("heading", { name: "FY2024" })).toBeInTheDocument();
     expect(score).toHaveTextContent("61,2/100");
     expect(score).not.toHaveTextContent("66,7");
   });
