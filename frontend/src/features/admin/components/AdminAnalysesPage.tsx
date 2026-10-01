@@ -29,7 +29,6 @@ export function AdminAnalysesPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Analyses"
         description="Toutes les analyses Chercheur, toutes versions, filtrables par statut."
       />

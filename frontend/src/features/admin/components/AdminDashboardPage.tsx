@@ -50,7 +50,6 @@ export function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Tableau de bord"
         description={
           dataUpdatedAt

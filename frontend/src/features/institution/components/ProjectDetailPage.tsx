@@ -51,7 +51,6 @@ export function ProjectDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Institution"
         title={projet.name}
         description={projet.objective ?? projet.description ?? "Aucune description."}
         action={

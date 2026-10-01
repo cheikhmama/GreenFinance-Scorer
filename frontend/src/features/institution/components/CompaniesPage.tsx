@@ -27,7 +27,6 @@ export function CompaniesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Institution"
         title="Entreprises"
         description="Entreprises publiées — score ESG et émissions Scope 1/2/3, base de tout périmètre de projet."
       />

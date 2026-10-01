@@ -25,7 +25,6 @@ export function AdminAuditeursPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Auditeurs"
         description="Charge de travail par Auditeur actif : dossiers affectés, en retard et avis rendus."
       />

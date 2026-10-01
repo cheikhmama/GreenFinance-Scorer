@@ -31,7 +31,6 @@ export function ResearchersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Institution"
         title="Chercheurs"
         description="Inviter un chercheur, suivre les invitations en attente, acceptées ou refusées."
       />

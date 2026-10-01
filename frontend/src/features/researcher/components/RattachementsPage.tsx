@@ -25,7 +25,6 @@ export function RattachementsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chercheur"
         title="Rattachements"
         description="Invitations reçues d'institutions — un projet ne peut vous être affecté qu'après acceptation."
       />

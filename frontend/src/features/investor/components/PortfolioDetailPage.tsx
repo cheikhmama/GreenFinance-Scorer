@@ -84,7 +84,6 @@ export function PortfolioDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Investisseur"
         title={portefeuille.name}
         description={`Créé le ${new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}.`}
         action={
@@ -630,7 +629,7 @@ function FormulairePosition({
         ) : null}
 
         {entrepriseActive ? (
-          <div className="space-y-2 rounded-md bg-slate-50 px-3 py-2">
+          <div className="space-y-2 rounded-md bg-muted/50 px-3 py-2">
             <CompanyIdentity
               nom={entrepriseActive.name}
               logo={entrepriseActive.logo}

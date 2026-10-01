@@ -19,7 +19,6 @@ export function AdminCompanyReportsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Rapports de l'entreprise"
         description="Tous les rapports déposés, quel que soit leur statut."
       />

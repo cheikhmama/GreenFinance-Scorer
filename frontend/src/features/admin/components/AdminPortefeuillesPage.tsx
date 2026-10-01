@@ -26,7 +26,6 @@ export function AdminPortefeuillesPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Portefeuilles"
         description="Tous les portefeuilles non archivés, tous Investisseurs confondus."
       />

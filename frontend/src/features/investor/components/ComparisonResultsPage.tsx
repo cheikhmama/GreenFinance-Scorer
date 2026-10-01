@@ -37,7 +37,6 @@ export function ComparisonResultsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Investisseur"
         title="Résultat de la comparaison"
         description="Scores ESG et indicateurs détaillés, côte à côte."
         action={
@@ -342,7 +341,7 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
             <tbody>
               {categories.map((categorie) => (
                 <Fragment key={categorie}>
-                  <tr className="border-b bg-slate-50">
+                  <tr className="border-b bg-muted/50">
                     <td
                       colSpan={entreprises.length + 1}
                       className="py-1.5 pr-4 text-xs font-semibold uppercase tracking-wide text-brand-grey"

@@ -29,7 +29,6 @@ export function CompaniesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Investisseur"
         title="Entreprises"
         description="Parcourez les entreprises dont les données ont été validées et publiées. Cliquez sur une entreprise pour consulter sa fiche ESG complète."
       />

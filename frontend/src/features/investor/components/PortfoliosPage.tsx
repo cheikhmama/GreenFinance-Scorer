@@ -34,7 +34,6 @@ export function PortfoliosPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Investisseur"
         title="Mes portefeuilles"
         description="Créer et suivre vos portefeuilles — score ESG agrégé et couverture calculés par le serveur."
         action={<Button onClick={() => setModaleOuverte(true)}>Créer un portefeuille</Button>}

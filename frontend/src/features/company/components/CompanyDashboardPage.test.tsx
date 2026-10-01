@@ -103,7 +103,7 @@ const BROUILLON = rapportListe("brouillon", {
 });
 
 describe("Espace Entreprise — tableau de bord", () => {
-  it("présente la session active avec l’identité de l’entreprise, et le dernier score officiel", async () => {
+  it("présente la session active et le dernier score officiel sous l’en-tête standard", async () => {
     servir({
       rapports: [rapportListe("valide"), BROUILLON],
       verification: { lei: LEI, result: "PASSED", detail: "Enregistrement ISSUED." },
@@ -114,14 +114,14 @@ describe("Espace Entreprise — tableau de bord", () => {
     });
     renderPage();
 
-    // En-tête : nom légal, puis secteur / LEI en badges ; « GLEIF Validé » sur contrôle réussi.
+    // En-tête standard (PageShell) : titre de la page, nom légal dans la description ; secteur,
+    // LEI et contrôle GLEIF vivent dans le Profil, jamais dans l’en-tête.
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Atlas Industries" }),
+      await screen.findByRole("heading", { level: 1, name: "Tableau de bord" }),
     ).toBeInTheDocument();
-    const identite = screen.getByRole("list", { name: "Identité de l’entreprise" });
-    expect(identite).toHaveTextContent("Secteur : Industrie manufacturière");
-    expect(within(identite).getByText(LEI)).toBeInTheDocument();
-    expect(await screen.findByText("GLEIF Validé")).toBeInTheDocument();
+    expect(await screen.findByText(/^Atlas Industries — /)).toBeInTheDocument();
+    expect(screen.queryByText(LEI)).not.toBeInTheDocument();
+    expect(screen.queryByText("GLEIF Validé")).not.toBeInTheDocument();
 
     const session = screen.getByRole("region", { name: "Session active" });
     expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
@@ -193,15 +193,15 @@ describe("Espace Entreprise — tableau de bord", () => {
     }
   });
 
-  it("sans LEI ni déclaration ni score : ni identifiant inventé, ni appel à la GLEIF", async () => {
+  it("sans déclaration ni score : états vides, et aucun appel à la GLEIF", async () => {
     servir({ rapports: [], entreprise: profil({ lei: null }) });
     renderPage();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Atlas Industries" }),
+      await screen.findByRole("heading", { level: 1, name: "Tableau de bord" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/LEI :/)).not.toBeInTheDocument();
-    const session = screen.getByRole("region", { name: "Session active" });
+    const session = await screen.findByRole("region", { name: "Session active" });
+    expect(screen.queryByText(/LEI/)).not.toBeInTheDocument();
     expect(within(session).getByText("Aucune déclaration en cours.")).toBeInTheDocument();
     expect(screen.getByText("Aucun score officiel publié")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Activité récente" })).not.toBeInTheDocument();

@@ -19,9 +19,8 @@ export function CompanyDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`${entreprise.sector} — ${entreprise.country}`}
         title={entreprise.name}
-        description={entreprise.description ?? "Fiche entreprise publiée."}
+        description={`${entreprise.sector} — ${entreprise.country}. ${entreprise.description ?? "Fiche entreprise publiée."}`}
       />
 
       <Card>

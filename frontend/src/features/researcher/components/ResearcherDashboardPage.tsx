@@ -18,7 +18,6 @@ export function ResearcherDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Chercheur"
         title="Tableau de bord"
         description="Vue d'ensemble de vos rattachements, projets et analyses."
       />

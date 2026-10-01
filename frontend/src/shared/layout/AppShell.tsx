@@ -203,7 +203,7 @@ export function AppShell() {
 
         <main
           id="app-content"
-          className={cn("mx-auto p-4 sm:p-6 lg:p-8", pleineLargeur ? "max-w-none" : "max-w-6xl")}
+          className={cn("mx-auto p-4 sm:p-6", pleineLargeur ? "max-w-none" : "max-w-7xl")}
         >
           <Outlet />
         </main>

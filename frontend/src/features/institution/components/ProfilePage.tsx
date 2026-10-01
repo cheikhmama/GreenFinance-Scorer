@@ -9,7 +9,7 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Institution" title="Profil" description="Vos informations de compte." />
+      <PageHeader title="Profil" description="Vos informations de compte." />
       <ProfileIdentityCard />
 
       <Card>

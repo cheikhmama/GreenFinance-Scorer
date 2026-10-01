@@ -24,7 +24,6 @@ export function AnalysesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Institution"
         title="Analyses"
         description="Toutes les analyses reçues de vos chercheurs, tous projets confondus."
       />

@@ -66,7 +66,6 @@ export function ComparisonPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Investisseur"
         title="Comparaison"
         description="Sélectionnez de 2 à 4 entreprises publiées, puis lancez la comparaison."
         action={
@@ -100,7 +99,7 @@ export function ComparisonPage() {
                       type="button"
                       onClick={() => retirer(id)}
                       aria-label={`Retirer ${entreprise?.name ?? "cette entreprise"} de la comparaison`}
-                      className="rounded-full px-1 text-brand-grey hover:bg-slate-200 hover:text-brand-blue"
+                      className="rounded-full px-1 text-brand-grey hover:bg-muted hover:text-brand-blue"
                     >
                       ×
                     </button>
@@ -170,7 +169,7 @@ export function ComparisonPage() {
                   className={`flex items-center gap-2 rounded-md border p-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     dejaSelectionnee
                       ? "border-brand-green bg-brand-green-light/40"
-                      : "border-transparent hover:border-slate-200 hover:bg-slate-50"
+                      : "border-transparent hover:border-border hover:bg-muted/50"
                   }`}
                 >
                   <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />

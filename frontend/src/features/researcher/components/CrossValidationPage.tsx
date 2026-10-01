@@ -284,7 +284,6 @@ export function CrossValidationPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Recherche"
         title="Validation croisée"
         description="Comparer les scores de la plateforme à un jeu de données public (Kaggle, CDP, GRI…)."
       />

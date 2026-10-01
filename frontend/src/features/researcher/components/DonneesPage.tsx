@@ -39,7 +39,6 @@ export function DonneesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chercheur"
         title="Données"
         description="Entreprises publiées — score ESG et émissions Scope 1/2/3, base de toute analyse."
         action={

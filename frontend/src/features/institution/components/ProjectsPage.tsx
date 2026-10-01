@@ -42,7 +42,6 @@ export function ProjectsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Institution"
         title="Projets"
         description="Créer un projet, définir son périmètre et ses documents, affecter des chercheurs, décider de leurs analyses."
         action={<Button onClick={() => setModaleOuverte(true)}>Créer un projet</Button>}

@@ -15,7 +15,6 @@ export function InvestorDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Investisseur"
         title="Tableau de bord"
         description="Synthèse de vos portefeuilles et de l'activité récente sur les entreprises publiées."
       />
@@ -86,7 +85,7 @@ export function InvestorDashboardPage() {
                 <Link
                   key={entreprise.id}
                   to={`/investor/entreprises/${entreprise.id}`}
-                  className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-slate-50"
+                  className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-muted/50"
                 >
                   <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} />
                   <div className="min-w-0 flex-1">
@@ -149,7 +148,7 @@ function RepartitionSecteurCard({
                     className={`block w-full rounded-lg border p-2 text-left transition ${
                       selectionnee
                         ? "border-brand-green bg-brand-green-light/40"
-                        : "border-transparent hover:border-slate-200 hover:bg-slate-50"
+                        : "border-transparent hover:border-border hover:bg-muted/50"
                     }`}
                   >
                     <div className="flex items-center justify-between text-sm">
@@ -164,7 +163,7 @@ function RepartitionSecteurCard({
                         {ligne.amount_usd.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} USD
                       </span>
                     </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-slate-100">
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted">
                       <div
                         className="h-1.5 rounded-full bg-brand-green"
                         style={{
@@ -178,7 +177,7 @@ function RepartitionSecteurCard({
             </div>
 
             {secteurActif ? (
-              <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
                 <span className="text-brand-grey">
                   Entreprises disponibles dans{" "}
                   <strong className="text-brand-blue">{secteurActif}</strong>

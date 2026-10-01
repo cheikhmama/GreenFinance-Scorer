@@ -12,7 +12,6 @@ export function ComparisonPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chercheur"
         title="Comparaison"
         description="Score ESG et émissions Scope 1/2/3, côte à côte — base d'une analyse."
       />

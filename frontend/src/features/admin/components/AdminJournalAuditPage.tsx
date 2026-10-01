@@ -9,7 +9,6 @@ export function AdminJournalAuditPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Journal d'audit"
         description={
           concerneId

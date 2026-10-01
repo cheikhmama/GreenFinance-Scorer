@@ -4,11 +4,11 @@ import type {
   NotificationPublic,
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { PageShell } from "@/shared/layout/PageShell";
 import { useMyNotifications } from "@/shared/notifications/api";
 import { Button } from "@/shared/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -16,10 +16,9 @@ import {
   CardTitle,
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports, useReportChecklist } from "../api";
+import { useCompanyReports, useMyCompanyProfile, useReportChecklist } from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
 import { dernierScoreAffichable, presentationSession } from "../session/presentation";
-import { CompanyIdentityHeader } from "./CompanyIdentityHeader";
 
 /** Les seuls jalons montrés à l'Entreprise : la transmission de son rapport et la publication de
  * son score. Les étapes internes (lecture du fichier, affectation, avis) n'y figurent jamais. */
@@ -34,11 +33,13 @@ function libelleJalon(type: string, exercice: string | null): string | null {
   return null;
 }
 
-/** Tableau de bord Entreprise (tâche 5.9) : l'identité de l'entreprise, la session active et le
- * dernier score officiel, puis les deux seuls jalons qui la concernent. Uniquement des composants
- * partagés (Card, Badge, Button) et des jetons de thème : rendu identique en clair et en sombre. */
+/** Tableau de bord Entreprise (tâche 5.9) : la session active et le dernier score officiel, puis
+ * les deux seuls jalons qui la concernent. Même gabarit (PageShell) que les autres pages de
+ * l'espace ; les immatriculations (secteur, LEI, ISIN) vivent dans le Profil. Uniquement des
+ * composants partagés et des jetons de thème : rendu identique en clair et en sombre. */
 export function CompanyDashboardPage() {
   const { data: rapports, isPending } = useCompanyReports();
+  const { data: entreprise } = useMyCompanyProfile();
   const notifications = useMyNotifications(20);
   const { enCours, historique } = separerDeclarations(rapports ?? []);
   // Jamais l'exercice de la session en cours ni un plus récent à côté d'elle.
@@ -53,10 +54,15 @@ export function CompanyDashboardPage() {
     .slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      <CompanyIdentityHeader />
-
-      <div className="grid gap-4 lg:grid-cols-2">
+    <PageShell
+      title="Tableau de bord"
+      description={
+        entreprise
+          ? `${entreprise.name} — suivi de votre déclaration en cours et de votre dernier score officiel.`
+          : "Suivi de votre déclaration en cours et de votre dernier score officiel."
+      }
+    >
+      <div className="grid gap-6 lg:grid-cols-2">
         {isPending ? <Skeleton className="h-64 w-full" /> : <SessionActive rapport={enCours[0]} />}
         {isPending ? <Skeleton className="h-64 w-full" /> : <DernierScore rapport={dernierScore} />}
       </div>
@@ -89,7 +95,7 @@ export function CompanyDashboardPage() {
           </CardContent>
         </Card>
       ) : null}
-    </div>
+    </PageShell>
   );
 }
 
@@ -111,9 +117,6 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
         <CardDescription className="text-xs font-semibold uppercase tracking-wider">
           Session active
         </CardDescription>
-        {exercice ? (
-          <CardAction className="text-xs text-muted-foreground">Exercice {exercice}</CardAction>
-        ) : null}
         {rapport ? (
           <CardTitle className="text-2xl font-bold tracking-tight">
             <h2>{exercice}</h2>
@@ -163,9 +166,6 @@ function DernierScore({ rapport }: { rapport: RapportESGPublic | undefined }) {
         <CardDescription className="text-xs font-semibold uppercase tracking-wider">
           Dernier score officiel
         </CardDescription>
-        {exercice ? (
-          <CardAction className="text-xs text-muted-foreground">Exercice {exercice}</CardAction>
-        ) : null}
         {exercice ? (
           <CardTitle className="text-2xl font-bold tracking-tight">
             <h2>{exercice}</h2>

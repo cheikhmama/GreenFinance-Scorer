@@ -76,7 +76,6 @@ export function AdminReportDetailPage() {
       </div>
 
       <PageHeader
-        eyebrow="Administration"
         title={`Rapport ${rapport.type} — ${rapport.fiscal_year ?? "année inconnue"}`}
         description="Indicateurs extraits, données carbone, avis d'audit et décision."
         action={

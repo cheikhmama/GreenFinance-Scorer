@@ -12,7 +12,7 @@ export function ProgressBar({ value, label }: { value: number; label?: string })
         </div>
       ) : null}
       <div
-        className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+        className="h-2 overflow-hidden rounded-full bg-muted"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}

@@ -32,7 +32,6 @@ export function AnalysesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chercheur"
         title="Analyses"
         description="Vos analyses, brouillons, soumises et décidées par l'institution."
         action={

@@ -202,7 +202,6 @@ export function AdminCompanyDetailPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title={entreprise.name}
         description="Profil complet de l'entreprise, tel que présenté à l'Investisseur une fois publiée."
       />

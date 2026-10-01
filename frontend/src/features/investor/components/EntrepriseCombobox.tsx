@@ -52,7 +52,7 @@ export function EntrepriseCombobox({
         <div
           role="listbox"
           aria-label="Résultats de la recherche d'entreprise"
-          className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-white shadow-md"
+          className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md"
           onMouseDown={(event) => event.preventDefault()}
         >
           {resultats.length === 0 ? (
@@ -64,7 +64,7 @@ export function EntrepriseCombobox({
                 type="button"
                 role="option"
                 aria-selected="false"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
                 onClick={() => choisir(entreprise)}
               >
                 <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-7" />

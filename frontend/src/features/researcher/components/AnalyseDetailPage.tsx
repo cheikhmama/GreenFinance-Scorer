@@ -36,9 +36,8 @@ export function AnalyseDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={`Version ${analyse.version}`}
         title={analyse.title}
-        description="Analyse comparative sur des entreprises publiées."
+        description={`Version ${analyse.version} — analyse comparative sur des entreprises publiées.`}
         action={
           <Badge variant={variantStatutAnalyse(analyse.status)}>
             {libelleStatutAnalyse(analyse.status)}

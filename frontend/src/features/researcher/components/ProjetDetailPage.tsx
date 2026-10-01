@@ -31,9 +31,8 @@ export function ProjetDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={projet.institution_email}
         title={projet.name}
-        description={projet.objective ?? "Aucun objectif renseigné par l'institution."}
+        description={`${projet.institution_email} — ${projet.objective ?? "Aucun objectif renseigné par l'institution."}`}
         action={
           <Badge variant={variantStatutProjet(projet.status)}>
             {libelleStatutProjet(projet.status)}

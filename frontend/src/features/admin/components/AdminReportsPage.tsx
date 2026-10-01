@@ -25,7 +25,6 @@ export function AdminReportsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Rapports"
         description="Affectation à un auditeur, puis décision (valider, rejeter ou demander une correction)."
       />

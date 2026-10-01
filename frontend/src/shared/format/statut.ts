@@ -25,13 +25,16 @@ const LIBELLES: Record<ReportStatus, string> = {
   REJECTED: "Rejeté",
 };
 
+/** Convention de badge commune à la plateforme (shared/ui/badge.tsx) : brouillon / inactif en
+ * `secondary`, en cours / en revue en `warning` (ambre), validé en `success` (émeraude), échec ou
+ * rejet en `destructive`. */
 const VARIANTES: Record<ReportStatus, Variante> = {
-  DRAFT: "outline",
-  EXTRACTING: "secondary",
+  DRAFT: "secondary",
+  EXTRACTING: "warning",
   EXTRACTION_FAILED: "destructive",
-  AWAITING_ASSIGNMENT: "secondary",
-  IN_AUDIT: "default",
-  PENDING_DECISION: "default",
+  AWAITING_ASSIGNMENT: "warning",
+  IN_AUDIT: "warning",
+  PENDING_DECISION: "warning",
   REVISION_REQUESTED: "warning",
   VALIDATED: "success",
   REJECTED: "destructive",
@@ -65,19 +68,7 @@ export function libelleStatutRapportEntreprise(statut: ReportStatus): string {
 }
 
 export function variantStatutRapportEntreprise(statut: ReportStatus): Variante {
-  if (statut === "DRAFT") return "outline";
-  if (statut === "VALIDATED") return "outline";
-  return estEnExamen(statut) ? "secondary" : VARIANTES[statut];
-}
-
-/** Teinte ajoutée au badge Entreprise (tâche 5.9) : « Brouillon » sur fond neutre, « Validé » en
- * contour vert ; les deux suivent le thème. */
-export function classeStatutRapportEntreprise(statut: ReportStatus): string | undefined {
-  if (statut === "DRAFT") return "bg-muted text-foreground";
-  if (statut === "VALIDATED") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400";
-  }
-  return undefined;
+  return estEnExamen(statut) ? "warning" : VARIANTES[statut];
 }
 
 /** Date affichée pour un rapport : son dépôt, ou — pour un brouillon (DRAFT, tâche 1.5), qui n'a

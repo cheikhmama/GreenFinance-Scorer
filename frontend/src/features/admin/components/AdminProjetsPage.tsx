@@ -27,7 +27,6 @@ export function AdminProjetsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Administration"
         title="Projets"
         description="Tous les projets Institution, filtrables par statut."
       />

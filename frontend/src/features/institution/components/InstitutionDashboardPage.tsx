@@ -34,7 +34,6 @@ export function InstitutionDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Institution"
         title="Tableau de bord"
         description="Vue d'ensemble de vos chercheurs rattachés, de vos projets et des analyses à décider."
       />

@@ -32,7 +32,6 @@ export function ProjetsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chercheur"
         title="Mes projets"
         description="Projets qui vous sont affectés — objectif, échéances, périmètre et documents autorisés."
       />

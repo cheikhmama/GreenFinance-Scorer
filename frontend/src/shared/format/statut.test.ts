@@ -28,7 +28,7 @@ describe("statut d'un rapport", () => {
     const enExamen = TOUS.filter((s) => libelleStatutRapportEntreprise(s) === LIBELLE_EN_EXAMEN);
     expect(enExamen).toEqual(["EXTRACTING", "AWAITING_ASSIGNMENT", "IN_AUDIT", "PENDING_DECISION"]);
     expect(new Set(enExamen.map((s) => variantStatutRapportEntreprise(s)))).toEqual(
-      new Set(["secondary"]),
+      new Set(["warning"]),
     );
   });
 
