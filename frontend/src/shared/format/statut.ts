@@ -9,10 +9,9 @@ type Variante = "default" | "secondary" | "destructive" | "outline" | "success" 
  * Deux lectures du même statut :
  * - rôles internes (Administrateur, Auditeur) : l'état détaillé ;
  * - espace Entreprise : les quatre états d'examen (extraction, attente d'affectation, audit,
- *   décision) sont regroupés en « En cours d'examen 🔒 » — l'entreprise sait que son rapport est
- *   verrouillé et examiné, pas à quelle étape interne il se trouve. Exception (tâche 5.8) : un
- *   brouillon dont le fichier est en analyse (EXTRACTING, pas encore soumis) n'est ni verrouillé
- *   ni examiné — « Analyse du fichier ».
+ *   décision) sont regroupés en « En cours d'examen » — l'entreprise sait que son rapport est
+ *   examiné, pas à quelle étape interne il se trouve. Depuis la tâche 5.9, un brouillon dont le
+ *   fichier est en cours de lecture porte le même libellé : aucun état intermédiaire n'est nommé.
  */
 const LIBELLES: Record<ReportStatus, string> = {
   DRAFT: "Brouillon",
@@ -46,8 +45,7 @@ export const STATUTS_EN_EXAMEN: readonly ReportStatus[] = [
   "PENDING_DECISION",
 ];
 
-export const LIBELLE_EN_EXAMEN = "En cours d'examen 🔒";
-export const LIBELLE_ANALYSE_BROUILLON = "Analyse du fichier";
+export const LIBELLE_EN_EXAMEN = "En cours d'examen";
 
 export function libelleStatutRapport(statut: ReportStatus): string {
   return LIBELLES[statut];
@@ -61,15 +59,12 @@ export function estEnExamen(statut: ReportStatus): boolean {
   return STATUTS_EN_EXAMEN.includes(statut);
 }
 
-/** Libellé affiché à l'Entreprise (espace Entreprise uniquement). `soumis` : le rapport a une
- * date de soumission — faux pour un brouillon, même pendant l'analyse de son fichier. */
-export function libelleStatutRapportEntreprise(statut: ReportStatus, soumis = true): string {
-  if (!soumis && statut === "EXTRACTING") return LIBELLE_ANALYSE_BROUILLON;
+/** Libellé affiché à l'Entreprise (espace Entreprise uniquement). */
+export function libelleStatutRapportEntreprise(statut: ReportStatus): string {
   return estEnExamen(statut) ? LIBELLE_EN_EXAMEN : LIBELLES[statut];
 }
 
-export function variantStatutRapportEntreprise(statut: ReportStatus, soumis = true): Variante {
-  if (!soumis && statut === "EXTRACTING") return "outline";
+export function variantStatutRapportEntreprise(statut: ReportStatus): Variante {
   return estEnExamen(statut) ? "secondary" : VARIANTES[statut];
 }
 

@@ -133,7 +133,7 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     expect(bandeau).toHaveTextContent(SHA);
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Examen");
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
-    expect(screen.getByText("En cours d'examen 🔒")).toBeInTheDocument();
+    expect(screen.getByText("En cours d'examen")).toBeInTheDocument();
   });
 
   it("joint le PDF d’un brouillon vide et suit l’analyse sans le verrouiller", async () => {
@@ -164,13 +164,14 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     );
     await user.click(screen.getByRole("button", { name: "Joindre et analyser" }));
 
-    expect(await screen.findByText(/Analyse de « rapport-2025.pdf » en cours/)).toBeInTheDocument();
+    expect(await screen.findByText(/Lecture de « rapport-2025.pdf » en cours/)).toBeInTheDocument();
     const envoi = appels("POST", "/file")[0];
     expect(envoi?.[0]).toBe(`/api/v1/reports/${ID}/file`);
     const corps = envoi?.[1]?.body;
     expect(corps).toBeInstanceOf(FormData);
     expect(((corps as FormData).get("file") as File).name).toBe("rapport-2025.pdf");
-    expect(screen.getByText("Analyse du fichier")).toBeInTheDocument();
+    expect(screen.getByText("En cours d'examen")).toBeInTheDocument();
+    expect(screen.queryByText(/Analyse du fichier/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
   });
 
@@ -180,7 +181,7 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     );
     renderPage();
 
-    expect(await screen.findByText("L’analyse du fichier a échoué")).toBeInTheDocument();
+    expect(await screen.findByText("Le fichier n’a pas pu être lu")).toBeInTheDocument();
     expect(screen.getByLabelText("Remplacer le fichier")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
     await waitFor(() => expect(appels("GET", "/checklist")).toHaveLength(0));

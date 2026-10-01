@@ -9,7 +9,7 @@ export interface PresentationSession {
 }
 
 const EN_EXAMEN: PresentationSession = {
-  libelle: "En cours d'examen d'audit",
+  libelle: "En cours d'examen",
   description:
     "Votre rapport a été transmis. Vous serez notifié dès la validation finale de l'auditeur.",
 };

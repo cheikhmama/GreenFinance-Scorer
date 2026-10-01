@@ -56,8 +56,8 @@ def marquer_echec(session: Session, rapport: ESGReport, cause: str) -> None:
             session,
             rapport.company.owner_user_id,
             "RAPPORT_EXTRACTION_ECHOUEE",
-            f"L'analyse du fichier de votre déclaration {rapport.type.value} "
-            f"({rapport.fiscal_year}) a échoué. Vous pouvez joindre à nouveau le fichier."
+            f"Le fichier de votre déclaration {rapport.type.value} ({rapport.fiscal_year}) "
+            "n'a pas pu être lu. Vous pouvez le joindre à nouveau."
             if brouillon
             else f"L'extraction de votre rapport {rapport.type.value} ({rapport.fiscal_year}) "
             "a échoué. Vous pouvez déposer une nouvelle version.",

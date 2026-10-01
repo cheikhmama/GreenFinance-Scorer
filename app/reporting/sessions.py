@@ -211,7 +211,7 @@ def soumettre(
         )
     if brouillon.extraction_finished_at is None or brouillon.extraction_error is not None:
         raise ValidationError(
-            "L'analyse du fichier n'a pas abouti : joignez à nouveau le fichier.",
+            "Le fichier n'a pas pu être lu : joignez-le à nouveau.",
             code="analyse_non_terminee",
         )
     verifier_entreprise_active(brouillon.company)

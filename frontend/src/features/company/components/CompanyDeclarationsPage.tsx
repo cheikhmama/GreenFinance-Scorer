@@ -17,10 +17,9 @@ import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
 import { SessionStepper } from "../session/SessionStepper";
 
 function StatutEntreprise({ rapport }: { rapport: RapportESGPublic }) {
-  const soumis = rapport.submitted_at !== null;
   return (
-    <Badge variant={variantStatutRapportEntreprise(rapport.status, soumis)}>
-      {libelleStatutRapportEntreprise(rapport.status, soumis)}
+    <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
+      {libelleStatutRapportEntreprise(rapport.status)}
     </Badge>
   );
 }

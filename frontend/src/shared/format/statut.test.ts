@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReportStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
-  LIBELLE_ANALYSE_BROUILLON,
   LIBELLE_EN_EXAMEN,
   libelleStatutRapport,
   libelleStatutRapportEntreprise,
@@ -40,8 +39,8 @@ describe("statut d'un rapport", () => {
     expect(libelleStatutRapportEntreprise("VALIDATED")).toBe("Validé");
   });
 
-  it("ne verrouille pas un brouillon dont le fichier est en analyse (tâche 5.8)", () => {
-    expect(libelleStatutRapportEntreprise("EXTRACTING", false)).toBe(LIBELLE_ANALYSE_BROUILLON);
-    expect(libelleStatutRapportEntreprise("EXTRACTING", true)).toBe(LIBELLE_EN_EXAMEN);
+  it("ne nomme aucun état intermédiaire, pas même la lecture du fichier d'un brouillon", () => {
+    expect(LIBELLE_EN_EXAMEN).toBe("En cours d'examen");
+    expect(libelleStatutRapportEntreprise("EXTRACTING")).toBe(LIBELLE_EN_EXAMEN);
   });
 });

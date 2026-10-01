@@ -9,7 +9,7 @@ describe("présentation de la session active (tableau de bord Entreprise)", () =
       "IN_AUDIT",
       "PENDING_DECISION",
     ] as const) {
-      expect(presentationSession(statut).libelle).toBe("En cours d'examen d'audit");
+      expect(presentationSession(statut).libelle).toBe("En cours d'examen");
     }
     expect(presentationSession("DRAFT").libelle).toBe("Brouillon");
     expect(presentationSession("REVISION_REQUESTED").libelle).toBe("Correction demandée");

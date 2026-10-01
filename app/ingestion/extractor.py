@@ -849,8 +849,8 @@ def run_extraction_pipeline(
                         session,
                         rapport.company.owner_user_id,
                         "RAPPORT_ANALYSE_TERMINEE",
-                        f"L'analyse du fichier de votre déclaration {rapport.type.value} "
-                        f"({rapport.fiscal_year}) est terminée : vérifiez la liste de complétude "
+                        f"Le fichier de votre déclaration {rapport.type.value} "
+                        f"({rapport.fiscal_year}) a été lu : vérifiez la liste de complétude "
                         "avant de soumettre.",
                         id_ressource=rapport_id,
                     )

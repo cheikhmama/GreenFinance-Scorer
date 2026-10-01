@@ -6,9 +6,73 @@ import { rapportListe } from "../session/fixtures";
 import { CompanyDashboardPage } from "./CompanyDashboardPage";
 
 const fetchMock = vi.fn<typeof fetch>();
+const LEI = "5493001KJTIIGC8Y1R12";
 
-function notification(id: string, type: string, message: string) {
-  return { id, type, message, read: false, sent_at: "2026-09-02T10:00:00Z", resource_id: null };
+function notification(id: string, type: string, resourceId: string | null) {
+  return {
+    id,
+    type,
+    message: "texte interne de la notification",
+    read: false,
+    sent_at: "2026-09-02T10:00:00Z",
+    resource_id: resourceId,
+  };
+}
+
+function profil(surcharges: Record<string, unknown> = {}) {
+  return {
+    id: "c1",
+    name: "Atlas Industries",
+    sector: "Industrie manufacturière",
+    country: "MR",
+    logo: null,
+    description: null,
+    website: null,
+    active: true,
+    status: "ACTIVE",
+    minimum_investment_amount: null,
+    minimum_investment_currency: null,
+    published_at: null,
+    isin: null,
+    lei: LEI,
+    ticker: null,
+    ...surcharges,
+  };
+}
+
+interface Donnees {
+  rapports: unknown[];
+  notifications?: unknown[];
+  entreprise?: object;
+  verification?: object;
+  liste?: unknown[];
+}
+
+function servir({
+  rapports,
+  notifications = [],
+  entreprise = profil(),
+  verification,
+  liste,
+}: Donnees) {
+  fetchMock.mockImplementation(async (url) => {
+    const chemin = String(url);
+    if (chemin.includes("/notifications")) {
+      return Response.json({
+        items: notifications,
+        page: 1,
+        page_size: 20,
+        total: notifications.length,
+        pages: 1,
+      });
+    }
+    if (chemin.endsWith("/lei-verification")) {
+      return Response.json(verification ?? { lei: LEI, result: "NOT_VERIFIABLE", detail: "" });
+    }
+    if (chemin.endsWith("/checklist")) return Response.json(liste ?? []);
+    if (chemin.endsWith("/company/profil")) return Response.json(entreprise);
+    return Response.json(rapports);
+  });
 }
 
 beforeEach(() => {
@@ -30,159 +94,134 @@ function renderPage() {
   );
 }
 
+const BROUILLON = rapportListe("brouillon", {
+  fiscal_year: 2025,
+  status: "DRAFT",
+  submitted_at: null,
+  created_at: "2026-09-01T08:00:00Z",
+  official_global_score: null,
+});
+
 describe("Espace Entreprise — tableau de bord", () => {
-  it("résume la session active, le dernier score officiel et les jalons sans étapes internes", async () => {
-    fetchMock.mockImplementation(async (url) => {
-      const chemin = String(url);
-      if (chemin.includes("/notifications")) {
-        return Response.json({
-          items: [
-            notification("n1", "RAPPORT_VALIDE", "RAPPORT_ESG (2024) : validé."),
-            notification("n2", "RAPPORT_AFFECTE_ENTREPRISE", "Un auditeur examine votre rapport."),
-            notification("n3", "RAPPORT_DEPOSE", "Votre rapport a été soumis."),
-          ],
-          page: 1,
-          page_size: 20,
-          total: 3,
-          pages: 1,
-        });
-      }
-      if (chemin.endsWith("/checklist")) {
-        return Response.json([
-          { group: "CARBON", expected: 5, found: 5 },
-          { group: "SOCIAL", expected: 17, found: 13 },
-        ]);
-      }
-      return Response.json([
-        rapportListe("valide"),
-        rapportListe("brouillon", {
-          fiscal_year: 2025,
-          status: "DRAFT",
-          submitted_at: null,
-          created_at: "2026-09-01T08:00:00Z",
-          official_global_score: null,
-        }),
-      ]);
+  it("présente la session active avec l’identité de l’entreprise, et le dernier score officiel", async () => {
+    servir({
+      rapports: [rapportListe("valide"), BROUILLON],
+      verification: { lei: LEI, result: "PASSED", detail: "Enregistrement ISSUED." },
+      liste: [
+        { group: "CARBON", expected: 5, found: 5 },
+        { group: "SOCIAL", expected: 17, found: 13 },
+      ],
     });
     renderPage();
 
     const session = await screen.findByRole("region", { name: "Session active" });
+    expect(await within(session).findByText("Atlas Industries")).toBeInTheDocument();
+    expect(within(session).getByText("Secteur : Industrie manufacturière")).toBeInTheDocument();
+    expect(within(session).getByText(LEI)).toBeInTheDocument();
+    expect(await within(session).findByText("GLEIF Validé")).toBeInTheDocument();
     expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
-    expect(within(session).getByText("Exercice FY2025")).toBeInTheDocument();
     expect(within(session).getByText("Brouillon ouvert le 01/09/2026")).toBeInTheDocument();
     expect(within(session).getByText("Statut : Brouillon")).toBeInTheDocument();
-    expect(
-      within(session).getByText(
-        "Brouillon en cours de préparation. Remplissez la déclaration et soumettez-la pour examen.",
-      ),
-    ).toBeInTheDocument();
     expect(await within(session).findByText("18/22 indicateurs détectés")).toBeInTheDocument();
-    expect(
-      within(session).getByRole("link", { name: /Voir le suivi de la déclaration/ }),
-    ).toHaveAttribute("href", "/company/declarations");
+    expect(within(session).getByRole("link", { name: /Voir le suivi/ })).toHaveAttribute(
+      "href",
+      "/company/declarations",
+    );
 
     const score = screen.getByRole("region", { name: "Dernier score officiel" });
+    expect(within(score).getByRole("heading", { name: "FY2024" })).toBeInTheDocument();
     expect(score).toHaveTextContent("74,5/100");
     expect(score).toHaveTextContent("Taux de couverture : 88 %");
-    expect(within(score).getByTitle("a".repeat(64))).toBeInTheDocument();
+    // Deux cartes, pas de tableau ni de liste de fichiers.
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("ne garde dans l’activité que la transmission et la publication du score", async () => {
+    servir({
+      rapports: [rapportListe("valide"), rapportListe("autre", { fiscal_year: 2025 })],
+      notifications: [
+        notification("n1", "RAPPORT_VALIDE", "valide"),
+        notification("n2", "RAPPORT_AFFECTE_ENTREPRISE", "autre"),
+        notification("n3", "RAPPORT_AVIS_RENDU_ENTREPRISE", "autre"),
+        notification("n4", "RAPPORT_ANALYSE_TERMINEE", "autre"),
+        notification("n5", "RAPPORT_DEPOSE", "autre"),
+      ],
+    });
+    renderPage();
 
     const fil = await screen.findByRole("list", { name: "Activité récente" });
-    expect(within(fil).getByText("Score officiel publié")).toBeInTheDocument();
-    expect(within(fil).getByText("Rapport transmis")).toBeInTheDocument();
-    expect(within(fil).queryByText(/auditeur/)).not.toBeInTheDocument();
+    const lignes = within(fil).getAllByRole("listitem");
+    expect(lignes).toHaveLength(2);
+    expect(lignes[0]).toHaveTextContent("Score officiel publié pour l’exercice FY2024.");
+    expect(lignes[1]).toHaveTextContent("Rapport FY2025 transmis avec succès pour audit.");
+    expect(fil).not.toHaveTextContent("texte interne");
   });
 
   it.each([
-    [
-      "EXTRACTING",
-      null,
-      "Statut : En cours d'examen d'audit",
-      "Votre rapport a été transmis. Vous serez notifié dès la validation finale de l'auditeur.",
-    ],
-    [
-      "IN_AUDIT",
-      "2026-09-02T10:00:00Z",
-      "Statut : En cours d'examen d'audit",
-      "Votre rapport a été transmis. Vous serez notifié dès la validation finale de l'auditeur.",
-    ],
-    [
-      "REVISION_REQUESTED",
-      "2026-09-02T10:00:00Z",
-      "Statut : Correction demandée",
-      "L'auditeur a demandé des précisions ou corrections sur votre rapport.",
-    ],
-  ])(
-    "présente une session %s sans nommer d’étape interne",
-    async (statut, soumis, statutAffiche, texte) => {
-      fetchMock.mockImplementation(async (url) =>
-        String(url).includes("/notifications")
-          ? Response.json({ items: [], page: 1, page_size: 20, total: 0, pages: 0 })
-          : Response.json([
-              rapportListe("session", {
-                fiscal_year: 2025,
-                status: statut,
-                submitted_at: soumis,
-                extraction_finished_at: null,
-                official_global_score: null,
-              }),
-            ]),
-      );
-      renderPage();
-
-      const session = await screen.findByRole("region", { name: "Session active" });
-      expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
-      expect(within(session).getByText(statutAffiche)).toBeInTheDocument();
-      if (soumis) {
-        expect(
-          within(session).getByText("Transmission effectuée le 02/09/2026"),
-        ).toBeInTheDocument();
-      }
-      // Ni pastille ni bouton plein : un encadré d'état et un lien.
-      expect(within(session).queryByRole("button")).not.toBeInTheDocument();
-      expect(within(session).getByText(texte)).toBeInTheDocument();
-      expect(session).not.toHaveTextContent("Analyse du fichier");
-      expect(
-        within(session).getByRole("link", { name: /Voir le suivi de la déclaration/ }),
-      ).toHaveAttribute("href", "/company/declarations");
-    },
-  );
-
-  it("n’affiche jamais le score de l’exercice en cours d’examen, mais le dernier exercice antérieur validé", async () => {
-    fetchMock.mockImplementation(async (url) =>
-      String(url).includes("/notifications")
-        ? Response.json({ items: [], page: 1, page_size: 20, total: 0, pages: 0 })
-        : Response.json([
-            rapportListe("v2023", { fiscal_year: 2023, official_global_score: 61.2 }),
-            rapportListe("v2025", { fiscal_year: 2025, official_global_score: 66.7 }),
-            rapportListe("enCours", {
-              fiscal_year: 2025,
-              type: "RAPPORT_ANNUEL",
-              status: "IN_AUDIT",
-              created_at: "2026-09-20T08:00:00Z",
-              official_global_score: null,
-            }),
-          ]),
-    );
+    ["EXTRACTING", null],
+    ["AWAITING_ASSIGNMENT", "2026-09-02T10:00:00Z"],
+    ["IN_AUDIT", "2026-09-02T10:00:00Z"],
+    ["PENDING_DECISION", "2026-09-02T10:00:00Z"],
+  ])("regroupe %s sous « En cours d’examen », sans jargon interne", async (statut, soumis) => {
+    servir({
+      rapports: [
+        rapportListe("session", {
+          fiscal_year: 2025,
+          status: statut,
+          submitted_at: soumis,
+          extraction_finished_at: null,
+          official_global_score: null,
+        }),
+      ],
+    });
     renderPage();
 
     const session = await screen.findByRole("region", { name: "Session active" });
-    expect(within(session).getByText("FY2025")).toBeInTheDocument();
-    const score = screen.getByRole("region", { name: "Dernier score officiel" });
-    expect(score).toHaveTextContent("FY2023");
-    expect(score).toHaveTextContent("61,2/100");
-    expect(score).not.toHaveTextContent("66,7");
+    expect(within(session).getByText("Statut : En cours d'examen")).toBeInTheDocument();
+    for (const jargon of [
+      /Analyse du fichier/,
+      /affecté à un auditeur/i,
+      /décision finale/i,
+      /extraction/i,
+    ]) {
+      expect(document.body.textContent).not.toMatch(jargon);
+    }
   });
 
-  it("sans déclaration ni score, invite à en ouvrir une", async () => {
-    fetchMock.mockImplementation(async (url) =>
-      String(url).includes("/notifications")
-        ? Response.json({ items: [], page: 1, page_size: 20, total: 0, pages: 0 })
-        : Response.json([]),
-    );
+  it("sans LEI ni déclaration ni score : ni identifiant inventé, ni appel à la GLEIF", async () => {
+    servir({ rapports: [], entreprise: profil({ lei: null }) });
     renderPage();
 
-    expect(await screen.findByText("Aucune déclaration en cours.")).toBeInTheDocument();
+    const session = await screen.findByRole("region", { name: "Session active" });
+    expect(await within(session).findByText("Atlas Industries")).toBeInTheDocument();
+    expect(within(session).queryByText(/LEI :/)).not.toBeInTheDocument();
+    expect(within(session).getByText("Aucune déclaration en cours.")).toBeInTheDocument();
     expect(screen.getByText("Aucun score officiel publié")).toBeInTheDocument();
-    expect(await screen.findByText("Aucun jalon pour l’instant.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Activité récente" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/lei-verification"))).toBe(
+      false,
+    );
+  });
+
+  it("n’affiche jamais le score de l’exercice en cours, mais le dernier exercice antérieur validé", async () => {
+    servir({
+      rapports: [
+        rapportListe("v2023", { fiscal_year: 2023, official_global_score: 61.2 }),
+        rapportListe("v2025", { fiscal_year: 2025, official_global_score: 66.7 }),
+        rapportListe("enCours", {
+          fiscal_year: 2025,
+          type: "RAPPORT_ANNUEL",
+          status: "IN_AUDIT",
+          created_at: "2026-09-20T08:00:00Z",
+          official_global_score: null,
+        }),
+      ],
+    });
+    renderPage();
+
+    const score = await screen.findByRole("region", { name: "Dernier score officiel" });
+    expect(within(score).getByRole("heading", { name: "FY2023" })).toBeInTheDocument();
+    expect(score).toHaveTextContent("61,2/100");
+    expect(score).not.toHaveTextContent("66,7");
   });
 });

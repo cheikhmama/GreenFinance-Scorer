@@ -60,10 +60,8 @@ export function CompanyReportDetailPage() {
           Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
         </h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge
-            variant={variantStatutRapportEntreprise(rapport.status, rapport.submitted_at !== null)}
-          >
-            {libelleStatutRapportEntreprise(rapport.status, rapport.submitted_at !== null)}
+          <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
+            {libelleStatutRapportEntreprise(rapport.status)}
           </Badge>
           <span className="text-sm text-brand-grey">
             version {rapport.version}

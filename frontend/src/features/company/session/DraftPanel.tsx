@@ -54,7 +54,7 @@ export function DraftPanel({
       <CardHeader>
         <CardTitle>Préparation de la déclaration</CardTitle>
         <CardDescription>
-          Rien n’est transmis avant la soumission. Joignez le PDF du rapport : son analyse indique
+          Rien n’est transmis avant la soumission. Joignez le PDF du rapport : sa lecture indique
           quels indicateurs attendus y ont été trouvés.
         </CardDescription>
       </CardHeader>
@@ -62,14 +62,14 @@ export function DraftPanel({
         {etat === "ANALYSE" ? (
           <p className="flex items-center gap-2 text-sm text-brand-blue" aria-live="polite">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Analyse de « {rapport.original_filename ?? "votre fichier"} » en cours — la liste de
-            complétude s’affiche à la fin de l’analyse.
+            Lecture de « {rapport.original_filename ?? "votre fichier"} » en cours — la liste de
+            complétude s’affiche dès qu’elle est terminée.
           </p>
         ) : null}
 
         {etat === "ECHEC" ? (
           <Alert variant="destructive">
-            <AlertTitle>L’analyse du fichier a échoué</AlertTitle>
+            <AlertTitle>Le fichier n’a pas pu être lu</AlertTitle>
             <AlertDescription>
               {libelleCauseExtraction(rapport.extraction_error)}. Joignez de nouveau le fichier.
             </AlertDescription>
