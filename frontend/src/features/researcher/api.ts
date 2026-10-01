@@ -1,5 +1,22 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
+import type {
+  AnalyseDetail,
+  AnalysePublic,
+  BodyImportReferenceDataset,
+  CreerAnalyseRequest,
+  CrossValidationReport,
+  DocumentProjetPublic,
+  EntrepriseDetailInvestisseur,
+  EntreprisePerimetrePublic,
+  EntreprisePublieePublic,
+  ModifierAnalyseRequest,
+  PageEntreprisePublieePublic,
+  ProjetAffecte,
+  RattachementPublic,
+  ReferenceDatasetImportResult,
+  ReferenceDatasetSummary,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   acceptInstitutionInvitation,
   compareCompaniesForResearcher,
@@ -7,9 +24,9 @@ import {
   createAnalysis,
   declineInstitutionInvitation,
   deleteReferenceDataset,
-  getCrossValidationReport,
   getAnalysisDetail,
   getAnalysisHistory,
+  getCrossValidationReport,
   getPublishedCompanyDetailForResearcher,
   importReferenceDataset,
   listMyAnalyses,
@@ -22,23 +39,6 @@ import {
   submitAnalysis,
   updateAnalysis,
 } from "@/shared/api/generated/researcher/researcher";
-import type {
-  AnalyseDetail,
-  AnalysePublic,
-  BodyImportReferenceDataset,
-  CreerAnalyseRequest,
-  CrossValidationReport,
-  DocumentProjetPublic,
-  EntreprisePerimetrePublic,
-  EntrepriseDetailInvestisseur,
-  EntreprisePublieePublic,
-  ModifierAnalyseRequest,
-  PageEntreprisePublieePublic,
-  ProjetAffecte,
-  RattachementPublic,
-  ReferenceDatasetImportResult,
-  ReferenceDatasetSummary,
-} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export const TAILLE_PAGE_RESEARCHER = 10;
 /** Plafond serveur pour /researcher/comparaison (app/investor/entreprises.py::
@@ -50,13 +50,17 @@ const ENTREPRISES_KEY = ["researcher", "entreprises"] as const;
 const entrepriseKey = (id: string) => ["researcher", "entreprises", id] as const;
 const RATTACHEMENTS_KEY = ["researcher", "rattachements"] as const;
 const PROJETS_KEY = ["researcher", "projets"] as const;
-const perimetreKey = (projetId: string) => ["researcher", "projets", projetId, "perimetre"] as const;
-const documentsKey = (projetId: string) => ["researcher", "projets", projetId, "documents"] as const;
+const perimetreKey = (projetId: string) =>
+  ["researcher", "projets", projetId, "perimetre"] as const;
+const documentsKey = (projetId: string) =>
+  ["researcher", "projets", projetId, "documents"] as const;
 const ANALYSES_KEY = ["researcher", "analyses"] as const;
 const analyseKey = (id: string) => ["researcher", "analyses", id] as const;
 const historiqueKey = (id: string) => ["researcher", "analyses", id, "historique"] as const;
 
-function pageSuivante<T extends { page: number; pages: number }>(dernierePage: T): number | undefined {
+function pageSuivante<T extends { page: number; pages: number }>(
+  dernierePage: T,
+): number | undefined {
   return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
 }
 
@@ -101,7 +105,9 @@ function useRespondInvitation(accept: boolean) {
   const queryClient = useQueryClient();
   return useMutation<RattachementPublic, ApiError, string>({
     mutationFn: (rattachementId) =>
-      accept ? acceptInstitutionInvitation(rattachementId) : declineInstitutionInvitation(rattachementId),
+      accept
+        ? acceptInstitutionInvitation(rattachementId)
+        : declineInstitutionInvitation(rattachementId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: RATTACHEMENTS_KEY });
     },

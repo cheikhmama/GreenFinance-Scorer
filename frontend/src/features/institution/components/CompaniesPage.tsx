@@ -73,7 +73,12 @@ export function CompaniesPage() {
       </div>
 
       {entreprises.length > 0 && hasNextPage ? (
-        <Button variant="outline" size="sm" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFetchingNextPage}
+          onClick={() => fetchNextPage()}
+        >
           {isFetchingNextPage ? "Chargement..." : "Voir plus"}
         </Button>
       ) : null}

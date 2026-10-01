@@ -1,5 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, CalendarDays, KeyRound, Mail, MailCheck, Shield, ShieldCheck, ShieldX, X } from "lucide-react";
+import {
+  CalendarDays,
+  Camera,
+  KeyRound,
+  Mail,
+  MailCheck,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  X,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -179,9 +189,7 @@ export function ProfileIdentityCard() {
           <div className="flex items-start gap-2 rounded-lg border p-3">
             <CalendarDays className="mt-0.5 size-4 shrink-0 text-brand-grey" />
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Membre depuis
-              </p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Membre depuis</p>
               <p className="text-sm font-medium text-brand-blue">
                 {new Date(user.created_at).toLocaleDateString("fr-FR")}
               </p>
@@ -205,7 +213,11 @@ export function ProfileIdentityCard() {
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 border-t pt-5" noValidate>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 border-t pt-5"
+            noValidate
+          >
             <div className="flex flex-wrap gap-3">
               <FormField
                 control={form.control}
@@ -259,7 +271,12 @@ export function ProfileIdentityCard() {
               />
             ) : null}
             <div className="flex justify-center pt-3">
-              <Button type="submit" size="lg" disabled={updateProfile.isPending} className="min-w-48">
+              <Button
+                type="submit"
+                size="lg"
+                disabled={updateProfile.isPending}
+                className="min-w-48"
+              >
                 {updateProfile.isPending ? "Enregistrement..." : "Enregistrer"}
               </Button>
             </div>

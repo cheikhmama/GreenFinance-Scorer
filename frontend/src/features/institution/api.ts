@@ -1,6 +1,29 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiError } from "@/shared/api/errors";
 import { downloadFile } from "@/shared/api/download";
+import type { ApiError } from "@/shared/api/errors";
+import type {
+  AffectationPublic,
+  AffecterChercheurRequest,
+  AffiliationStatus,
+  AjouterDocumentRequest,
+  AjouterEntreprisePerimetreRequest,
+  AnalyseDetail,
+  AnalyseInstitutionPublic,
+  AnalysePublic,
+  AnalysisStatus,
+  ChercheurDisponible,
+  CreerProjetRequest,
+  DecisionAnalyseRequest,
+  DocumentProjetPublic,
+  EntrepriseDetailInvestisseur,
+  EntreprisePerimetrePublic,
+  InstitutionProfilPublic,
+  InviterChercheurRequest,
+  PageEntreprisePublieePublic,
+  ProjetDetail,
+  ProjetPublic,
+  RattachementPublic,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   addCompanyToProjectScope,
   addDocumentToProject,
@@ -23,29 +46,6 @@ import {
   listPublishedCompaniesForInstitution,
   requestAnalysisCorrection,
 } from "@/shared/api/generated/institution/institution";
-import type {
-  AffectationPublic,
-  AffecterChercheurRequest,
-  AjouterDocumentRequest,
-  AjouterEntreprisePerimetreRequest,
-  AnalyseDetail,
-  AnalyseInstitutionPublic,
-  AnalysePublic,
-  ChercheurDisponible,
-  CreerProjetRequest,
-  DecisionAnalyseRequest,
-  DocumentProjetPublic,
-  EntreprisePerimetrePublic,
-  EntrepriseDetailInvestisseur,
-  InstitutionProfilPublic,
-  InviterChercheurRequest,
-  PageEntreprisePublieePublic,
-  ProjetDetail,
-  ProjetPublic,
-  RattachementPublic,
-  AnalysisStatus,
-  AffiliationStatus,
-} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export const TAILLE_PAGE_INSTITUTION = 10;
 
@@ -53,15 +53,19 @@ const CHERCHEURS_DISPONIBLES_KEY = ["institution", "chercheurs", "disponibles"] 
 const MES_CHERCHEURS_KEY = ["institution", "chercheurs"] as const;
 const PROJETS_KEY = ["institution", "projets"] as const;
 const projetKey = (id: string) => ["institution", "projets", id] as const;
-const perimetreKey = (projetId: string) => ["institution", "projets", projetId, "perimetre"] as const;
-const documentsKey = (projetId: string) => ["institution", "projets", projetId, "documents"] as const;
+const perimetreKey = (projetId: string) =>
+  ["institution", "projets", projetId, "perimetre"] as const;
+const documentsKey = (projetId: string) =>
+  ["institution", "projets", projetId, "documents"] as const;
 const MES_ANALYSES_KEY = ["institution", "analyses"] as const;
 const analyseKey = (id: string) => ["institution", "analyses", id] as const;
 const historiqueKey = (id: string) => ["institution", "analyses", id, "historique"] as const;
 const ENTREPRISES_KEY = ["institution", "entreprises"] as const;
 const entrepriseKey = (id: string) => ["institution", "entreprises", id] as const;
 
-function pageSuivante<T extends { page: number; pages: number }>(dernierePage: T): number | undefined {
+function pageSuivante<T extends { page: number; pages: number }>(
+  dernierePage: T,
+): number | undefined {
   return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
 }
 

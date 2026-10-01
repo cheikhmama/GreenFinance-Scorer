@@ -46,7 +46,9 @@ export function ScoreSummary({ score }: { score: ScoreEntreprisePublic }) {
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">E</dt>
-        <dd className="mt-0.5 font-semibold text-brand-blue">{formatScore(score.environmental_score)}</dd>
+        <dd className="mt-0.5 font-semibold text-brand-blue">
+          {formatScore(score.environmental_score)}
+        </dd>
         <BarreScore valeur={score.environmental_score} teinte={TEINTES_PILIER.E} />
       </div>
       <div>
@@ -56,7 +58,9 @@ export function ScoreSummary({ score }: { score: ScoreEntreprisePublic }) {
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">G</dt>
-        <dd className="mt-0.5 font-semibold text-brand-blue">{formatScore(score.governance_score)}</dd>
+        <dd className="mt-0.5 font-semibold text-brand-blue">
+          {formatScore(score.governance_score)}
+        </dd>
         <BarreScore valeur={score.governance_score} teinte={TEINTES_PILIER.G} />
       </div>
     </dl>
@@ -79,7 +83,9 @@ export function CarbonSummary({ carbone }: { carbone: DonneesCarboneAgregees }) 
         <dd className="mt-0.5 font-medium">{formatTonnes(carbone.scope_2_market_based)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Scope 2 (location)</dt>
+        <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+          Scope 2 (location)
+        </dt>
         <dd className="mt-0.5 font-medium">{formatTonnes(carbone.scope_2_location_based)}</dd>
       </div>
       <div>

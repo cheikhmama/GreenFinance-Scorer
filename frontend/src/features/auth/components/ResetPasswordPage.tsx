@@ -1,5 +1,5 @@
-import type { UseMutationResult } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { UseMutationResult } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,7 +18,11 @@ import {
   FormMessage,
 } from "@/shared/ui/form";
 import { useActivateAccount, useResetPassword } from "../api";
-import { MOT_DE_PASSE_LONGUEUR_MIN, type NouveauMotDePasseForm, resetPasswordFormSchema } from "../schemas";
+import {
+  MOT_DE_PASSE_LONGUEUR_MIN,
+  type NouveauMotDePasseForm,
+  resetPasswordFormSchema,
+} from "../schemas";
 import { PasswordInput } from "./PasswordInput";
 
 // secrets.token_urlsafe(32), émis par app/auth/password_reset.py et app/auth/activation.py.
@@ -50,7 +54,13 @@ interface Textes {
  * réinitialisation (mot de passe oublié) et activation d'un compte provisionné par
  * l'Administrateur. Même règle de mot de passe, même garde sur le jeton, seuls les textes et
  * l'appel changent. */
-function TokenPasswordPage({ mutation, textes }: { mutation: TokenPasswordMutation; textes: Textes }) {
+function TokenPasswordPage({
+  mutation,
+  textes,
+}: {
+  mutation: TokenPasswordMutation;
+  textes: Textes;
+}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const tokens = searchParams.getAll("token");
   const token = tokens[0] ?? "";
@@ -236,8 +246,7 @@ export function ActivateAccountPage() {
           "Le compte n’a pas pu être activé. Vérifiez votre connexion et réessayez dans quelques instants.",
         lienRejete:
           "Ce lien d’activation est invalide, a expiré ou a déjà été utilisé. Demandez à l’administrateur de vous renvoyer une invitation.",
-        lienAbsent:
-          "Le lien d’activation est absent ou incomplet. Ouvrez le lien reçu par e-mail.",
+        lienAbsent: "Le lien d’activation est absent ou incomplet. Ouvrez le lien reçu par e-mail.",
         actionLienInvalide: { libelle: "Contacter l’équipe", vers: "/contact" },
         boutonEnCours: "Activation en cours…",
       }}

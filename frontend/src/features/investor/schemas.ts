@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  Currency,
-  DurationType,
-} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { Currency, DurationType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
 export { Currency, DurationType };

@@ -483,7 +483,6 @@ export function AdminCompanyDetailPage() {
       </Card>
 
       <CompanyIdentifiersCard key={entreprise.id} entreprise={entreprise} />
-
     </div>
   );
 }

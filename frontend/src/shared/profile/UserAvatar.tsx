@@ -42,13 +42,7 @@ export function UserAvatar({
   fallback?: "initiales" | "icone";
 }) {
   if (avatar) {
-    return (
-      <img
-        src={avatar}
-        alt={nom}
-        className={`${className} rounded-full object-cover`}
-      />
-    );
+    return <img src={avatar} alt={nom} className={`${className} rounded-full object-cover`} />;
   }
   if (fallback === "icone") {
     return (

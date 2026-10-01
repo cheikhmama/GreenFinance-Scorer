@@ -34,7 +34,9 @@ export function formatScore(valeur: number | null): string {
 /** Seuils d'appréciation d'un score ESG (0-100) pour un badge visuellement remarquable —
  * mêmes seuils que ceux déjà utilisés à l'écran pour la couverture ESG, réutilisés ici pour un
  * score individuel. Un score absent (entreprise sans score calculé) reste neutre. */
-export function variantScore(valeur: number | null): "secondary" | "success" | "warning" | "destructive" {
+export function variantScore(
+  valeur: number | null,
+): "secondary" | "success" | "warning" | "destructive" {
   if (valeur === null) return "secondary";
   if (valeur >= 70) return "success";
   if (valeur >= 40) return "warning";

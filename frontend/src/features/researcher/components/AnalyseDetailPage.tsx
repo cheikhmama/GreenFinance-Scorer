@@ -39,7 +39,11 @@ export function AnalyseDetailPage() {
         eyebrow={`Version ${analyse.version}`}
         title={analyse.title}
         description="Analyse comparative sur des entreprises publiées."
-        action={<Badge variant={variantStatutAnalyse(analyse.status)}>{libelleStatutAnalyse(analyse.status)}</Badge>}
+        action={
+          <Badge variant={variantStatutAnalyse(analyse.status)}>
+            {libelleStatutAnalyse(analyse.status)}
+          </Badge>
+        }
       />
 
       <HistoriqueVersions analyseId={analyse.id} versionActuelle={analyse.version} />
@@ -108,7 +112,13 @@ function HistoriqueVersions({
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
           >
             <div className="flex items-center gap-2">
-              <span className={version.version === versionActuelle ? "font-semibold text-brand-blue" : "text-brand-grey"}>
+              <span
+                className={
+                  version.version === versionActuelle
+                    ? "font-semibold text-brand-blue"
+                    : "text-brand-grey"
+                }
+              >
                 Version {version.version}
               </span>
               {version.version === versionActuelle ? (

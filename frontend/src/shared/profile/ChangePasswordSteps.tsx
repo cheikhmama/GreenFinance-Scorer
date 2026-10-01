@@ -143,7 +143,11 @@ export function ChangePasswordSteps({
             control={nouveauForm.control}
             name="nouveauMotDePasse"
             render={({ field }) => (
-              <ChampMotDePasse field={field} label="Nouveau mot de passe" autoComplete="new-password" />
+              <ChampMotDePasse
+                field={field}
+                label="Nouveau mot de passe"
+                autoComplete="new-password"
+              />
             )}
           />
           <FormField

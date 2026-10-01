@@ -35,14 +35,18 @@ export function ProjetDetailPage() {
         title={projet.name}
         description={projet.objective ?? "Aucun objectif renseigné par l'institution."}
         action={
-          <Badge variant={variantStatutProjet(projet.status)}>{libelleStatutProjet(projet.status)}</Badge>
+          <Badge variant={variantStatutProjet(projet.status)}>
+            {libelleStatutProjet(projet.status)}
+          </Badge>
         }
       />
 
       {projet.start_date || projet.planned_end_date || projet.deadline ? (
         <Card>
           <CardContent className="flex flex-wrap gap-6 text-sm">
-            {projet.start_date ? <Champ label="Début" valeur={formatDate(projet.start_date)} /> : null}
+            {projet.start_date ? (
+              <Champ label="Début" valeur={formatDate(projet.start_date)} />
+            ) : null}
             {projet.planned_end_date ? (
               <Champ label="Fin prévue" valeur={formatDate(projet.planned_end_date)} />
             ) : null}
@@ -91,7 +95,10 @@ export function ProjetDetailPage() {
         <CardContent className="space-y-2">
           {chargementDocuments ? <p className="text-brand-grey">Chargement...</p> : null}
           {!chargementDocuments && documents?.length === 0 ? (
-            <EmptyState icon={FileText} message="Aucun document mis à disposition sur ce projet pour l'instant." />
+            <EmptyState
+              icon={FileText}
+              message="Aucun document mis à disposition sur ce projet pour l'instant."
+            />
           ) : null}
           {documents?.map((document) => (
             <Link

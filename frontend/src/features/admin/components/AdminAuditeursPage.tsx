@@ -47,7 +47,9 @@ export function AdminAuditeursPage() {
           </label>
 
           {isLoading ? <CardListSkeleton count={3} /> : null}
-          {isError ? <p className="text-destructive">Impossible de charger la charge des auditeurs.</p> : null}
+          {isError ? (
+            <p className="text-destructive">Impossible de charger la charge des auditeurs.</p>
+          ) : null}
           {!isLoading && !isError && auditeurs.length === 0 ? (
             <EmptyState icon={ClipboardCheck} message="Aucun auditeur actif pour ce filtre." />
           ) : null}
@@ -74,7 +76,9 @@ export function AdminAuditeursPage() {
                         <span className="tabular-nums text-brand-grey">0</span>
                       )}
                     </TableCell>
-                    <TableCell className="tabular-nums text-brand-grey">{auditeur.opinions_submitted}</TableCell>
+                    <TableCell className="tabular-nums text-brand-grey">
+                      {auditeur.opinions_submitted}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -26,7 +26,11 @@ function PreuveModal({ url, onClose }: { url: string | null; onClose: () => void
         </DialogHeader>
         {url ? (
           <div className="space-y-2">
-            <iframe src={url} title="Preuve documentaire" className="h-[70vh] w-full rounded-md border" />
+            <iframe
+              src={url}
+              title="Preuve documentaire"
+              className="h-[70vh] w-full rounded-md border"
+            />
             <a
               href={url}
               target="_blank"
@@ -88,8 +92,7 @@ function CouvertureNote({ couverture }: { couverture: CouvertureResume }) {
   if (couverture.total_targets === 0) return null;
   return (
     <p className="mb-3 text-sm text-brand-grey">
-      {couverture.found}/{couverture.total_targets} indicateurs cibles communiqués par
-      l'entreprise.
+      {couverture.found}/{couverture.total_targets} indicateurs cibles communiqués par l'entreprise.
       {couverture.missing_codes.length > 0 ? (
         <span className="block text-xs">
           Non communiqués : {couverture.missing_codes.join(", ")}
@@ -194,9 +197,14 @@ export function CarbonTable({
                       Scope {donnee.scope}
                       {donnee.ghg_category ? ` — ${donnee.ghg_category}` : ""}
                     </td>
-                    <td className="py-2 pr-4">{donnee.tonnes_co2e.toLocaleString("fr-FR")} tCO2e</td>
+                    <td className="py-2 pr-4">
+                      {donnee.tonnes_co2e.toLocaleString("fr-FR")} tCO2e
+                    </td>
                     <td className="py-2">
-                      <PreuveLien preuve={donnee.proof} url={construireUrlPreuve(donnee.proof.id)} />
+                      <PreuveLien
+                        preuve={donnee.proof}
+                        url={construireUrlPreuve(donnee.proof.id)}
+                      />
                     </td>
                   </tr>
                 ))}

@@ -53,7 +53,10 @@ export function ComparisonResultsPage() {
       {selection.length < 2 ? (
         <p className="text-brand-grey">
           Il faut au moins deux entreprises pour une comparaison —{" "}
-          <Link to="/investor/comparaison" className="text-brand-blue underline-offset-2 hover:underline">
+          <Link
+            to="/investor/comparaison"
+            className="text-brand-blue underline-offset-2 hover:underline"
+          >
             retournez à la sélection
           </Link>
           .
@@ -77,7 +80,11 @@ export function ComparisonResultsPage() {
               >
                 <CardContent className="space-y-2 px-5">
                   <div className="flex items-center gap-2">
-                    <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
+                    <CompanyAvatar
+                      nom={entreprise.name}
+                      logo={entreprise.logo}
+                      className="size-8"
+                    />
                     <p className="truncate font-medium text-brand-blue">{entreprise.name}</p>
                   </div>
                   <Badge variant={variantScore(entreprise.score.global_score)}>
@@ -193,12 +200,20 @@ interface LigneComparaison {
   valeurs: Map<string, { value: number; unit: string; year: number; method: string } | null>;
 }
 
-function construireLignesIndicateurs(entreprises: EntrepriseDetailInvestisseur[]): LigneComparaison[] {
-  const parCode = new Map<string, { pillar: string; parEntreprise: Map<string, IndicateurESGDetail> }>();
+function construireLignesIndicateurs(
+  entreprises: EntrepriseDetailInvestisseur[],
+): LigneComparaison[] {
+  const parCode = new Map<
+    string,
+    { pillar: string; parEntreprise: Map<string, IndicateurESGDetail> }
+  >();
   for (const entreprise of entreprises) {
     for (const indicateur of entreprise.metrics) {
       if (!parCode.has(indicateur.metric_code)) {
-        parCode.set(indicateur.metric_code, { pillar: indicateur.pillar, parEntreprise: new Map() });
+        parCode.set(indicateur.metric_code, {
+          pillar: indicateur.pillar,
+          parEntreprise: new Map(),
+        });
       }
       parCode.get(indicateur.metric_code)?.parEntreprise.set(entreprise.id, indicateur);
     }
@@ -226,7 +241,10 @@ function construireLignesIndicateurs(entreprises: EntrepriseDetailInvestisseur[]
 }
 
 function construireLignesCarbone(entreprises: EntrepriseDetailInvestisseur[]): LigneComparaison[] {
-  const parCle = new Map<string, { libelle: string; parEntreprise: Map<string, DonneeCarboneDetail> }>();
+  const parCle = new Map<
+    string,
+    { libelle: string; parEntreprise: Map<string, DonneeCarboneDetail> }
+  >();
   for (const entreprise of entreprises) {
     for (const donnee of entreprise.carbon_data) {
       const cle = `${donnee.scope}-${donnee.ghg_category ?? ""}`;
@@ -339,10 +357,17 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
                       const valeursPresentes = Array.from(ligne.valeurs.values()).filter(
                         (v) => v !== null,
                       ) as { value: number; unit: string; year: number; method: string }[];
-                      const max = comparable ? Math.max(...valeursPresentes.map((v) => v.value)) : null;
-                      const min = comparable ? Math.min(...valeursPresentes.map((v) => v.value)) : null;
+                      const max = comparable
+                        ? Math.max(...valeursPresentes.map((v) => v.value))
+                        : null;
+                      const min = comparable
+                        ? Math.min(...valeursPresentes.map((v) => v.value))
+                        : null;
                       return (
-                        <tr key={`${categorie}-${ligne.libelle}`} className="border-b last:border-0">
+                        <tr
+                          key={`${categorie}-${ligne.libelle}`}
+                          className="border-b last:border-0"
+                        >
                           <td className="py-2 pr-4 text-brand-grey">{ligne.libelle}</td>
                           {entreprises.map((entreprise) => {
                             const cellule = ligne.valeurs.get(entreprise.id) ?? null;

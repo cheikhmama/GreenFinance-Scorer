@@ -80,40 +80,45 @@ export function DonneesPage() {
         {entreprises.map((entreprise) => {
           const selectionnee = selection.includes(entreprise.id);
           return (
-          <Card key={entreprise.id}>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-3">
-                <label className="mt-1 flex items-center gap-2">
-                  <span className="sr-only">Sélectionner {entreprise.name} pour comparaison</span>
-                  <input
-                    type="checkbox"
-                    checked={selectionnee}
-                    disabled={!selectionnee && plafondAtteint}
-                    onChange={() => toggleSelection(entreprise.id)}
-                  />
-                </label>
-                <div>
-                  <Link
-                    to={`/researcher/entreprises/${entreprise.id}`}
-                    className="text-base font-semibold text-brand-blue underline-offset-2 hover:underline"
-                  >
-                    {entreprise.name}
-                  </Link>
-                  <p className="text-sm text-brand-grey">
-                    {entreprise.sector} — {entreprise.country}
-                  </p>
+            <Card key={entreprise.id}>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <label className="mt-1 flex items-center gap-2">
+                    <span className="sr-only">Sélectionner {entreprise.name} pour comparaison</span>
+                    <input
+                      type="checkbox"
+                      checked={selectionnee}
+                      disabled={!selectionnee && plafondAtteint}
+                      onChange={() => toggleSelection(entreprise.id)}
+                    />
+                  </label>
+                  <div>
+                    <Link
+                      to={`/researcher/entreprises/${entreprise.id}`}
+                      className="text-base font-semibold text-brand-blue underline-offset-2 hover:underline"
+                    >
+                      {entreprise.name}
+                    </Link>
+                    <p className="text-sm text-brand-grey">
+                      {entreprise.sector} — {entreprise.country}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <ScoreSummary score={entreprise.score} />
-              <CarbonSummary carbone={entreprise.carbon} />
-            </CardContent>
-          </Card>
+                <ScoreSummary score={entreprise.score} />
+                <CarbonSummary carbone={entreprise.carbon} />
+              </CardContent>
+            </Card>
           );
         })}
       </div>
 
       {entreprises.length > 0 && hasNextPage ? (
-        <Button variant="outline" size="sm" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFetchingNextPage}
+          onClick={() => fetchNextPage()}
+        >
           {isFetchingNextPage ? "Chargement..." : "Voir plus"}
         </Button>
       ) : null}

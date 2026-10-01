@@ -10,9 +10,8 @@ import {
   getAdminESGPerformance,
   getAdminReport,
   getCompanyAdmin,
-  getReportFinancials,
-  listReportExtractionRuns,
   getCompanyKyc,
+  getReportFinancials,
   listAdminCompanyReports,
   listAllCompanies,
   listAllReports,
@@ -27,6 +26,7 @@ import {
   listPortfoliosAdmin,
   listProjectsAdmin,
   listPublishableCompanies,
+  listReportExtractionRuns,
   listReportOpinions,
   listReportsInValidation,
   listReportsToAssign,
@@ -42,9 +42,9 @@ import {
   requestReportCorrection,
   retryExtraction,
   suspendCompany,
-  updateReportFinancials,
   updateCompanyIdentifiers,
   updateCompanyProfile,
+  updateReportFinancials,
   uploadCompanyLogo,
   validateReport,
   verifyReportScorability,
@@ -54,8 +54,6 @@ import type {
   AnalysisStatus,
   ApercuActeursAdmin,
   AvisAuditAdmin,
-  ReportFinancials,
-  ReportFinancialsRequest,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
@@ -82,6 +80,8 @@ import type {
   ProjectStatus,
   RapportESGDetail,
   RapportESGPublic,
+  ReportFinancials,
+  ReportFinancialsRequest,
   ReportStatus,
   Role,
   ScoreRecalculeAdmin,
@@ -452,7 +452,8 @@ export function useReportExtractionRuns(rapportId: string) {
   });
 }
 
-const financialsKey = (rapportId: string) => ["admin", "rapports", rapportId, "financials"] as const;
+const financialsKey = (rapportId: string) =>
+  ["admin", "rapports", rapportId, "financials"] as const;
 
 /** GET /admin/reports/{id}/financials (tâches 2.3, 5.4) — chiffre d'affaires et EVIC de l'exercice
  * du rapport, dont le moteur PCAF a besoin. */

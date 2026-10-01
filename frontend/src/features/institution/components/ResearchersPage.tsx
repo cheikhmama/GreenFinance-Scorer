@@ -3,7 +3,10 @@ import { UserCheck, Users } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { ApiError } from "@/shared/api/errors";
-import { libelleStatutRattachement, variantStatutRattachement } from "@/shared/format/statutRattachement";
+import {
+  libelleStatutRattachement,
+  variantStatutRattachement,
+} from "@/shared/format/statutRattachement";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -44,7 +47,10 @@ export function ResearchersPage() {
         <CardContent className="space-y-2">
           {chargementDisponibles ? <CardListSkeleton count={2} /> : null}
           {!chargementDisponibles && disponibles?.length === 0 ? (
-            <EmptyState icon={Users} message="Aucun chercheur disponible à inviter pour l'instant." />
+            <EmptyState
+              icon={Users}
+              message="Aucun chercheur disponible à inviter pour l'instant."
+            />
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {disponibles?.map((chercheur) => (
@@ -55,13 +61,17 @@ export function ResearchersPage() {
                 <div className="flex items-center gap-3">
                   <InitialsAvatar nom={chercheur.name ?? chercheur.email} size="sm" />
                   <div>
-                    <p className="text-sm font-medium text-brand-blue">{chercheur.name ?? chercheur.email}</p>
+                    <p className="text-sm font-medium text-brand-blue">
+                      {chercheur.name ?? chercheur.email}
+                    </p>
                     <p className="text-xs text-brand-grey">{chercheur.email}</p>
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => setInviteCible({ id: chercheur.id, label: chercheur.name ?? chercheur.email })}
+                  onClick={() =>
+                    setInviteCible({ id: chercheur.id, label: chercheur.name ?? chercheur.email })
+                  }
                 >
                   Inviter
                 </Button>
@@ -87,7 +97,10 @@ export function ResearchersPage() {
             <div key={rattachement.id} className="space-y-2 border-b py-3 text-sm last:border-0">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <InitialsAvatar nom={rattachement.researcher_name ?? rattachement.researcher_email} size="sm" />
+                  <InitialsAvatar
+                    nom={rattachement.researcher_name ?? rattachement.researcher_email}
+                    size="sm"
+                  />
                   <div>
                     <p className="font-medium text-brand-blue">
                       {rattachement.researcher_name ?? rattachement.researcher_email}
@@ -144,7 +157,8 @@ function DialogueInvitation({
           form.reset({ collaboration_terms: "" });
           onClose();
         },
-        onError: (error) => onError(error instanceof ApiError ? error.message : "Échec de l'invitation."),
+        onError: (error) =>
+          onError(error instanceof ApiError ? error.message : "Échec de l'invitation."),
       },
     );
   }

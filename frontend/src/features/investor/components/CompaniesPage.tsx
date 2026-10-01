@@ -68,11 +68,19 @@ export function CompaniesPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {entreprises.map((entreprise) => (
-          <Link key={entreprise.id} to={`/investor/entreprises/${entreprise.id}`} className="group block">
+          <Link
+            key={entreprise.id}
+            to={`/investor/entreprises/${entreprise.id}`}
+            className="group block"
+          >
             <Card className="h-full transition group-hover:border-brand-green group-hover:shadow-md">
               <CardContent className="flex h-full flex-col gap-3">
                 <div className="flex items-start gap-3">
-                  <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-14 shrink-0" />
+                  <CompanyAvatar
+                    nom={entreprise.name}
+                    logo={entreprise.logo}
+                    className="size-14 shrink-0"
+                  />
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-brand-blue">{entreprise.name}</p>
                     <Badge variant="secondary" className="mt-1">
@@ -111,7 +119,12 @@ export function CompaniesPage() {
       </div>
 
       {entreprises.length > 0 && hasNextPage ? (
-        <Button variant="outline" size="sm" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isFetchingNextPage}
+          onClick={() => fetchNextPage()}
+        >
           {isFetchingNextPage ? "Chargement..." : "Voir plus"}
         </Button>
       ) : null}

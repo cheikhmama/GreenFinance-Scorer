@@ -53,14 +53,8 @@ export function UsersSection() {
   const rechercheDebattue = useDebouncedValue(recherche);
   // Comptes désactivés toujours inclus (jamais de bascule dans l'UI) : sans ça, un compte
   // désactivé disparaîtrait de cette liste et son bouton "Réactiver" deviendrait inatteignable.
-  const {
-    data,
-    isLoading,
-    isError,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useUsersByRole(roleAffiche, rechercheDebattue, true);
+  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useUsersByRole(roleAffiche, rechercheDebattue, true);
   const deactivate = useDeactivateUser(roleAffiche);
   const reactivate = useReactivateUser(roleAffiche);
   const confirm = useConfirm();
@@ -166,9 +160,7 @@ export function UsersSection() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="text-brand-blue">{utilisateur.email}</span>
-                        {!utilisateur.active ? (
-                          <Badge variant="secondary">désactivé</Badge>
-                        ) : null}
+                        {!utilisateur.active ? <Badge variant="secondary">désactivé</Badge> : null}
                       </div>
                     </TableCell>
                     <TableCell>

@@ -25,8 +25,10 @@ function formatPeriode(projet: {
   deadline: string | null;
 }): string | null {
   const morceaux: string[] = [];
-  if (projet.start_date) morceaux.push(`Du ${new Date(projet.start_date).toLocaleDateString("fr-FR")}`);
-  if (projet.planned_end_date) morceaux.push(`au ${new Date(projet.planned_end_date).toLocaleDateString("fr-FR")}`);
+  if (projet.start_date)
+    morceaux.push(`Du ${new Date(projet.start_date).toLocaleDateString("fr-FR")}`);
+  if (projet.planned_end_date)
+    morceaux.push(`au ${new Date(projet.planned_end_date).toLocaleDateString("fr-FR")}`);
   if (projet.deadline) {
     morceaux.push(`échéance : ${new Date(projet.deadline).toLocaleDateString("fr-FR")}`);
   }

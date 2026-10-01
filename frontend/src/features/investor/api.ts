@@ -1,6 +1,23 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiError } from "@/shared/api/errors";
 import { downloadFile } from "@/shared/api/download";
+import type { ApiError } from "@/shared/api/errors";
+import type {
+  AjouterPositionRequest,
+  BodyImportPortfolioPositions,
+  CreerPortefeuilleRequest,
+  EntrepriseDetailInvestisseur,
+  FermerPositionRequest,
+  ModifierPositionRequest,
+  PageEntreprisePublieePublic,
+  PagePortefeuilleResume,
+  PortefeuilleDetail,
+  PortefeuilleResume,
+  PortfolioCarbon,
+  PortfolioImportResult,
+  PositionDetail,
+  RenommerPortefeuilleRequest,
+  TableauDeBordInvestisseur,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   addPosition,
   archivePortfolio,
@@ -12,31 +29,14 @@ import {
   getInvestorDashboard,
   getPortfolioCarbon,
   getPortfolioDetail,
-  importPortfolioPositions,
   getPublishedCompanyDetail,
+  importPortfolioPositions,
   listMyPortfolios,
   listPublishedCompanies,
   renamePortfolio,
   restorePortfolio,
   updatePosition,
 } from "@/shared/api/generated/investor/investor";
-import type {
-  AjouterPositionRequest,
-  BodyImportPortfolioPositions,
-  PortfolioCarbon,
-  PortfolioImportResult,
-  CreerPortefeuilleRequest,
-  EntrepriseDetailInvestisseur,
-  FermerPositionRequest,
-  ModifierPositionRequest,
-  PageEntreprisePublieePublic,
-  PagePortefeuilleResume,
-  PortefeuilleDetail,
-  PortefeuilleResume,
-  PositionDetail,
-  RenommerPortefeuilleRequest,
-  TableauDeBordInvestisseur,
-} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export const TAILLE_PAGE_INVESTOR = 10;
 
@@ -46,7 +46,9 @@ const DASHBOARD_KEY = ["investor", "dashboard"] as const;
 const PORTEFEUILLES_KEY = ["investor", "portefeuilles"] as const;
 const portefeuilleKey = (id: string) => ["investor", "portefeuilles", id] as const;
 
-function pageSuivante<T extends { page: number; pages: number }>(dernierePage: T): number | undefined {
+function pageSuivante<T extends { page: number; pages: number }>(
+  dernierePage: T,
+): number | undefined {
   return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
 }
 
@@ -57,7 +59,11 @@ export function useInvestorDashboard() {
   });
 }
 
-export function usePublishedCompanies(filtres: { secteur?: string; pays?: string; recherche?: string }) {
+export function usePublishedCompanies(filtres: {
+  secteur?: string;
+  pays?: string;
+  recherche?: string;
+}) {
   return useInfiniteQuery<PageEntreprisePublieePublic, ApiError>({
     queryKey: [...ENTREPRISES_KEY, filtres],
     queryFn: ({ pageParam }) =>
@@ -167,7 +173,8 @@ export function useRenamePortfolio(portefeuilleId: string) {
 function useSetPortfolioArchived(portefeuilleId: string, archived: boolean) {
   const queryClient = useQueryClient();
   return useMutation<PortefeuilleResume, ApiError, void>({
-    mutationFn: () => (archived ? archivePortfolio(portefeuilleId) : restorePortfolio(portefeuilleId)),
+    mutationFn: () =>
+      archived ? archivePortfolio(portefeuilleId) : restorePortfolio(portefeuilleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PORTEFEUILLES_KEY });
       queryClient.invalidateQueries({ queryKey: portefeuilleKey(portefeuilleId) });
@@ -193,7 +200,10 @@ export function useDeletePortfolio() {
   });
 }
 
-function invalidatePortfolio(queryClient: ReturnType<typeof useQueryClient>, portefeuilleId: string) {
+function invalidatePortfolio(
+  queryClient: ReturnType<typeof useQueryClient>,
+  portefeuilleId: string,
+) {
   queryClient.invalidateQueries({ queryKey: portefeuilleKey(portefeuilleId) });
   queryClient.invalidateQueries({ queryKey: PORTEFEUILLES_KEY });
 }
@@ -208,7 +218,11 @@ export function useAddPosition(portefeuilleId: string) {
 
 export function useUpdatePosition(portefeuilleId: string) {
   const queryClient = useQueryClient();
-  return useMutation<PositionDetail, ApiError, { positionId: string; payload: ModifierPositionRequest }>({
+  return useMutation<
+    PositionDetail,
+    ApiError,
+    { positionId: string; payload: ModifierPositionRequest }
+  >({
     mutationFn: ({ positionId, payload }) => updatePosition(portefeuilleId, positionId, payload),
     onSuccess: () => invalidatePortfolio(queryClient, portefeuilleId),
   });
@@ -216,7 +230,11 @@ export function useUpdatePosition(portefeuilleId: string) {
 
 export function useClosePosition(portefeuilleId: string) {
   const queryClient = useQueryClient();
-  return useMutation<PositionDetail, ApiError, { positionId: string; payload: FermerPositionRequest }>({
+  return useMutation<
+    PositionDetail,
+    ApiError,
+    { positionId: string; payload: FermerPositionRequest }
+  >({
     mutationFn: ({ positionId, payload }) => closePosition(portefeuilleId, positionId, payload),
     onSuccess: () => invalidatePortfolio(queryClient, portefeuilleId),
   });
@@ -232,7 +250,10 @@ export function useDeletePosition(portefeuilleId: string) {
 
 /** GET /investor/portefeuilles/{id}/export — pas un hook TanStack Query (une action, pas une
  * donnée mise en cache) : déclenche un téléchargement navigateur réel du CSV. */
-export function exportPortfolioFile(portefeuilleId: string, nomPortefeuille: string): Promise<void> {
+export function exportPortfolioFile(
+  portefeuilleId: string,
+  nomPortefeuille: string,
+): Promise<void> {
   return downloadFile(
     `/investor/portefeuilles/${portefeuilleId}/export`,
     `portefeuille-${nomPortefeuille}.csv`,
