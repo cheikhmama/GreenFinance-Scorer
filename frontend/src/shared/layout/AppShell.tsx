@@ -172,7 +172,7 @@ export function AppShell() {
           </Button>
 
           <Link to="/dashboard" className="flex items-center gap-2 lg:hidden">
-            <span className="grid size-8 place-items-center rounded-lg bg-brand-green text-xs font-bold text-white">
+            <span className="grid size-8 place-items-center rounded-lg bg-brand-green text-xs font-bold text-primary-foreground">
               GF
             </span>
           </Link>

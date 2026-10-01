@@ -30,7 +30,7 @@ export function CompletenessChecklist({ groupes }: { groupes: GroupeCompletude[]
                 </span>
               </div>
               <div
-                className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+                className="h-2 overflow-hidden rounded-full bg-muted"
                 role="progressbar"
                 aria-label={libelleGroupe(groupe.group)}
                 aria-valuemin={0}

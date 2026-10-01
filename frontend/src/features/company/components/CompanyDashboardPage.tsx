@@ -1,20 +1,25 @@
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type {
   NotificationPublic,
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { useMyNotifications } from "@/shared/notifications/api";
-import { Skeleton } from "@/shared/ui/skeleton";
+import { Button } from "@/shared/ui/button";
 import {
-  useCompanyReports,
-  useMyCompanyProfile,
-  useMyLeiVerification,
-  useReportChecklist,
-} from "../api";
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/shared/ui/card";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { useCompanyReports, useReportChecklist } from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
 import { dernierScoreAffichable, presentationSession } from "../session/presentation";
+import { CompanyIdentityHeader } from "./CompanyIdentityHeader";
 
 /** Les seuls jalons montrés à l'Entreprise : la transmission de son rapport et la publication de
  * son score. Les étapes internes (lecture du fichier, affectation, avis) n'y figurent jamais. */
@@ -29,34 +34,9 @@ function libelleJalon(type: string, exercice: string | null): string | null {
   return null;
 }
 
-function Carte({
-  titre,
-  coin,
-  children,
-}: {
-  titre: string;
-  coin?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      aria-label={titre}
-      className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950"
-    >
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {titre}
-        </span>
-        {coin ? <span className="text-xs text-slate-400">{coin}</span> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** Tableau de bord Entreprise (tâche 5.9) : la session active, avec l'identité de l'entreprise,
- * et le dernier score officiel ; puis les deux seuls jalons qui la concernent. Le détail des
- * déclarations vit sur « Mes déclarations ». */
+/** Tableau de bord Entreprise (tâche 5.9) : l'identité de l'entreprise, la session active et le
+ * dernier score officiel, puis les deux seuls jalons qui la concernent. Uniquement des composants
+ * partagés (Card, Badge, Button) et des jetons de thème : rendu identique en clair et en sombre. */
 export function CompanyDashboardPage() {
   const { data: rapports, isPending } = useCompanyReports();
   const notifications = useMyNotifications(20);
@@ -74,40 +54,40 @@ export function CompanyDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-        Tableau de bord
-      </h1>
+      <CompanyIdentityHeader />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {isPending ? <Skeleton className="h-56 w-full" /> : <SessionActive rapport={enCours[0]} />}
-        {isPending ? <Skeleton className="h-56 w-full" /> : <DernierScore rapport={dernierScore} />}
+        {isPending ? <Skeleton className="h-64 w-full" /> : <SessionActive rapport={enCours[0]} />}
+        {isPending ? <Skeleton className="h-64 w-full" /> : <DernierScore rapport={dernierScore} />}
       </div>
 
       {jalons.length > 0 ? (
-        <section aria-labelledby="titre-jalons" className="space-y-2">
-          <h2
-            id="titre-jalons"
-            className="text-xs font-semibold uppercase tracking-wider text-slate-400"
-          >
-            Activité récente
-          </h2>
-          <ol aria-label="Activité récente" className="space-y-2">
-            {jalons.map(({ notification, libelle }) => (
-              <li
-                key={notification.id}
-                className="flex items-center justify-between gap-4 text-sm text-slate-700 dark:text-slate-200"
-              >
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                  {libelle}
-                </span>
-                <time className="shrink-0 text-xs text-slate-400" dateTime={notification.sent_at}>
-                  {new Date(notification.sent_at).toLocaleDateString("fr-FR")}
-                </time>
-              </li>
-            ))}
-          </ol>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Activité récente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol aria-label="Activité récente" className="space-y-3">
+              {jalons.map(({ notification, libelle }) => (
+                <li
+                  key={notification.id}
+                  className="flex items-center justify-between gap-4 text-sm text-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
+                    {libelle}
+                  </span>
+                  <time
+                    className="shrink-0 text-xs text-muted-foreground"
+                    dateTime={notification.sent_at}
+                  >
+                    {new Date(notification.sent_at).toLocaleDateString("fr-FR")}
+                  </time>
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   );
@@ -115,39 +95,6 @@ export function CompanyDashboardPage() {
 
 function dateCourte(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR");
-}
-
-/** Identité de l'entreprise connectée, telle que déclarée ; « GLEIF Validé » seulement sur un
- * contrôle GLEIF réussi, jamais une valeur de remplacement. */
-function Identite() {
-  const { data: entreprise } = useMyCompanyProfile();
-  const verification = useMyLeiVerification(entreprise?.lei);
-  if (!entreprise) return null;
-  return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{entreprise.name}</p>
-        {verification.data?.result === "PASSED" ? (
-          <span
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
-            title={verification.data.detail}
-          >
-            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-            GLEIF Validé
-          </span>
-        ) : null}
-      </div>
-      <p className="flex flex-wrap gap-x-3 text-xs text-slate-500">
-        <span>Secteur : {entreprise.sector}</span>
-        {entreprise.lei ? (
-          <span>
-            LEI :{" "}
-            <code className="font-mono text-slate-700 dark:text-slate-200">{entreprise.lei}</code>
-          </span>
-        ) : null}
-      </p>
-    </div>
-  );
 }
 
 function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
@@ -159,79 +106,97 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
   const exercice = rapport ? libelleExercice(rapport.fiscal_year) : null;
 
   return (
-    <Carte titre="Session active" coin={exercice ? `Exercice ${exercice}` : undefined}>
-      <div className="space-y-4 py-4">
-        <Identite />
+    <Card role="region" aria-label="Session active">
+      <CardHeader>
+        <CardDescription className="text-xs font-semibold uppercase tracking-wider">
+          Session active
+        </CardDescription>
+        {exercice ? (
+          <CardAction className="text-xs text-muted-foreground">Exercice {exercice}</CardAction>
+        ) : null}
+        {rapport ? (
+          <CardTitle className="text-2xl font-bold tracking-tight">
+            <h2>{exercice}</h2>
+          </CardTitle>
+        ) : null}
+      </CardHeader>
+      <CardContent className="flex-1">
         {rapport && presentation ? (
-          <div>
-            <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-              {exercice}
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
               {rapport.submitted_at
                 ? `Transmission effectuée le ${dateCourte(rapport.submitted_at)}`
                 : `Brouillon ouvert le ${dateCourte(rapport.created_at)}`}
             </p>
-            <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-              <div className="text-xs font-medium text-slate-700 dark:text-slate-200">
-                Statut : {presentation.libelle}
-              </div>
-              <div className="mt-0.5 text-xs text-slate-500">{presentation.description}</div>
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <p className="text-xs font-medium text-foreground">Statut : {presentation.libelle}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{presentation.description}</p>
               {total ? (
-                <div className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-muted-foreground">
                   {total.found}/{total.expected} indicateurs détectés
-                </div>
+                </p>
               ) : null}
             </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">Aucune déclaration en cours.</p>
+          <p className="text-sm text-muted-foreground">Aucune déclaration en cours.</p>
         )}
-      </div>
-      <Link
-        to="/company/declarations"
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
-      >
-        {rapport ? "Voir le suivi" : "Ouvrir une déclaration"}
-        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-      </Link>
-    </Carte>
+      </CardContent>
+      <CardFooter>
+        <Button asChild variant="link" size="sm" className="h-auto px-0">
+          <Link to="/company/declarations">
+            {rapport ? "Voir le suivi" : "Ouvrir une déclaration"}
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 
 function DernierScore({ rapport }: { rapport: RapportESGPublic | undefined }) {
-  const publie = rapport && rapport.official_global_score != null ? rapport : undefined;
-  const exercice = publie ? libelleExercice(publie.fiscal_year) : null;
+  const score = rapport?.official_global_score ?? null;
+  const exercice = rapport && score !== null ? libelleExercice(rapport.fiscal_year) : null;
   return (
-    <Carte titre="Dernier score officiel" coin={exercice ? `Exercice ${exercice}` : undefined}>
-      <div className="space-y-2 py-4">
-        {publie && publie.official_global_score != null ? (
+    <Card role="region" aria-label="Dernier score officiel">
+      <CardHeader>
+        <CardDescription className="text-xs font-semibold uppercase tracking-wider">
+          Dernier score officiel
+        </CardDescription>
+        {exercice ? (
+          <CardAction className="text-xs text-muted-foreground">Exercice {exercice}</CardAction>
+        ) : null}
+        {exercice ? (
+          <CardTitle className="text-2xl font-bold tracking-tight">
+            <h2>{exercice}</h2>
+          </CardTitle>
+        ) : null}
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {rapport && score !== null ? (
           <>
-            <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-              {exercice}
-            </h3>
-            <p className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-50">
-              {publie.official_global_score.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}
-              <span className="text-base font-normal text-slate-400">/100</span>
+            <p className="text-3xl font-semibold tabular-nums text-foreground">
+              {score.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}
+              <span className="text-base font-normal text-muted-foreground">/100</span>
             </p>
-            {publie.coverage_rate != null ? (
-              <p className="text-xs text-slate-500">
-                Taux de couverture : {Math.round(publie.coverage_rate * 100)} %
+            {rapport.coverage_rate != null ? (
+              <p className="text-xs text-muted-foreground">
+                Taux de couverture : {Math.round(rapport.coverage_rate * 100)} %
               </p>
             ) : null}
-            {publie.config_hash ? (
-              <p className="text-xs text-slate-500">
+            {rapport.config_hash ? (
+              <p className="text-xs text-muted-foreground">
                 Configuration de scoring :{" "}
-                <code className="font-mono" title={publie.config_hash}>
-                  {publie.config_hash.slice(0, 12)}…
+                <code className="font-mono text-foreground" title={rapport.config_hash}>
+                  {rapport.config_hash.slice(0, 12)}…
                 </code>
               </p>
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-slate-500">Aucun score officiel publié</p>
+          <p className="text-sm text-muted-foreground">Aucun score officiel publié</p>
         )}
-      </div>
-    </Carte>
+      </CardContent>
+    </Card>
   );
 }

@@ -114,11 +114,16 @@ describe("Espace Entreprise — tableau de bord", () => {
     });
     renderPage();
 
-    const session = await screen.findByRole("region", { name: "Session active" });
-    expect(await within(session).findByText("Atlas Industries")).toBeInTheDocument();
-    expect(within(session).getByText("Secteur : Industrie manufacturière")).toBeInTheDocument();
-    expect(within(session).getByText(LEI)).toBeInTheDocument();
-    expect(await within(session).findByText("GLEIF Validé")).toBeInTheDocument();
+    // En-tête : nom légal, puis secteur / LEI en badges ; « GLEIF Validé » sur contrôle réussi.
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Atlas Industries" }),
+    ).toBeInTheDocument();
+    const identite = screen.getByRole("list", { name: "Identité de l’entreprise" });
+    expect(identite).toHaveTextContent("Secteur : Industrie manufacturière");
+    expect(within(identite).getByText(LEI)).toBeInTheDocument();
+    expect(await screen.findByText("GLEIF Validé")).toBeInTheDocument();
+
+    const session = screen.getByRole("region", { name: "Session active" });
     expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
     expect(within(session).getByText("Brouillon ouvert le 01/09/2026")).toBeInTheDocument();
     expect(within(session).getByText("Statut : Brouillon")).toBeInTheDocument();
@@ -192,9 +197,11 @@ describe("Espace Entreprise — tableau de bord", () => {
     servir({ rapports: [], entreprise: profil({ lei: null }) });
     renderPage();
 
-    const session = await screen.findByRole("region", { name: "Session active" });
-    expect(await within(session).findByText("Atlas Industries")).toBeInTheDocument();
-    expect(within(session).queryByText(/LEI :/)).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Atlas Industries" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/LEI :/)).not.toBeInTheDocument();
+    const session = screen.getByRole("region", { name: "Session active" });
     expect(within(session).getByText("Aucune déclaration en cours.")).toBeInTheDocument();
     expect(screen.getByText("Aucun score officiel publié")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Activité récente" })).not.toBeInTheDocument();

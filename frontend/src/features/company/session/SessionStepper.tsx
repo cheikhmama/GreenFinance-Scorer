@@ -22,7 +22,7 @@ export function SessionStepper({ rapport }: { rapport: RapportSession }) {
             <span
               className={cn(
                 "flex size-6 items-center justify-center rounded-full border text-xs font-semibold",
-                franchie && "border-brand-green bg-brand-green text-white",
+                franchie && "border-primary bg-primary text-primary-foreground",
                 active && !franchie && "border-brand-blue text-brand-blue",
                 !franchie && !active && "text-brand-grey",
               )}

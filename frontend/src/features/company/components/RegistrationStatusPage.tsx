@@ -118,7 +118,7 @@ function Suivi({ vue, token }: { vue: RegistrationStatusView; token: string }) {
 
       {vue.status === "INFO_REQUESTED" ? (
         <>
-          <Alert className="border-amber-300 bg-amber-50">
+          <Alert className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/60">
             <FileUp aria-hidden="true" />
             <AlertTitle>Informations demandées le {dateCourte(vue.info_requested_at)}</AlertTitle>
             <AlertDescription className="whitespace-pre-line">
