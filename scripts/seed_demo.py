@@ -218,16 +218,19 @@ def main() -> None:
                 owner_user_id=titulaire.id,
                 onboarded_at=utcnow() - timedelta(days=30),
                 onboarded_by_id=admin.id,
-                revenue=Decimal(ca) * 1_000_000,
-                revenue_currency=Currency.EUR,
-                enterprise_value=Decimal(ve) * 1_000_000,
-                enterprise_value_currency=Currency.EUR,
-                enterprise_value_as_of=(utcnow() - timedelta(days=90)).date(),
             )
             session.add(entreprise)
             session.commit()
 
             rapport = _rapport_extrait(session, entreprise, dossier, scenario)
+            # Données financières PCAF de l'exercice, portées par le rapport (tâche 5.4).
+            rapport.revenue = Decimal(ca) * 1_000_000
+            rapport.revenue_currency = Currency.EUR
+            rapport.enterprise_value = Decimal(ve) * 1_000_000
+            rapport.enterprise_value_currency = Currency.EUR
+            rapport.evic_date = (utcnow() - timedelta(days=90)).date()
+            session.add(rapport)
+            session.commit()
             affecter_auditeur(session, rapport.id, auditeur.id)
             if etape == "audit":
                 continue

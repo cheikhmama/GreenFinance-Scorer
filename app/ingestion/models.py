@@ -9,15 +9,17 @@ l'Auditeur.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, Column, Index, Numeric, UniqueConstraint, text
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
 from app.core.enums import (
     ConfidenceLevel,
+    Currency,
     DataMethod,
     MetricCoverageStatus,
     Pillar,
@@ -126,6 +128,21 @@ class ESGReport(SQLModel, table=True):
     official_score: float | None = Field(default=None)
     coverage_rate: float | None = Field(default=None)
     config_hash: str | None = Field(default=None, max_length=64)
+    # Données financières PCAF de l'exercice (tâche 5.4, avant sur `companies`) : chiffre
+    # d'affaires pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur
+    # d'attribution — elles accompagnent les émissions du même rapport. Chaque montant avec sa
+    # devise ; evic_date dit à quelle date l'EVIC a été mesurée.
+    revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))
+    revenue_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
+    )
+    enterprise_value: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
+    )
+    enterprise_value_currency: Currency | None = Field(
+        default=None, sa_column=sa_enum_column(Currency, nullable=True)
+    )
+    evic_date: date | None = None
 
     company: "Company" = Relationship(back_populates="reports")
     auditor: Optional["User"] = Relationship(back_populates="audited_reports")

@@ -247,7 +247,7 @@ class PositionCarbon(BaseModel):
     data_quality: int | None  # score PCAF 1 (meilleur) à 5
     emissions_year: int | None
     scope_2_basis: str | None  # market_based, location_based, ou null si non précisé
-    enterprise_value_as_of: date | None
+    evic_date: date | None
     excluded_reason: CarbonExclusionReason | None
 
 

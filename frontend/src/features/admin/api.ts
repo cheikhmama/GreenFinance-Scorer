@@ -10,7 +10,7 @@ import {
   getAdminESGPerformance,
   getAdminReport,
   getCompanyAdmin,
-  getCompanyFinancials,
+  getReportFinancials,
   getCompanyKyc,
   listAdminCompanyReports,
   listAllCompanies,
@@ -41,7 +41,7 @@ import {
   requestReportCorrection,
   retryExtraction,
   suspendCompany,
-  updateCompanyFinancials,
+  updateReportFinancials,
   updateCompanyIdentifiers,
   updateCompanyProfile,
   uploadCompanyLogo,
@@ -53,8 +53,8 @@ import type {
   AnalysisStatus,
   ApercuActeursAdmin,
   AvisAuditAdmin,
-  CompanyFinancials,
-  CompanyFinancialsRequest,
+  ReportFinancials,
+  ReportFinancialsRequest,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
@@ -440,26 +440,25 @@ export function useUpdateCompanyIdentifiers(entrepriseId: string) {
   });
 }
 
-const financialsKey = (entrepriseId: string) =>
-  [...companyDetailKey(entrepriseId), "financials"] as const;
+const financialsKey = (rapportId: string) => ["admin", "rapports", rapportId, "financials"] as const;
 
-/** GET /admin/companies/{id}/financials (tâche 2.3) — chiffre d'affaires et EVIC, dont le moteur
- * PCAF a besoin. */
-export function useCompanyFinancials(entrepriseId: string) {
-  return useQuery<CompanyFinancials, ApiError>({
-    queryKey: financialsKey(entrepriseId),
-    queryFn: () => getCompanyFinancials(entrepriseId),
-    enabled: entrepriseId.length > 0,
+/** GET /admin/reports/{id}/financials (tâches 2.3, 5.4) — chiffre d'affaires et EVIC de l'exercice
+ * du rapport, dont le moteur PCAF a besoin. */
+export function useReportFinancials(rapportId: string) {
+  return useQuery<ReportFinancials, ApiError>({
+    queryKey: financialsKey(rapportId),
+    queryFn: () => getReportFinancials(rapportId),
+    enabled: rapportId.length > 0,
   });
 }
 
-/** PUT /admin/companies/{id}/financials — remplacement complet (un champ omis vaut null). */
-export function useUpdateCompanyFinancials(entrepriseId: string) {
+/** PUT /admin/reports/{id}/financials — remplacement complet (un champ omis vaut null). */
+export function useUpdateReportFinancials(rapportId: string) {
   const queryClient = useQueryClient();
-  return useMutation<CompanyFinancials, ApiError, CompanyFinancialsRequest>({
-    mutationFn: (payload) => updateCompanyFinancials(entrepriseId, payload),
+  return useMutation<ReportFinancials, ApiError, ReportFinancialsRequest>({
+    mutationFn: (payload) => updateReportFinancials(rapportId, payload),
     onSuccess: (financieres) => {
-      queryClient.setQueryData(financialsKey(entrepriseId), financieres);
+      queryClient.setQueryData(financialsKey(rapportId), financieres);
     },
   });
 }

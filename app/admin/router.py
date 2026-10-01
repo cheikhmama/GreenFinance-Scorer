@@ -61,8 +61,6 @@ from app.admin.schemas import (
     AnalyseAdmin,
     ApercuActeursAdmin,
     ChargeAuditeurAdmin,
-    CompanyFinancials,
-    CompanyFinancialsRequest,
     CompanyIdentifiers,
     CompanyIdentifiersRequest,
     CompanyOnboardingRequest,
@@ -77,6 +75,8 @@ from app.admin.schemas import (
     PerformanceESGAdmin,
     PortefeuilleAdmin,
     ProjetAdmin,
+    ReportFinancials,
+    ReportFinancialsRequest,
     ScoreRecalculeAdmin,
     ScoreVerificationAdmin,
     StatistiquesAuditeursAdmin,
@@ -1126,43 +1126,48 @@ def lister_projets_admin_route(
     )
 
 
-def _donnees_financieres(entreprise: Company) -> CompanyFinancials:
-    return CompanyFinancials(
-        company_id=entreprise.id,
-        revenue=entreprise.revenue,
-        revenue_currency=entreprise.revenue_currency,
-        enterprise_value=entreprise.enterprise_value,
-        enterprise_value_currency=entreprise.enterprise_value_currency,
-        enterprise_value_as_of=entreprise.enterprise_value_as_of,
+def _donnees_financieres(rapport: ESGReport) -> ReportFinancials:
+    return ReportFinancials(
+        report_id=rapport.id,
+        company_id=rapport.company_id,
+        fiscal_year=rapport.fiscal_year,
+        status=rapport.status,
+        revenue=float(rapport.revenue) if rapport.revenue is not None else None,
+        revenue_currency=rapport.revenue_currency,
+        enterprise_value=float(rapport.enterprise_value) if rapport.enterprise_value is not None else None,
+        enterprise_value_currency=rapport.enterprise_value_currency,
+        evic_date=rapport.evic_date,
     )
 
 
 @router.get(
-    "/admin/companies/{company_id}/financials",
-    response_model=CompanyFinancials,
-    operation_id="getCompanyFinancials",
-    summary="Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)",
+    "/admin/reports/{report_id}/financials",
+    response_model=ReportFinancials,
+    operation_id="getReportFinancials",
+    summary="Données financières PCAF de l'exercice d'un rapport (chiffre d'affaires, EVIC)",
 )
-def get_company_financials(
-    company_id: uuid.UUID,
+def get_report_financials(
+    report_id: uuid.UUID,
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> CompanyFinancials:
-    return _donnees_financieres(consulter_entreprise_admin(session, company_id))
+) -> ReportFinancials:
+    rapport = session.get(ESGReport, report_id)
+    if rapport is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return _donnees_financieres(rapport)
 
 
 @router.put(
-    "/admin/companies/{company_id}/financials",
-    response_model=CompanyFinancials,
-    operation_id="updateCompanyFinancials",
-    summary="Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)",
+    "/admin/reports/{report_id}/financials",
+    response_model=ReportFinancials,
+    operation_id="updateReportFinancials",
+    summary="Renseigner le chiffre d'affaires et l'EVIC de l'exercice d'un rapport (PCAF)",
 )
-def update_company_financials(
-    company_id: uuid.UUID,
-    payload: CompanyFinancialsRequest,
+def update_report_financials(
+    report_id: uuid.UUID,
+    payload: ReportFinancialsRequest,
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> CompanyFinancials:
-    entreprise = modifier_donnees_financieres(session, company_id, payload.model_dump())
-    return _donnees_financieres(entreprise)
+) -> ReportFinancials:
+    return _donnees_financieres(modifier_donnees_financieres(session, report_id, payload.model_dump()))
 

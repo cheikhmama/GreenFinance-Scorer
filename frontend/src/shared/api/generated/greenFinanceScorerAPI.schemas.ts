@@ -375,35 +375,6 @@ export interface ChercheurDisponible {
   name: string | null;
 }
 
-/**
- * Réponse de GET / PUT /admin/companies/{id}/financials : montants en nombres JSON (un
- * Decimal serait sérialisé en chaîne).
- */
-export interface CompanyFinancials {
-  company_id: string;
-  revenue: number | null;
-  revenue_currency: Currency | null;
-  enterprise_value: number | null;
-  enterprise_value_currency: Currency | null;
-  enterprise_value_as_of: string | null;
-}
-
-/**
- * PUT /admin/companies/{id}/financials (tâche 2.3, contrat JSON en anglais) : les
- * données financières dont le moteur PCAF a besoin (docs/WORKFLOWS.md §2.4). Chiffre d'affaires
- * pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur d'attribution.
- * Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais affichée à
- * côté des émissions, pour juger de l'écart entre les deux exercices. Remplacement complet : un
- * champ omis vaut null.
- */
-export interface CompanyFinancialsRequest {
-  revenue?: number | string | null;
-  revenue_currency?: Currency | null;
-  enterprise_value?: number | string | null;
-  enterprise_value_currency?: Currency | null;
-  enterprise_value_as_of?: string | null;
-}
-
 export interface CompanyIdentifiers {
   company_id: string;
   isin: string | null;
@@ -1452,7 +1423,7 @@ export interface PositionCarbon {
   data_quality: number | null;
   emissions_year: number | null;
   scope_2_basis: string | null;
-  enterprise_value_as_of: string | null;
+  evic_date: string | null;
   excluded_reason: CarbonExclusionReason | null;
 }
 
@@ -1666,6 +1637,38 @@ export interface ReportCreateRequest {
   fiscal_year: number;
   report_type: ReportType;
   company_id?: string | null;
+}
+
+/**
+ * Réponse de GET / PUT /admin/reports/{id}/financials : montants en nombres JSON (un
+ * Decimal serait sérialisé en chaîne). `fiscal_year` rappelle l'exercice auquel ils se
+ * rapportent.
+ */
+export interface ReportFinancials {
+  report_id: string;
+  company_id: string;
+  fiscal_year: number | null;
+  status: ReportStatus;
+  revenue: number | null;
+  revenue_currency: Currency | null;
+  enterprise_value: number | null;
+  enterprise_value_currency: Currency | null;
+  evic_date: string | null;
+}
+
+/**
+ * PUT /admin/reports/{id}/financials (tâches 2.3 et 5.4) : les données financières dont le
+ * moteur PCAF a besoin (docs/WORKFLOWS.md §2.4), pour l'exercice de ce rapport. Chiffre
+ * d'affaires pour la WACI, EVIC (valeur d'entreprise trésorerie incluse) pour le facteur
+ * d'attribution. Chaque montant va de pair avec sa devise ; la date de l'EVIC est facultative mais
+ * affichée à côté des émissions. Remplacement complet : un champ omis vaut null.
+ */
+export interface ReportFinancialsRequest {
+  revenue?: number | string | null;
+  revenue_currency?: Currency | null;
+  enterprise_value?: number | string | null;
+  enterprise_value_currency?: Currency | null;
+  evic_date?: string | null;
 }
 
 /**

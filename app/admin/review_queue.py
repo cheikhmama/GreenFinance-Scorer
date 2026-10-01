@@ -678,17 +678,21 @@ def modifier_identifiants(
 
 
 def modifier_donnees_financieres(
-    session: Session, entreprise_id: uuid.UUID, valeurs: dict[str, Any]
-) -> Company:
-    """Remplace chiffre d'affaires et EVIC (tâche 2.3) — `valeurs` porte tous les champs de
-    app/admin/schemas.py::CompanyFinancialsRequest, un champ nul efface la donnée."""
-    entreprise = consulter_entreprise_admin(session, entreprise_id)
-    assert set(valeurs) <= set(Company.model_fields), set(valeurs) - set(Company.model_fields)
+    session: Session, rapport_id: uuid.UUID, valeurs: dict[str, Any]
+) -> ESGReport:
+    """Remplace chiffre d'affaires et EVIC de l'exercice d'un rapport (tâches 2.3, 5.4) — `valeurs`
+    porte tous les champs d'app/admin/schemas.py::ReportFinancialsRequest, un champ nul efface la
+    donnée. Tout statut : corriger l'EVIC d'un rapport déjà validé ne touche pas à son score ESG,
+    seulement à l'empreinte PCAF, recalculée à la lecture."""
+    rapport = session.get(ESGReport, rapport_id, with_for_update=True)
+    if rapport is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    assert set(valeurs) <= set(ESGReport.model_fields), set(valeurs) - set(ESGReport.model_fields)
     for champ, valeur in valeurs.items():
-        setattr(entreprise, champ, valeur)
-    session.add(entreprise)
+        setattr(rapport, champ, valeur)
+    session.add(rapport)
     session.commit()
-    session.refresh(entreprise)
-    logger.info("entreprise_donnees_financieres_modifiees", entreprise_id=str(entreprise_id))
-    return entreprise
+    session.refresh(rapport)
+    logger.info("rapport_donnees_financieres_modifiees", rapport_id=str(rapport_id))
+    return rapport
 

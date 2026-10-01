@@ -221,8 +221,11 @@ assembly `app/investor/carbon.py`), with these choices:
 - a line's data quality is the worse of its Scope 1 and Scope 2 scores; unknown stays unknown;
 - quality derived at extraction from the method: reported 2, calculated 3, estimated 4. Score 1
   (verified) needs third-party assurance information the extraction does not capture yet;
-- EVIC and revenue are entered by an admin (`PUT /admin/companies/{id}/financials`); the EVIC
-  date is shown next to the emissions year rather than matched automatically;
+- EVIC and revenue belong to the fiscal year of a report (*task 5.4*) and are entered by an admin
+  (`PUT /admin/reports/{id}/financials`); the engine reads them from the same report as the
+  emissions — the company's latest validated one — so figures entered on a report still in review
+  wait for its validation. The EVIC date (`evic_date`) is shown next to the emissions year rather
+  than matched automatically;
 - coverages are returned as shares of the total amount (0–1), one per metric, and every excluded
   line carries its reason (`UNMATCHED`, `NO_VALIDATED_REPORT`, `MISSING_EMISSIONS`, `MISSING_EVIC`).
 

@@ -12,7 +12,7 @@ Investisseur et Chercheur.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
@@ -54,17 +54,7 @@ class Company(SQLModel, table=True):
     # Données financières requises par PCAF (docs/WORKFLOWS.md §2.4) : chiffre d'affaires pour la
     # WACI, valeur d'entreprise trésorerie incluse (EVIC) pour le facteur d'attribution. Montants
     # en Decimal, jamais en float.
-    revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))
-    revenue_currency: Currency | None = Field(
-        default=None, sa_column=sa_enum_column(Currency, nullable=True)
-    )
-    enterprise_value: Decimal | None = Field(
-        default=None, sa_column=Column(Numeric(20, 2), nullable=True)
-    )
-    enterprise_value_currency: Currency | None = Field(
-        default=None, sa_column=sa_enum_column(Currency, nullable=True)
-    )
-    enterprise_value_as_of: date | None = None
+    # Chiffre d'affaires et EVIC : par exercice, sur le rapport (esg_reports, tâche 5.4).
     minimum_investment_amount: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(20, 2), nullable=True)
     )

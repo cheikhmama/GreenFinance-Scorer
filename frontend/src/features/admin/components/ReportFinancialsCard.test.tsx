@@ -2,17 +2,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CompanyFinancialsCard } from "./CompanyFinancialsCard";
+import { ReportFinancialsCard } from "./ReportFinancialsCard";
 
 const ID = "55555555-5555-5555-5555-555555555555";
 const fetchMock = vi.fn<typeof fetch>();
 const VIDE = {
-  company_id: ID,
+  report_id: ID,
+  company_id: "66666666-6666-6666-6666-666666666666",
+  fiscal_year: 2025,
+  status: "VALIDATED",
   revenue: null,
   revenue_currency: null,
   enterprise_value: null,
   enterprise_value_currency: null,
-  enterprise_value_as_of: null,
+  evic_date: null,
 };
 
 beforeEach(() => {
@@ -27,12 +30,12 @@ function renderCard() {
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <CompanyFinancialsCard entrepriseId={ID} />
+      <ReportFinancialsCard rapportId={ID} />
     </QueryClientProvider>,
   );
 }
 
-describe("CompanyFinancialsCard", () => {
+describe("ReportFinancialsCard", () => {
   it("envoie le remplacement complet, la devise seulement avec son montant", async () => {
     fetchMock
       .mockResolvedValueOnce(Response.json(VIDE))
@@ -48,14 +51,14 @@ describe("CompanyFinancialsCard", () => {
 
     expect(await screen.findByText("Données financières enregistrées.")).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[1];
-    expect(url).toBe(`/api/v1/admin/companies/${ID}/financials`);
+    expect(url).toBe(`/api/v1/admin/reports/${ID}/financials`);
     expect(init?.method).toBe("PUT");
     expect(JSON.parse(init?.body as string)).toEqual({
       revenue: null,
       revenue_currency: null,
       enterprise_value: 1000000.5,
       enterprise_value_currency: "EUR",
-      enterprise_value_as_of: null,
+      evic_date: null,
     });
   });
 
@@ -71,5 +74,16 @@ describe("CompanyFinancialsCard", () => {
     expect(screen.getByText("Au plus deux décimales.")).toBeInTheDocument();
     expect(screen.getByText("Renseignez l'EVIC avec sa date.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("prévient que les données d’un rapport non validé ne comptent pas encore", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ ...VIDE, status: "IN_AUDIT" }));
+    renderCard();
+
+    expect(
+      await screen.findByText(
+        "Prises en compte dans l’empreinte carbone une fois ce rapport validé.",
+      ),
+    ).toBeInTheDocument();
   });
 });

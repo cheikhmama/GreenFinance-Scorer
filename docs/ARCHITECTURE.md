@@ -74,8 +74,6 @@ companies 1───* esg_reports 1───* esg_metrics
 | `name` | text | |
 | `sector` | text | NACE / GICS code preferred over free text |
 | `country` | char(2) | ISO 3166-1 alpha-2 |
-| `revenue` | numeric(20,2) + `revenue_currency` | needed for carbon intensity (WACI) |
-| `enterprise_value` | numeric(20,2) + `ev_currency` + `ev_as_of` | **EVIC**, needed for the PCAF attribution factor |
 | `status` | enum `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED` (task 5.2) | registration then account lifecycle; replaces the `actif` flag |
 | `registered_at`, `status_token_hash` (unique) | timestamp, char(64) | public registration (task 5.2): only the SHA-256 of the follow-up token is stored |
 | `mandate_letter_path`, `mandate_letter_uploaded_at` | | mandate letter PDF, stored like reports (`mandats/{company_id}/…`) |
@@ -101,6 +99,8 @@ API with its role-based scope.
 | `company_id` | FK companies | |
 | `fiscal_year` | int | indexed with `company_id` (not unique, see below) |
 | `version`, `previous_report_id` | int, FK self | correction chain (already exists) |
+| `revenue` | numeric(20,2) + `revenue_currency` | needed for carbon intensity (WACI); per fiscal year, moved from `companies` in task 5.4 |
+| `enterprise_value` | numeric(20,2) + `enterprise_value_currency` + `evic_date` | **EVIC**, needed for the PCAF attribution factor; per fiscal year (task 5.4) |
 | `status` | enum, see §3.2.1 | one status for the whole lifecycle, extraction included (task 5.1) |
 | `official_score` | numeric(5,2), nullable | denormalised from the official `scores` row, set in the validation transaction |
 | `coverage_rate` | numeric(5,4) | present indicators ÷ targeted indicators, weighted |

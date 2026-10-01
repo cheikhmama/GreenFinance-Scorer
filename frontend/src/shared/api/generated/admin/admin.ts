@@ -9,8 +9,6 @@ import type {
   ApercuActeursAdmin,
   AvisAuditAdmin,
   BodyUploadCompanyLogo,
-  CompanyFinancials,
-  CompanyFinancialsRequest,
   CompanyIdentifiers,
   CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
@@ -45,6 +43,8 @@ import type {
   PerformanceESGAdmin,
   RapportESGDetail,
   RapportESGPublic,
+  ReportFinancials,
+  ReportFinancialsRequest,
   ScoreRecalculeAdmin,
   ScoreVerificationAdmin,
   TableauDeBordAdmin,
@@ -1273,20 +1273,20 @@ export const listProjectsAdmin = async (params?: ListProjectsAdminParams, option
 );}
 
 
-export const getGetCompanyFinancialsUrl = (companyId: string,) => {
+export const getGetReportFinancialsUrl = (reportId: string,) => {
 
 
 
 
-  return `/admin/companies/${companyId}/financials`
+  return `/admin/reports/${reportId}/financials`
 }
 
 /**
- * @summary Données financières PCAF d'une entreprise (chiffre d'affaires, EVIC)
+ * @summary Données financières PCAF de l'exercice d'un rapport (chiffre d'affaires, EVIC)
  */
-export const getCompanyFinancials = async (companyId: string, options?: RequestInit): Promise<CompanyFinancials> => {
+export const getReportFinancials = async (reportId: string, options?: RequestInit): Promise<ReportFinancials> => {
 
-  return apiFetch<CompanyFinancials>(getGetCompanyFinancialsUrl(companyId),
+  return apiFetch<ReportFinancials>(getGetReportFinancialsUrl(reportId),
   {
     ...options,
     method: 'GET'
@@ -1296,19 +1296,19 @@ export const getCompanyFinancials = async (companyId: string, options?: RequestI
 );}
 
 
-export const getUpdateCompanyFinancialsUrl = (companyId: string,) => {
+export const getUpdateReportFinancialsUrl = (reportId: string,) => {
 
 
 
 
-  return `/admin/companies/${companyId}/financials`
+  return `/admin/reports/${reportId}/financials`
 }
 
 /**
- * @summary Renseigner le chiffre d'affaires et l'EVIC d'une entreprise (PCAF)
+ * @summary Renseigner le chiffre d'affaires et l'EVIC de l'exercice d'un rapport (PCAF)
  */
-export const updateCompanyFinancials = async (companyId: string,
-    companyFinancialsRequest: CompanyFinancialsRequest, options?: RequestInit): Promise<CompanyFinancials> => {
+export const updateReportFinancials = async (reportId: string,
+    reportFinancialsRequest: ReportFinancialsRequest, options?: RequestInit): Promise<ReportFinancials> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1316,12 +1316,12 @@ export const updateCompanyFinancials = async (companyId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return apiFetch<CompanyFinancials>(getUpdateCompanyFinancialsUrl(companyId),
+return apiFetch<ReportFinancials>(getUpdateReportFinancialsUrl(reportId),
   {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(companyFinancialsRequest)
+    body: JSON.stringify(reportFinancialsRequest)
   }
 );}
 

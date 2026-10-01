@@ -33,7 +33,6 @@ import {
   useValidateReport,
 } from "../api";
 import { DEVISES, type ModifierEntrepriseForm, modifierEntrepriseSchema } from "../schemas";
-import { CompanyFinancialsCard } from "./CompanyFinancialsCard";
 import { CompanyIdentifiersCard } from "./CompanyIdentifiersCard";
 import { OnboardingPanel } from "./OnboardingPanel";
 
@@ -485,7 +484,6 @@ export function AdminCompanyDetailPage() {
 
       <CompanyIdentifiersCard key={entreprise.id} entreprise={entreprise} />
 
-      <CompanyFinancialsCard entrepriseId={entreprise.id} />
     </div>
   );
 }
