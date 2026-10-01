@@ -32,6 +32,8 @@ import app.main  # noqa: F401  -- enregistre tous les modèles
 from app.admin.review_queue import publier_entreprise, valider_rapport
 from app.audit.assignment import affecter_auditeur
 from app.audit.opinion import soumettre_avis
+from app.audit.revue import enregistrer_revue
+from app.audit.schemas import MetricReviewRequest
 from app.auth.hashing import hash_password
 from app.auth.models import InstitutionProfile, User
 from app.carbon.pcaf import qualite_donnee_pcaf
@@ -45,9 +47,12 @@ from app.core.enums import (
     DataMethod,
     DurationType,
     MetricCoverageStatus,
+    MetricReviewStatus,
+    Pillar,
     RegistrationStatus,
     ReportStatus,
     ReportType,
+    ReviewReason,
     Role,
     SubmissionChannel,
 )
@@ -191,6 +196,33 @@ def _rapport_extrait(session: Session, entreprise: Company, dossier: Path, scena
     return rapport
 
 
+def _revoir(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid.UUID) -> None:
+    """Revue complète par l'auditeur (tâche 5.6) : la première valeur sociale corrigée, toutes les
+    autres acceptées — l'avis exige un dossier entièrement revu (tâche 5.7)."""
+    indicateurs = session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport_id)).all()
+    emissions = session.exec(select(CarbonEmission).where(CarbonEmission.report_id == rapport_id)).all()
+    corrigee = next((i for i in indicateurs if i.pillar == Pillar.SOCIAL and i.unit == "%"), None)
+    for indicateur in indicateurs:
+        if indicateur is corrigee:
+            demande = MetricReviewRequest(
+                metric_id=indicateur.id,
+                decision=MetricReviewStatus.OVERRIDDEN,
+                new_value=round(indicateur.value + 1, 1),
+                reason=ReviewReason.UNIT_ERROR,
+                comment="Arrondi corrigé d'après le tableau de la page citée.",
+            )
+        else:
+            demande = MetricReviewRequest(metric_id=indicateur.id, decision=MetricReviewStatus.ACCEPTED)
+        enregistrer_revue(session, rapport_id, auditeur_id, demande)
+    for emission in emissions:
+        enregistrer_revue(
+            session,
+            rapport_id,
+            auditeur_id,
+            MetricReviewRequest(emission_id=emission.id, decision=MetricReviewStatus.ACCEPTED),
+        )
+
+
 def main() -> None:
     with Session(engine) as session:
         if session.exec(select(User)).first() is not None:
@@ -234,12 +266,13 @@ def main() -> None:
             affecter_auditeur(session, rapport.id, auditeur.id)
             if etape == "audit":
                 continue
+            _revoir(session, rapport.id, auditeur.id)
             soumettre_avis(
                 session,
                 rapport.id,
                 auditeur.id,
-                AuditDecision.FAVORABLE,
-                "Indicateurs conformes aux pages citées ; périmètre carbone complet.",
+                AuditDecision.FAVORABLE_WITH_RESERVATIONS,
+                "Indicateurs conformes aux pages citées ; une valeur sociale corrigée (unité).",
             )
             if etape == "decision":
                 continue

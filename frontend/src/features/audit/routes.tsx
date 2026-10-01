@@ -3,8 +3,8 @@ import { AppShell } from "@/shared/layout/AppShell";
 import { RequireRole } from "@/shared/RequireRole";
 import { AuditDashboardPage } from "./components/AuditDashboardPage";
 import { AuditHistoryPage } from "./components/AuditHistoryPage";
-import { AuditReportDetailPage } from "./components/AuditReportDetailPage";
 import { ProfilePage } from "./components/ProfilePage";
+import { AuditReviewPage } from "./review/AuditReviewPage";
 
 export const auditRoutes: RouteObject[] = [
   {
@@ -16,7 +16,12 @@ export const auditRoutes: RouteObject[] = [
     children: [
       { path: "/audit", element: <AuditDashboardPage /> },
       { path: "/audit/historique", element: <AuditHistoryPage /> },
-      { path: "/audit/rapports/:rapportId", element: <AuditReportDetailPage /> },
+      {
+        path: "/audit/rapports/:rapportId",
+        element: <AuditReviewPage />,
+        // Espace de revue en trois volets : il occupe toute la largeur (tâche 5.7).
+        handle: { pleineLargeur: true },
+      },
       { path: "/audit/profil", element: <ProfilePage /> },
     ],
   },

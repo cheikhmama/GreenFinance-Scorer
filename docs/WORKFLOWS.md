@@ -97,7 +97,7 @@ Internal roles see the detailed state.
 | retry extraction | ADMIN | `EXTRACTION_FAILED` | status `EXTRACTING` (queued), error cleared | job `extract_report` |
 | assign auditor | ADMIN | `AWAITING_ASSIGNMENT` | `auditor_id`, `assigned_at`, status `IN_AUDIT`, notification | — |
 | review a value (*task 5.6*, `POST /audit/rapports/{id}/reviews`) | AUDITOR (assigned) | `IN_AUDIT`; the value belongs to this report; `OVERRIDDEN` needs the new value, `OVERRIDDEN` / `NOT_FOUND` a reason category | an **append-only** `metric_reviews` row (original value, new value, reason, comment, auditor) + the value's current `review_status` / `audited_value`; deciding again adds a row | — |
-| audit opinion | AUDITOR (assigned) | `IN_AUDIT`; a comment unless `FAVORABLE` | opinion row (`FAVORABLE`, `FAVORABLE_WITH_RESERVATIONS`, `CORRECTION_REQUIRED`, `UNFAVORABLE` — *task 5.6*), status `PENDING_DECISION`; the review is closed | — |
+| audit opinion | AUDITOR (assigned) | `IN_AUDIT`; every metric and carbon value reviewed (`422 revue_incomplete` otherwise — *task 5.7*); a comment unless `FAVORABLE` | opinion row (`FAVORABLE`, `FAVORABLE_WITH_RESERVATIONS`, `CORRECTION_REQUIRED`, `UNFAVORABLE` — *task 5.6*), status `PENDING_DECISION`; the review is closed | — |
 | pre-score (*task 5.6*, `GET /audit/rapports/{id}/pre-score`) | AUDITOR (assigned) | opinion already submitted (`409 avis_requis` before) | — (reference score with the reviewed values, never official) | — |
 | **validate** | ADMIN | `PENDING_DECISION`; score computable; coverage ≥ config threshold | see §1.3 | `generate_synthesis_pdf`, notification email |
 | reject | ADMIN | `PENDING_DECISION` | status `REJECTED`, reason, notification | — |

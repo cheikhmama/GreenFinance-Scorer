@@ -11,6 +11,7 @@ import structlog
 from sqlmodel import Session, col, select
 
 from app.audit.models import AuditOpinion
+from app.audit.revue import valeurs_non_revues
 from app.auth.models import User
 from app.core.enums import AuditDecision, ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
@@ -44,6 +45,14 @@ def soumettre_avis(
     if rapport.status != ReportStatus.IN_AUDIT:
         raise ValidationError(
             "Un avis a déjà été soumis pour ce rapport.", code="avis_deja_soumis"
+        )
+    # Tâche 5.7 : l'avis porte sur un dossier entièrement revu — chaque valeur extraite acceptée,
+    # corrigée ou déclarée non trouvée (app/audit/revue.py).
+    restantes = valeurs_non_revues(session, rapport_id)
+    if restantes:
+        raise ValidationError(
+            f"{restantes} valeur(s) restent à revoir avant de rendre l'avis.",
+            code="revue_incomplete",
         )
 
     avis = AuditOpinion(

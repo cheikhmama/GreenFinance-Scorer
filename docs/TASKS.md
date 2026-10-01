@@ -186,10 +186,11 @@ Decisions taken before starting (2026-10-01):
   - [x] Opinion values `FAVORABLE`, `FAVORABLE_WITH_RESERVATIONS`, `CORRECTION_REQUIRED`, `UNFAVORABLE` (migration maps the three former ones; downgrade maps reservations back to validation). Comment required unless `FAVORABLE`, now also server-side. Pre-score (`GET /audit/rapports/{id}/pre-score`) answers `409 avis_requis` until the opinion is submitted.
   - [x] Separation of duties: only the assigned auditor reviews (another auditor gets 404, an admin 403), only while `IN_AUDIT` (the opinion closes the review: `revue_close`); the admin reads the log (`GET /admin/rapports/{id}/reviews`) and decides only from `PENDING_DECISION`; an auditor can't decide, an admin can't issue an opinion. The enterprise doesn't see review states or audited values before validation.
   - Not here: requiring every value to be reviewed before the opinion — it lands with the review workspace (5.7), otherwise opinions could not be submitted from today's auditor page.
-- [ ] 5.7 Auditor 3-pane workspace
-  - [ ] Full-width review page: metrics list (25%), PDF viewer with highlighted boxes (45%, pdf.js), metric detail and override form (30%).
-  - [ ] Keyboard: `A` accept, `E` edit/override, `N` not found, `J`/`K` previous/next; never active while typing in a field.
-  - [ ] Opinion form with the four values; pre-score shown only after submission.
+- [x] 5.7 Auditor 3-pane workspace
+  - [x] Full-width review page (`/audit/rapports/:id`, replaces the former detail page; a route asks for full width with `handle: { pleineLargeur: true }`): values list (25%) — carbon rows first, then metrics by pillar, each with its review badge and a "x / y revue(s)" counter; PDF viewer (45%, pdf.js loaded on demand in its own chunk) rendering the one-page evidence excerpt at the pane's width with the value's boxes (5.5) overlaid in page fractions, the whole page standing as proof when there is no box; detail pane (30%) — value (audited value with the extracted one struck through), raw text, citation, page, confidence, the value's review history, and the accept / override (value, reason, comment) / not-found (reason, comment) forms.
+  - [x] Keyboard: `A` accept, `E` override, `N` not found, `J`/`K` next/previous; ignored while typing in a field, with a modifier key, on key repeat or inside a dialog. Accepting or saving moves to the next value still to review.
+  - [x] Opinion dialog with the four values (comment required unless `FAVORABLE`); "Rendre l'avis" stays disabled while a value is still to review. After submission the page turns read-only and shows the pre-score.
+  - [x] Every value must be reviewed before the opinion (deferred from 5.6), server-side too: `422 revue_incomplete` with the number of values left. Demo seed reviews its values (one unit correction) before its opinion.
 - [ ] 5.8 Enterprise portal
   - [x] Registration form and public status page — done in 5.2 (the acknowledgment e-mail links to the status page, so both had to land together).
   - [ ] `DRAFT` completeness checklist: detected / missing indicator counts per pillar, never values or scores.

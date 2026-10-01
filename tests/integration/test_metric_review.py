@@ -80,6 +80,13 @@ def _url(rapport: ESGReport) -> str:
     return f"/api/v1/audit/rapports/{rapport.id}/reviews"
 
 
+def _accepter(client, rapport: ESGReport, *valeurs: ESGMetric | CarbonEmission) -> None:
+    for valeur in valeurs:
+        cle = "metric_id" if isinstance(valeur, ESGMetric) else "emission_id"
+        reponse = client.post(_url(rapport), json={cle: str(valeur.id), "decision": "ACCEPTED"})
+        assert reponse.status_code == 201, reponse.text
+
+
 def test_revues_journalisees_et_etat_courant(session, auditeur) -> None:
     rapport, conseil, management, scope_1, _ = _dossier(session, auditeur.id)
     client = _login(auditeur.email, "s3cret-pass")
@@ -143,7 +150,7 @@ def test_revue_incoherente_refusee(session, auditeur, corps) -> None:
 
 
 def test_separation_des_taches(session, auditeur) -> None:
-    rapport, conseil, _, _, _ = _dossier(session, auditeur.id)
+    rapport, conseil, management, scope_1, _ = _dossier(session, auditeur.id)
     autre_dossier, valeur_ailleurs, _, _, _ = _dossier(session, auditeur.id)
     autre_auditeur = _login(_create_utilisateur(session, Role.AUDITOR).email, "s3cret-pass")
     admin = _login(_create_utilisateur(session, Role.ADMIN).email, "s3cret-pass")
@@ -161,6 +168,7 @@ def test_separation_des_taches(session, auditeur) -> None:
     assert client.post(f"/api/v1/admin/rapports/{rapport.id}/valider", json={}).status_code == 403
     assert admin.post(f"/api/v1/audit/rapports/{rapport.id}/avis", json={"decision": "FAVORABLE"}).status_code == 403
     # L'avis rendu clôt la revue.
+    _accepter(client, rapport, conseil, management, scope_1)
     assert client.post(f"/api/v1/audit/rapports/{rapport.id}/avis", json={"decision": "FAVORABLE"}).status_code == 201
     close = client.post(_url(rapport), json=corps)
     assert close.status_code == 422 and close.json()["error"]["code"] == "revue_close"
@@ -168,12 +176,13 @@ def test_separation_des_taches(session, auditeur) -> None:
 
 
 def test_pre_score_seulement_apres_l_avis(session, auditeur) -> None:
-    rapport, _, management, _, _ = _dossier(session, auditeur.id)
+    rapport, conseil, management, scope_1, _ = _dossier(session, auditeur.id)
     client = _login(auditeur.email, "s3cret-pass")
     client.post(
         _url(rapport),
         json={"metric_id": str(management.id), "decision": "OVERRIDDEN", "new_value": 50.0, "reason": "OTHER"},
     )
+    _accepter(client, rapport, conseil, scope_1)
     url = f"/api/v1/audit/rapports/{rapport.id}/pre-score"
 
     avant = client.get(url)
@@ -241,3 +250,20 @@ def test_le_module_carbone_lit_la_valeur_auditee_ou_ecarte_la_ligne(session, aud
     assert emissions_corrigees.scope_1.tonnes_co2e == 1200.0
     # Jamais comptée comme zéro : simplement absente.
     assert emissions_ecartees is not None and emissions_ecartees.scope_1 is None
+
+
+def test_avis_refuse_tant_qu_une_valeur_reste_a_revoir(session, auditeur) -> None:
+    """Tâche 5.7 : l'avis porte sur un dossier entièrement revu."""
+    rapport, conseil, management, scope_1, _ = _dossier(session, auditeur.id)
+    client = _login(auditeur.email, "s3cret-pass")
+    _accepter(client, rapport, conseil, management)
+    avis = f"/api/v1/audit/rapports/{rapport.id}/avis"
+
+    incomplet = client.post(avis, json={"decision": "FAVORABLE"})
+    _accepter(client, rapport, scope_1)
+    complet = client.post(avis, json={"decision": "FAVORABLE"})
+
+    assert incomplet.status_code == 422
+    assert incomplet.json()["error"]["code"] == "revue_incomplete"
+    assert "1 valeur" in incomplet.json()["error"]["message"]
+    assert complet.status_code == 201

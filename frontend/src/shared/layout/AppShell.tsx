@@ -1,6 +1,6 @@
 import { ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useMatches } from "react-router-dom";
 import { useCurrentUser, useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/shared/notifications/NotificationBell";
 import { UserAvatar } from "@/shared/profile/UserAvatar";
@@ -25,6 +25,10 @@ export function AppShell() {
   const confirm = useConfirm();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Une route peut demander toute la largeur via `handle: { pleineLargeur: true }` (tâche 5.7).
+  const pleineLargeur = useMatches().some(
+    (match) => (match.handle as { pleineLargeur?: boolean } | undefined)?.pleineLargeur,
+  );
 
   // RequireRole a déjà garanti une session valide avant de monter ce composant ; ce garde-fou ne
   // couvre que l'instant très bref entre le montage et le premier rendu avec les données en cache.
@@ -102,7 +106,9 @@ export function AppShell() {
           className={({ isActive }) =>
             cn(
               "flex items-center gap-3 rounded-xl p-3 transition",
-              isActive ? "bg-white/10 text-white shadow-sm" : "text-slate-300 hover:bg-white/5 hover:text-white",
+              isActive
+                ? "bg-white/10 text-white shadow-sm"
+                : "text-slate-300 hover:bg-white/5 hover:text-white",
             )
           }
         >
@@ -193,7 +199,10 @@ export function AppShell() {
           </div>
         </header>
 
-        <main id="app-content" className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
+        <main
+          id="app-content"
+          className={cn("mx-auto p-4 sm:p-6 lg:p-8", pleineLargeur ? "max-w-none" : "max-w-6xl")}
+        >
           <Outlet />
         </main>
       </div>

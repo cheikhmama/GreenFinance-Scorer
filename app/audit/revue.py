@@ -85,6 +85,21 @@ def enregistrer_revue(
     return revue
 
 
+def valeurs_non_revues(session: Session, rapport_id: uuid.UUID) -> int:
+    """Nombre de valeurs extraites (indicateurs et données carbone) encore PENDING."""
+    total = 0
+    for modele in (ESGMetric, CarbonEmission):
+        total += len(
+            session.exec(
+                select(modele.id).where(
+                    col(modele.report_id) == rapport_id,
+                    col(modele.review_status) == MetricReviewStatus.PENDING,
+                )
+            ).all()
+        )
+    return total
+
+
 def lister_revues(session: Session, rapport_id: uuid.UUID) -> list[MetricReview]:
     return list(
         session.exec(
