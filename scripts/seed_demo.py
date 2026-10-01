@@ -18,6 +18,7 @@ Comptes créés (mot de passe commun : MOT_DE_PASSE ci-dessous) : admin@, audite
 investisseur@, institution@, chercheur@ et une adresse par entreprise, tous @greenfinance-demo.com.
 """
 
+import hashlib
 import json
 import sys
 import uuid
@@ -136,6 +137,11 @@ def _rapport_extrait(
         original_filename=nom_fichier,
         fiscal_year=annee,
     )
+    if brouillon:
+        # Empreinte du fichier joint : le reçu de soumission l'affiche (tâche 5.8). Seulement sur
+        # le brouillon — il reprend le PDF de l'exercice précédent, et une empreinte est unique
+        # par entreprise.
+        rapport.checksum_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     session.add(rapport)
     session.flush()
 
