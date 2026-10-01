@@ -1410,6 +1410,11 @@ export interface RapportESGPublic {
   version: number;
   previous_report_id: string | null;
   checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
 }
 
 export interface PageRapportESGPublic {
@@ -1679,11 +1684,16 @@ export interface RapportESGDetail {
   version: number;
   previous_report_id: string | null;
   checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
   metrics: IndicateurESGDetail[];
   carbon_data: DonneeCarboneDetail[];
   declared_global_score: number | null;
   declared_global_score_proof: PreuveDocumentairePublic | null;
   official_score?: ScoreESGPublic | null;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
   readonly coverage: CouvertureResume;
 }
 
@@ -1771,12 +1781,21 @@ export interface RepartitionSecteur {
  *
  * `company_id` n'est lu que pour un Administrateur ; une Entreprise déclare toujours pour la
  * sienne (même règle que l'import par URL, app/company/router.py).
+ *
+ * Données financières de l'exercice (tâche 5.9), facultatives : une devise pour le chiffre
+ * d'affaires et l'EVIC. Sans date, l'EVIC est datée de la clôture de l'exercice (31 décembre).
+ * Elles ne comptent pour PCAF qu'une fois le rapport validé (tâche 5.4) ; l'Administrateur peut
+ * toujours les corriger.
  */
 export interface ReportCreateRequest {
   /** @minimum 2000 */
   fiscal_year: number;
   report_type: ReportType;
   company_id?: string | null;
+  currency?: Currency | null;
+  revenue?: number | string | null;
+  enterprise_value?: number | string | null;
+  evic_date?: string | null;
 }
 
 /**

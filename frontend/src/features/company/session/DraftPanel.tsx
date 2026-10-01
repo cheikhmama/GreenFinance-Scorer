@@ -45,7 +45,8 @@ export function DraftPanel({
       confirmLabel: "Abandonner",
       destructive: true,
     });
-    if (confirme) abandonner.mutate(undefined, { onSuccess: () => navigate("/company/rapports") });
+    if (confirme)
+      abandonner.mutate(undefined, { onSuccess: () => navigate("/company/declarations") });
   }
 
   return (

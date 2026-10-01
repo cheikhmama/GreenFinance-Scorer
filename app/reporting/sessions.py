@@ -15,6 +15,7 @@ d'autrui (même règle que app/company/rapports.py::rapport_de_lentreprise).
 """
 
 import uuid
+from datetime import date
 
 import structlog
 from fastapi import BackgroundTasks
@@ -116,6 +117,16 @@ def ouvrir(session: Session, user: User, demande: ReportCreateRequest) -> ESGRep
         channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=demande.fiscal_year,
         status=ReportStatus.DRAFT,
+        # Données financières de l'exercice (tâche 5.9), saisies à l'ouverture.
+        revenue=demande.revenue,
+        revenue_currency=demande.currency if demande.revenue is not None else None,
+        enterprise_value=demande.enterprise_value,
+        enterprise_value_currency=demande.currency if demande.enterprise_value is not None else None,
+        evic_date=(
+            demande.evic_date or date(demande.fiscal_year, 12, 31)
+            if demande.enterprise_value is not None
+            else None
+        ),
     )
     session.add(brouillon)
     try:

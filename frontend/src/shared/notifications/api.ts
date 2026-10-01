@@ -51,14 +51,14 @@ export function useMarkNotificationRead() {
 // Types dont la cible est un élément précis (id_ressource requis) — voir app/core/notifications.py
 // pour la liste des types réellement émis côté backend.
 const LIENS_AVEC_ID: Record<string, (id: string) => string> = {
-  RAPPORT_DEPOSE: (id) => `/company/rapports/${id}`,
-  RAPPORT_EXTRACTION_ECHOUEE: (id) => `/company/rapports/${id}`,
-  RAPPORT_ANALYSE_TERMINEE: (id) => `/company/rapports/${id}`,
-  RAPPORT_AFFECTE_ENTREPRISE: (id) => `/company/rapports/${id}`,
-  RAPPORT_AVIS_RENDU_ENTREPRISE: (id) => `/company/rapports/${id}`,
-  RAPPORT_VALIDE: (id) => `/company/rapports/${id}`,
-  RAPPORT_REJETE: (id) => `/company/rapports/${id}`,
-  RAPPORT_CORRECTION_DEMANDEE: (id) => `/company/rapports/${id}`,
+  RAPPORT_DEPOSE: (id) => `/company/declarations/${id}`,
+  RAPPORT_EXTRACTION_ECHOUEE: (id) => `/company/declarations/${id}`,
+  RAPPORT_ANALYSE_TERMINEE: (id) => `/company/declarations/${id}`,
+  RAPPORT_AFFECTE_ENTREPRISE: (id) => `/company/declarations/${id}`,
+  RAPPORT_AVIS_RENDU_ENTREPRISE: (id) => `/company/declarations/${id}`,
+  RAPPORT_VALIDE: (id) => `/company/declarations/${id}`,
+  RAPPORT_REJETE: (id) => `/company/declarations/${id}`,
+  RAPPORT_CORRECTION_DEMANDEE: (id) => `/company/declarations/${id}`,
   RAPPORT_AFFECTE_AUDITEUR: (id) => `/audit/rapports/${id}`,
   RAPPORT_PRET_A_AFFECTER: (id) => `/admin/rapports/${id}`,
   ENTREPRISE_INSCRITE: (id) => `/admin/entreprises/${id}`,
@@ -68,14 +68,14 @@ const LIENS_AVEC_ID: Record<string, (id: string) => string> = {
 };
 
 // Types dont la cible est une liste, jamais un id précis (ex. une invitation de rattachement).
-// ENTREPRISE_PUBLIEE/SUSPENDUE/REACTIVEE pointent vers « Mes rapports », jamais Profil : ce sont
+// ENTREPRISE_PUBLIEE/SUSPENDUE/REACTIVEE pointent vers « Mes déclarations », jamais Profil : ce sont
 // des événements sur l'activité de dépôt/publication de l'entreprise, pas sur son compte — Profil
 // reste réservé à la gestion du compte (nom, e-mail, mot de passe), jamais une cible de
 // notification métier.
 const LIENS_FIXES: Record<string, string> = {
-  ENTREPRISE_PUBLIEE: "/company/rapports",
-  ENTREPRISE_SUSPENDUE: "/company/rapports",
-  ENTREPRISE_REACTIVEE: "/company/rapports",
+  ENTREPRISE_PUBLIEE: "/company/declarations",
+  ENTREPRISE_SUSPENDUE: "/company/declarations",
+  ENTREPRISE_REACTIVEE: "/company/declarations",
   RATTACHEMENT_INVITATION: "/researcher/rattachements",
   RATTACHEMENT_ACCEPTE: "/institution/chercheurs",
   RATTACHEMENT_REFUSE: "/institution/chercheurs",

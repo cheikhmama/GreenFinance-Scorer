@@ -8,8 +8,11 @@ export function CompletenessChecklist({ groupes }: { groupes: GroupeCompletude[]
   return (
     <section aria-label="Liste de complétude" className="space-y-3">
       <p className="text-sm text-brand-grey">
-        {total.found} indicateur(s) trouvé(s) sur {total.expected} attendus. Les valeurs ne sont pas
-        affichées : elles seront relues par l’auditeur après la soumission.
+        <span className="font-semibold text-brand-blue">
+          Indicateurs détectés : {total.found}/{total.expected}
+        </span>{" "}
+        — les valeurs ne sont pas affichées : elles seront relues par l’auditeur après la
+        soumission.
       </p>
       <ul className="divide-y rounded-lg border">
         {groupes.map((groupe) => {

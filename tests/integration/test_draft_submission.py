@@ -216,3 +216,68 @@ def test_seuls_lentreprise_et_ladmin_soumettent(session, entreprise) -> None:
     _auditeur, client_auditeur = _utilisateur(session, Role.AUDITOR)
 
     assert client_auditeur.post(f"{URL}/{rapport_id}/submit").status_code == 403
+
+
+def test_ouvrir_avec_les_donnees_financieres_de_lexercice(session, entreprise) -> None:
+    from datetime import date
+    from decimal import Decimal
+
+    from app.core.enums import Currency
+
+    _user, client = entreprise
+    sans_devise = client.post(
+        URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG", "revenue": "1000"}
+    )
+    ouvert = client.post(
+        URL,
+        json={
+            "fiscal_year": 2024,
+            "report_type": "RAPPORT_ESG",
+            "currency": "EUR",
+            "revenue": "820000000",
+            "enterprise_value": "1450000000",
+        },
+    )
+
+    assert sans_devise.status_code == 422
+    assert ouvert.status_code == 201, ouvert.text
+    session.expire_all()
+    rapport = session.get(ESGReport, uuid.UUID(ouvert.json()["id"]))
+    assert rapport is not None
+    assert rapport.revenue == Decimal(820000000)
+    assert rapport.revenue_currency == Currency.EUR
+    assert rapport.enterprise_value_currency == Currency.EUR
+    # Sans date fournie, l'EVIC est datée de la clôture de l'exercice.
+    assert rapport.evic_date == date(2024, 12, 31)
+
+
+def test_la_liste_resume_le_score_officiel_et_la_synthese(session, entreprise) -> None:
+    from app.core.database import utcnow
+
+    user, client = entreprise
+    valide = ESGReport(
+        company_id=user.company.id,
+        type="RAPPORT_ESG",
+        channel="ENTREPRISE",
+        fiscal_year=2023,
+        status=ReportStatus.VALIDATED,
+        source_file="rapports/test/v.pdf",
+        submitted_at=utcnow(),
+        checksum_sha256="b" * 64,
+        official_score=74.5,
+        coverage_rate=0.88,
+        config_hash="c" * 64,
+        synthesis_report_path="synthese/v.pdf",
+    )
+    session.add(valide)
+    session.commit()
+
+    ligne = next(
+        r for r in client.get("/api/v1/company/rapports").json() if r["id"] == str(valide.id)
+    )
+
+    assert ligne["official_global_score"] == 74.5
+    assert ligne["coverage_rate"] == 0.88
+    assert ligne["config_hash"] == "c" * 64
+    assert ligne["synthesis_available"] is True
+    assert "synthesis_report_path" not in ligne

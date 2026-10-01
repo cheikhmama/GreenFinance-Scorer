@@ -58,9 +58,9 @@ function renderPage() {
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       <ConfirmProvider>
-        <MemoryRouter initialEntries={[`/company/rapports/${ID}`]}>
+        <MemoryRouter initialEntries={[`/company/declarations/${ID}`]}>
           <Routes>
-            <Route path="/company/rapports/:rapportId" element={<CompanyReportDetailPage />} />
+            <Route path="/company/declarations/:rapportId" element={<CompanyReportDetailPage />} />
           </Routes>
         </MemoryRouter>
       </ConfirmProvider>
@@ -105,7 +105,7 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     renderPage();
 
     const liste = await screen.findByRole("region", { name: "Liste de complétude" });
-    expect(liste).toHaveTextContent("12 indicateur(s) trouvé(s) sur 19 attendus");
+    expect(liste).toHaveTextContent("Indicateurs détectés : 12/19");
     expect(within(liste).getByText("Émissions carbone")).toBeInTheDocument();
     expect(within(liste).getByText("3 / 5 trouvé(s)")).toBeInTheDocument();
     expect(within(liste).getByText("· 3 manquant(s)")).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
 
     await user.click(within(dialogue).getByRole("button", { name: "Terminer" }));
     const bandeau = await screen.findByRole("region", { name: "Déclaration verrouillée" });
-    expect(bandeau).toHaveTextContent("🔒 Soumis le");
+    expect(bandeau).toHaveTextContent(/🔒 Soumis le 2 septembre 2026 à \d{2}:30 — lecture seule/);
     expect(bandeau).toHaveTextContent(SHA);
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Examen");
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();

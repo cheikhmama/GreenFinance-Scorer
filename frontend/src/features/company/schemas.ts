@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { Currency, ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-export { ReportType };
+export { Currency, ReportType };
+export const DEVISES = Object.values(Currency);
 export const TYPES_RAPPORT = Object.values(ReportType);
 
 // z.number(), pas z.coerce.number() : coerce sépare le type d'entrée (unknown) du type de
@@ -14,14 +15,24 @@ const anneeReportingSchema = z
   .min(2000, "L'année est invalide.")
   .max(2100, "L'année est invalide.");
 
-/** Ouverture d'une déclaration (tâche 5.8) : le type et l'exercice ; le PDF se joint ensuite au
+/** Ouverture d'une déclaration (tâches 5.8, 5.9) : le type, l'exercice et ses données
+ * financières (facultatives, une devise pour les deux montants) ; le PDF se joint ensuite au
  * brouillon, qui est analysé avant la soumission. */
+const montantFacultatif = z
+  .number()
+  .positive("Le montant doit être positif.")
+  .max(1e17, "Montant trop grand.")
+  .optional();
+
 export const ouvrirDeclarationSchema = z.object({
   report_type: z.enum(ReportType),
   fiscal_year: anneeReportingSchema.max(
     new Date().getFullYear(),
     "L'exercice ne peut pas être postérieur à l'année en cours.",
   ),
+  currency: z.enum(Currency),
+  revenue: montantFacultatif,
+  enterprise_value: montantFacultatif,
 });
 
 export type OuvrirDeclarationForm = z.infer<typeof ouvrirDeclarationSchema>;

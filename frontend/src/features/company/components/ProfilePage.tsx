@@ -15,7 +15,11 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Entreprise" title="Profil" description="Vos informations de compte." />
+      <PageHeader
+        eyebrow="Entreprise"
+        title="Profil entreprise"
+        description="Votre compte et la fiche de votre entreprise."
+      />
       <ProfileIdentityCard />
 
       <Card>

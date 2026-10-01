@@ -57,3 +57,29 @@ export function totaux(groupes: GroupeCompletude[]) {
 export function dateHeure(iso: string): string {
   return new Date(iso).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" });
 }
+
+/** Le minimum d'un rapport pour le ranger entre « en cours » et « historique » (tâche 5.9). */
+interface RapportListe {
+  id: string;
+  status: ReportStatus;
+  previous_report_id: string | null;
+  created_at: string;
+}
+
+const STATUTS_CLOS: readonly ReportStatus[] = ["VALIDATED", "REJECTED"];
+
+/** Sépare les déclarations en cours (brouillon, examen, correction demandée non encore déposée)
+ * de l'historique (validées, rejetées, et versions remplacées par une correction). Chaque groupe
+ * est trié de la plus récente à la plus ancienne. */
+export function separerDeclarations<T extends RapportListe>(rapports: T[]) {
+  const remplaces = new Set(rapports.map((r) => r.previous_report_id).filter(Boolean));
+  const tries = [...rapports].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  const close = (r: T) => STATUTS_CLOS.includes(r.status) || remplaces.has(r.id);
+  return { enCours: tries.filter((r) => !close(r)), historique: tries.filter(close) };
+}
+
+export function libelleExercice(annee: number | null): string {
+  return annee === null ? "Exercice inconnu" : `FY${annee}`;
+}

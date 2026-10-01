@@ -106,6 +106,19 @@ class RapportESGPublic(BaseModel):
     previous_report_id: uuid.UUID | None
     # Empreinte SHA-256 du fichier : le reçu de soumission (tâche 5.8).
     checksum_sha256: str | None
+    # Résumé du score officiel, posé à la validation (tâches 1.6, 3.1) : nul avant. Lu sous un autre
+    # nom que `official_score`, que RapportESGDetail redéfinit en objet complet (tâche 5.9).
+    official_global_score: float | None = Field(default=None, validation_alias="official_score")
+    coverage_rate: float | None = None
+    config_hash: str | None = None
+    # Source du champ calculé ci-dessous, jamais sérialisée : un chemin de stockage reste interne.
+    synthesis_report_path: str | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def synthesis_available(self) -> bool:
+        """Le PDF de synthèse peut être téléchargé (tâche 5.9)."""
+        return self.synthesis_report_path is not None
 
 
 class PreuveDocumentairePublic(BaseModel):

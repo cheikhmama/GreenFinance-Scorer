@@ -2,12 +2,13 @@
 (docs/RENAME_PLAN.md §1, règle 3)."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.database import utcnow
-from app.core.enums import ReportStatus, ReportType
+from app.core.enums import Currency, ReportStatus, ReportType
 from app.ingestion.models import ESGReport
 
 
@@ -15,13 +16,30 @@ class ReportCreateRequest(BaseModel):
     """POST /reports — ouvre une déclaration (DRAFT) pour un exercice, avant tout fichier.
 
     `company_id` n'est lu que pour un Administrateur ; une Entreprise déclare toujours pour la
-    sienne (même règle que l'import par URL, app/company/router.py)."""
+    sienne (même règle que l'import par URL, app/company/router.py).
+
+    Données financières de l'exercice (tâche 5.9), facultatives : une devise pour le chiffre
+    d'affaires et l'EVIC. Sans date, l'EVIC est datée de la clôture de l'exercice (31 décembre).
+    Elles ne comptent pour PCAF qu'une fois le rapport validé (tâche 5.4) ; l'Administrateur peut
+    toujours les corriger."""
 
     model_config = ConfigDict(extra="forbid")
 
     fiscal_year: int = Field(ge=2000)
     report_type: ReportType
     company_id: uuid.UUID | None = None
+    currency: Currency | None = None
+    revenue: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
+    enterprise_value: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
+    evic_date: date | None = None
+
+    @model_validator(mode="after")
+    def _montants_avec_devise(self) -> "ReportCreateRequest":
+        if (self.revenue is not None or self.enterprise_value is not None) and self.currency is None:
+            raise ValueError("Une devise est requise avec le chiffre d'affaires ou l'EVIC.")
+        if self.enterprise_value is None and self.evic_date is not None:
+            raise ValueError("evic_date n'a de sens qu'avec enterprise_value.")
+        return self
 
     @field_validator("fiscal_year")
     @classmethod

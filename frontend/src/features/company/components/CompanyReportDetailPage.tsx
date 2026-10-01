@@ -40,7 +40,7 @@ export function CompanyReportDetailPage() {
     return (
       <div className="p-8">
         <p className="text-destructive">Rapport introuvable.</p>
-        <Link to="/company/rapports" className="text-brand-green underline underline-offset-2">
+        <Link to="/company/declarations" className="text-brand-green underline underline-offset-2">
           Retour à la liste
         </Link>
       </div>
@@ -51,10 +51,10 @@ export function CompanyReportDetailPage() {
     <div className="space-y-6">
       <div>
         <Link
-          to="/company/rapports"
+          to="/company/declarations"
           className="text-sm text-brand-green underline underline-offset-2"
         >
-          ← Mes rapports
+          ← Mes déclarations
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
           Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
