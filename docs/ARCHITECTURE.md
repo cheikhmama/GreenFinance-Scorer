@@ -92,6 +92,10 @@ registration (task 1.3) validates ISO codes on input.
 Task 1.5 adds `created_at`, makes `source_file` / `submitted_at` nullable for `DRAFT` (a CHECK
 constraint requires both for every other status) and creates `app/reporting/` for the `/reports`
 API with its role-based scope.
+Task 5.8 lets a draft carry its file while its analysis runs: the CHECK constraint becomes
+`ck_esg_reports_file_and_submission` (a file outside `DRAFT`; no `submitted_at` only in `DRAFT` or
+`EXTRACTING`), and the one-draft-per-period index covers every unsubmitted report
+(`submitted_at IS NULL`). `submitted_at` is the lock: once set, nothing changes the file.
 
 | Column | Type | Notes |
 |---|---|---|

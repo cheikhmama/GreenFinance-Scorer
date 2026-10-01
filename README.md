@@ -123,8 +123,10 @@ Le cycle de vie d'un rapport (l'entreprise voit les quatre états d'examen, de `
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT
-    DRAFT --> EXTRACTING : dépôt
-    EXTRACTING --> AWAITING_ASSIGNMENT : extraction terminée
+    DRAFT --> EXTRACTING : fichier joint (analyse)
+    EXTRACTING --> DRAFT : analyse terminée (brouillon)
+    DRAFT --> AWAITING_ASSIGNMENT : soumission 🔒
+    EXTRACTING --> AWAITING_ASSIGNMENT : extraction terminée (dépôt direct)
     EXTRACTING --> EXTRACTION_FAILED
     EXTRACTION_FAILED --> EXTRACTING : relance (admin)
     AWAITING_ASSIGNMENT --> IN_AUDIT : affectation d'un auditeur

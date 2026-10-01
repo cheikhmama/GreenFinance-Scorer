@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type { RapportESGDetail } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import {
   libelleStatutRapportEntreprise,
@@ -14,14 +15,25 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
-import { useCompanyReport, useSubmitCorrection } from "../api";
+import { useCompanyReport, useReportChecklist, useSubmitCorrection } from "../api";
 import { type CorrectionForm, correctionSchema } from "../schemas";
+import { DraftPanel } from "../session/DraftPanel";
+import { etatBrouillon } from "../session/etat";
+import { LockBanner } from "../session/LockBanner";
+import { SessionStepper } from "../session/SessionStepper";
+import { SubmitDialog } from "../session/SubmitDialog";
 
 const ANNEE_COURANTE = new Date().getFullYear();
 
 export function CompanyReportDetailPage() {
   const { rapportId } = useParams<{ rapportId: string }>();
   const { data: rapport, isLoading, isError } = useCompanyReport(rapportId ?? "");
+  const [soumissionOuverte, setSoumissionOuverte] = useState(false);
+  const etat = rapport ? etatBrouillon(rapport) : null;
+  const liste = useReportChecklist(
+    rapportId ?? "",
+    etat === "PRET" ? (rapport?.extraction_finished_at ?? null) : null,
+  );
 
   if (isLoading) return <div className="p-8 text-brand-grey">Chargement...</div>;
   if (isError || !rapport) {
@@ -48,8 +60,10 @@ export function CompanyReportDetailPage() {
           Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
         </h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
-            {libelleStatutRapportEntreprise(rapport.status)}
+          <Badge
+            variant={variantStatutRapportEntreprise(rapport.status, rapport.submitted_at !== null)}
+          >
+            {libelleStatutRapportEntreprise(rapport.status, rapport.submitted_at !== null)}
           </Badge>
           <span className="text-sm text-brand-grey">
             version {rapport.version}
@@ -64,10 +78,42 @@ export function CompanyReportDetailPage() {
         ) : null}
       </div>
 
+      <SessionStepper rapport={rapport} />
+
+      {rapport.submitted_at ? (
+        <LockBanner submittedAt={rapport.submitted_at} checksum={rapport.checksum_sha256} />
+      ) : null}
+
+      {etat ? (
+        <DraftPanel
+          rapport={rapport}
+          etat={etat}
+          groupes={liste.data}
+          chargementListe={liste.isPending}
+          onSoumettre={() => setSoumissionOuverte(true)}
+        />
+      ) : null}
+      <SubmitDialog
+        rapport={rapport}
+        groupes={liste.data ?? []}
+        open={soumissionOuverte}
+        onOpenChange={setSoumissionOuverte}
+      />
+
       {rapport.status === "REVISION_REQUESTED" ? (
         <FormulaireCorrection rapportId={rapport.id} />
       ) : null}
 
+      {etat ? null : <ValeursExtraites rapport={rapport} />}
+    </div>
+  );
+}
+
+/** Indicateurs et données carbone d'un rapport soumis (un brouillon n'en montre aucun, tâche
+ * 5.8 : seule la liste de complétude, en comptes). */
+function ValeursExtraites({ rapport }: { rapport: RapportESGDetail }) {
+  return (
+    <>
       <Card>
         <CardHeader>
           <CardTitle>Indicateurs ESG</CardTitle>
@@ -163,7 +209,7 @@ export function CompanyReportDetailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }
 

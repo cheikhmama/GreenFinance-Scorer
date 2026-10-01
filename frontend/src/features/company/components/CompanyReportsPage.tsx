@@ -23,7 +23,7 @@ export function CompanyReportsPage() {
         description="Suivez le cycle d'extraction, d'audit et de décision de chaque rapport déposé."
         action={
           <Button asChild>
-            <Link to="/company/deposer">Déposer un rapport</Link>
+            <Link to="/company/deposer">Nouvelle déclaration</Link>
           </Button>
         }
       />
@@ -56,8 +56,16 @@ export function CompanyReportsPage() {
                     <tr key={rapport.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         <div className="flex flex-col gap-1">
-                          <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
-                            {libelleStatutRapportEntreprise(rapport.status)}
+                          <Badge
+                            variant={variantStatutRapportEntreprise(
+                              rapport.status,
+                              rapport.submitted_at !== null,
+                            )}
+                          >
+                            {libelleStatutRapportEntreprise(
+                              rapport.status,
+                              rapport.submitted_at !== null,
+                            )}
                           </Badge>
                           {/* Message actionnable seulement tant que l'échec est l'état courant. */}
                           {rapport.extraction_error && rapport.status === "EXTRACTION_FAILED" ? (

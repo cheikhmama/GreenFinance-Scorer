@@ -14,15 +14,23 @@ const anneeReportingSchema = z
   .min(2000, "L'année est invalide.")
   .max(2100, "L'année est invalide.");
 
-export const deposerRapportSchema = z.object({
-  fichier: z
-    .instanceof(File, { message: "Un fichier PDF est requis." })
-    .refine((f) => f.size > 0, "Le fichier est vide."),
-  type: z.string().min(1, "Le type de rapport est requis."),
-  annee_reporting: anneeReportingSchema,
+/** Ouverture d'une déclaration (tâche 5.8) : le type et l'exercice ; le PDF se joint ensuite au
+ * brouillon, qui est analysé avant la soumission. */
+export const ouvrirDeclarationSchema = z.object({
+  report_type: z.enum(ReportType),
+  fiscal_year: anneeReportingSchema.max(
+    new Date().getFullYear(),
+    "L'exercice ne peut pas être postérieur à l'année en cours.",
+  ),
 });
 
-export type DeposerRapportForm = z.infer<typeof deposerRapportSchema>;
+export type OuvrirDeclarationForm = z.infer<typeof ouvrirDeclarationSchema>;
+
+/** PDF joint à un brouillon : mêmes bornes que le serveur (50 Mo), qui reste seul juge. */
+export const fichierBrouillonSchema = z
+  .instanceof(File, { message: "Un fichier PDF est requis." })
+  .refine((f) => f.size > 0, "Le fichier est vide.")
+  .refine((f) => f.size <= 50 * 1024 * 1024, "Le fichier dépasse 50 Mo.");
 
 export const correctionSchema = z.object({
   fichier: z

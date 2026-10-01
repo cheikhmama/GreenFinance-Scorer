@@ -10,68 +10,65 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
-import { useSubmitReport } from "../api";
-import { type DeposerRapportForm, deposerRapportSchema, TYPES_RAPPORT, type ReportType } from "../schemas";
+import { useOpenDeclaration } from "../api";
+import { type OuvrirDeclarationForm, ouvrirDeclarationSchema, TYPES_RAPPORT } from "../schemas";
 
 const ANNEE_COURANTE = new Date().getFullYear();
 
-/** Dépôt d'un nouveau rapport — action isolée sur sa propre page (voir CompanyReportsPage pour
- * le suivi des dépôts déjà faits) : une réussite renvoie directement vers la liste, où le nouveau
- * rapport apparaît aussitôt (useSubmitReport invalide déjà la requête, voir ../api.ts). */
+/** Ouverture d'une déclaration (tâche 5.8) : un brouillon pour un type de rapport et un exercice.
+ * Le PDF se joint ensuite sur la page du brouillon, où son analyse donne la liste de complétude
+ * avant la soumission. */
 export function CompanyDepositPage() {
   const navigate = useNavigate();
-  const submitReport = useSubmitReport();
+  const ouvrir = useOpenDeclaration();
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const form = useForm<DeposerRapportForm>({
-    resolver: zodResolver(deposerRapportSchema),
-    defaultValues: { type: TYPES_RAPPORT[0], annee_reporting: ANNEE_COURANTE },
+  const form = useForm<OuvrirDeclarationForm>({
+    resolver: zodResolver(ouvrirDeclarationSchema),
+    defaultValues: { report_type: TYPES_RAPPORT[0], fiscal_year: ANNEE_COURANTE - 1 },
   });
 
-  function onSubmit(values: DeposerRapportForm) {
+  function onSubmit(values: OuvrirDeclarationForm) {
     setServerError(null);
-    // Le <select> n'offre que les valeurs de TYPES_RAPPORT (dérivées de ReportType lui-même) —
-    // cast sûr, zod ne valide ce champ qu'en chaîne non vide pour rester simple côté schéma.
-    submitReport.mutate(
-      { ...values, type: values.type as ReportType },
-      {
-        onSuccess: () => navigate("/company/rapports"),
-        onError: (error) => {
-          setServerError(
-            error instanceof ApiError ? error.message : "Une erreur inattendue est survenue.",
-          );
-        },
+    ouvrir.mutate(values, {
+      onSuccess: (brouillon) => navigate(`/company/rapports/${brouillon.id}`),
+      onError: (error) => {
+        setServerError(
+          error instanceof ApiError ? error.message : "Une erreur inattendue est survenue.",
+        );
       },
-    );
+    });
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Entreprise"
-        title="Déposer un rapport"
-        description="Transmettez votre rapport ESG/climat pour extraction et audit."
+        title="Nouvelle déclaration"
+        description="Ouvrez la déclaration d’un exercice, joignez votre rapport, vérifiez la liste de complétude, puis soumettez-le."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Nouveau dépôt</CardTitle>
-          <CardDescription>PDF uniquement, 50 Mo maximum.</CardDescription>
+          <CardTitle>Exercice déclaré</CardTitle>
+          <CardDescription>
+            Le brouillon reste modifiable jusqu’à sa soumission ; rien n’est transmis avant.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
               {serverError ? (
                 <Alert variant="destructive">
-                  <AlertTitle>Dépôt impossible</AlertTitle>
+                  <AlertTitle>Ouverture impossible</AlertTitle>
                   <AlertDescription>{serverError}</AlertDescription>
                 </Alert>
               ) : null}
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="type"
+                  name="report_type"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type de rapport</FormLabel>
@@ -90,10 +87,10 @@ export function CompanyDepositPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="annee_reporting"
+                  name="fiscal_year"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Année</FormLabel>
+                      <FormLabel>Exercice</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -105,30 +102,10 @@ export function CompanyDepositPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="fichier"
-                  render={({ field: { onChange, onBlur, name, ref } }) => (
-                    <FormItem>
-                      <FormLabel>Fichier PDF</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="file"
-                          accept="application/pdf"
-                          name={name}
-                          ref={ref}
-                          onBlur={onBlur}
-                          onChange={(event) => onChange(event.target.files?.[0])}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
-              <Button type="submit" disabled={submitReport.isPending}>
-                {submitReport.isPending ? "Dépôt en cours..." : "Déposer"}
+              <Button type="submit" disabled={ouvrir.isPending}>
+                {ouvrir.isPending ? "Ouverture…" : "Ouvrir la déclaration"}
               </Button>
             </form>
           </Form>

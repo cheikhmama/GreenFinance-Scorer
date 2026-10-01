@@ -5,7 +5,8 @@
  * OpenAPI spec version: v1
  */
 import type {
-  BodySubmitReport,
+  BodyAttachReportFile,
+  GroupeCompletude,
   ListReportsParams,
   PageReportResponse,
   ReportCreateRequest,
@@ -119,6 +120,55 @@ export const discardReport = async (reportId: string, options?: RequestInit): Pr
 );}
 
 
+export const getAttachReportFileUrl = (reportId: string,) => {
+
+
+
+
+  return `/reports/${reportId}/file`
+}
+
+/**
+ * @summary Joindre (ou remplacer) le PDF d'un brouillon et lancer son analyse
+ */
+export const attachReportFile = async (reportId: string,
+    bodyAttachReportFile: BodyAttachReportFile, options?: RequestInit): Promise<ReportResponse> => {
+    const formData = new FormData();
+formData.append(`file`, bodyAttachReportFile.file);
+
+  return apiFetch<ReportResponse>(getAttachReportFileUrl(reportId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+export const getGetReportChecklistUrl = (reportId: string,) => {
+
+
+
+
+  return `/reports/${reportId}/checklist`
+}
+
+/**
+ * @summary Liste de complétude : indicateurs trouvés / attendus par groupe, sans valeurs
+ */
+export const getReportChecklist = async (reportId: string, options?: RequestInit): Promise<GroupeCompletude[]> => {
+
+  return apiFetch<GroupeCompletude[]>(getGetReportChecklistUrl(reportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 export const getSubmitReportUrl = (reportId: string,) => {
 
 
@@ -128,19 +178,16 @@ export const getSubmitReportUrl = (reportId: string,) => {
 }
 
 /**
- * @summary Déposer le PDF d'un brouillon et le soumettre à l'extraction
+ * @summary Soumettre un brouillon analysé : le rapport est verrouillé
  */
-export const submitReport = async (reportId: string,
-    bodySubmitReport: BodySubmitReport, options?: RequestInit): Promise<ReportResponse> => {
-    const formData = new FormData();
-formData.append(`file`, bodySubmitReport.file);
+export const submitReport = async (reportId: string, options?: RequestInit): Promise<ReportResponse> => {
 
   return apiFetch<ReportResponse>(getSubmitReportUrl(reportId),
   {
     ...options,
     method: 'POST'
-    ,
-    body: formData
+
+
   }
 );}
 

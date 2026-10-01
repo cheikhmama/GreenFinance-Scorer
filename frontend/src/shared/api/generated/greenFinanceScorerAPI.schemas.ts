@@ -266,6 +266,10 @@ export interface BaselineInfo {
   peer_count: number;
 }
 
+export interface BodyAttachReportFile {
+  file: Blob;
+}
+
 export interface BodyImportPortfolioPositions {
   file: Blob;
   total_value?: number | string | null;
@@ -322,10 +326,6 @@ export interface BodySubmitCompanyReport {
 export interface BodySubmitCompanyReportCorrection {
   fichier: Blob;
   annee_reporting: number;
-}
-
-export interface BodySubmitReport {
-  file: Blob;
 }
 
 export interface BodyUploadCompanyLogo {
@@ -985,6 +985,16 @@ export interface FermerPositionRequest {
   end_date?: string | null;
 }
 
+/**
+ * Liste de complétude d'un brouillon (tâche 5.8) : des comptes, jamais de valeurs.
+ * `group` : `CARBON` ou un pilier (`ENVIRONNEMENT`, `SOCIAL`, `GOUVERNANCE`).
+ */
+export interface GroupeCompletude {
+  group: string;
+  expected: number;
+  found: number;
+}
+
 export type ValidationErrorCtx = { [key: string]: unknown };
 
 export interface ValidationError {
@@ -1399,6 +1409,7 @@ export interface RapportESGPublic {
   extraction_attempts: number;
   version: number;
   previous_report_id: string | null;
+  checksum_sha256: string | null;
 }
 
 export interface PageRapportESGPublic {
@@ -1421,6 +1432,9 @@ export interface ReportResponse {
   submitted_at: string | null;
   original_filename: string | null;
   official_score: number | null;
+  checksum_sha256: string | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
 }
 
 export interface PageReportResponse {
@@ -1664,6 +1678,7 @@ export interface RapportESGDetail {
   extraction_attempts: number;
   version: number;
   previous_report_id: string | null;
+  checksum_sha256: string | null;
   metrics: IndicateurESGDetail[];
   carbon_data: DonneeCarboneDetail[];
   declared_global_score: number | null;

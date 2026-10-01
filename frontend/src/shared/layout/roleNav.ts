@@ -54,7 +54,7 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
     items: [
       { to: "/company", label: "Tableau de bord", icon: LayoutDashboard, end: true },
       { to: "/company/rapports", label: "Mes rapports", icon: FileText },
-      { to: "/company/deposer", label: "Déposer un rapport", icon: Upload },
+      { to: "/company/deposer", label: "Nouvelle déclaration", icon: Upload },
     ],
   },
   [Role.AUDITOR]: {

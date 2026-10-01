@@ -37,7 +37,7 @@ export function CompanyDashboardPage() {
           <Button asChild>
             <Link to="/company/deposer">
               <Upload />
-              Déposer un rapport
+              Nouvelle déclaration
             </Link>
           </Button>
         }
@@ -59,8 +59,16 @@ export function CompanyDashboardPage() {
               {chargementRapports ? (
                 <span className="text-brand-grey">…</span>
               ) : dernierRapport ? (
-                <Badge variant={variantStatutRapportEntreprise(dernierRapport.status)}>
-                  {libelleStatutRapportEntreprise(dernierRapport.status)}
+                <Badge
+                  variant={variantStatutRapportEntreprise(
+                    dernierRapport.status,
+                    dernierRapport.submitted_at !== null,
+                  )}
+                >
+                  {libelleStatutRapportEntreprise(
+                    dernierRapport.status,
+                    dernierRapport.submitted_at !== null,
+                  )}
                 </Badge>
               ) : (
                 <span className="text-sm text-brand-grey">Aucun rapport déposé</span>

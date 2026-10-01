@@ -43,6 +43,12 @@ class ReportResponse(BaseModel):
     submitted_at: datetime | None
     original_filename: str | None
     official_score: float | None
+    # Reçu de soumission (tâche 5.8) : empreinte du fichier joint, avec submitted_at.
+    checksum_sha256: str | None
+    # Analyse du fichier d'un brouillon (tâche 5.8) : terminée quand extraction_finished_at est
+    # posé sans erreur ; sinon cause fixe de l'échec (jamais le texte d'une exception).
+    extraction_finished_at: datetime | None
+    extraction_error: str | None
 
     @classmethod
     def depuis(cls, rapport: ESGReport) -> "ReportResponse":
@@ -58,4 +64,19 @@ class ReportResponse(BaseModel):
             submitted_at=rapport.submitted_at,
             original_filename=rapport.original_filename,
             official_score=rapport.official_score,
+            checksum_sha256=rapport.checksum_sha256,
+            extraction_finished_at=rapport.extraction_finished_at,
+            extraction_error=rapport.extraction_error,
         )
+
+
+GROUPE_CARBONE = "CARBON"
+
+
+class GroupeCompletude(BaseModel):
+    """Liste de complétude d'un brouillon (tâche 5.8) : des comptes, jamais de valeurs.
+    `group` : `CARBON` ou un pilier (`ENVIRONNEMENT`, `SOCIAL`, `GOUVERNANCE`)."""
+
+    group: str
+    expected: int
+    found: int

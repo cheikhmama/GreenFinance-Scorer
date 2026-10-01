@@ -56,11 +56,16 @@ def lister_mes_rapports(session: Session, entreprise_id: uuid.UUID) -> list[ESGR
     )
 
 
-def _verifier_doublon(session: Session, entreprise_id: uuid.UUID, checksum: str) -> None:
+def _verifier_doublon(
+    session: Session, entreprise_id: uuid.UUID, checksum: str, rapport_id: uuid.UUID
+) -> None:
+    # Le rapport lui-même est exclu : joindre de nouveau le même fichier à un brouillon (après un
+    # échec d'analyse, tâche 5.8) n'est pas un doublon.
     existant = session.exec(
         select(ESGReport.id).where(
             ESGReport.company_id == entreprise_id,
             ESGReport.checksum_sha256 == checksum,
+            col(ESGReport.id) != rapport_id,
         )
     ).first()
     if existant is not None:
@@ -104,18 +109,23 @@ def deposer_fichier(
     rapport: ESGReport,
     contenu: bytes,
     nom_fichier_origine: str | None,
+    *,
+    soumettre: bool = True,
 ) -> ESGReport:
-    """Dépose le PDF d'un rapport — nouveau (dépôt en une étape) ou brouillon existant (tâche 1.5,
-    POST /reports/{id}/submit) — et le soumet à l'extraction : validation du PDF, détection de
-    doublon, stockage, statut EXTRACTING (job en file), notification, un seul commit, puis
-    extraction en tâche de fond. Point unique : les deux chemins de dépôt appliquent exactement
-    les mêmes règles."""
+    """Dépose le PDF d'un rapport — nouveau (dépôt en une étape) ou brouillon existant (tâche 5.8,
+    POST /reports/{id}/file) — et le passe à l'extraction : validation du PDF, détection de
+    doublon, stockage, statut EXTRACTING (job en file), un seul commit, puis extraction en tâche
+    de fond. Point unique : les deux chemins de dépôt appliquent exactement les mêmes règles.
+
+    `soumettre=False` (brouillon) : le rapport reste non soumis — l'extraction le ramène en DRAFT
+    avec sa liste de complétude, et seule la soumission explicite le verrouille
+    (app/reporting/sessions.py::soumettre)."""
     entreprise = session.get(Company, rapport.company_id)
     verifier_entreprise_active(entreprise)
 
     valider_pdf(contenu)
     checksum = calculer_checksum(contenu)
-    _verifier_doublon(session, rapport.company_id, checksum)
+    _verifier_doublon(session, rapport.company_id, checksum, rapport.id)
 
     chemin_relatif = _enregistrer_fichier(rapport.company_id, rapport.id, contenu)
     rapport.source_file = chemin_relatif
@@ -123,10 +133,13 @@ def deposer_fichier(
     rapport.checksum_sha256 = checksum
     rapport.status = ReportStatus.EXTRACTING
     rapport.extraction_started_at = None
-    rapport.submitted_at = utcnow()
+    rapport.extraction_finished_at = None
+    rapport.extraction_error = None
+    if soumettre:
+        rapport.submitted_at = utcnow()
     try:
         session.add(rapport)
-        if entreprise is not None and entreprise.owner_user_id is not None:
+        if soumettre and entreprise is not None and entreprise.owner_user_id is not None:
             notifier(
                 session,
                 entreprise.owner_user_id,

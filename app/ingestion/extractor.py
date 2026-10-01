@@ -27,7 +27,7 @@ import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import faiss
 import httpx
@@ -40,19 +40,20 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from sqlmodel import Session, col, select
 
-from app.auth.models import User
 from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import DataMethod, ExtractionRunStatus, Pillar, ReportStatus, Role
+from app.core.enums import DataMethod, ExtractionRunStatus, ReportStatus
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, localisation, proof_generator
+from app.ingestion.cibles import INDICATEURS_CIBLES
 from app.ingestion.completeness import calculer_couverture
 from app.ingestion.etat_extraction import (
     ExtractionTransitoire,
     cloturer_executions,
     marquer_echec,
+    notifier_pret_a_affecter,
 )
 from app.ingestion.models import (
     CarbonEmission,
@@ -169,86 +170,11 @@ EXTRACTION_TOOL = genai_types.FunctionDeclaration(
 )
 
 
-@dataclass(frozen=True)
-class CibleIndicateur:
-    code: str
-    # "rapport_score_global" : score transversal auto-déclaré par l'entreprise (ex. "Score global
-    # ESG : 66/100"), écrit directement sur ESGReport.declared_global_score — aucun pilier E/S/G
-    # ne convient à une valeur transversale aux trois.
-    cible: Literal["donnee_carbone", "indicateur_esg", "rapport_score_global"]
-    scope: int | None = None
-    categorie_ges: str | None = None
-    pilier: Pillar | None = None
-
-
-# Les 7 codes carbone/environnement déjà validés sur le corpus pilote (voir
-# data_test/ground_truth.yaml), plus le socle Social/Gouvernance harmonisé retenu en Phase 5 §9
-# (voir config/weights/default.yaml et le diagnostic associé — analyse de couverture sur
-# data_test/reference_esg_8_entreprises.json), plus un second lot (ci-dessous) ajouté pour la
-# transparence humaine (Admin/Auditeur/Investisseur consultant un rapport doit voir ce qui y est
-# réellement écrit, avec preuve page par page — garantie G1) : un consommateur légitime distinct
-# du moteur de scoring, qui continue de ne lire que les codes présents dans
-# config/weights/default.yaml (app/scoring/engine.py ignore silencieusement tout code inconnu du
-# YAML — confirmé par lecture directe, aucun risque de modifier un score déjà calculé).
-INDICATEURS_CIBLES: list[CibleIndicateur] = [
-    CibleIndicateur("scope_1", "donnee_carbone", scope=1),
-    # Scope 2 non différencié marché/localisation — le cas le plus courant en pratique (voir
-    # data_test/reference_esg_8_entreprises.json, "Scope 2 communiqué comme une valeur unique...
-    # pour les 8 entreprises") : sans ce code, un Scope 2 pourtant explicite dans le rapport ne
-    # matche jamais scope_2_market_based/location_based et disparaît silencieusement.
-    CibleIndicateur("scope_2", "donnee_carbone", scope=2),
-    CibleIndicateur(
-        "scope_2_market_based", "donnee_carbone", scope=2, categorie_ges="market_based"
-    ),
-    CibleIndicateur(
-        "scope_2_location_based", "donnee_carbone", scope=2, categorie_ges="location_based"
-    ),
-    CibleIndicateur("scope_3", "donnee_carbone", scope=3),
-    CibleIndicateur(
-        "intensite_scope_1_2_marketbased", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur(
-        "intensite_scope_1_2_3_hors_cat11", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur(
-        "intensite_scope_1_2_3_total", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur("femmes_management_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("deces_professionnels", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("femmes_conseil_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
-    # Second lot — transparence humaine, repris du catalogue déjà pensé dans
-    # data_test/reference_esg_8_entreprises.json (codes déjà nommés, jamais branchés jusqu'ici).
-    # Liste non exhaustive : le pattern (un CibleIndicateur par fait numérique avec page-preuve)
-    # se répète, d'autres codes pourront s'ajouter au fil des rapports rencontrés.
-    CibleIndicateur("taille_conseil", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
-    CibleIndicateur(
-        "administrateurs_independants_pourcentage", "indicateur_esg", pilier=Pillar.GOUVERNANCE
-    ),
-    CibleIndicateur("effectif_total", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("femmes_effectif_pourcentage", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("heures_formation_par_employe", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("taux_frequence_accidents", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur(
-        "part_renouvelable_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    CibleIndicateur(
-        "dechets_valorises_pourcentage", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT
-    ),
-    # Scores auto-déclarés par l'entreprise dans sa propre synthèse ESG — par pilier uniquement
-    # (pas de "global" : Pilier n'a que 3 valeurs, et la plateforme calcule déjà son propre score
-    # officiel via Score/config/weights/default.yaml ; ajouter un score global auto-déclaré à
-    # côté créerait une confusion entre "ce que l'entreprise prétend" et "ce que la plateforme
-    # calcule" — décision produit à part entière, pas un ajout silencieux ici).
-    CibleIndicateur("score_environnement_declare", "indicateur_esg", pilier=Pillar.ENVIRONNEMENT),
-    CibleIndicateur("score_social_declare", "indicateur_esg", pilier=Pillar.SOCIAL),
-    CibleIndicateur("score_gouvernance_declare", "indicateur_esg", pilier=Pillar.GOUVERNANCE),
-    CibleIndicateur("score_global_declare", "rapport_score_global"),
-]
-
 assert {c.code for c in INDICATEURS_CIBLES} == set(REQUETES_PAR_CODE), (
     "Chaque code de INDICATEURS_CIBLES doit avoir exactement une requête sémantique dédiée "
     "dans REQUETES_PAR_CODE."
 )
+
 
 @lru_cache
 def _get_embed_model() -> BGEM3FlagModel:
@@ -906,7 +832,10 @@ def run_extraction_pipeline(
 
             rapport.extraction_finished_at = utcnow()
             rapport.extraction_error = None
-            rapport.status = ReportStatus.AWAITING_ASSIGNMENT
+            # Brouillon (fichier joint avant soumission, tâche 5.8) : retour en DRAFT avec sa
+            # liste de complétude ; l'Entreprise soumet ensuite. Sinon, file d'affectation.
+            brouillon = rapport.submitted_at is None
+            rapport.status = ReportStatus.DRAFT if brouillon else ReportStatus.AWAITING_ASSIGNMENT
             session.add(rapport)
             execution_reussie = session.get(ExtractionRun, execution_id)
             assert execution_reussie is not None  # créée et commitée plus haut
@@ -914,42 +843,41 @@ def run_extraction_pipeline(
             execution_reussie.finished_at = rapport.extraction_finished_at
             session.add(execution_reussie)
 
-            # Import différé : app.ingestion.synthesis_report importe
-            # CODES_AUTO_DECLARES_PAR_PILIER depuis ce module -- un import en tête de fichier
-            # créerait un cycle (ce module ne serait pas encore entièrement chargé au moment où
-            # synthesis_report tenterait de lire cette constante).
-            from app.ingestion import synthesis_report
+            if brouillon:
+                if rapport.company.owner_user_id is not None:
+                    notifier(
+                        session,
+                        rapport.company.owner_user_id,
+                        "RAPPORT_ANALYSE_TERMINEE",
+                        f"L'analyse du fichier de votre déclaration {rapport.type.value} "
+                        f"({rapport.fiscal_year}) est terminée : vérifiez la liste de complétude "
+                        "avant de soumettre.",
+                        id_ressource=rapport_id,
+                    )
+            else:
+                # Import différé : app.ingestion.synthesis_report importe
+                # CODES_AUTO_DECLARES_PAR_PILIER depuis ce module -- un import en tête de fichier
+                # créerait un cycle (ce module ne serait pas encore entièrement chargé au moment où
+                # synthesis_report tenterait de lire cette constante).
+                from app.ingestion import synthesis_report
 
-            # Best-effort, délibérément (Phase 6) : un échec de génération du PDF de synthèse ne
-            # doit jamais faire échouer l'extraction elle-même -- les indicateurs sont le résultat
-            # porteur, le PDF de synthèse n'en est qu'une présentation dérivée, régénérable plus
-            # tard (voir aussi app/admin/review_queue.py::valider_rapport, second déclencheur).
-            try:
-                contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
-                storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
-                rapport.synthesis_report_path = f"synthese/{rapport_id}.pdf"
-                session.add(rapport)
-            except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
-                logger.error(
-                    "synthese_pdf_generation_echouee",
-                    rapport_id=str(rapport_id),
-                    error_type=type(exc_synthese).__name__,
-                )
+                # Best-effort, délibérément (Phase 6) : un échec de génération du PDF de synthèse ne
+                # doit jamais faire échouer l'extraction elle-même -- les indicateurs sont le résultat
+                # porteur, le PDF de synthèse n'en est qu'une présentation dérivée, régénérable plus
+                # tard (voir aussi app/admin/review_queue.py::valider_rapport, second déclencheur).
+                try:
+                    contenu_synthese = synthesis_report.generer_rapport_synthese(session, rapport)
+                    storage.save_bytes(f"synthese/{rapport_id}.pdf", contenu_synthese)
+                    rapport.synthesis_report_path = f"synthese/{rapport_id}.pdf"
+                    session.add(rapport)
+                except Exception as exc_synthese:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+                    logger.error(
+                        "synthese_pdf_generation_echouee",
+                        rapport_id=str(rapport_id),
+                        error_type=type(exc_synthese).__name__,
+                    )
 
-            admins = session.exec(
-                select(User).where(
-                    col(User.role) == Role.ADMIN, col(User.active).is_(True)
-                )
-            ).all()
-            for admin in admins:
-                notifier(
-                    session,
-                    admin.id,
-                    "RAPPORT_PRET_A_AFFECTER",
-                    f"Le rapport {rapport.type.value} ({rapport.fiscal_year}) de "
-                    f"{nom_entreprise} est prêt à être affecté à un auditeur.",
-                    id_ressource=rapport_id,
-                )
+                notifier_pret_a_affecter(session, rapport)
             session.commit()
             logger.info("extraction_pipeline_reussie", rapport_id=str(rapport_id))
 

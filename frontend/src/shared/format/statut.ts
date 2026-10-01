@@ -10,7 +10,9 @@ type Variante = "default" | "secondary" | "destructive" | "outline" | "success" 
  * - rôles internes (Administrateur, Auditeur) : l'état détaillé ;
  * - espace Entreprise : les quatre états d'examen (extraction, attente d'affectation, audit,
  *   décision) sont regroupés en « En cours d'examen 🔒 » — l'entreprise sait que son rapport est
- *   verrouillé et examiné, pas à quelle étape interne il se trouve.
+ *   verrouillé et examiné, pas à quelle étape interne il se trouve. Exception (tâche 5.8) : un
+ *   brouillon dont le fichier est en analyse (EXTRACTING, pas encore soumis) n'est ni verrouillé
+ *   ni examiné — « Analyse du fichier ».
  */
 const LIBELLES: Record<ReportStatus, string> = {
   DRAFT: "Brouillon",
@@ -45,6 +47,7 @@ export const STATUTS_EN_EXAMEN: readonly ReportStatus[] = [
 ];
 
 export const LIBELLE_EN_EXAMEN = "En cours d'examen 🔒";
+export const LIBELLE_ANALYSE_BROUILLON = "Analyse du fichier";
 
 export function libelleStatutRapport(statut: ReportStatus): string {
   return LIBELLES[statut];
@@ -58,12 +61,15 @@ export function estEnExamen(statut: ReportStatus): boolean {
   return STATUTS_EN_EXAMEN.includes(statut);
 }
 
-/** Libellé affiché à l'Entreprise (espace Entreprise uniquement). */
-export function libelleStatutRapportEntreprise(statut: ReportStatus): string {
+/** Libellé affiché à l'Entreprise (espace Entreprise uniquement). `soumis` : le rapport a une
+ * date de soumission — faux pour un brouillon, même pendant l'analyse de son fichier. */
+export function libelleStatutRapportEntreprise(statut: ReportStatus, soumis = true): string {
+  if (!soumis && statut === "EXTRACTING") return LIBELLE_ANALYSE_BROUILLON;
   return estEnExamen(statut) ? LIBELLE_EN_EXAMEN : LIBELLES[statut];
 }
 
-export function variantStatutRapportEntreprise(statut: ReportStatus): Variante {
+export function variantStatutRapportEntreprise(statut: ReportStatus, soumis = true): Variante {
+  if (!soumis && statut === "EXTRACTING") return "outline";
   return estEnExamen(statut) ? "secondary" : VARIANTES[statut];
 }
 
@@ -72,6 +78,6 @@ export function variantStatutRapportEntreprise(statut: ReportStatus): Variante {
  * (qui afficherait le 1er janvier 1970). */
 export function libelleDateRapport(rapport: { submitted_at: string | null; created_at: string }) {
   return rapport.submitted_at
-    ? `Déposé le ${new Date(rapport.submitted_at).toLocaleDateString("fr-FR")}`
+    ? `Soumis le ${new Date(rapport.submitted_at).toLocaleDateString("fr-FR")}`
     : `Brouillon ouvert le ${new Date(rapport.created_at).toLocaleDateString("fr-FR")}`;
 }

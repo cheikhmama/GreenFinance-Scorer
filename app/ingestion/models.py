@@ -54,20 +54,24 @@ class ESGReport(SQLModel, table=True):
             "company_id", "checksum_sha256", name="uq_esg_reports_company_checksum"
         ),
         Index("ix_esg_reports_company_fiscal_year", "company_id", "fiscal_year"),
-        # Un seul brouillon ouvert par exercice et par type de rapport (tâche 1.5) : ouvrir deux
-        # sessions de déclaration pour la même période serait une erreur de saisie, jamais utile.
+        # Une seule déclaration non soumise par exercice et par type de rapport (tâche 1.5) :
+        # ouvrir deux sessions pour la même période serait une erreur de saisie, jamais utile.
+        # Depuis la tâche 5.8, un brouillon dont le fichier est en cours d'analyse (EXTRACTING,
+        # pas encore soumis) compte aussi.
         Index(
             "uq_esg_reports_one_draft_per_period",
             "company_id",
             "fiscal_year",
             "type",
             unique=True,
-            postgresql_where=text("status = 'DRAFT'"),
+            postgresql_where=text("submitted_at IS NULL"),
         ),
-        # Un brouillon n'a encore ni fichier ni date de dépôt ; tout autre statut en a toujours.
+        # Hors brouillon, toujours un fichier ; non soumis, seulement en brouillon ou pendant
+        # l'analyse du fichier joint au brouillon (tâche 5.8).
         CheckConstraint(
-            "status = 'DRAFT' OR (source_file IS NOT NULL AND submitted_at IS NOT NULL)",
-            name="ck_esg_reports_file_unless_draft",
+            "(status = 'DRAFT' OR source_file IS NOT NULL) "
+            "AND (submitted_at IS NOT NULL OR status IN ('DRAFT', 'EXTRACTING'))",
+            name="ck_esg_reports_file_and_submission",
         ),
     )
 
@@ -76,7 +80,8 @@ class ESGReport(SQLModel, table=True):
     type: ReportType = Field(sa_column=sa_enum_column(ReportType))
     channel: SubmissionChannel = Field(sa_column=sa_enum_column(SubmissionChannel))
     created_at: datetime = Field(default_factory=utcnow)
-    # Moment du dépôt du fichier : nul tant que le rapport est un brouillon (DRAFT, tâche 1.5).
+    # Moment de la soumission : nul tant que la déclaration est un brouillon (tâche 1.5), y compris
+    # pendant l'analyse du fichier joint (tâche 5.8). Une fois posé, le rapport est verrouillé.
     submitted_at: datetime | None = Field(default=None)
     status: ReportStatus = Field(
         default=ReportStatus.EXTRACTING, sa_column=sa_enum_column(ReportStatus)

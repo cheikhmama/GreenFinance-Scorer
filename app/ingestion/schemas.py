@@ -104,6 +104,8 @@ class RapportESGPublic(BaseModel):
     extraction_attempts: int
     version: int
     previous_report_id: uuid.UUID | None
+    # Empreinte SHA-256 du fichier : le reçu de soumission (tâche 5.8).
+    checksum_sha256: str | None
 
 
 class PreuveDocumentairePublic(BaseModel):

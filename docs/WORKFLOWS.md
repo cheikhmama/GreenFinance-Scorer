@@ -79,6 +79,12 @@ extraction state in a separate `extraction_status` column).
 ```
 \* `PENDING_DECISION` was added by decision D2 (replaces `EN_VALIDATION`).
 
+**Draft analysis** (*task 5.8*). Attaching a PDF to a `DRAFT` moves it to `EXTRACTING` **without**
+`submitted_at`; the pipeline brings it back to `DRAFT` (with its completeness checklist, or with
+the failure cause) instead of `AWAITING_ASSIGNMENT` / `EXTRACTION_FAILED`. Only the explicit
+submission sets `submitted_at` and moves the analysed draft to `AWAITING_ASSIGNMENT`: from then on
+the report is locked. The one-step deposit, URL import and corrections still submit at once.
+
 Within `EXTRACTING`, a job still in the queue has no `extraction_started_at`; a running one has
 it. The supervision cron fails a started run older than `EXTRACTION_TIMEOUT_MINUTES`
 (`delai_depasse`) and re-enqueues a queued one whose job was lost. The pipeline only acts on an
@@ -86,12 +92,15 @@ it. The supervision cron fails a started run older than `EXTRACTION_TIMEOUT_MINU
 
 **Enterprise view.** The enterprise sees `EXTRACTING`, `AWAITING_ASSIGNMENT`, `IN_AUDIT` and
 `PENDING_DECISION` as one state, "En cours d'examen 🔒"; the other states are shown as they are.
+A draft whose file is being analysed (not submitted) reads "Analyse du fichier".
 Internal roles see the detailed state.
 
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|
-| create session (*task 1.5*, `POST /reports`) | ENTERPRISE (own ACTIVE company), or ADMIN with `company_id` | fiscal year between 2000 and the current year; no other `DRAFT` for `(company, fiscal_year, report type)` (partial unique index) | report `DRAFT`, no file | — |
-| submit (*task 1.5*, `POST /reports/{id}/submit`) | ENTERPRISE owner or ADMIN | `DRAFT` (row locked); PDF valid (magic bytes, size cap, checksum not already used) — same code path as the one-step deposit. Raw metrics without a PDF: not yet | status `EXTRACTING` (queued), `submitted_at`, file stored | job `extract_report` (worker, task 4.1) |
+| create session (*task 1.5*, `POST /reports`) | ENTERPRISE (own ACTIVE company), or ADMIN with `company_id` | fiscal year between 2000 and the current year; no other unsubmitted report for `(company, fiscal_year, report type)` (partial unique index on `submitted_at IS NULL`, *task 5.8*) | report `DRAFT`, no file | — |
+| attach file (*task 5.8*, `POST /reports/{id}/file`) | ENTERPRISE owner or ADMIN | `DRAFT` (row locked); PDF valid (magic bytes, size cap, checksum not used by another report) — same code path as the one-step deposit | status `EXTRACTING` (queued), file stored, checksum; **no** `submitted_at` | job `extract_report`; on success back to `DRAFT` + `RAPPORT_ANALYSE_TERMINEE`, on failure back to `DRAFT` with the cause |
+| checklist (*task 5.8*, `GET /reports/{id}/checklist`) | any role within scope | — (empty until an analysis succeeded) | — (found / expected per group, never values) | — |
+| submit (*tasks 1.5, 5.8*, `POST /reports/{id}/submit`) | ENTERPRISE owner or ADMIN | `DRAFT` (row locked) with a file whose analysis succeeded (`fichier_manquant`, `analyse_non_terminee`); company `ACTIVE` | `submitted_at` (lock), status `AWAITING_ASSIGNMENT`, admin notifications, journal `report_submitted` (file SHA-256) | job `generate_synthesis_pdf` |
 | discard (*task 1.5*, `DELETE /reports/{id}`) | ENTERPRISE owner or ADMIN | `DRAFT` | draft deleted, period free again | — |
 | extraction | worker | `EXTRACTING` | an `extraction_runs` row (Docling version, LLM model, prompt version — *task 5.5*) opened at the start and closed with the outcome; metrics + carbon rows (each with its run id and the boxes of its cited value) + evidence replaced as a whole, coverage rows, status `AWAITING_ASSIGNMENT` (or `EXTRACTION_FAILED` with a fixed cause), **pre-score** (non-official score with the reference config) | `generate_synthesis_pdf` |
 | retry extraction | ADMIN | `EXTRACTION_FAILED` | status `EXTRACTING` (queued), error cleared | job `extract_report` |

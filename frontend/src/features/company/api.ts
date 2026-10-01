@@ -7,19 +7,27 @@ import {
   listCompanyReports,
   registerCompany,
   replyToRegistrationInfoRequest,
-  submitCompanyReport,
   submitCompanyReportCorrection,
 } from "@/shared/api/generated/company/company";
 import type {
   BodyRegisterCompany,
   BodyReplyToRegistrationInfoRequest,
-  BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
   EntreprisePublic,
+  GroupeCompletude,
   RapportESGDetail,
   RapportESGPublic,
   RegistrationStatusView,
+  ReportCreateRequest,
+  ReportResponse,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import {
+  attachReportFile,
+  discardReport,
+  getReportChecklist,
+  openReport,
+  submitReport,
+} from "@/shared/api/generated/reports/reports";
 
 const REPORTS_QUERY_KEY = ["company", "rapports"] as const;
 const reportQueryKey = (rapportId: string) => ["company", "rapports", rapportId] as const;
@@ -32,12 +40,77 @@ export function useCompanyReports() {
   });
 }
 
-/** GET /company/rapports/{id} — détail, indicateurs et données carbone inclus. */
+/** Intervalle de rafraîchissement pendant l'analyse du fichier d'un brouillon (tâche 5.8). */
+export const DELAI_SUIVI_ANALYSE_MS = 5000;
+
+/** GET /company/rapports/{id} — détail, indicateurs et données carbone inclus (aucune valeur
+ * pour un brouillon, tâche 5.8). Suivi automatique tant qu'une extraction est en cours. */
 export function useCompanyReport(rapportId: string) {
   return useQuery<RapportESGDetail, ApiError>({
     queryKey: reportQueryKey(rapportId),
     queryFn: () => getCompanyReport(rapportId),
     enabled: rapportId.length > 0,
+    refetchInterval: (query) =>
+      query.state.data?.status === "EXTRACTING" ? DELAI_SUIVI_ANALYSE_MS : false,
+  });
+}
+
+/** GET /reports/{id}/checklist — trouvés / attendus par groupe, jamais de valeurs (tâche 5.8). */
+export function useReportChecklist(rapportId: string, analyseTermineeLe: string | null) {
+  return useQuery<GroupeCompletude[], ApiError>({
+    queryKey: [...reportQueryKey(rapportId), "checklist", analyseTermineeLe],
+    queryFn: () => getReportChecklist(rapportId),
+    enabled: analyseTermineeLe !== null,
+  });
+}
+
+function useRafraichirRapport(rapportId: string) {
+  const queryClient = useQueryClient();
+  return (rapport: ReportResponse) => {
+    queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
+    queryClient.invalidateQueries({ queryKey: reportQueryKey(rapportId) });
+    return rapport;
+  };
+}
+
+/** POST /reports — ouvre une déclaration (brouillon) pour un exercice (tâche 5.8). */
+export function useOpenDeclaration() {
+  const queryClient = useQueryClient();
+  return useMutation<ReportResponse, ApiError, ReportCreateRequest>({
+    mutationFn: (payload) => openReport(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
+    },
+  });
+}
+
+/** POST /reports/{id}/file — joint (ou remplace) le PDF d'un brouillon et lance son analyse. */
+export function useAttachDraftFile(rapportId: string) {
+  const rafraichir = useRafraichirRapport(rapportId);
+  return useMutation<ReportResponse, ApiError, File>({
+    mutationFn: (file) => attachReportFile(rapportId, { file }),
+    onSuccess: rafraichir,
+  });
+}
+
+/** POST /reports/{id}/submit — soumission : le rapport est verrouillé ; la réponse est le reçu. */
+export function useSubmitDraft(rapportId: string) {
+  const rafraichir = useRafraichirRapport(rapportId);
+  return useMutation<ReportResponse, ApiError, void>({
+    mutationFn: () => submitReport(rapportId),
+    onSuccess: rafraichir,
+  });
+}
+
+/** DELETE /reports/{id} — abandon d'un brouillon. */
+export function useDiscardDraft(rapportId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, void>({
+    mutationFn: () => discardReport(rapportId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
+      queryClient.removeQueries({ queryKey: reportQueryKey(rapportId) });
+    },
   });
 }
 
@@ -47,18 +120,6 @@ export function useMyCompanyProfile() {
   return useQuery<EntreprisePublic, ApiError>({
     queryKey: ["company", "profil"],
     queryFn: () => getMyCompanyProfile(),
-  });
-}
-
-/** POST /company/rapports. Invalide la liste pour que le nouveau dépôt apparaisse aussitôt. */
-export function useSubmitReport() {
-  const queryClient = useQueryClient();
-
-  return useMutation<RapportESGPublic, ApiError, BodySubmitCompanyReport>({
-    mutationFn: (payload) => submitCompanyReport(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
-    },
   });
 }
 

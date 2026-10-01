@@ -22,47 +22,40 @@ function renderPage() {
       <MemoryRouter initialEntries={["/company/deposer"]}>
         <Routes>
           <Route path="/company/deposer" element={<CompanyDepositPage />} />
-          <Route path="/company/rapports" element={<h1>Mes rapports</h1>} />
+          <Route path="/company/rapports/:rapportId" element={<h1>Brouillon ouvert</h1>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-const pdf = () => new File(["%PDF-1.7"], "rapport-2025.pdf", { type: "application/pdf" });
-
-describe("Espace Entreprise — déposer un rapport", () => {
-  it("refuse l’envoi sans fichier, puis dépose et renvoie vers la liste des rapports", async () => {
+describe("Espace Entreprise — ouvrir une déclaration", () => {
+  it("ouvre un brouillon pour le type et l’exercice choisis, puis mène à sa page", async () => {
     fetchMock.mockResolvedValue(Response.json({ id: "r1" }, { status: 201 }));
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: "Déposer" }));
-    expect(await screen.findByText("Un fichier PDF est requis.")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-
     await user.selectOptions(screen.getByLabelText("Type de rapport"), "RAPPORT_CLIMAT");
-    await user.clear(screen.getByLabelText("Année"));
-    await user.type(screen.getByLabelText("Année"), "2025");
-    await user.upload(screen.getByLabelText("Fichier PDF"), pdf());
-    await user.click(screen.getByRole("button", { name: "Déposer" }));
+    await user.clear(screen.getByLabelText("Exercice"));
+    await user.type(screen.getByLabelText("Exercice"), "2024");
+    await user.click(screen.getByRole("button", { name: "Ouvrir la déclaration" }));
 
-    expect(await screen.findByRole("heading", { name: "Mes rapports" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Brouillon ouvert" })).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("/api/v1/company/rapports");
-    const corps = init?.body as FormData;
-    expect((corps.get("fichier") as File).name).toBe("rapport-2025.pdf");
-    expect(corps.get("type")).toBe("RAPPORT_CLIMAT");
-    expect(corps.get("annee_reporting")).toBe("2025");
+    expect(url).toBe("/api/v1/reports");
+    expect(JSON.parse(init?.body as string)).toEqual({
+      report_type: "RAPPORT_CLIMAT",
+      fiscal_year: 2024,
+    });
   });
 
-  it("affiche le refus du serveur sans quitter la page", async () => {
+  it("refuse un exercice futur et affiche le refus du serveur sans quitter la page", async () => {
     fetchMock.mockResolvedValue(
       Response.json(
         {
           error: {
-            code: "rapport_doublon",
-            message: "Ce fichier a déjà été déposé.",
+            code: "brouillon_existant",
+            message: "Une déclaration est déjà ouverte pour cet exercice et ce type de rapport.",
             correlation_id: null,
           },
         },
@@ -72,10 +65,23 @@ describe("Espace Entreprise — déposer un rapport", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.upload(screen.getByLabelText("Fichier PDF"), pdf());
-    await user.click(screen.getByRole("button", { name: "Déposer" }));
+    await user.clear(screen.getByLabelText("Exercice"));
+    await user.type(screen.getByLabelText("Exercice"), String(new Date().getFullYear() + 1));
+    await user.click(screen.getByRole("button", { name: "Ouvrir la déclaration" }));
+    expect(
+      await screen.findByText("L'exercice ne peut pas être postérieur à l'année en cours."),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
 
-    expect(await screen.findByText("Ce fichier a déjà été déposé.")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Mes rapports" })).not.toBeInTheDocument();
+    await user.clear(screen.getByLabelText("Exercice"));
+    await user.type(screen.getByLabelText("Exercice"), "2024");
+    await user.click(screen.getByRole("button", { name: "Ouvrir la déclaration" }));
+
+    expect(
+      await screen.findByText(
+        "Une déclaration est déjà ouverte pour cet exercice et ce type de rapport.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Brouillon ouvert" })).not.toBeInTheDocument();
   });
 });

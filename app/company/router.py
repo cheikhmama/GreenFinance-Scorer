@@ -285,6 +285,18 @@ def consulter_rapport(
 ) -> RapportESGDetail:
     rapport = rapport_de_lentreprise(session, rapport_id, _entreprise_id(current_user))
     detail = RapportESGDetail.model_validate(rapport)
+    if rapport.submitted_at is None:
+        # Brouillon analysé (tâche 5.8) : la liste de complétude donne des comptes, jamais les
+        # valeurs extraites ni le score auto-déclaré relu — rien qui invite à ajuster le fichier
+        # à un résultat avant de soumettre.
+        return detail.model_copy(
+            update={
+                "metrics": [],
+                "carbon_data": [],
+                "declared_global_score": None,
+                "declared_global_score_proof": None,
+            }
+        )
     if rapport.status != ReportStatus.VALIDATED:
         # Pendant l'examen, l'Entreprise ne voit pas l'avancement de la revue (tâches 5.1, 5.6).
         sans_revue = {"review_status": None, "audited_value": None}

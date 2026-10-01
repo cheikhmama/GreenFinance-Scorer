@@ -109,11 +109,16 @@ def _compte(session: Session, email: str, nom: str, role: Role, admin_id=None) -
     return utilisateur
 
 
-def _rapport_extrait(session: Session, entreprise: Company, dossier: Path, scenario: dict) -> ESGReport:
+def _rapport_extrait(
+    session: Session, entreprise: Company, dossier: Path, scenario: dict, *, brouillon: bool = False
+) -> ESGReport:
     """Rapport déposé puis extrait : PDF copié dans le stockage, indicateurs et données carbone
-    avec page-preuve, couverture par code — ce que le pipeline aurait persisté."""
+    avec page-preuve, couverture par code — ce que le pipeline aurait persisté. `brouillon` : une
+    déclaration de l'exercice suivant, analysée mais pas encore soumise (tâche 5.8)."""
     meta = scenario["rapport"]
     annee = meta["annee_reporting"]
+    if brouillon:
+        annee = min(annee + 1, utcnow().year)
     source = dossier / meta["fichier"]
     nom_fichier = f"{dossier.name}_rapport_{annee}.pdf"
     rapport_id = uuid.uuid4()
@@ -125,8 +130,8 @@ def _rapport_extrait(session: Session, entreprise: Company, dossier: Path, scena
         created_at=depose_le,
         type=ReportType(meta["type"]),
         channel=SubmissionChannel.ENTREPRISE,
-        submitted_at=depose_le,
-        status=ReportStatus.AWAITING_ASSIGNMENT,
+        submitted_at=None if brouillon else depose_le,
+        status=ReportStatus.DRAFT if brouillon else ReportStatus.AWAITING_ASSIGNMENT,
         extraction_finished_at=depose_le,
         original_filename=nom_fichier,
         fiscal_year=annee,
@@ -264,6 +269,9 @@ def main() -> None:
             session.add(rapport)
             session.commit()
             affecter_auditeur(session, rapport.id, auditeur.id)
+            if email == "atlas":
+                # Déclaration de l'exercice suivant, analysée, à soumettre (tâche 5.8).
+                _rapport_extrait(session, entreprise, dossier, scenario, brouillon=True)
             if etape == "audit":
                 continue
             _revoir(session, rapport.id, auditeur.id)

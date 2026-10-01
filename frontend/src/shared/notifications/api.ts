@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import type { NotificationPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { listMyNotifications, markNotificationRead } from "@/shared/api/generated/notifications/notifications";
+import {
+  listMyNotifications,
+  markNotificationRead,
+} from "@/shared/api/generated/notifications/notifications";
 
 const NOTIFICATIONS_KEY = ["notifications"] as const;
 
@@ -50,6 +53,7 @@ export function useMarkNotificationRead() {
 const LIENS_AVEC_ID: Record<string, (id: string) => string> = {
   RAPPORT_DEPOSE: (id) => `/company/rapports/${id}`,
   RAPPORT_EXTRACTION_ECHOUEE: (id) => `/company/rapports/${id}`,
+  RAPPORT_ANALYSE_TERMINEE: (id) => `/company/rapports/${id}`,
   RAPPORT_AFFECTE_ENTREPRISE: (id) => `/company/rapports/${id}`,
   RAPPORT_AVIS_RENDU_ENTREPRISE: (id) => `/company/rapports/${id}`,
   RAPPORT_VALIDE: (id) => `/company/rapports/${id}`,

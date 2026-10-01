@@ -159,28 +159,31 @@ def test_un_role_sans_rapports_est_refuse(session) -> None:
     assert client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"}).status_code == 403
 
 
-def test_soumettre_un_brouillon_le_depose_et_programme_lextraction(
+def test_joindre_le_fichier_dun_brouillon_programme_son_analyse_sans_le_soumettre(
     session, entreprise, _extraction_simulee
 ) -> None:
     _user, client = entreprise
     brouillon = _ouvrir(client)
 
-    soumis = client.post(
-        f"{URL}/{brouillon['id']}/submit",
+    joint = client.post(
+        f"{URL}/{brouillon['id']}/file",
         files={"file": ("rapport-2024.pdf", _minimal_pdf_bytes(), "application/pdf")},
     )
-    seconde = client.post(
-        f"{URL}/{brouillon['id']}/submit",
+    pendant_lanalyse = client.post(
+        f"{URL}/{brouillon['id']}/file",
         files={"file": ("rapport-2024.pdf", _minimal_pdf_bytes(), "application/pdf")},
     )
+    soumission_prematuree = client.post(f"{URL}/{brouillon['id']}/submit")
 
-    assert soumis.status_code == 200
-    corps = soumis.json()
+    assert joint.status_code == 200
+    corps = joint.json()
     assert corps["id"] == brouillon["id"]
     assert corps["status"] == ReportStatus.EXTRACTING.value
     assert "extraction_status" not in corps
-    assert corps["submitted_at"] is not None
+    # Analyse du brouillon (tâche 5.8) : pas encore soumis, donc pas verrouillé.
+    assert corps["submitted_at"] is None
     assert corps["original_filename"] == "rapport-2024.pdf"
+    assert len(corps["checksum_sha256"]) == 64
     assert [
         (fonction, str(args[0]), args[1], job_id, file)
         for fonction, args, job_id, file in _extraction_simulee
@@ -188,8 +191,12 @@ def test_soumettre_un_brouillon_le_depose_et_programme_lextraction(
     ] == [
         ("extract_report", brouillon["id"], 2024, f"extract:{brouillon['id']}", "arq:extraction")
     ]
-    assert seconde.status_code == 422
-    assert seconde.json()["error"]["code"] == "transition_invalide"
+    for refus in (pendant_lanalyse, soumission_prematuree):
+        assert refus.status_code == 422
+        assert refus.json()["error"]["code"] == "transition_invalide"
+    # Un brouillon en analyse occupe toujours sa période.
+    autre = client.post(URL, json={"fiscal_year": 2024, "report_type": "RAPPORT_ESG"})
+    assert autre.json()["error"]["code"] == "brouillon_existant"
 
 
 def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> None:
@@ -197,7 +204,7 @@ def test_un_fichier_invalide_laisse_le_brouillon_intact(session, entreprise) -> 
     brouillon = _ouvrir(client)
 
     reponse = client.post(
-        f"{URL}/{brouillon['id']}/submit",
+        f"{URL}/{brouillon['id']}/file",
         files={"file": ("faux.pdf", b"pas un PDF", "application/pdf")},
     )
 
@@ -214,7 +221,7 @@ def test_abandonner_seulement_un_brouillon(session, entreprise) -> None:
     brouillon = _ouvrir(client)
     soumis = _ouvrir(client, report_type="RAPPORT_CLIMAT")
     client.post(
-        f"{URL}/{soumis['id']}/submit",
+        f"{URL}/{soumis['id']}/file",
         files={"file": ("climat.pdf", _minimal_pdf_bytes(), "application/pdf")},
     )
 
