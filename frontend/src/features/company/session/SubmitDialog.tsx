@@ -3,6 +3,7 @@ import type {
   GroupeCompletude,
   RapportESGDetail,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import {
@@ -61,7 +62,7 @@ export function SubmitDialog({
             </DialogHeader>
             <dl className="space-y-2 text-sm">
               <Ligne libelle="Rapport">
-                {recu.report_type} — exercice {recu.fiscal_year}
+                {titreDeclaration({ type: recu.report_type, fiscal_year: recu.fiscal_year })}
               </Ligne>
               <Ligne libelle="Fichier">{recu.original_filename ?? "—"}</Ligne>
               <Ligne libelle="Soumis le">{dateHeure(recu.submitted_at)}</Ligne>
@@ -95,9 +96,7 @@ export function SubmitDialog({
               </Alert>
             ) : null}
             <dl className="space-y-2 text-sm">
-              <Ligne libelle="Rapport">
-                {rapport.type} — exercice {rapport.fiscal_year}
-              </Ligne>
+              <Ligne libelle="Rapport">{titreDeclaration(rapport)}</Ligne>
               <Ligne libelle="Fichier">{rapport.original_filename ?? "—"}</Ligne>
               <Ligne libelle="Empreinte SHA-256">
                 <code className="break-all font-mono text-xs">{rapport.checksum_sha256}</code>

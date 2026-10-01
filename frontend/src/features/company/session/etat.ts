@@ -25,7 +25,7 @@ export function etatBrouillon(rapport: RapportSession): EtatBrouillon | null {
   return "PRET";
 }
 
-export const ETAPES = ["Préparation", "Soumission", "Examen 🔒", "Décision"] as const;
+export const ETAPES = ["Préparation", "Soumission", "Examen", "Décision"] as const;
 
 const DECISIONS: readonly ReportStatus[] = ["VALIDATED", "REJECTED", "REVISION_REQUESTED"];
 

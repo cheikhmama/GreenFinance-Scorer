@@ -10,6 +10,7 @@ import {
   libelleStatutRapportEntreprise,
   variantStatutRapportEntreprise,
 } from "@/shared/format/statut";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -57,9 +58,7 @@ export function CompanyReportDetailPage() {
         >
           ← Mes déclarations
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
-          Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
-        </h1>
+        <h1 className="mt-2 text-2xl font-semibold text-brand-blue">{titreDeclaration(rapport)}</h1>
         <div className="mt-2 flex items-center gap-2">
           <Badge
             variant={variantStatutRapportEntreprise(rapport.status)}

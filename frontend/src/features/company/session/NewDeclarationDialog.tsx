@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { libelleTypeRapport } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import {
@@ -125,7 +126,7 @@ export function NewDeclarationDialog({
                       <Select {...field}>
                         {TYPES_RAPPORT.map((type) => (
                           <option key={type} value={type}>
-                            {type}
+                            {libelleTypeRapport(type)}
                           </option>
                         ))}
                       </Select>

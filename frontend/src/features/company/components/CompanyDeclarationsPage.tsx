@@ -1,4 +1,4 @@
-import { Download, Plus } from "lucide-react";
+import { Download, Info, Plus } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { RapportESGPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
@@ -7,15 +7,16 @@ import {
   libelleStatutRapportEntreprise,
   variantStatutRapportEntreprise,
 } from "@/shared/format/statut";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports, useMyCompanyProfile } from "../api";
+import { useCompanyReports } from "../api";
 import { libelleExercice, separerDeclarations } from "../session/etat";
 import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
 import { SessionStepper } from "../session/SessionStepper";
+import { CompanyIdentityHeader } from "./CompanyIdentityHeader";
 
 function StatutEntreprise({ rapport }: { rapport: RapportESGPublic }) {
   return (
@@ -37,7 +38,6 @@ function date(iso: string | null) {
  * empreinte du fichier). */
 export function CompanyDeclarationsPage() {
   const { data: rapports, isPending, isError } = useCompanyReports();
-  const { data: entreprise } = useMyCompanyProfile();
   const [creation, setCreation] = useState(false);
   const { enCours, historique, sessionBloquante } = separerDeclarations(rapports ?? []);
   const exercicesValides = (rapports ?? [])
@@ -46,29 +46,40 @@ export function CompanyDeclarationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow={entreprise?.name}
-        title="Mes déclarations"
-        description="Préparez, soumettez et suivez vos déclarations ESG par exercice."
-        action={
-          <div className="flex flex-col items-end gap-1">
-            <Button
-              onClick={() => setCreation(true)}
-              disabled={!rapports || sessionBloquante !== undefined}
-              aria-describedby={sessionBloquante ? "raison-blocage" : undefined}
-            >
-              <Plus />
-              Nouvelle déclaration
-            </Button>
-            {sessionBloquante ? (
-              <p id="raison-blocage" className="max-w-64 text-right text-xs text-muted-foreground">
-                Une seule déclaration à la fois : terminez{" "}
-                {libelleExercice(sessionBloquante.fiscal_year)} avant d’en ouvrir une autre.
-              </p>
-            ) : null}
-          </div>
-        }
-      />
+      <CompanyIdentityHeader />
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Mes déclarations</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Préparez, soumettez et suivez vos déclarations ESG par exercice.
+          </p>
+        </div>
+        <Button
+          onClick={() => setCreation(true)}
+          disabled={!rapports || sessionBloquante !== undefined}
+          aria-describedby={sessionBloquante ? "raison-blocage" : undefined}
+          className="self-start sm:self-auto"
+        >
+          <Plus />
+          Nouvelle déclaration
+        </Button>
+      </div>
+
+      {sessionBloquante ? (
+        <div
+          id="raison-blocage"
+          role="note"
+          className="flex items-start gap-3 rounded-lg border bg-muted/50 px-4 py-3 text-sm text-muted-foreground"
+        >
+          <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <p>
+            <span className="font-medium text-foreground">Une seule déclaration à la fois.</span>{" "}
+            Terminez la déclaration {titreDeclaration(sessionBloquante)} avant d’en ouvrir une
+            autre.
+          </p>
+        </div>
+      ) : null}
       {rapports ? (
         <NewDeclarationDialog
           open={creation}
@@ -101,7 +112,7 @@ export function CompanyDeclarationsPage() {
                             {libelleExercice(rapport.fiscal_year)}
                           </span>
                           <span className="text-sm text-muted-foreground">
-                            {rapport.type} · v{rapport.version}
+                            {titreDeclaration(rapport)}
                           </span>
                           <StatutEntreprise rapport={rapport} />
                         </div>
@@ -149,7 +160,7 @@ export function CompanyDeclarationsPage() {
                         <td className="py-2 pr-4 font-medium text-foreground">
                           {libelleExercice(rapport.fiscal_year)}
                           <span className="block text-xs font-normal text-muted-foreground">
-                            {rapport.type} · v{rapport.version}
+                            {titreDeclaration(rapport)}
                           </span>
                         </td>
                         <td className="py-2 pr-4">

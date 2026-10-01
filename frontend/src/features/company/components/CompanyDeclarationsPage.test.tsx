@@ -58,9 +58,29 @@ function renderPage() {
   );
 }
 
+const PROFIL = {
+  id: "c1",
+  name: "Atlas Industries",
+  sector: "Industrie manufacturière",
+  country: "MR",
+  logo: null,
+  description: null,
+  website: null,
+  active: true,
+  status: "ACTIVE",
+  minimum_investment_amount: null,
+  minimum_investment_currency: null,
+  published_at: null,
+  isin: null,
+  lei: null,
+  ticker: null,
+};
+
 describe("Espace Entreprise — Mes déclarations", () => {
   it("une seule session en cours, l’historique avec score, empreinte et synthèse", async () => {
-    fetchMock.mockImplementation(async () => Response.json(RAPPORTS));
+    fetchMock.mockImplementation(async (url) =>
+      String(url).endsWith("/company/profil") ? Response.json(PROFIL) : Response.json(RAPPORTS),
+    );
     renderPage();
 
     // Données héritées : deux déclarations actives ; seule la plus récente est montrée.
@@ -74,8 +94,15 @@ describe("Espace Entreprise — Mes déclarations", () => {
 
     // Une déclaration est active : pas d’ouverture d’une autre, et la raison est dite.
     expect(screen.getByRole("button", { name: "Nouvelle déclaration" })).toBeDisabled();
+    const note = screen.getByRole("note");
+    expect(note).toHaveTextContent("Une seule déclaration à la fois.");
+    expect(note).toHaveTextContent("Terminez la déclaration Rapport ESG — Exercice 2025");
+    // Aucun code technique à l’écran : titres lisibles.
+    expect(document.body.textContent).not.toMatch(/RAPPORT_ESG|· v1/);
+    expect(within(enCours).getByText("Rapport ESG — Exercice 2025")).toBeInTheDocument();
+    // En-tête partagé : le nom de l’entreprise.
     expect(
-      screen.getByText(/Une seule déclaration à la fois : terminez FY2025/),
+      await screen.findByRole("heading", { level: 1, name: "Atlas Industries" }),
     ).toBeInTheDocument();
 
     const historique = screen.getByRole("table");
