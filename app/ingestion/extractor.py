@@ -13,6 +13,8 @@ Docling/bge-m3 CPU de plusieurs heures en parallèle n'apportent rien et leur th
 documentée.
 """
 
+import hashlib
+import importlib.metadata
 import os
 
 # Ceinture-bretelles : ce module importe aussi FlagEmbedding/torch (bge-m3), même garde-fou qu'en
@@ -43,16 +45,21 @@ from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import DataMethod, Pillar, ReportStatus, Role
+from app.core.enums import DataMethod, ExtractionRunStatus, Pillar, ReportStatus, Role
 from app.core.notifications import notifier
-from app.ingestion import docling_pipeline, proof_generator
+from app.ingestion import docling_pipeline, localisation, proof_generator
 from app.ingestion.completeness import calculer_couverture
-from app.ingestion.etat_extraction import ExtractionTransitoire, marquer_echec
+from app.ingestion.etat_extraction import (
+    ExtractionTransitoire,
+    cloturer_executions,
+    marquer_echec,
+)
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
     ESGReport,
     Evidence,
+    ExtractionRun,
     MetricCoverage,
 )
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
@@ -146,6 +153,8 @@ TABLE_SCORE_BOOST = 1.15
 # valeurs, ≥85% pages, 0% hallucination, data_test/ground_truth.yaml) a été mesurée avec Claude à
 # l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
 EXTRACTION_MODEL = "gemini-3.6-flash"
+# Modèle enregistré sur une exécution en mode démonstration (clé GEMINI_API_KEY factice).
+MODELE_DEMO = "demo-synthetique"
 
 EXTRACTION_TOOL = genai_types.FunctionDeclaration(
     name="extraction_indicateurs",
@@ -439,22 +448,15 @@ def _build_context(
     return context, pages_finales, pages_par_code
 
 
-# Nombre de tentatives face à une erreur serveur transitoire (503, surcharge du palier gratuit) —
-# jamais sur une ClientError (4xx : clé invalide, modèle inconnu, quota dépassé), qui ne se
-# résoudra pas en réessayant. Constaté en pratique sur gemini-3.6-flash, pas hypothétique.
-_TENTATIVES_APPEL_LLM = 3
+# Version du prompt d'extraction (tâche 5.5), enregistrée sur chaque exécution
+# (ExtractionRun.prompt_version). À changer à chaque modification du gabarit ci-dessous ou de
+# l'outil EXTRACTION_TOOL : tests/unit/test_extraction_provenance.py fige l'empreinte de cette
+# version et échoue tant qu'elle n'est pas montée.
+PROMPT_VERSION = "2026-10-01"
 
 
-def _call_llm_extraction(
-    *, nom_entreprise: str, context: str, codes: list[str]
-) -> ExtractionEntreprise:
-    """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
-    Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
-    toute erreur non transitoire du fournisseur telle quelle — run_extraction_pipeline la classe,
-    ne la masque jamais. Signature inchangée par le passage à la sélection adaptative (Phase 6) :
-    c'est ce qui permet d'appeler cette fonction une seconde fois pour la relance groupée sans la
-    modifier (voir run_extraction_pipeline)."""
-    prompt = f"""Tu es un extracteur de donnees ESG/carbone. Voici des extraits d'un rapport d'entreprise
+def construire_prompt(*, nom_entreprise: str, context: str, codes: list[str]) -> str:
+    return f"""Tu es un extracteur de donnees ESG/carbone. Voici des extraits d'un rapport d'entreprise
 ({nom_entreprise}), avec le numero de page physique indique avant chaque extrait.
 
 Pour CHACUN des indicateurs suivants, trouve sa valeur numerique la plus recente dans les extraits fournis :
@@ -483,6 +485,40 @@ Regles strictes :
 Extraits du rapport :
 {context}
 """
+
+
+def empreinte_prompt() -> str:
+    """SHA-256 du gabarit du prompt et de l'outil déclaré, hors parties variables."""
+    gabarit = construire_prompt(
+        nom_entreprise="{nom_entreprise}", context="{context}", codes=["{codes}"]
+    )
+    outil = EXTRACTION_TOOL.model_dump_json(exclude_none=True)
+    return hashlib.sha256(f"{gabarit}\n{outil}".encode()).hexdigest()
+
+
+def version_docling() -> str:
+    try:
+        return importlib.metadata.version("docling")
+    except importlib.metadata.PackageNotFoundError:
+        return "absent"
+
+
+# Nombre de tentatives face à une erreur serveur transitoire (503, surcharge du palier gratuit) —
+# jamais sur une ClientError (4xx : clé invalide, modèle inconnu, quota dépassé), qui ne se
+# résoudra pas en réessayant. Constaté en pratique sur gemini-3.6-flash, pas hypothétique.
+_TENTATIVES_APPEL_LLM = 3
+
+
+def _call_llm_extraction(
+    *, nom_entreprise: str, context: str, codes: list[str]
+) -> ExtractionEntreprise:
+    """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
+    Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
+    toute erreur non transitoire du fournisseur telle quelle — run_extraction_pipeline la classe,
+    ne la masque jamais. Signature inchangée par le passage à la sélection adaptative (Phase 6) :
+    c'est ce qui permet d'appeler cette fonction une seconde fois pour la relance groupée sans la
+    modifier (voir run_extraction_pipeline)."""
+    prompt = construire_prompt(nom_entreprise=nom_entreprise, context=context, codes=codes)
     config = genai_types.GenerateContentConfig(
         tools=[genai_types.Tool(function_declarations=[EXTRACTION_TOOL])],
         tool_config=genai_types.ToolConfig(
@@ -548,15 +584,45 @@ def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> Ex
     )
 
 
+def _boites_de_la_valeur(
+    document: Any, page: int, indicateur: IndicateurExtrait, rapport_id: uuid.UUID
+) -> list[dict]:
+    """Best-effort : une localisation impossible laisse la valeur sans surlignage, elle ne fait
+    jamais échouer l'extraction (la page reste la preuve)."""
+    try:
+        return [
+            boite.en_dict()
+            for boite in localisation.localiser(
+                document,
+                page,
+                citation=indicateur.citation_source,
+                valeur_brute=indicateur.valeur_brute,
+                valeur=indicateur.valeur,
+            )
+        ]
+    except Exception as exc:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+        logger.warning(
+            "localisation_preuve_echouee",
+            rapport_id=str(rapport_id),
+            code=indicateur.code,
+            error_type=type(exc).__name__,
+        )
+        return []
+
+
 def run_extraction_pipeline(
     rapport_id: uuid.UUID, annee_reporting: int, *, derniere_tentative: bool = True
 ) -> None:
     """Exécuté par le worker (app/worker/jobs.py::extract_report, file d'extraction à un job à la
     fois — plus de verrou applicatif). Ouvre sa propre session DB.
 
-    derniere_tentative=False : un échec transitoire (_est_transitoire) remet le rapport en QUEUED
-    et lève ExtractionTransitoire pour que le worker retente plus tard ; toute autre erreur, ou un
-    échec transitoire à la dernière tentative, marque le rapport FAILED comme avant."""
+    derniere_tentative=False : un échec transitoire (_est_transitoire) remet le job en file (rapport
+    EXTRACTING, début nul, exécution RETRY_SCHEDULED) et lève ExtractionTransitoire pour que le
+    worker retente plus tard ; toute autre erreur, ou un échec transitoire à la dernière tentative,
+    passe le rapport en EXTRACTION_FAILED et l'exécution en FAILED.
+
+    Chaque passage crée une ExtractionRun (tâche 5.5) : version de Docling, modèle LLM, version
+    du prompt ; chaque valeur écrite porte son identifiant et les boîtes de son texte cité."""
     with Session(engine) as session:
         rapport = session.get(ESGReport, rapport_id)
         if rapport is None:
@@ -588,14 +654,25 @@ def run_extraction_pipeline(
         # repartir d'un chronomètre frais, pas de celui de la toute première tentative.
         rapport.extraction_started_at = utcnow()
         session.add(rapport)
+        # Une ligne par exécution (tâche 5.5) : ce qui produit les valeurs, enregistré avant de
+        # commencer pour qu'une exécution interrompue laisse aussi sa trace.
+        demo = get_settings().gemini_api_key_is_placeholder
+        execution = ExtractionRun(
+            report_id=rapport_id,
+            started_at=rapport.extraction_started_at,
+            docling_version=version_docling(),
+            llm_model=MODELE_DEMO if demo else EXTRACTION_MODEL,
+            prompt_version=PROMPT_VERSION,
+        )
+        session.add(execution)
         session.commit()
+        execution_id = execution.id
 
         etape = "erreur_inattendue"
         try:
             source_path = storage.resolve_path(fichier_source)
             nom_entreprise = rapport.company.name
             nom_document = Path(fichier_source).name
-            demo = get_settings().gemini_api_key_is_placeholder
             if demo:
                 nom_document = f"[DEMO] {nom_document}"
 
@@ -758,6 +835,8 @@ def run_extraction_pipeline(
                     session.flush()
                     preuves_par_page[page] = preuve
                 preuve = preuves_par_page[page]
+                # Où la valeur se lit sur la page (surlignage de l'espace Auditeur, tâche 5.7).
+                boites = _boites_de_la_valeur(conversion.document, page, indicateur, rapport_id)
 
                 if cible.cible == "donnee_carbone":
                     assert cible.scope is not None  # invariant garanti par INDICATEURS_CIBLES
@@ -776,6 +855,8 @@ def run_extraction_pipeline(
                             proof_text=indicateur.citation_source,
                             value_year=indicateur.annee_valeur,
                             confidence=indicateur.confiance,
+                            extraction_run_id=execution_id,
+                            proof_boxes=boites,
                         )
                     )
                 elif cible.cible == "indicateur_esg":
@@ -794,6 +875,8 @@ def run_extraction_pipeline(
                             proof_text=indicateur.citation_source,
                             value_year=indicateur.annee_valeur,
                             confidence=indicateur.confiance,
+                            extraction_run_id=execution_id,
+                            proof_boxes=boites,
                         )
                     )
                 else:  # "rapport_score_global"
@@ -825,6 +908,11 @@ def run_extraction_pipeline(
             rapport.extraction_error = None
             rapport.status = ReportStatus.AWAITING_ASSIGNMENT
             session.add(rapport)
+            execution_reussie = session.get(ExtractionRun, execution_id)
+            assert execution_reussie is not None  # créée et commitée plus haut
+            execution_reussie.status = ExtractionRunStatus.SUCCEEDED
+            execution_reussie.finished_at = rapport.extraction_finished_at
+            session.add(execution_reussie)
 
             # Import différé : app.ingestion.synthesis_report importe
             # CODES_AUTO_DECLARES_PAR_PILIER depuis ce module -- un import en tête de fichier
@@ -874,6 +962,9 @@ def run_extraction_pipeline(
                 # cours (app/ingestion/supervision.py).
                 rapport.extraction_started_at = None
                 session.add(rapport)
+                cloturer_executions(
+                    session, rapport_id, ExtractionRunStatus.RETRY_SCHEDULED, etape
+                )
                 session.commit()
                 logger.warning(
                     "extraction_echec_transitoire",

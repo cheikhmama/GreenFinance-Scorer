@@ -529,7 +529,9 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
     assert rapport.status == ReportStatus.EXTRACTION_FAILED
 
 
-def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) -> None:
+def _simuler_pipeline_extraction(
+    monkeypatch, extraction: ExtractionEntreprise, document: object | None = None
+) -> None:
     """Remplace Docling, l'indexation, le modèle d'embedding, le LLM et la génération de preuve
     par des doubles : run_extraction_pipeline ne dépend plus que de `extraction`, la réponse
     simulée du LLM (un seul passage, la relance groupée est court-circuitée)."""
@@ -537,7 +539,9 @@ def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) 
     from app.ingestion.docling_pipeline import ConversionResult
 
     fake_conversion = ConversionResult(
-        document=object(),  # type: ignore[arg-type]  # double minimal, jamais inspecté comme un vrai DoclingDocument ici
+        # Double minimal par défaut : la localisation des preuves (tâche 5.5) échoue alors sans
+        # conséquence ; un test qui la vérifie passe une vraie sortie Docling.
+        document=document if document is not None else object(),  # type: ignore[arg-type]
         status="ok",
         errors=[],
         pages_docling=5,

@@ -43,6 +43,17 @@ class ReportStatus(str, Enum):
     REJECTED = "REJECTED"
 
 
+class ExtractionRunStatus(str, Enum):
+    """Issue d'une exécution du pipeline d'extraction sur un rapport (tâche 5.5, table
+    extraction_runs) — une ligne par tentative, jamais réécrite après sa clôture."""
+
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    # Échec passager (quota, réseau) : le job est remis en file, une nouvelle exécution suivra.
+    RETRY_SCHEDULED = "RETRY_SCHEDULED"
+
+
 class RegistrationStatus(str, Enum):
     """Cycle de vie de l'inscription puis du compte entreprise (KYC, décision D5, tâche 5.2) —
     distinct de la publication de son score (Company.published_at).

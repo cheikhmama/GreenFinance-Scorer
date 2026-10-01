@@ -11,6 +11,7 @@ import {
   getAdminReport,
   getCompanyAdmin,
   getReportFinancials,
+  listReportExtractionRuns,
   getCompanyKyc,
   listAdminCompanyReports,
   listAllCompanies,
@@ -63,6 +64,7 @@ import type {
   DecisionAdminRequest,
   EntrepriseAdmin,
   EntreprisePublic,
+  ExtractionRunPublic,
   KycReport,
   ListAuditLogParams,
   ModifierEntrepriseAdminRequest,
@@ -437,6 +439,16 @@ export function useUpdateCompanyIdentifiers(entrepriseId: string) {
       queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
     },
+  });
+}
+
+/** GET /admin/reports/{id}/extraction-runs (tâche 5.5) — exécutions du pipeline, plus récente
+ * d'abord. */
+export function useReportExtractionRuns(rapportId: string) {
+  return useQuery<ExtractionRunPublic[], ApiError>({
+    queryKey: ["admin", "rapports", rapportId, "extraction-runs"],
+    queryFn: () => listReportExtractionRuns(rapportId),
+    enabled: rapportId.length > 0,
   });
 }
 

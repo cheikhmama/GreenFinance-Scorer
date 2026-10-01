@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import CheckConstraint, Column, Index, Numeric, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.database import utcnow
@@ -21,6 +22,7 @@ from app.core.enums import (
     ConfidenceLevel,
     Currency,
     DataMethod,
+    ExtractionRunStatus,
     MetricCoverageStatus,
     Pillar,
     ReportStatus,
@@ -154,6 +156,28 @@ class ESGReport(SQLModel, table=True):
     coverages: list["MetricCoverage"] = Relationship(back_populates="report")
 
 
+class ExtractionRun(SQLModel, table=True):
+    """Une exécution du pipeline d'extraction sur un rapport (tâche 5.5) : ce qui a produit les
+    valeurs — version de Docling, modèle LLM, version du prompt — et comment l'exécution s'est
+    terminée. Une ligne par tentative ; les lignes d'un rapport disparaissent avec lui. Les
+    indicateurs et données carbone portent l'identifiant de l'exécution qui les a écrits."""
+
+    __tablename__ = "extraction_runs"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    report_id: uuid.UUID = Field(foreign_key="esg_reports.id", ondelete="CASCADE", index=True)
+    started_at: datetime = Field(default_factory=utcnow)
+    finished_at: datetime | None = Field(default=None)
+    status: ExtractionRunStatus = Field(
+        default=ExtractionRunStatus.RUNNING, sa_column=sa_enum_column(ExtractionRunStatus)
+    )
+    # Cause classifiée (même vocabulaire qu'ESGReport.extraction_error), jamais str(exception).
+    error: str | None = Field(default=None, max_length=100)
+    docling_version: str = Field(max_length=50)
+    llm_model: str = Field(max_length=100)
+    prompt_version: str = Field(max_length=50)
+
+
 class Evidence(SQLModel, table=True):
     """Table `evidence` (docs/RENAME_PLAN.md §4, tâche 2.3) : extrait PDF prouvant une valeur
     extraite — aucune valeur sans preuve."""
@@ -206,6 +230,17 @@ class ESGMetric(SQLModel, table=True):
     )
     # Correction par l'Auditeur (docs/WORKFLOWS.md §1.2) : la valeur extraite reste intacte,
     # override_value la remplace au calcul du score quand auditor_overridden est vrai.
+    # Exécution du pipeline qui a écrit cette ligne (tâche 5.5) — nulle pour une ligne antérieure.
+    extraction_run_id: uuid.UUID | None = Field(
+        default=None, foreign_key="extraction_runs.id", ondelete="SET NULL", index=True
+    )
+    # Où la valeur se lit sur sa page-preuve : boîtes {page, x0, y0, x1, y1} en fractions de la
+    # page, origine en haut à gauche (app/ingestion/localisation.py). Vide quand le texte cité n'a
+    # pas pu être retrouvé : la page reste la preuve, sans surlignage.
+    proof_boxes: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    )
     auditor_overridden: bool = Field(default=False)
     override_value: float | None = Field(default=None)
     override_reason: str | None = Field(default=None)
@@ -255,6 +290,18 @@ class CarbonEmission(SQLModel, table=True):
     value_year: int | None = Field(default=None)
     confidence: ConfidenceLevel | None = Field(
         default=None, sa_column=sa_enum_column(ConfidenceLevel, nullable=True)
+    )
+
+    # Exécution du pipeline qui a écrit cette ligne (tâche 5.5) — nulle pour une ligne antérieure.
+    extraction_run_id: uuid.UUID | None = Field(
+        default=None, foreign_key="extraction_runs.id", ondelete="SET NULL", index=True
+    )
+    # Où la valeur se lit sur sa page-preuve : boîtes {page, x0, y0, x1, y1} en fractions de la
+    # page, origine en haut à gauche (app/ingestion/localisation.py). Vide quand le texte cité n'a
+    # pas pu être retrouvé : la page reste la preuve, sans surlignage.
+    proof_boxes: list[dict] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     )
 
     report: ESGReport = Relationship(back_populates="carbon_data")

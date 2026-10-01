@@ -151,6 +151,15 @@ method — the old hard-coded placeholder `3` is gone). *Implemented in task 2.3
 `couverture_indicateur`, `signalement_ecart`); their JSON fields take the same English names since
 task 4.7.
 
+**Provenance** (*task 5.5*). `extraction_runs`: one row per execution of the pipeline on a report
+— `docling_version`, `llm_model` (`demo-synthetique` in demo mode), `prompt_version`, start/end,
+outcome (`RUNNING`, `SUCCEEDED`, `FAILED`, `RETRY_SCHEDULED`) and classified error. Every
+`esg_metrics` / `carbon_emissions` row records its `extraction_run_id` (SET NULL) and
+`proof_boxes`: where the cited value reads on its page, as fractions of the page with a top-left
+origin, matched in the Docling output by the verbatim citation, else by the number itself
+(`app/ingestion/localisation.py`; no box rather than a wrong one). `PROMPT_VERSION` is pinned by a
+test on the prompt's fingerprint: the prompt can't change without a new version.
+
 ### 3.4 `portfolios` and `portfolio_positions` (module `app/investor`)
 
 *Implemented in task 2.1*; amounts and FX rate in `numeric` / `Decimal` since task 2.3. Import

@@ -17,6 +17,7 @@ import type {
   DecisionAdminRequest,
   EntrepriseAdmin,
   EntreprisePublic,
+  ExtractionRunPublic,
   KycReport,
   ListAllCompaniesParams,
   ListAllReportsParams,
@@ -1264,6 +1265,29 @@ export const getListProjectsAdminUrl = (params?: ListProjectsAdminParams,) => {
 export const listProjectsAdmin = async (params?: ListProjectsAdminParams, options?: RequestInit): Promise<PageProjetAdmin> => {
 
   return apiFetch<PageProjetAdmin>(getListProjectsAdminUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListReportExtractionRunsUrl = (reportId: string,) => {
+
+
+
+
+  return `/admin/reports/${reportId}/extraction-runs`
+}
+
+/**
+ * @summary Exécutions du pipeline d'extraction d'un rapport (Docling, modèle LLM, prompt)
+ */
+export const listReportExtractionRuns = async (reportId: string, options?: RequestInit): Promise<ExtractionRunPublic[]> => {
+
+  return apiFetch<ExtractionRunPublic[]>(getListReportExtractionRunsUrl(reportId),
   {
     ...options,
     method: 'GET'

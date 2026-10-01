@@ -20,6 +20,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Textarea } from "@/shared/ui/textarea";
+import { ExtractionRunsCard } from "./ExtractionRunsCard";
 import { ReportFinancialsCard } from "./ReportFinancialsCard";
 import {
   useAdminReport,
@@ -235,6 +236,8 @@ export function AdminReportDetailPage() {
       </Card>
 
       <ReportFinancialsCard rapportId={rapport.id} />
+
+      <ExtractionRunsCard rapportId={rapport.id} />
 
       <Card>
         <CardHeader>

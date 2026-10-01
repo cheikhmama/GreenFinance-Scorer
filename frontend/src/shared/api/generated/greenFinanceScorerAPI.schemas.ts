@@ -680,6 +680,18 @@ export interface PreuveDocumentairePublic {
   excerpt_pdf_path: string;
 }
 
+/**
+ * Où une valeur se lit sur sa page-preuve (tâche 5.5) : fractions de la page (0 à 1),
+ * origine en haut à gauche — indépendantes de l'échelle d'affichage.
+ */
+export interface ProofBox {
+  page: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 export interface DonneeCarboneDetail {
   id: string;
   scope: number;
@@ -694,6 +706,8 @@ export interface DonneeCarboneDetail {
   proof_text: string | null;
   value_year: number | null;
   confidence: ConfidenceLevel | null;
+  extraction_run_id?: string | null;
+  proof_boxes?: ProofBox[];
 }
 
 export interface DonneesCarboneAgregees {
@@ -806,6 +820,8 @@ export interface IndicateurESGDetail {
   proof_text: string | null;
   value_year: number | null;
   confidence: ConfidenceLevel | null;
+  extraction_run_id?: string | null;
+  proof_boxes?: ProofBox[];
 }
 
 /**
@@ -914,6 +930,34 @@ export const EtatPosition = {
   CLOTUREE: 'CLOTUREE',
   ENTREPRISE_SUSPENDUE: 'ENTREPRISE_SUSPENDUE',
 } as const;
+
+/**
+ * Issue d'une exécution du pipeline d'extraction sur un rapport (tâche 5.5, table
+ * extraction_runs) — une ligne par tentative, jamais réécrite après sa clôture.
+ */
+export type ExtractionRunStatus = typeof ExtractionRunStatus[keyof typeof ExtractionRunStatus];
+
+
+export const ExtractionRunStatus = {
+  RUNNING: 'RUNNING',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  RETRY_SCHEDULED: 'RETRY_SCHEDULED',
+} as const;
+
+/**
+ * Une exécution du pipeline d'extraction (tâche 5.5) : ce qui a produit les valeurs.
+ */
+export interface ExtractionRunPublic {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: ExtractionRunStatus;
+  error: string | null;
+  docling_version: string;
+  llm_model: string;
+  prompt_version: string;
+}
 
 export interface FermerPositionRequest {
   end_date?: string | null;

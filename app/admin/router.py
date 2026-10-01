@@ -16,7 +16,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
 from app.admin.apercu import (
     calculer_performance_esg,
@@ -110,8 +110,12 @@ from app.core.dependencies import get_session
 from app.core.enums import AnalysisStatus, ProjectStatus, ReportStatus, Role
 from app.core.exceptions import NotFoundError
 from app.core.schemas import Page
-from app.ingestion.models import ESGReport
-from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
+from app.ingestion.models import ESGReport, ExtractionRun
+from app.ingestion.schemas import (
+    ExtractionRunPublic,
+    RapportESGDetail,
+    RapportESGPublic,
+)
 from app.institution.projets import lister_projets_admin
 from app.investor.portfolio import lister_portefeuilles_admin
 from app.researcher.analyses import lister_analyses_admin
@@ -1137,6 +1141,28 @@ def _donnees_financieres(rapport: ESGReport) -> ReportFinancials:
         enterprise_value=float(rapport.enterprise_value) if rapport.enterprise_value is not None else None,
         enterprise_value_currency=rapport.enterprise_value_currency,
         evic_date=rapport.evic_date,
+    )
+
+
+@router.get(
+    "/admin/reports/{report_id}/extraction-runs",
+    response_model=list[ExtractionRunPublic],
+    operation_id="listReportExtractionRuns",
+    summary="Exécutions du pipeline d'extraction d'un rapport (Docling, modèle LLM, prompt)",
+)
+def list_report_extraction_runs(
+    report_id: uuid.UUID,
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> list[ExtractionRun]:
+    if session.get(ESGReport, report_id) is None:
+        raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
+    return list(
+        session.exec(
+            select(ExtractionRun)
+            .where(col(ExtractionRun.report_id) == report_id)
+            .order_by(col(ExtractionRun.started_at).desc())
+        ).all()
     )
 
 

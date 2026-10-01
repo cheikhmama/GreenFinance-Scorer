@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.core.enums import (
     ConfidenceLevel,
     DataMethod,
+    ExtractionRunStatus,
     MetricCoverageStatus,
     Pillar,
     ReportStatus,
@@ -116,6 +117,32 @@ class PreuveDocumentairePublic(BaseModel):
     excerpt_pdf_path: str
 
 
+class ProofBox(BaseModel):
+    """Où une valeur se lit sur sa page-preuve (tâche 5.5) : fractions de la page (0 à 1),
+    origine en haut à gauche — indépendantes de l'échelle d'affichage."""
+
+    page: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+class ExtractionRunPublic(BaseModel):
+    """Une exécution du pipeline d'extraction (tâche 5.5) : ce qui a produit les valeurs."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    started_at: datetime
+    finished_at: datetime | None
+    status: ExtractionRunStatus
+    error: str | None
+    docling_version: str
+    llm_model: str
+    prompt_version: str
+
+
 class IndicateurESGDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -131,6 +158,10 @@ class IndicateurESGDetail(BaseModel):
     proof_text: str | None
     value_year: int | None
     confidence: ConfidenceLevel | None
+    # Exécution qui a produit la valeur et boîtes de la valeur citée (tâche 5.5) ; vides pour une
+    # valeur antérieure, ou quand le texte cité n'a pas été retrouvé sur la page.
+    extraction_run_id: uuid.UUID | None = None
+    proof_boxes: list[ProofBox] = Field(default_factory=list)
 
 
 class DonneeCarboneDetail(BaseModel):
@@ -150,6 +181,10 @@ class DonneeCarboneDetail(BaseModel):
     proof_text: str | None
     value_year: int | None
     confidence: ConfidenceLevel | None
+    # Exécution qui a produit la valeur et boîtes de la valeur citée (tâche 5.5) ; vides pour une
+    # valeur antérieure, ou quand le texte cité n'a pas été retrouvé sur la page.
+    extraction_run_id: uuid.UUID | None = None
+    proof_boxes: list[ProofBox] = Field(default_factory=list)
 
 
 class CouvertureIndicateurPublic(BaseModel):
