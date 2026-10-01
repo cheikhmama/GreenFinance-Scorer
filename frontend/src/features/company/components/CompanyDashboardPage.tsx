@@ -5,14 +5,14 @@ import type {
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { useMyNotifications } from "@/shared/notifications/api";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useCompanyReports, useReportChecklist } from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
-import { presentationSession } from "../session/presentation";
+import { dernierScoreAffichable, presentationSession } from "../session/presentation";
+import { StatusPill } from "../session/StatusPill";
 
 /** Jalons montrés dans le fil d'activité : les étapes internes de l'examen (affectation, avis)
  * restent hors du fil, comme du badge (tâches 5.1, 5.9). */
@@ -32,9 +32,8 @@ export function CompanyDashboardPage() {
   const { data: rapports, isPending } = useCompanyReports();
   const notifications = useMyNotifications(20);
   const { enCours, historique } = separerDeclarations(rapports ?? []);
-  const dernierScore = historique
-    .filter((r) => r.status === "VALIDATED" && r.official_global_score != null)
-    .sort((a, b) => (b.submitted_at ?? "").localeCompare(a.submitted_at ?? ""))[0];
+  // Jamais l'exercice de la session en cours ni un plus récent à côté d'elle (tâche 5.9).
+  const dernierScore = dernierScoreAffichable(historique, enCours[0]);
   const jalons = (notifications.data ?? []).filter((n) => n.type in JALONS).slice(0, 6);
 
   return (
@@ -93,11 +92,11 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
       <CardContent className="space-y-3">
         {rapport && presentation ? (
           <>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-2xl font-semibold text-brand-blue">
                 {libelleExercice(rapport.fiscal_year)}
               </span>
-              <Badge className={presentation.ton}>{presentation.libelle}</Badge>
+              <StatusPill presentation={presentation} />
             </div>
             <p className="text-sm text-brand-grey">{presentation.description}</p>
             {total ? (
@@ -160,7 +159,7 @@ function DernierScore({ rapport }: { rapport: RapportESGPublic | undefined }) {
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-brand-grey">Aucun score officiel publié pour l’instant.</p>
+          <p className="text-sm text-brand-grey">Aucun score officiel publié</p>
         )}
       </CardContent>
     </Card>

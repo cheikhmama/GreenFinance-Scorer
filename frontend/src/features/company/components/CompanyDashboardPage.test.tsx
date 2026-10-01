@@ -94,19 +94,19 @@ describe("Espace Entreprise — tableau de bord", () => {
     [
       "EXTRACTING",
       null,
-      "En cours d'examen 🔒",
+      "En cours d'examen",
       "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
     ],
     [
       "IN_AUDIT",
       "2026-09-02T10:00:00Z",
-      "En cours d'examen 🔒",
+      "En cours d'examen",
       "Votre rapport a été transmis et est en cours d'examen par l'équipe d'audit.",
     ],
     [
       "REVISION_REQUESTED",
       "2026-09-02T10:00:00Z",
-      "Précisions requises ⚠️",
+      "Correction demandée",
       "L'auditeur a demandé des précisions ou corrections sur votre rapport.",
     ],
   ])(
@@ -138,6 +138,32 @@ describe("Espace Entreprise — tableau de bord", () => {
     },
   );
 
+  it("n’affiche jamais le score de l’exercice en cours d’examen, mais le dernier exercice antérieur validé", async () => {
+    fetchMock.mockImplementation(async (url) =>
+      String(url).includes("/notifications")
+        ? Response.json({ items: [], page: 1, page_size: 20, total: 0, pages: 0 })
+        : Response.json([
+            rapportListe("v2023", { fiscal_year: 2023, official_global_score: 61.2 }),
+            rapportListe("v2025", { fiscal_year: 2025, official_global_score: 66.7 }),
+            rapportListe("enCours", {
+              fiscal_year: 2025,
+              type: "RAPPORT_ANNUEL",
+              status: "IN_AUDIT",
+              created_at: "2026-09-20T08:00:00Z",
+              official_global_score: null,
+            }),
+          ]),
+    );
+    renderPage();
+
+    const session = await screen.findByRole("region", { name: "Session active" });
+    expect(within(session).getByText("FY2025")).toBeInTheDocument();
+    const score = screen.getByRole("region", { name: "Dernier score officiel" });
+    expect(score).toHaveTextContent("FY2023");
+    expect(score).toHaveTextContent("61,2/100");
+    expect(score).not.toHaveTextContent("66,7");
+  });
+
   it("sans déclaration ni score, invite à en ouvrir une", async () => {
     fetchMock.mockImplementation(async (url) =>
       String(url).includes("/notifications")
@@ -147,7 +173,7 @@ describe("Espace Entreprise — tableau de bord", () => {
     renderPage();
 
     expect(await screen.findByText("Aucune déclaration en cours.")).toBeInTheDocument();
-    expect(screen.getByText("Aucun score officiel publié pour l’instant.")).toBeInTheDocument();
+    expect(screen.getByText("Aucun score officiel publié")).toBeInTheDocument();
     expect(await screen.findByText("Aucun jalon pour l’instant.")).toBeInTheDocument();
   });
 });
