@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.auth.schemas import EmailNormalise
 from app.company.identifiers import isin_valide, lei_valide
 from app.company.models import Company
-from app.core.enums import Currency, RegistrationStatus, ReportType
+from app.core.enums import Currency, KycCheckResult, RegistrationStatus, ReportType
 
 
 def company_vers_contrat(company: Company) -> dict[str, Any]:
@@ -74,6 +74,16 @@ class EntreprisePublic(CompanyContractMixin):
     isin: str | None = None
     lei: str | None = None
     ticker: str | None = None
+
+
+class VerificationLei(BaseModel):
+    """GET /company/lei-verification (tâche 5.9) : le LEI déclaré, confirmé ou non par la GLEIF.
+    `result` vaut PASSED seulement si l'enregistrement est actif ET le nom légal correspond ;
+    NOT_APPLICABLE sans LEI ; NOT_VERIFIABLE si la GLEIF n'a pas répondu. Rien n'est stocké."""
+
+    lei: str | None
+    result: KycCheckResult
+    detail: str
 
 
 class ImporterRapportParURLRequest(BaseModel):

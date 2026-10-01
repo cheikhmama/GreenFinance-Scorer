@@ -16,7 +16,7 @@ export function ProfilePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Entreprise"
+        eyebrow={entreprise?.name}
         title="Profil entreprise"
         description="Votre compte et la fiche de votre entreprise."
       />

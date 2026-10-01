@@ -16,6 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from sqlmodel import Session
 
+from app.admin.kyc import controles_gleif
 from app.auth.models import User
 from app.auth.permissions import require_role
 from app.company.import_rate_limit import enforce_url_import_rate_limit
@@ -38,11 +39,12 @@ from app.company.schemas import (
     ImporterRapportParURLRequest,
     RegistrationStatusRequest,
     RegistrationStatusView,
+    VerificationLei,
 )
 from app.company.upload_validation import TAILLE_MAX_MANDAT_OCTETS
 from app.core import storage
 from app.core.dependencies import get_session
-from app.core.enums import ReportStatus, ReportType, Role
+from app.core.enums import KycCheckResult, ReportStatus, ReportType, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.ingestion.models import ESGReport
 from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
@@ -165,6 +167,39 @@ def consulter_mon_profil_route(
     _entreprise_id(current_user)  # lève si aucune entreprise n'est rattachée
     assert current_user.company is not None
     return current_user.company
+
+
+@router.get(
+    "/company/lei-verification",
+    response_model=VerificationLei,
+    operation_id="getMyLeiVerification",
+    summary="Vérifier en direct le LEI de mon entreprise auprès de la GLEIF",
+)
+def verifier_mon_lei_route(
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
+) -> VerificationLei:
+    """Badge « GLEIF Validé » de l'en-tête Entreprise (tâche 5.9) : même contrôle que la fenêtre
+    KYC de l'Administrateur (app/admin/kyc.py), refait à chaque appel, jamais stocké."""
+    _entreprise_id(current_user)
+    entreprise = current_user.company
+    assert entreprise is not None
+    controles = controles_gleif(entreprise)
+    resultats = {controle.result for controle in controles}
+    if resultats == {KycCheckResult.PASSED}:
+        resultat = KycCheckResult.PASSED
+    else:
+        # Le plus parlant d'abord : un refus, puis une GLEIF muette, puis l'absence de LEI.
+        resultat = next(
+            r
+            for r in (
+                KycCheckResult.FAILED,
+                KycCheckResult.NOT_VERIFIABLE,
+                KycCheckResult.NOT_APPLICABLE,
+            )
+            if r in resultats
+        )
+    detail = " ".join(controle.detail for controle in controles if controle.result == resultat)
+    return VerificationLei(lei=entreprise.lei, result=resultat, detail=detail)
 
 
 @router.get(

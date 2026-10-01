@@ -3,6 +3,7 @@ import type { ApiError } from "@/shared/api/errors";
 import {
   getCompanyReport,
   getMyCompanyProfile,
+  getMyLeiVerification,
   getRegistrationStatus,
   listCompanyReports,
   registerCompany,
@@ -20,6 +21,7 @@ import type {
   RegistrationStatusView,
   ReportCreateRequest,
   ReportResponse,
+  VerificationLei,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   attachReportFile,
@@ -120,6 +122,18 @@ export function useMyCompanyProfile() {
   return useQuery<EntreprisePublic, ApiError>({
     queryKey: ["company", "profil"],
     queryFn: () => getMyCompanyProfile(),
+  });
+}
+
+/** GET /company/lei-verification — contrôle GLEIF en direct (tâche 5.9), seulement si un LEI est
+ * déclaré ; gardé dix minutes pour ne pas solliciter la GLEIF à chaque page. */
+export function useMyLeiVerification(lei: string | null | undefined) {
+  return useQuery<VerificationLei, ApiError>({
+    queryKey: ["company", "lei-verification", lei],
+    queryFn: () => getMyLeiVerification(),
+    enabled: Boolean(lei),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
   });
 }
 

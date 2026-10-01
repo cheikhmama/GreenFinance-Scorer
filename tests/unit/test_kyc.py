@@ -84,8 +84,8 @@ def _entreprise(**champs) -> Company:
 def test_controles_gleif_reussis_par_nom_legal_ou_autre_nom(monkeypatch) -> None:
     monkeypatch.setattr(kyc, "recuperer_fiche_gleif", lambda _lei: FICHE)
 
-    legal = kyc._controles_gleif(_entreprise(lei="5493001KJTIIGC8Y1R12"))
-    commercial = kyc._controles_gleif(_entreprise(lei="5493001KJTIIGC8Y1R12", name="MDN Mining"))
+    legal = kyc.controles_gleif(_entreprise(lei="5493001KJTIIGC8Y1R12"))
+    commercial = kyc.controles_gleif(_entreprise(lei="5493001KJTIIGC8Y1R12", name="MDN Mining"))
 
     assert [c.result for c in legal] == [KycCheckResult.PASSED, KycCheckResult.PASSED]
     assert commercial[1].result == KycCheckResult.PASSED
@@ -96,7 +96,7 @@ def test_enregistrement_echu_et_nom_different(monkeypatch) -> None:
     echu = {**FICHE, "registration": {"status": "LAPSED"}}
     monkeypatch.setattr(kyc, "recuperer_fiche_gleif", lambda _lei: echu)
 
-    enregistrement, nom = kyc._controles_gleif(
+    enregistrement, nom = kyc.controles_gleif(
         _entreprise(lei="5493001KJTIIGC8Y1R12", name="Autre Société")
     )
 
@@ -107,13 +107,13 @@ def test_enregistrement_echu_et_nom_different(monkeypatch) -> None:
 
 
 def test_sans_lei_ou_gleif_injoignable(monkeypatch) -> None:
-    sans_lei = kyc._controles_gleif(_entreprise())
+    sans_lei = kyc.controles_gleif(_entreprise())
 
     def _injoignable(_lei):
         raise kyc.GleifIndisponible
 
     monkeypatch.setattr(kyc, "recuperer_fiche_gleif", _injoignable)
-    injoignable = kyc._controles_gleif(_entreprise(lei="5493001KJTIIGC8Y1R12"))
+    injoignable = kyc.controles_gleif(_entreprise(lei="5493001KJTIIGC8Y1R12"))
 
     assert {c.result for c in sans_lei} == {KycCheckResult.NOT_APPLICABLE}
     assert {c.result for c in injoignable} == {KycCheckResult.NOT_VERIFIABLE}

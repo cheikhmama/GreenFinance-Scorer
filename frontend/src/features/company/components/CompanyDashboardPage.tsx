@@ -6,11 +6,11 @@ import type {
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { useMyNotifications } from "@/shared/notifications/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useCompanyReports, useReportChecklist } from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
 import { dernierScoreAffichable, presentationSession } from "../session/presentation";
+import { CompanyIdentityHeader } from "./CompanyIdentityHeader";
 
 /** Jalons montrés dans le fil d'activité : les étapes internes de l'examen (affectation, avis)
  * restent hors du fil, comme du badge (tâches 5.1, 5.9). */
@@ -36,11 +36,7 @@ export function CompanyDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Entreprise"
-        title="Tableau de bord"
-        description="Votre déclaration en cours, votre dernier score officiel et les derniers jalons."
-      />
+      <CompanyIdentityHeader />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {isPending ? <Skeleton className="h-44 w-full" /> : <SessionActive rapport={enCours[0]} />}

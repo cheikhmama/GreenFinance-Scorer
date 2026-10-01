@@ -108,7 +108,9 @@ def _noms_gleif(fiche: dict[str, Any]) -> tuple[str | None, list[str]]:
     return nom_legal if isinstance(nom_legal, str) else None, autres
 
 
-def _controles_gleif(entreprise: Company) -> list[KycCheck]:
+def controles_gleif(entreprise: Company) -> list[KycCheck]:
+    """Enregistrement LEI et nom légal, vérifiés en direct auprès de la GLEIF. Partagé par la
+    fenêtre KYC et l'en-tête de l'espace Entreprise (tâche 5.9)."""
     def controle(code: str, libelle: str, resultat: KycCheckResult, detail: str) -> KycCheck:
         return KycCheck(code=code, label=libelle, result=resultat, detail=detail, source=SOURCE_GLEIF)
 
@@ -249,5 +251,5 @@ def rapport_kyc(session: Session, entreprise_id: uuid.UUID) -> KycReport:
         info_requested_at=entreprise.info_requested_at,
         info_response_message=entreprise.info_response_message,
         checked_at=utcnow(),
-        checks=[*_controles_gleif(entreprise), _controle_domaine(entreprise, email), _controle_mandat(entreprise)],
+        checks=[*controles_gleif(entreprise), _controle_domaine(entreprise, email), _controle_mandat(entreprise)],
     )

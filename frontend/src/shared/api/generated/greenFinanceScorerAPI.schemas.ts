@@ -1930,6 +1930,17 @@ export interface UtilisateurCree {
 }
 
 /**
+ * GET /company/lei-verification (tâche 5.9) : le LEI déclaré, confirmé ou non par la GLEIF.
+ * `result` vaut PASSED seulement si l'enregistrement est actif ET le nom légal correspond ;
+ * NOT_APPLICABLE sans LEI ; NOT_VERIFIABLE si la GLEIF n'a pas répondu. Rien n'est stocké.
+ */
+export interface VerificationLei {
+  lei: string | null;
+  result: KycCheckResult;
+  detail: string;
+}
+
+/**
  * Étape 1 du changement de mot de passe progressif côté frontend — vérifie sans rien
  * modifier, pour afficher une erreur au bon endroit avant même de proposer un nouveau mot de
  * passe. Jamais de contenu retourné au-delà du statut HTTP : ni confirmer ni infirmer autre

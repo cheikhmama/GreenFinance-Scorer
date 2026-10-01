@@ -11,7 +11,7 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports } from "../api";
+import { useCompanyReports, useMyCompanyProfile } from "../api";
 import { libelleExercice, separerDeclarations } from "../session/etat";
 import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
 import { SessionStepper } from "../session/SessionStepper";
@@ -34,13 +34,14 @@ function date(iso: string | null) {
  * empreinte du fichier). */
 export function CompanyDeclarationsPage() {
   const { data: rapports, isPending, isError } = useCompanyReports();
+  const { data: entreprise } = useMyCompanyProfile();
   const [creation, setCreation] = useState(false);
   const { enCours, historique } = separerDeclarations(rapports ?? []);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Entreprise"
+        eyebrow={entreprise?.name}
         title="Mes déclarations"
         description="Préparez, soumettez et suivez vos déclarations ESG par exercice."
         action={

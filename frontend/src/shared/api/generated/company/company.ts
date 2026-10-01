@@ -14,7 +14,8 @@ import type {
   RapportESGDetail,
   RapportESGPublic,
   RegistrationStatusRequest,
-  RegistrationStatusView
+  RegistrationStatusView,
+  VerificationLei
 } from '../greenFinanceScorerAPI.schemas';
 
 import { apiFetch } from '../../client';
@@ -133,6 +134,31 @@ export const getGetMyCompanyProfileUrl = () => {
 export const getMyCompanyProfile = async ( options?: RequestInit): Promise<EntreprisePublic> => {
 
   return apiFetch<EntreprisePublic>(getGetMyCompanyProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getGetMyLeiVerificationUrl = () => {
+
+
+
+
+  return `/company/lei-verification`
+}
+
+/**
+ * Badge « GLEIF Validé » de l'en-tête Entreprise (tâche 5.9) : même contrôle que la fenêtre
+ * KYC de l'Administrateur (app/admin/kyc.py), refait à chaque appel, jamais stocké.
+ * @summary Vérifier en direct le LEI de mon entreprise auprès de la GLEIF
+ */
+export const getMyLeiVerification = async ( options?: RequestInit): Promise<VerificationLei> => {
+
+  return apiFetch<VerificationLei>(getGetMyLeiVerificationUrl(),
   {
     ...options,
     method: 'GET'
