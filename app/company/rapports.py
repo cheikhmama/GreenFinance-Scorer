@@ -20,7 +20,6 @@ from app.company.url_fetch import telecharger_pdf_depuis_url
 from app.core.database import utcnow
 from app.core.enums import (
     CompanyStatus,
-    ExtractionStatus,
     ReportStatus,
     ReportType,
     SubmissionChannel,
@@ -103,7 +102,7 @@ def deposer_fichier(
 ) -> ESGReport:
     """Dépose le PDF d'un rapport — nouveau (dépôt en une étape) ou brouillon existant (tâche 1.5,
     POST /reports/{id}/submit) — et le soumet à l'extraction : validation du PDF, détection de
-    doublon, stockage, statut SUBMITTED + extraction QUEUED, notification, un seul commit, puis
+    doublon, stockage, statut EXTRACTING (job en file), notification, un seul commit, puis
     extraction en tâche de fond. Point unique : les deux chemins de dépôt appliquent exactement
     les mêmes règles."""
     entreprise = session.get(Company, rapport.company_id)
@@ -117,8 +116,8 @@ def deposer_fichier(
     rapport.source_file = chemin_relatif
     rapport.original_filename = nettoyer_nom_fichier(nom_fichier_origine)
     rapport.checksum_sha256 = checksum
-    rapport.status = ReportStatus.SUBMITTED
-    rapport.extraction_status = ExtractionStatus.QUEUED
+    rapport.status = ReportStatus.EXTRACTING
+    rapport.extraction_started_at = None
     rapport.submitted_at = utcnow()
     try:
         session.add(rapport)

@@ -47,7 +47,7 @@ export function AdminCompanyReportsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={variantStatutRapport(rapport.status)}>
-                  {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+                  {libelleStatutRapport(rapport.status)}
                 </Badge>
                 <Button asChild size="sm" variant="outline">
                   <Link to={`/admin/rapports/${rapport.id}`}>Ouvrir</Link>

@@ -736,16 +736,21 @@ export interface DonneesCarboneAgregees {
 }
 
 /**
- * Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
- * d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne.
+ * Cycle de vie d'un rapport (docs/WORKFLOWS.md §1.2), extraction comprise (tâche 5.1 : un
+ * seul statut, l'ancien ExtractionStatus est fondu ici).
+ *
+ * Pendant EXTRACTING, `extraction_started_at` distingue un job en file (NULL) d'un job en cours
+ * (renseigné) — c'est la seule différence dont la supervision a besoin.
  */
 export type ReportStatus = typeof ReportStatus[keyof typeof ReportStatus];
 
 
 export const ReportStatus = {
   DRAFT: 'DRAFT',
-  SUBMITTED: 'SUBMITTED',
-  PENDING_AUDIT: 'PENDING_AUDIT',
+  EXTRACTING: 'EXTRACTING',
+  EXTRACTION_FAILED: 'EXTRACTION_FAILED',
+  AWAITING_ASSIGNMENT: 'AWAITING_ASSIGNMENT',
+  IN_AUDIT: 'IN_AUDIT',
   PENDING_DECISION: 'PENDING_DECISION',
   REVISION_REQUESTED: 'REVISION_REQUESTED',
   VALIDATED: 'VALIDATED',
@@ -940,17 +945,6 @@ export const EtatPosition = {
   ACTIVE: 'ACTIVE',
   CLOTUREE: 'CLOTUREE',
   ENTREPRISE_SUSPENDUE: 'ENTREPRISE_SUSPENDUE',
-} as const;
-
-export type ExtractionStatus = typeof ExtractionStatus[keyof typeof ExtractionStatus];
-
-
-export const ExtractionStatus = {
-  NOT_STARTED: 'NOT_STARTED',
-  QUEUED: 'QUEUED',
-  RUNNING: 'RUNNING',
-  DONE: 'DONE',
-  FAILED: 'FAILED',
 } as const;
 
 export interface FermerPositionRequest {
@@ -1270,7 +1264,6 @@ export interface RapportESGPublic {
   created_at: string;
   submitted_at: string | null;
   status: ReportStatus;
-  extraction_status: ExtractionStatus;
   source_file: string | null;
   original_filename: string | null;
   fiscal_year: number | null;
@@ -1295,7 +1288,6 @@ export interface ReportResponse {
   report_type: ReportType;
   fiscal_year: number | null;
   status: ReportStatus;
-  extraction_status: ExtractionStatus;
   version: number;
   previous_report_id: string | null;
   created_at: string;
@@ -1523,7 +1515,6 @@ export interface RapportESGDetail {
   created_at: string;
   submitted_at: string | null;
   status: ReportStatus;
-  extraction_status: ExtractionStatus;
   source_file: string | null;
   original_filename: string | null;
   fiscal_year: number | null;

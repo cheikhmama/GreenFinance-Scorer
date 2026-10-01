@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleStatutRapportEntreprise,
+  variantStatutRapportEntreprise,
+} from "@/shared/format/statut";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -53,16 +56,11 @@ export function CompanyReportsPage() {
                     <tr key={rapport.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         <div className="flex flex-col gap-1">
-                          <Badge variant={variantStatutRapport(rapport.status)}>
-                            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+                          <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
+                            {libelleStatutRapportEntreprise(rapport.status)}
                           </Badge>
-                          {/* Une relance d'extraction peut échouer sur un rapport déjà avancé
-                              dans le workflow (PENDING_AUDIT et au-delà) — le message n'est
-                              actionnable que tant que le rapport est encore SUBMITTED, jamais
-                              après. */}
-                          {rapport.extraction_error &&
-                          rapport.status === "SUBMITTED" &&
-                          rapport.extraction_status === "FAILED" ? (
+                          {/* Message actionnable seulement tant que l'échec est l'état courant. */}
+                          {rapport.extraction_error && rapport.status === "EXTRACTION_FAILED" ? (
                             <span className="text-xs text-destructive">
                               Échec d'extraction récupérable — nouvelle version possible.
                             </span>

@@ -1,7 +1,6 @@
 """Entités de persistance produites par le pipeline d'extraction documentaire.
 
-ESGReport porte le cycle de vie documentaire (ReportStatus) et l'avancement de son extraction
-(ExtractionStatus). Les entités qui en dérivent (ESGMetric, CarbonEmission, Evidence —
+ESGReport porte le cycle de vie du rapport, extraction comprise (ReportStatus, tâche 5.1). Les entités qui en dérivent (ESGMetric, CarbonEmission, Evidence —
 Prompt 3.5 ; DiscrepancyFlag — Prompt 3.8) sont exclusivement produites
 par le pipeline automatique (Étapes 4 à 7) : un Auditeur les consulte et
 les valide via AuditOpinion (app/audit/models.py), il ne les crée jamais
@@ -20,7 +19,6 @@ from app.core.database import utcnow
 from app.core.enums import (
     ConfidenceLevel,
     DataMethod,
-    ExtractionStatus,
     MetricCoverageStatus,
     Pillar,
     ReportStatus,
@@ -75,13 +73,7 @@ class ESGReport(SQLModel, table=True):
     # Moment du dépôt du fichier : nul tant que le rapport est un brouillon (DRAFT, tâche 1.5).
     submitted_at: datetime | None = Field(default=None)
     status: ReportStatus = Field(
-        default=ReportStatus.SUBMITTED, sa_column=sa_enum_column(ReportStatus)
-    )
-    # Avancement du pipeline d'extraction, distinct du statut métier (docs/RENAME_PLAN.md §2.4) :
-    # un rapport reste SUBMITTED pendant toute l'extraction, qu'elle soit en file, en cours,
-    # terminée ou échouée.
-    extraction_status: ExtractionStatus = Field(
-        default=ExtractionStatus.QUEUED, sa_column=sa_enum_column(ExtractionStatus)
+        default=ReportStatus.EXTRACTING, sa_column=sa_enum_column(ReportStatus)
     )
     # Chemin de stockage du PDF déposé — nul tant que le rapport est un brouillon.
     source_file: str | None = Field(default=None)
@@ -104,8 +96,9 @@ class ESGReport(SQLModel, table=True):
     # Horodatages du pipeline d'extraction (Étape 5, Phase 6). extraction_error ne contient
     # jamais str(exception) (fuite potentielle de contenu sensible), seulement une chaîne de
     # classification fixe — voir app/ingestion/extractor.py. extraction_started_at est posé à
-    # chaque entrée dans le pipeline : RUNNING au-delà de settings.extraction_timeout_minutes
-    # signale un traitement interrompu.
+    # chaque entrée dans le pipeline et remis à NULL quand le job retourne en file : un rapport
+    # EXTRACTING avec un début plus ancien que settings.extraction_timeout_minutes signale un
+    # traitement interrompu.
     extraction_started_at: datetime | None = Field(default=None)
     extraction_finished_at: datetime | None = Field(default=None)
     extraction_error: str | None = Field(default=None)

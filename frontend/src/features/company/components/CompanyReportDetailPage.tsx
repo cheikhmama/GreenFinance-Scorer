@@ -4,7 +4,10 @@ import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleStatutRapportEntreprise,
+  variantStatutRapportEntreprise,
+} from "@/shared/format/statut";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -35,27 +38,26 @@ export function CompanyReportDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/company/rapports" className="text-sm text-brand-green underline underline-offset-2">
+        <Link
+          to="/company/rapports"
+          className="text-sm text-brand-green underline underline-offset-2"
+        >
           ← Mes rapports
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-brand-blue">
           Rapport {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
         </h1>
         <div className="mt-2 flex items-center gap-2">
-          <Badge variant={variantStatutRapport(rapport.status)}>
-            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+          <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
+            {libelleStatutRapportEntreprise(rapport.status)}
           </Badge>
           <span className="text-sm text-brand-grey">
             version {rapport.version}
             {rapport.previous_report_id ? " (correction)" : ""}
           </span>
         </div>
-        {/* Même garde que CompanyReportsPage.tsx : une relance d'extraction peut échouer sur un
-            rapport déjà avancé dans le workflow -- n'afficher que tant que c'est encore
-            actionnable (rapport encore SUBMITTED). */}
-        {rapport.extraction_error &&
-        rapport.status === "SUBMITTED" &&
-        rapport.extraction_status === "FAILED" ? (
+        {/* Cause affichée seulement tant que l'échec est l'état courant du rapport. */}
+        {rapport.extraction_error && rapport.status === "EXTRACTION_FAILED" ? (
           <p className="mt-2 text-sm text-destructive">
             Échec d'extraction : {libelleCauseExtraction(rapport.extraction_error)}
           </p>

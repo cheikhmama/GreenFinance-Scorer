@@ -16,7 +16,7 @@ from app.audit.models import AuditOpinion
 from app.auth.models import User
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import ExtractionStatus, ReportStatus, Role
+from app.core.enums import ReportStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
@@ -30,13 +30,13 @@ def affecter_auditeur(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
-    if rapport.status != ReportStatus.SUBMITTED:
-        raise ValidationError(
-            "Ce rapport n'est pas en attente d'affectation.", code="rapport_deja_affecte"
-        )
-    if rapport.extraction_status != ExtractionStatus.DONE:
+    if rapport.status in (ReportStatus.EXTRACTING, ReportStatus.EXTRACTION_FAILED):
         raise ValidationError(
             "L'extraction de ce rapport n'est pas terminée.", code="extraction_non_terminee"
+        )
+    if rapport.status != ReportStatus.AWAITING_ASSIGNMENT:
+        raise ValidationError(
+            "Ce rapport n'est pas en attente d'affectation.", code="rapport_deja_affecte"
         )
 
     auditeur = session.get(User, auditeur_id)
@@ -44,7 +44,7 @@ def affecter_auditeur(session: Session, rapport_id: uuid.UUID, auditeur_id: uuid
         raise ValidationError("Auditeur invalide.", code="auditeur_invalide")
 
     rapport.auditor_id = auditeur.id
-    rapport.status = ReportStatus.PENDING_AUDIT
+    rapport.status = ReportStatus.IN_AUDIT
     rapport.assigned_at = utcnow()
     session.add(rapport)
 
@@ -82,7 +82,7 @@ def statistiques_charge_globale(session: Session) -> tuple[int, int]:
     dossiers_affectes = session.exec(
         select(func.count())
         .select_from(ESGReport)
-        .where(col(ESGReport.status) == ReportStatus.PENDING_AUDIT)
+        .where(col(ESGReport.status) == ReportStatus.IN_AUDIT)
     ).one()
     avis_rendus = session.exec(select(func.count()).select_from(AuditOpinion)).one()
     return dossiers_affectes, avis_rendus
@@ -125,7 +125,7 @@ def lister_charge_auditeurs(
             .select_from(ESGReport)
             .where(
                 col(ESGReport.auditor_id) == auditeur.id,
-                col(ESGReport.status) == ReportStatus.PENDING_AUDIT,
+                col(ESGReport.status) == ReportStatus.IN_AUDIT,
             )
         ).one()
         dossiers_en_retard = session.exec(
@@ -133,7 +133,7 @@ def lister_charge_auditeurs(
             .select_from(ESGReport)
             .where(
                 col(ESGReport.auditor_id) == auditeur.id,
-                col(ESGReport.status) == ReportStatus.PENDING_AUDIT,
+                col(ESGReport.status) == ReportStatus.IN_AUDIT,
                 col(ESGReport.assigned_at).is_not(None),
                 col(ESGReport.assigned_at) < seuil_retard,
             )

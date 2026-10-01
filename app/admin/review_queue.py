@@ -21,7 +21,7 @@ from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import CompanyStatus, Currency, ExtractionStatus, ReportStatus
+from app.core.enums import CompanyStatus, Currency, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
@@ -38,8 +38,7 @@ def lister_rapports_a_affecter(session: Session) -> list[ESGReport]:
         session.exec(
             select(ESGReport)
             .where(
-                ESGReport.status == ReportStatus.SUBMITTED,
-                ESGReport.extraction_status == ExtractionStatus.DONE,
+                ESGReport.status == ReportStatus.AWAITING_ASSIGNMENT,
             )
             .order_by(col(ESGReport.extraction_finished_at))
         ).all()
@@ -58,16 +57,14 @@ def lister_rapports_en_validation(session: Session) -> list[ESGReport]:
 
 
 def lister_rapports_echec_extraction(session: Session) -> list[ESGReport]:
-    """Rapports soumis dont l'extraction a échoué (ExtractionStatus.FAILED, cause classifiée dans
-    extraction_error) — invisibles de lister_rapports_a_affecter, qui ne retient que DONE. Sans
-    cette vue, un rapport déposé par une Entreprise reste bloqué en SUBMITTED indéfiniment,
-    invisible de tout tableau de bord Admin."""
+    """Rapports dont l'extraction a échoué (EXTRACTION_FAILED, cause classifiée dans
+    extraction_error) — sans cette vue, un rapport déposé par une Entreprise resterait bloqué
+    indéfiniment, invisible de tout tableau de bord Admin."""
     return list(
         session.exec(
             select(ESGReport)
             .where(
-                ESGReport.status == ReportStatus.SUBMITTED,
-                ESGReport.extraction_status == ExtractionStatus.FAILED,
+                ESGReport.status == ReportStatus.EXTRACTION_FAILED,
             )
             .order_by(col(ESGReport.submitted_at))
         ).all()
@@ -77,22 +74,17 @@ def lister_rapports_echec_extraction(session: Session) -> list[ESGReport]:
 def relancer_extraction(session: Session, rapport_id: uuid.UUID) -> ESGReport:
     """Autorise une nouvelle tentative d'extraction pour un rapport soumis en échec (cause classifiée,
     ou `delai_depasse` posé par la tâche planifiée) — jamais pour une extraction encore en cours ni
-    pour un rapport déjà avancé dans le workflow. Le repassage à QUEUED DANS CETTE MÊME transaction est la
-    garde de concurrence : un second appel simultané relit QUEUED et se fait rejeter par la
+    pour un rapport déjà avancé dans le workflow. Le repassage à EXTRACTING DANS CETTE MÊME transaction est
+    la garde de concurrence : un second appel simultané relit EXTRACTING et se fait rejeter par la
     vérification ci-dessous, sans verrou applicatif supplémentaire — même principe que les autres
     gardes d'état de ce fichier. Le dépôt du job d'extraction, après le commit, reste du
     ressort de la route (app/admin/router.py)."""
     rapport = session.get(ESGReport, rapport_id)
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
-    if rapport.status != ReportStatus.SUBMITTED:
-        raise ValidationError(
-            "Seul un rapport en cours d'extraction peut être relancé.", code="transition_invalide"
-        )
-
-    if rapport.extraction_status != ExtractionStatus.FAILED:
+    if rapport.status != ReportStatus.EXTRACTION_FAILED:
         # Une extraction interrompue n'a plus à être repérée ici : la tâche planifiée du worker la
-        # passe FAILED (`delai_depasse`, app/ingestion/supervision.py) — tâche 4.1.
+        # passe EXTRACTION_FAILED (`delai_depasse`, app/ingestion/supervision.py) — tâche 4.1.
         raise ValidationError(
             "Ce rapport n'est pas en échec d'extraction : rien à relancer.", code="relance_impossible"
         )
@@ -106,7 +98,8 @@ def relancer_extraction(session: Session, rapport_id: uuid.UUID) -> ESGReport:
         )
 
     rapport.extraction_error = None
-    rapport.extraction_status = ExtractionStatus.QUEUED
+    rapport.status = ReportStatus.EXTRACTING
+    rapport.extraction_started_at = None
     session.add(rapport)
     session.commit()
     session.refresh(rapport)
@@ -143,7 +136,7 @@ def lister_rapports_en_retard(session: Session) -> list[ESGReport]:
         session.exec(
             select(ESGReport)
             .where(
-                ESGReport.status == ReportStatus.PENDING_AUDIT,
+                ESGReport.status == ReportStatus.IN_AUDIT,
                 col(ESGReport.assigned_at).is_not(None),
                 col(ESGReport.assigned_at) < seuil_retard,
             )

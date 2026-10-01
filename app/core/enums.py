@@ -24,25 +24,23 @@ def sa_enum_column(enum_cls: type[Enum], *, nullable: bool = False) -> Column:
 
 
 class ReportStatus(str, Enum):
-    """Cycle de vie métier d'un rapport (docs/WORKFLOWS.md §1.2). L'avancement du pipeline
-    d'extraction n'y figure plus : il vit dans ExtractionStatus, sur sa propre colonne."""
+    """Cycle de vie d'un rapport (docs/WORKFLOWS.md §1.2), extraction comprise (tâche 5.1 : un
+    seul statut, l'ancien ExtractionStatus est fondu ici).
+
+    Pendant EXTRACTING, `extraction_started_at` distingue un job en file (NULL) d'un job en cours
+    (renseigné) — c'est la seule différence dont la supervision a besoin.
+    """
 
     DRAFT = "DRAFT"
-    SUBMITTED = "SUBMITTED"
-    PENDING_AUDIT = "PENDING_AUDIT"
+    EXTRACTING = "EXTRACTING"
+    EXTRACTION_FAILED = "EXTRACTION_FAILED"
+    AWAITING_ASSIGNMENT = "AWAITING_ASSIGNMENT"
+    IN_AUDIT = "IN_AUDIT"
     # Avis de l'auditeur rendu, décision de l'Administrateur attendue (décision D2).
     PENDING_DECISION = "PENDING_DECISION"
     REVISION_REQUESTED = "REVISION_REQUESTED"
     VALIDATED = "VALIDATED"
     REJECTED = "REJECTED"
-
-
-class ExtractionStatus(str, Enum):
-    NOT_STARTED = "NOT_STARTED"
-    QUEUED = "QUEUED"
-    RUNNING = "RUNNING"
-    DONE = "DONE"
-    FAILED = "FAILED"
 
 
 class CompanyStatus(str, Enum):

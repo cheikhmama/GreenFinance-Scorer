@@ -13,7 +13,6 @@ from app.core.database import utcnow
 from app.core.enums import (
     AuditDecision,
     DataMethod,
-    ExtractionStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -53,9 +52,9 @@ def _create_rapport_affecte(session, auditeur_id: uuid.UUID | None) -> ESGReport
         company_id=entreprise.id,
         type=ReportType.RAPPORT_ESG,
         channel=SubmissionChannel.ENTREPRISE,
-        status=ReportStatus.PENDING_AUDIT if auditeur_id else ReportStatus.SUBMITTED,
+        status=ReportStatus.IN_AUDIT if auditeur_id else ReportStatus.AWAITING_ASSIGNMENT,
         source_file="rapports/test/dummy.pdf",
-        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
         auditor_id=auditeur_id,
         submitted_at=utcnow(),
     )

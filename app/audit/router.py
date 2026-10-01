@@ -43,7 +43,7 @@ def lister_mes_dossiers(
         session.exec(
             select(ESGReport).where(
                 ESGReport.auditor_id == current_user.id,
-                ESGReport.status == ReportStatus.PENDING_AUDIT,
+                ESGReport.status == ReportStatus.IN_AUDIT,
             )
         ).all()
     )

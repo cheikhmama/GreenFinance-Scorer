@@ -4,7 +4,6 @@ from app.core.enums import (
     Currency,
     DataMethod,
     DurationType,
-    ExtractionStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -14,25 +13,17 @@ from app.core.enums import (
 
 
 def test_report_status_values() -> None:
-    assert {s.value for s in ReportStatus} == {
+    assert [s.value for s in ReportStatus] == [
         "DRAFT",
-        "SUBMITTED",
-        "PENDING_AUDIT",
+        "EXTRACTING",
+        "EXTRACTION_FAILED",
+        "AWAITING_ASSIGNMENT",
+        "IN_AUDIT",
         "PENDING_DECISION",
         "REVISION_REQUESTED",
         "VALIDATED",
         "REJECTED",
-    }
-
-
-def test_extraction_status_values() -> None:
-    assert {s.value for s in ExtractionStatus} == {
-        "NOT_STARTED",
-        "QUEUED",
-        "RUNNING",
-        "DONE",
-        "FAILED",
-    }
+    ]
 
 
 def test_company_status_values() -> None:

@@ -20,7 +20,6 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.core.enums import (
     ConfidenceLevel,
     DataMethod,
-    ExtractionStatus,
     MetricCoverageStatus,
     Pillar,
     ReportStatus,
@@ -92,11 +91,9 @@ class RapportESGPublic(BaseModel):
     # Nuls pour un brouillon (DRAFT, tâche 1.5) : ni fichier ni dépôt tant que la déclaration
     # n'est pas soumise.
     submitted_at: datetime | None
+    # Statut unique, extraction comprise (tâche 5.1). L'espace Entreprise regroupe les états
+    # d'examen en un seul libellé ; les rôles internes voient l'état détaillé.
     status: ReportStatus
-    # Avancement de l'extraction, distinct du statut métier (ExtractionStatus) — ajouté au
-    # contrat avec le découpage de l'ancien statut unique, pour que le frontend distingue un
-    # rapport en file, en cours, extrait ou en échec sans le déduire des horodatages.
-    extraction_status: ExtractionStatus
     source_file: str | None
     original_filename: str | None
     fiscal_year: int | None

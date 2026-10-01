@@ -11,7 +11,6 @@ from app.auth.models import User
 from app.core.database import utcnow
 from app.core.enums import (
     CompanyStatus,
-    ExtractionStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -64,7 +63,7 @@ def test_ouvrir_une_declaration_cree_un_brouillon_sans_fichier(session, entrepri
     brouillon = _ouvrir(client)
 
     assert brouillon["status"] == ReportStatus.DRAFT.value
-    assert brouillon["extraction_status"] == ExtractionStatus.NOT_STARTED.value
+    assert "extraction_status" not in brouillon
     assert brouillon["company_id"] == str(user.company.id)
     assert brouillon["submitted_at"] is None
     # Les listes historiques de l'espace Entreprise l'affichent aussi (contrat rendu nullable).
@@ -131,7 +130,7 @@ def test_perimetre_entreprise_et_auditeur(session, entreprise) -> None:
         type=ReportType.RAPPORT_CLIMAT,
         channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=2023,
-        status=ReportStatus.PENDING_AUDIT,
+        status=ReportStatus.IN_AUDIT,
         source_file="rapports/test/affecte.pdf",
         submitted_at=utcnow(),
         auditor_id=auditeur.id,
@@ -178,8 +177,8 @@ def test_soumettre_un_brouillon_le_depose_et_programme_lextraction(
     assert soumis.status_code == 200
     corps = soumis.json()
     assert corps["id"] == brouillon["id"]
-    assert corps["status"] == ReportStatus.SUBMITTED.value
-    assert corps["extraction_status"] == ExtractionStatus.QUEUED.value
+    assert corps["status"] == ReportStatus.EXTRACTING.value
+    assert "extraction_status" not in corps
     assert corps["submitted_at"] is not None
     assert corps["original_filename"] == "rapport-2024.pdf"
     assert [

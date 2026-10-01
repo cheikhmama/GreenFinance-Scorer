@@ -40,7 +40,7 @@ def soumettre_avis(
     if rapport is None or rapport.auditor_id != auditeur_id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
 
-    if rapport.status != ReportStatus.PENDING_AUDIT:
+    if rapport.status != ReportStatus.IN_AUDIT:
         raise ValidationError(
             "Un avis a déjà été soumis pour ce rapport.", code="avis_deja_soumis"
         )

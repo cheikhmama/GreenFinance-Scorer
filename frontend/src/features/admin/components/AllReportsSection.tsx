@@ -11,8 +11,10 @@ import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAllReports } from "../api";
 
 const STATUTS: ReportStatus[] = [
-  "SUBMITTED",
-  "PENDING_AUDIT",
+  "EXTRACTING",
+  "EXTRACTION_FAILED",
+  "AWAITING_ASSIGNMENT",
+  "IN_AUDIT",
   "PENDING_DECISION",
   "VALIDATED",
   "REJECTED",
@@ -76,7 +78,7 @@ export function AllReportsSection() {
               <li key={rapport.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="flex items-center gap-2">
                   <Badge variant={variantStatutRapport(rapport.status)}>
-                    {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+                    {libelleStatutRapport(rapport.status)}
                   </Badge>
                   <span className="text-brand-blue">
                     {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}

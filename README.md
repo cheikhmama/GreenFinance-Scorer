@@ -115,18 +115,22 @@ flowchart LR
 - **Frontend** (`frontend/`) : client TypeScript généré par Orval depuis le schéma OpenAPI ; la CI
   échoue si le client n'est pas à jour.
 
-Le cycle de vie d'un rapport :
+Le cycle de vie d'un rapport (l'entreprise voit les quatre états d'examen, de `EXTRACTING` à
+`PENDING_DECISION`, comme un seul : « En cours d'examen 🔒 ») :
 
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT
-    DRAFT --> SUBMITTED : dépôt (extraction en file)
-    SUBMITTED --> PENDING_AUDIT : affectation d'un auditeur
-    PENDING_AUDIT --> PENDING_DECISION : avis d'audit
+    DRAFT --> EXTRACTING : dépôt
+    EXTRACTING --> AWAITING_ASSIGNMENT : extraction terminée
+    EXTRACTING --> EXTRACTION_FAILED
+    EXTRACTION_FAILED --> EXTRACTING : relance (admin)
+    AWAITING_ASSIGNMENT --> IN_AUDIT : affectation d'un auditeur
+    IN_AUDIT --> PENDING_DECISION : avis d'audit
     PENDING_DECISION --> VALIDATED : validation + score
     PENDING_DECISION --> REJECTED
     PENDING_DECISION --> REVISION_REQUESTED
-    REVISION_REQUESTED --> SUBMITTED : nouvelle version
+    REVISION_REQUESTED --> EXTRACTING : nouvelle version
 ```
 
 Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (modèle de données, sécurité,

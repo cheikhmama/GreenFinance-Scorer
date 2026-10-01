@@ -22,7 +22,6 @@ from app.core.database import utcnow
 from app.core.enums import (
     AuditDecision,
     DataMethod,
-    ExtractionStatus,
     Pillar,
     ReportStatus,
     ReportType,
@@ -91,7 +90,7 @@ def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> ESGReport
         "company_id": entreprise_id,
         "type": ReportType.RAPPORT_ESG,
         "channel": SubmissionChannel.ENTREPRISE,
-        "status": ReportStatus.SUBMITTED,
+        "status": ReportStatus.EXTRACTING,
         "submitted_at": utcnow(),
         "source_file": "rapports/test/dummy.pdf",
     }
@@ -110,7 +109,7 @@ def _create_rapport_en_validation(session, entreprise_id: uuid.UUID, auditeur_id
         session,
         entreprise_id,
         status=ReportStatus.PENDING_DECISION,
-        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
         auditor_id=auditeur_id,
     )
     session.add(
@@ -488,12 +487,12 @@ def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
     # égalité de liste absolue.
     admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    non_extrait = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED)
-    en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
+    non_extrait = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING)
+    en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, extraction_started_at=utcnow())
     qualifiant = _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        status=ReportStatus.AWAITING_ASSIGNMENT,
         extraction_finished_at=utcnow(),
     )
 
@@ -514,7 +513,7 @@ def test_affecter_happy_path(session) -> None:
     rapport = _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        status=ReportStatus.AWAITING_ASSIGNMENT,
         extraction_finished_at=utcnow(),
     )
 
@@ -524,7 +523,7 @@ def test_affecter_happy_path(session) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["status"] == ReportStatus.PENDING_AUDIT.value
+    assert response.json()["status"] == ReportStatus.IN_AUDIT.value
 
     notifications = session.exec(
         select(Notification).where(Notification.user_id == auditeur.id)
@@ -551,7 +550,7 @@ def test_affecter_extraction_non_terminee(session) -> None:
     admin = _create_utilisateur(session, Role.ADMIN)
     auditeur = _create_utilisateur(session, Role.AUDITOR)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, extraction_started_at=utcnow())
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(
@@ -569,7 +568,7 @@ def test_affecter_auditeur_invalide(session) -> None:
     rapport = _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        status=ReportStatus.AWAITING_ASSIGNMENT,
         extraction_finished_at=utcnow(),
     )
 
@@ -670,7 +669,7 @@ def test_demander_correction_happy_path(session) -> None:
 def test_decision_avec_statut_invalide_est_rejetee(session) -> None:
     admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING)
 
     authed_client = _login(admin.email, "s3cret-pass")
     response = authed_client.post(f"/api/v1/admin/rapports/{rapport.id}/valider", json={})
@@ -690,7 +689,7 @@ def test_valider_sans_aucun_indicateur_est_rejete(session) -> None:
         session,
         entreprise.id,
         status=ReportStatus.PENDING_DECISION,
-        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
         auditor_id=auditeur.id,
     )
     session.add(
@@ -821,12 +820,14 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
     avec_compte.name = f"{marqueur} avec-compte"
     session.add(avec_compte)
     session.commit()
-    # Horodatage explicite : deux dépôts consécutifs peuvent recevoir le même utcnow() (résolution
-    # de l'horloge), ce qui rendait "le plus récent" aléatoire.
+    # Horodatages explicites : deux créations consécutives peuvent recevoir le même utcnow()
+    # (résolution de l'horloge), ce qui rendait "le plus récent" aléatoire. Le service ordonne sur
+    # created_at (un brouillon n'a pas de date de dépôt) : c'est lui qu'il faut reculer.
     _create_rapport(
         session,
         avec_compte.id,
         status=ReportStatus.REJECTED,
+        created_at=utcnow() - timedelta(minutes=1),
         submitted_at=utcnow() - timedelta(minutes=1),
     )
     plus_recent = _create_rapport(session, avec_compte.id, status=ReportStatus.VALIDATED)
@@ -843,7 +844,7 @@ def test_lister_toutes_les_entreprises_inclut_celles_sans_rapport_ni_compte(sess
 
     assert items[str(avec_compte.id)]["owner_user_id"] == str(utilisateur.id)
     assert items[str(avec_compte.id)]["report_count"] == 2
-    # Le plus récent des deux rapports (par date_depot), pas le premier créé.
+    # Le plus récent des deux rapports (par created_at), pas le premier créé.
     assert items[str(avec_compte.id)]["latest_report_status"] == plus_recent.status.value
     assert items[str(avec_compte.id)]["latest_report_id"] == str(plus_recent.id)
 
@@ -1280,13 +1281,13 @@ def test_audits_en_retard_respecte_le_sla(session) -> None:
     _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.PENDING_AUDIT,
+        status=ReportStatus.IN_AUDIT,
         assigned_at=utcnow() - timedelta(days=sla + 1),
     )
     _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.PENDING_AUDIT,
+        status=ReportStatus.IN_AUDIT,
         assigned_at=utcnow() - timedelta(days=sla - 1),
     )
     apres = _dashboard(authed_client)
@@ -1357,14 +1358,14 @@ def test_lister_rapports_echec_extraction_filtre_correctement(session) -> None:
     echec = _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.FAILED,
+        status=ReportStatus.EXTRACTION_FAILED,
         extraction_error="appel_claude_echoue",
     )
-    en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
+    en_cours = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, extraction_started_at=utcnow())
     qualifiant = _create_rapport(
         session,
         entreprise.id,
-        status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.DONE,
+        status=ReportStatus.AWAITING_ASSIGNMENT,
         extraction_finished_at=utcnow(),
     )
 
@@ -1389,7 +1390,7 @@ def test_lister_rapports_orphelins_en_validation(session) -> None:
         session,
         entreprise.id,
         status=ReportStatus.PENDING_DECISION,
-        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
     )
     auditeur = _create_utilisateur(session, Role.AUDITOR)
     avec_avis = _create_rapport_en_validation(session, entreprise.id, auditeur.id)
@@ -1422,7 +1423,7 @@ def test_verifier_score_calculable_route(session) -> None:
         session,
         entreprise.id,
         status=ReportStatus.PENDING_DECISION,
-        extraction_finished_at=utcnow(), extraction_status=ExtractionStatus.DONE,
+        extraction_finished_at=utcnow(),
     )
     preuve = Evidence(
         document_name="rapport-test.pdf",
@@ -1501,7 +1502,7 @@ def test_recalculer_score_route(session) -> None:
     assert deja_calcule.status_code == 422
     assert deja_calcule.json()["error"]["code"] == "score_deja_calcule"
 
-    non_valide = _create_rapport(session, entreprise.id, status=ReportStatus.SUBMITTED, extraction_status=ExtractionStatus.RUNNING)
+    non_valide = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, extraction_started_at=utcnow())
     reponse_invalide = authed_client.post(f"/api/v1/admin/rapports/{non_valide.id}/recalculer-score")
     assert reponse_invalide.status_code == 422
     assert reponse_invalide.json()["error"]["code"] == "transition_invalide"
@@ -1545,7 +1546,6 @@ def test_premiere_validation_incalculable_sous_une_nouvelle_version_ne_valide_ri
         session,
         entreprise.id,
         status=ReportStatus.PENDING_DECISION,
-        extraction_status=ExtractionStatus.DONE,
         auditor_id=auditeur.id,
     )
     session.add(

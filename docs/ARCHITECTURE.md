@@ -97,8 +97,7 @@ API with its role-based scope.
 | `company_id` | FK companies | |
 | `fiscal_year` | int | indexed with `company_id` (not unique, see below) |
 | `version`, `previous_report_id` | int, FK self | correction chain (already exists) |
-| `status` | enum, see §3.2.1 | |
-| `extraction_status` | enum `NOT_STARTED`, `QUEUED`, `RUNNING`, `DONE`, `FAILED` | separates the pipeline state from the business status |
+| `status` | enum, see §3.2.1 | one status for the whole lifecycle, extraction included (task 5.1) |
 | `official_score` | numeric(5,2), nullable | denormalised from the official `scores` row, set in the validation transaction |
 | `coverage_rate` | numeric(5,4) | present indicators ÷ targeted indicators, weighted |
 | `config_hash` | char(64), nullable | SHA-256 of the scoring config used for `official_score` |
@@ -106,16 +105,17 @@ API with its role-based scope.
 
 #### 3.2.1 Status mapping
 
-| Current `StatutRapport` | Target `status` | Target `extraction_status` |
+*Task 5.1* folds the extraction state back into `status` (tasks 1.1–4.7 kept it in a separate
+`extraction_status` column; migration `a4c7e2d9b6f1` maps every pair and back):
+
+| `status` until 5.1 | `extraction_status` until 5.1 | `status` since 5.1 |
 |---|---|---|
-| — | `DRAFT` | `NOT_STARTED` |
-| `ENVOYE` | `SUBMITTED` | `QUEUED` |
-| `EN_EXTRACTION` | `SUBMITTED` | `RUNNING` / `DONE` / `FAILED` |
-| `AFFECTE_AUDITEUR` | `PENDING_AUDIT` | `DONE` |
-| `EN_VALIDATION` | `PENDING_DECISION` (D2) | `DONE` |
-| `DEMANDE_CORRECTION` | `REVISION_REQUESTED` | derived from the extraction timestamps |
-| `VALIDE` | `VALIDATED` | derived from the extraction timestamps |
-| `REJETE` | `REJECTED` | derived from the extraction timestamps |
+| `DRAFT` | `NOT_STARTED` | `DRAFT` |
+| `SUBMITTED` | `QUEUED` / `RUNNING` | `EXTRACTING` (queued = no `extraction_started_at`) |
+| `SUBMITTED` | `FAILED` | `EXTRACTION_FAILED` |
+| `SUBMITTED` | `DONE` | `AWAITING_ASSIGNMENT` |
+| `PENDING_AUDIT` | `DONE` | `IN_AUDIT` |
+| `PENDING_DECISION`, `REVISION_REQUESTED`, `VALIDATED`, `REJECTED` | `DONE` | unchanged |
 
 `(company_id, fiscal_year)` is **indexed, not unique**: a company can file several report types
 (annual, ESG, climate) for the same year, and each correction adds a version.
@@ -253,16 +253,16 @@ API (FastAPI) ──enqueue──> Redis (ARQ) ──> worker process(es)
      │                                        ├── generate_synthesis_pdf(report_id)
      │                                        ├── recompute_portfolio(portfolio_id)
      │                                        └── send_email(...)
-     └── reads extraction_status / job result
+     └── reads esg_reports.status / job result
 ```
 
 - Job IDs are deterministic (`extract:{report_id}`), so a double submission doesn't start two jobs.
 - Retries with backoff for transient errors (LLM 429/5xx); classified permanent errors set
-  `extraction_status=FAILED` with a fixed error code (never `str(exc)`).
+  `status=EXTRACTION_FAILED` with a fixed error code (never `str(exc)`).
 - The worker image contains torch/Docling/Paddle; the API image doesn't. *Done in task 4.2*
   (`Dockerfile` targets `api` and `worker`; the default worker runs on the `api` image).
-- A cron job in the worker marks `RUNNING` jobs stuck longer than `EXTRACTION_TIMEOUT_MINUTES`
-  as `FAILED`, replacing today's read-time detection.
+- A cron job in the worker marks started extractions stuck longer than
+  `EXTRACTION_TIMEOUT_MINUTES` as `EXTRACTION_FAILED`, replacing today's read-time detection.
 
 *Implemented in task 4.1*, with two queues so an e-mail never waits behind a long extraction:
 `arq:extraction` (one job at a time per worker) and `arq:queue` (e-mails, synthesis PDF, the cron).

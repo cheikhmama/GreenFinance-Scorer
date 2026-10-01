@@ -157,11 +157,12 @@ Decisions taken before starting (2026-10-01):
   mandate letter's presence.
 - Work happens on branch `phase-5`, one task per commit, as in phases 1–4.
 
-- [ ] 5.1 Report lifecycle as one status
-  - [ ] `ReportStatus` → 9 states: `DRAFT`, `EXTRACTING`, `EXTRACTION_FAILED`, `AWAITING_ASSIGNMENT`, `IN_AUDIT`, `PENDING_DECISION`, `REVISION_REQUESTED`, `VALIDATED`, `REJECTED`. Migration maps every existing (`status`, `extraction_status`) pair to one state and back; `extraction_status` dropped.
-  - [ ] Worker, supervision, assignment, opinion and decision services use the new transitions; admin queues (to assign, failed extractions, overdue) filter on them.
-  - [ ] API: `status` only. Enterprise views show one collapsed label, "En cours d'examen 🔒", for `EXTRACTING`, `AWAITING_ASSIGNMENT`, `IN_AUDIT` and `PENDING_DECISION`; internal roles see the detailed state.
-  - [ ] `docs/WORKFLOWS.md` §1 state machine updated.
+- [x] 5.1 Report lifecycle as one status
+  - [x] `ReportStatus` → 9 states: `DRAFT`, `EXTRACTING`, `EXTRACTION_FAILED`, `AWAITING_ASSIGNMENT`, `IN_AUDIT`, `PENDING_DECISION`, `REVISION_REQUESTED`, `VALIDATED`, `REJECTED`. Migration `a4c7e2d9b6f1` maps every existing (`status`, `extraction_status`) pair to one state and back (round trip on one report per pair, identical rows after downgrade; `alembic check` clean); `extraction_status` dropped. Within `EXTRACTING`, a queued job is the one with no `extraction_started_at` — set at each start, reset when the job goes back to the queue.
+  - [x] Worker, supervision, assignment, opinion and decision services use the new transitions; admin queues (to assign, failed extractions, overdue) filter on them. The pipeline now does nothing on a report that is not `EXTRACTING` (a replayed job never moves a report backwards — the reason for the old split; new parametrised test).
+  - [x] API: `status` only. Enterprise views show one collapsed label, "En cours d'examen 🔒", for `EXTRACTING`, `AWAITING_ASSIGNMENT`, `IN_AUDIT` and `PENDING_DECISION` (`shared/format/statut.ts`, `…Entreprise` variants); internal roles see the detailed state. Enterprise notifications still name the step (assignment, end of audit) — left as is.
+  - [x] `docs/WORKFLOWS.md` §1.2 state machine, `docs/ARCHITECTURE.md` §3.2.1, README diagram updated.
+  - [x] Also: a flaky admin test (two reports created in the same clock tick, ordered by `created_at`) fixed. 668 backend tests, 84 frontend tests.
 - [ ] 5.2 Company registration lifecycle
   - [ ] `CompanyStatus` → `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED` (today a refusal deletes the request — it now stays as `REJECTED` with its reason).
   - [ ] Columns: `status_token` (hashed, lets the applicant follow the request without an account), `rejection_reason`, `info_request_message`, `info_requested_at`; activation link valid 72 h (was 7 days).

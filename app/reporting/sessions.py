@@ -1,6 +1,6 @@
 """Sessions de déclaration et périmètre d'accès multi-tenant (tâche 1.5, docs/WORKFLOWS.md §1.2).
 
-Cycle : ouvrir (DRAFT, sans fichier) -> soumettre (dépôt du PDF : SUBMITTED, extraction en file)
+Cycle : ouvrir (DRAFT, sans fichier) -> soumettre (dépôt du PDF : EXTRACTING, job en file)
 ou abandonner (suppression du brouillon). La soumission passe par exactement le même chemin que
 le dépôt en une étape (app/company/rapports.py::deposer_fichier).
 
@@ -24,7 +24,6 @@ from app.auth.models import User
 from app.company.models import Company
 from app.company.rapports import deposer_fichier, verifier_entreprise_active
 from app.core.enums import (
-    ExtractionStatus,
     ReportStatus,
     ReportType,
     Role,
@@ -106,7 +105,6 @@ def ouvrir(session: Session, user: User, demande: ReportCreateRequest) -> ESGRep
         channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=demande.fiscal_year,
         status=ReportStatus.DRAFT,
-        extraction_status=ExtractionStatus.NOT_STARTED,
     )
     session.add(brouillon)
     try:

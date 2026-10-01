@@ -7,7 +7,7 @@ app/ingestion/extractor.py, exécuté par le worker d'extraction, en a besoin.
 
 from sqlmodel import Session
 
-from app.core.enums import ExtractionStatus
+from app.core.enums import ReportStatus
 from app.core.notifications import notifier
 from app.ingestion.models import ESGReport
 
@@ -22,7 +22,7 @@ def marquer_echec(session: Session, rapport: ESGReport, cause: str) -> None:
     entreprise prévenue. Partagé par le pipeline et la reprise planifiée des extractions bloquées
     (app/worker/jobs.py::reprendre_extractions). Ne commite pas."""
     rapport.extraction_error = cause
-    rapport.extraction_status = ExtractionStatus.FAILED
+    rapport.status = ReportStatus.EXTRACTION_FAILED
     rapport.extraction_attempts += 1
     session.add(rapport)
     if rapport.company.owner_user_id is not None:

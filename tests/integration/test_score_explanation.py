@@ -164,7 +164,7 @@ def test_rapport_sans_score_officiel(session) -> None:
     session.flush()
     rapport = ESGReport(
         company_id=entreprise.id, type=ReportType.RAPPORT_ESG, channel=SubmissionChannel.ENTREPRISE,
-        status=ReportStatus.SUBMITTED, source_file="rapports/x.pdf", submitted_at=utcnow(),
+        status=ReportStatus.EXTRACTING, source_file="rapports/x.pdf", submitted_at=utcnow(),
     )
     session.add(rapport)
     session.commit()

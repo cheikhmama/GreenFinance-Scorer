@@ -1,6 +1,9 @@
 import { Bell, FileText, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
-import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import {
+  libelleStatutRapportEntreprise,
+  variantStatutRapportEntreprise,
+} from "@/shared/format/statut";
 import { useMyNotifications } from "@/shared/notifications/api";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -56,8 +59,8 @@ export function CompanyDashboardPage() {
               {chargementRapports ? (
                 <span className="text-brand-grey">…</span>
               ) : dernierRapport ? (
-                <Badge variant={variantStatutRapport(dernierRapport.status)}>
-                  {libelleStatutRapport(dernierRapport.status, dernierRapport.extraction_status)}
+                <Badge variant={variantStatutRapportEntreprise(dernierRapport.status)}>
+                  {libelleStatutRapportEntreprise(dernierRapport.status)}
                 </Badge>
               ) : (
                 <span className="text-sm text-brand-grey">Aucun rapport déposé</span>
@@ -73,7 +76,10 @@ export function CompanyDashboardPage() {
             <Bell className="size-4" />
             Notifications récentes
           </CardTitle>
-          <Link to="/company/rapports" className="text-sm text-brand-green underline underline-offset-2">
+          <Link
+            to="/company/rapports"
+            className="text-sm text-brand-green underline underline-offset-2"
+          >
             Voir mes rapports
           </Link>
         </CardHeader>
@@ -85,8 +91,15 @@ export function CompanyDashboardPage() {
           {notifications && notifications.length > 0 ? (
             <ul className="divide-y">
               {notifications.map((notification) => (
-                <li key={notification.id} className="flex items-center justify-between gap-4 py-3 text-sm">
-                  <span className={notification.read ? "text-brand-grey" : "font-medium text-brand-blue"}>
+                <li
+                  key={notification.id}
+                  className="flex items-center justify-between gap-4 py-3 text-sm"
+                >
+                  <span
+                    className={
+                      notification.read ? "text-brand-grey" : "font-medium text-brand-blue"
+                    }
+                  >
                     {notification.message}
                   </span>
                   <span className="shrink-0 text-xs text-brand-grey">

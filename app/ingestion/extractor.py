@@ -43,7 +43,7 @@ from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import DataMethod, ExtractionStatus, Pillar, Role
+from app.core.enums import DataMethod, Pillar, ReportStatus, Role
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, proof_generator
 from app.ingestion.completeness import calculer_couverture
@@ -569,17 +569,23 @@ def run_extraction_pipeline(
             return
         fichier_source = rapport.source_file
 
-        # Seul extraction_status avance ici, jamais le statut métier (ReportStatus) : rejouer
-        # l'extraction (ex. après élargissement d'INDICATEURS_CIBLES) sur un rapport déjà affecté
-        # à un auditeur ne doit jamais le faire régresser dans le workflow — un vrai bug rencontré
-        # en pratique avec l'ancien statut unique (SMH/SNDE repassés en extraction alors que déjà
-        # affectés).
+        # Le pipeline n'agit que sur un rapport EXTRACTING (tâche 5.1) : rejouer un job (ex.
+        # doublon dans la file, ou relance après élargissement d'INDICATEURS_CIBLES) sur un rapport
+        # déjà affecté à un auditeur ne doit jamais le faire régresser dans le workflow — un vrai
+        # bug rencontré en pratique avec le premier statut unique (SMH/SNDE repassés en extraction
+        # alors que déjà affectés).
+        if rapport.status != ReportStatus.EXTRACTING:
+            logger.warning(
+                "extraction_ignoree_hors_extracting",
+                rapport_id=str(rapport_id),
+                statut=rapport.status.value,
+            )
+            return
         #
         # extraction_started_at est posé à CHAQUE entrée dans le pipeline (dépôt initial ou
         # relance manuelle après échec) — sert de référence à la tâche planifiée
         # (app/ingestion/supervision.py) pour détecter un traitement interrompu ; une relance doit
         # repartir d'un chronomètre frais, pas de celui de la toute première tentative.
-        rapport.extraction_status = ExtractionStatus.RUNNING
         rapport.extraction_started_at = utcnow()
         session.add(rapport)
         session.commit()
@@ -817,7 +823,7 @@ def run_extraction_pipeline(
 
             rapport.extraction_finished_at = utcnow()
             rapport.extraction_error = None
-            rapport.extraction_status = ExtractionStatus.DONE
+            rapport.status = ReportStatus.AWAITING_ASSIGNMENT
             session.add(rapport)
 
             # Import différé : app.ingestion.synthesis_report importe
@@ -864,7 +870,9 @@ def run_extraction_pipeline(
             # remonter silencieusement dans une BackgroundTask sans observateur.
             session.rollback()
             if not derniere_tentative and _est_transitoire(exc):
-                rapport.extraction_status = ExtractionStatus.QUEUED
+                # Retour en file : un début nul est ce qui distingue un job en attente d'un job en
+                # cours (app/ingestion/supervision.py).
+                rapport.extraction_started_at = None
                 session.add(rapport)
                 session.commit()
                 logger.warning(

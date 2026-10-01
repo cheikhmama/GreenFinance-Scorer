@@ -106,7 +106,7 @@ export function AdminReportDetailPage() {
             <span className="text-sm text-brand-grey">Entreprise…</span>
           )}
           <Badge variant={variantStatutRapport(rapport.status)}>
-            {libelleStatutRapport(rapport.status, rapport.extraction_status)}
+            {libelleStatutRapport(rapport.status)}
           </Badge>
         </CardContent>
       </Card>
@@ -253,7 +253,7 @@ export function AdminReportDetailPage() {
                       {version.id === rapport.id ? " (celle-ci)" : ""}
                     </p>
                     <p className="text-sm text-brand-grey">
-                      {libelleStatutRapport(version.status, version.extraction_status)} —{" "}
+                      {libelleStatutRapport(version.status)} —{" "}
                       {libelleDateRapport(version).toLowerCase()}
                     </p>
                   </div>

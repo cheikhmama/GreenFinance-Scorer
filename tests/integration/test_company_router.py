@@ -14,7 +14,6 @@ from app.core.enums import (
     CompanyStatus,
     ConfidenceLevel,
     DataMethod,
-    ExtractionStatus,
     MetricCoverageStatus,
     Pillar,
     ReportStatus,
@@ -113,8 +112,8 @@ def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, mon
     )
 
     assert response.status_code == 201
-    assert response.json()["status"] == ReportStatus.SUBMITTED.value
-    assert response.json()["extraction_status"] == ExtractionStatus.QUEUED.value
+    assert response.json()["status"] == ReportStatus.EXTRACTING.value
+    assert "extraction_status" not in response.json()
     assert response.json()["channel"] == SubmissionChannel.ENTREPRISE.value
 
 
@@ -374,7 +373,7 @@ def test_creer_correction_happy_path_incremente_la_version(session, monkeypatch)
     body = response.json()
     assert body["version"] == 2
     assert body["previous_report_id"] == str(original.id)
-    assert body["status"] == ReportStatus.SUBMITTED.value
+    assert body["status"] == ReportStatus.EXTRACTING.value
     assert body["id"] != str(original.id)
 
     # L'original n'est jamais réécrit — il reste DEMANDE_CORRECTION indéfiniment (Phase 0).
@@ -487,7 +486,7 @@ def test_consulter_rapport_retourne_le_statut_courant(session) -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == str(rapport.id)
-    assert response.json()["status"] == ReportStatus.SUBMITTED.value
+    assert response.json()["status"] == ReportStatus.EXTRACTING.value
 
 
 def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(session, monkeypatch) -> None:
@@ -527,8 +526,7 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
     session.refresh(rapport)
     assert rapport.extraction_error == "docling_conversion_echouee"
     assert rapport.extraction_finished_at is None
-    assert rapport.status == ReportStatus.SUBMITTED
-    assert rapport.extraction_status == ExtractionStatus.FAILED
+    assert rapport.status == ReportStatus.EXTRACTION_FAILED
 
 
 def _simuler_pipeline_extraction(monkeypatch, extraction: ExtractionEntreprise) -> None:
@@ -643,8 +641,7 @@ def test_pipeline_reussi_persiste_donnee_carbone_et_indicateur_esg_et_marque_ter
     session.refresh(rapport)
     assert rapport.extraction_error is None
     assert rapport.extraction_finished_at is not None
-    assert rapport.extraction_status == ExtractionStatus.DONE
-    assert rapport.status == ReportStatus.SUBMITTED
+    assert rapport.status == ReportStatus.AWAITING_ASSIGNMENT
 
     donnees_carbone = session.exec(
         select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)
@@ -690,7 +687,7 @@ def test_pipeline_ne_persiste_quun_indicateur_par_code_meme_si_le_llm_le_repete(
     extractor.run_extraction_pipeline(rapport.id, 2024)
 
     session.refresh(rapport)
-    assert rapport.extraction_status == ExtractionStatus.DONE
+    assert rapport.status == ReportStatus.AWAITING_ASSIGNMENT
     indicateurs = session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport.id)).all()
     assert [(i.metric_code, i.value) for i in indicateurs] == [(code, 42.0)]
 
@@ -862,7 +859,7 @@ def test_importer_rapport_par_url_entreprise_happy_path_marque_canal_automatique
 
     assert response.status_code == 201
     assert response.json()["channel"] == SubmissionChannel.AUTOMATIQUE.value
-    assert response.json()["status"] == ReportStatus.SUBMITTED.value
+    assert response.json()["status"] == ReportStatus.EXTRACTING.value
 
 
 def test_importer_rapport_par_url_entreprise_ignore_un_entreprise_id_fourni(

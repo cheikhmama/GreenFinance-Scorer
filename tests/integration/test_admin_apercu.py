@@ -153,7 +153,7 @@ def test_charge_auditeurs_reflete_les_dossiers_affectes(session) -> None:
             company_id=entreprise.id,
             type=ReportType.RAPPORT_ESG,
             channel=SubmissionChannel.ENTREPRISE,
-            status=ReportStatus.PENDING_AUDIT,
+            status=ReportStatus.IN_AUDIT,
             source_file="rapports/test/dummy.pdf",
             auditor_id=auditeur.id,
             assigned_at=utcnow(),

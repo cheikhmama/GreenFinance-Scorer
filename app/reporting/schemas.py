@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.database import utcnow
-from app.core.enums import ExtractionStatus, ReportStatus, ReportType
+from app.core.enums import ReportStatus, ReportType
 from app.ingestion.models import ESGReport
 
 
@@ -37,7 +37,6 @@ class ReportResponse(BaseModel):
     report_type: ReportType
     fiscal_year: int | None
     status: ReportStatus
-    extraction_status: ExtractionStatus
     version: int
     previous_report_id: uuid.UUID | None
     created_at: datetime
@@ -53,7 +52,6 @@ class ReportResponse(BaseModel):
             report_type=rapport.type,
             fiscal_year=rapport.fiscal_year,
             status=rapport.status,
-            extraction_status=rapport.extraction_status,
             version=rapport.version,
             previous_report_id=rapport.previous_report_id,
             created_at=rapport.created_at,
