@@ -144,3 +144,48 @@ Rules for every task:
   - [x] 10 screenshots (`docs/screenshots/`, one or more per role) captured with Playwright on the demo data set.
   - [x] `scripts/seed_demo.py`: loads the six synthetic companies of `data_test/reference_e2e/` into an empty database through the real services (assignment, opinion, validation with score, publication), with page proofs cut from the real PDFs, plus a portfolio, a research project and a submitted analysis; refuses a non-empty database and sends nothing to Redis.
   - [x] `docs/ARCHITECTURE.md` §1: role table no longer lists the pre-1.2 French enum values, nor researcher YAML weights (not built).
+
+## Phase 5: UI/UX Redesign & State Model Polish
+
+Decisions taken before starting (2026-10-01):
+- **One report status.** The extraction state goes back into the report's lifecycle status
+  (reverses the task 1.1 split); `extraction_status` is dropped, the extraction bookkeeping
+  columns (attempts, error, timestamps) stay.
+- **KYC checks.** Registration collects identity fields, a contact e-mail and a mandate letter
+  (PDF); the admin modal checks the LEI live against GLEIF (with a timeout — a GLEIF outage shows
+  "not verifiable", it never blocks), the contact e-mail domain against the website, and the
+  mandate letter's presence.
+- Work happens on branch `phase-5`, one task per commit, as in phases 1–4.
+
+- [ ] 5.1 Report lifecycle as one status
+  - [ ] `ReportStatus` → 9 states: `DRAFT`, `EXTRACTING`, `EXTRACTION_FAILED`, `AWAITING_ASSIGNMENT`, `IN_AUDIT`, `PENDING_DECISION`, `REVISION_REQUESTED`, `VALIDATED`, `REJECTED`. Migration maps every existing (`status`, `extraction_status`) pair to one state and back; `extraction_status` dropped.
+  - [ ] Worker, supervision, assignment, opinion and decision services use the new transitions; admin queues (to assign, failed extractions, overdue) filter on them.
+  - [ ] API: `status` only. Enterprise views show one collapsed label, "En cours d'examen 🔒", for `EXTRACTING`, `AWAITING_ASSIGNMENT`, `IN_AUDIT` and `PENDING_DECISION`; internal roles see the detailed state.
+  - [ ] `docs/WORKFLOWS.md` §1 state machine updated.
+- [ ] 5.2 Company registration lifecycle
+  - [ ] `CompanyStatus` → `RegistrationStatus`: `PENDING_ONBOARDING`, `INFO_REQUESTED`, `ACTIVE`, `REJECTED`, `SUSPENDED` (today a refusal deletes the request — it now stays as `REJECTED` with its reason).
+  - [ ] Columns: `status_token` (hashed, lets the applicant follow the request without an account), `rejection_reason`, `info_request_message`, `info_requested_at`; activation link valid 72 h (was 7 days).
+  - [ ] Public registration: identity fields only (legal name, LEI, ISIN, sector, country) + contact e-mail + mandate letter PDF (size/type checked, stored like reports). Public status page reached with the token; the applicant can answer an info request by uploading a new mandate letter.
+- [ ] 5.3 KYC verification
+  - [ ] Automated checks computed on demand and shown with their result and source: GLEIF (LEI exists and is `ISSUED`, legal name match), domain match (contact e-mail vs website), mandate letter present.
+  - [ ] Admin actions: `Approve` (→ `ACTIVE`, activation e-mail), `Request info` (→ `INFO_REQUESTED`, message e-mailed), `Reject` (→ `REJECTED`, reason required, e-mailed). Each action audit-logged.
+  - [ ] Frontend: KYC modal with the three actions and the check list.
+- [ ] 5.4 Financials per reporting session
+  - [ ] `revenue`, `enterprise_value` (+ currencies) and `evic_date` move from `companies` to `esg_reports` (migration copies each company's values to its latest validated report).
+  - [ ] PCAF engine reads them from the report it already uses for emissions; admin financials endpoint moves to the report.
+- [ ] 5.5 Extraction provenance and bounding boxes
+  - [ ] `extraction_runs` table: `id`, report, `docling_version`, `llm_model`, `prompt_version`, timestamps, outcome; every metric and carbon row records its `extraction_run_id`.
+  - [ ] Evidence keeps the bounding box(es) of the cited text, taken from the stored Docling JSON (page coordinates), so the viewer can highlight them.
+- [ ] 5.6 Metric review, override log and audit opinion
+  - [ ] Per-metric review state (`PENDING`, `ACCEPTED`, `OVERRIDDEN`, `NOT_FOUND`) set by the assigned auditor only.
+  - [ ] `metric_overrides`: append-only log (original value, new value, reason category, comment, auditor, timestamp); a database trigger forbids UPDATE and DELETE. Scoring uses the latest override.
+  - [ ] Opinion values: `FAVORABLE`, `FAVORABLE_WITH_RESERVATIONS`, `CORRECTION_REQUIRED`, `UNFAVORABLE` (migration maps the three current values). The pre-score is not returned to the auditor until the opinion is submitted.
+  - [ ] Separation of duties: only the assigned auditor reviews and overrides; only an admin decides, and only from `PENDING_DECISION`.
+- [ ] 5.7 Auditor 3-pane workspace
+  - [ ] Full-width review page: metrics list (25%), PDF viewer with highlighted boxes (45%, pdf.js), metric detail and override form (30%).
+  - [ ] Keyboard: `A` accept, `E` edit/override, `N` not found, `J`/`K` previous/next; never active while typing in a field.
+  - [ ] Opinion form with the four values; pre-score shown only after submission.
+- [ ] 5.8 Enterprise portal
+  - [ ] Registration form (5.2) and public status page.
+  - [ ] `DRAFT` completeness checklist: detected / missing indicator counts per pillar, never values or scores.
+  - [ ] Submission: status stepper, confirmation modal, receipt with the file's SHA-256 and submission time, lock banner "🔒 Soumis le …" on a submitted session.
