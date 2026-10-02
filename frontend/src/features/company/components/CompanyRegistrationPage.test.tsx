@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,13 +59,33 @@ async function remplirEtEnvoyer({ avecMandat = true, pays = "MR", identifiant = 
 }
 
 describe("CompanyRegistrationPage", () => {
-  it("envoie la demande en multipart, identifiant fiscal compris, puis confirme", async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
+  it("envoie la demande, fait confirmer l’adresse par le code reçu, puis confirme", async () => {
+    fetchMock.mockImplementation(async (url) =>
+      String(url).endsWith("/verify-email")
+        ? new Response(null, { status: 204 })
+        : new Response(null, { status: 202 }),
+    );
     renderPage();
-    await remplirEtEnvoyer();
+    const user = await remplirEtEnvoyer();
+
+    // Étape du code (tâche 5.11) : la demande n'est pas encore transmise.
+    expect(await screen.findByText(/Un code à 6 chiffres a été envoyé à/)).toHaveTextContent(
+      "aicha@miniere.mr",
+    );
+    expect(screen.queryByText("Demande d’inscription transmise")).not.toBeInTheDocument();
+    const verifier = screen.getByRole("button", { name: /Vérifier et transmettre/ });
+    expect(verifier).toBeDisabled();
+    await user.type(screen.getByLabelText("Code de vérification"), "12a3456");
+    expect(screen.getByLabelText("Code de vérification")).toHaveValue("123456");
+    await user.click(verifier);
 
     expect(await screen.findByText("Demande d’inscription transmise")).toBeInTheDocument();
     expect(screen.getByText(/sous 24h à 48h.*dès validation/)).toBeInTheDocument();
+    const verification = fetchMock.mock.calls.find(([u]) => String(u).endsWith("/verify-email"));
+    expect(JSON.parse(verification?.[1]?.body as string)).toEqual({
+      email: "aicha@miniere.mr",
+      code: "123456",
+    });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/v1/companies/register");
     const corps = init?.body as FormData;
@@ -164,5 +184,67 @@ describe("CompanyRegistrationPage", () => {
     await remplirEtEnvoyer();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Réessayez dans une heure");
+  });
+
+  it("refuse une messagerie grand public dès la saisie", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText("E-mail professionnel"), "aicha@gmail.com");
+    await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
+
+    expect(
+      await screen.findByText(
+        "Utilisez votre adresse e-mail professionnelle (pas une messagerie grand public).",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("exige une adresse sur le domaine du site web quand il est donné", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("button", { name: /Identifiants complémentaires/ }));
+    await user.type(screen.getByLabelText("Site web officiel"), "https://www.autre-groupe.mr");
+
+    await remplirEtEnvoyer(); // adresse aicha@miniere.mr
+
+    expect(
+      await screen.findByText(
+        "L'adresse doit appartenir au domaine du site web (autre-groupe.mr).",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("signale un code faux et permet d’en redemander un après le délai", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).endsWith("/verify-email")) {
+        return Response.json(
+          { error: { code: "code_invalide", message: "Code invalide", correlation_id: null } },
+          { status: 422 },
+        );
+      }
+      return new Response(null, { status: 202 });
+    });
+    renderPage();
+    const user = await remplirEtEnvoyer();
+    const renvoyer = await screen.findByRole("button", { name: /Renvoyer le code \(60 s\)/ });
+    expect(renvoyer).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Code de vérification"), "000000");
+    await user.click(screen.getByRole("button", { name: /Vérifier et transmettre/ }));
+    expect(await screen.findByText(/Code invalide ou expiré/)).toBeInTheDocument();
+
+    for (let seconde = 0; seconde < 61; seconde += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+    }
+    await user.click(await screen.findByRole("button", { name: "Renvoyer le code" }));
+    expect(await screen.findByText(/un nouveau code vient d’être envoyé/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/resend-code"))).toBe(true);
+    vi.useRealTimers();
   });
 });

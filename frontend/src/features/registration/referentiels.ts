@@ -115,3 +115,64 @@ export function erreurIdentifiantFiscal(pays: string, valeur: string): string | 
         : "Saisissez un identifiant fiscal valide (3 à 32 caractères).";
   }
 }
+
+/** Messageries grand public (app/company/domaines.py) : une telle adresse ne rattache pas le
+ * demandeur à son entreprise (tâche 5.11). */
+const MESSAGERIES_GRAND_PUBLIC = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.fr",
+  "hotmail.com",
+  "hotmail.fr",
+  "outlook.com",
+  "outlook.fr",
+  "live.com",
+  "live.fr",
+  "msn.com",
+  "icloud.com",
+  "me.com",
+  "aol.com",
+  "gmx.com",
+  "gmx.fr",
+  "proton.me",
+  "protonmail.com",
+  "orange.fr",
+  "free.fr",
+  "laposte.net",
+  "yandex.com",
+  "mail.com",
+]);
+
+function domaineDuSite(site: string): string | null {
+  try {
+    return (
+      new URL(site).hostname
+        .toLowerCase()
+        .replace(/\.$/, "")
+        .replace(/^www\./, "") || null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** Message d'erreur, ou null si l'adresse est professionnelle et — quand un site web est donné —
+ * sur son domaine (ou un sous-domaine). Même règle que le serveur. */
+export function erreurAdresseProfessionnelle(email: string, site: string): string | null {
+  const domaine = email.split("@").pop()?.toLowerCase().replace(/\.$/, "") ?? "";
+  if (!domaine) return null;
+  if (MESSAGERIES_GRAND_PUBLIC.has(domaine)) {
+    return "Utilisez votre adresse e-mail professionnelle (pas une messagerie grand public).";
+  }
+  const domaineSite = site ? domaineDuSite(site) : null;
+  if (
+    domaineSite &&
+    domaine !== domaineSite &&
+    !domaine.endsWith(`.${domaineSite}`) &&
+    !domaineSite.endsWith(`.${domaine}`)
+  ) {
+    return `L'adresse doit appartenir au domaine du site web (${domaineSite}).`;
+  }
+  return null;
+}

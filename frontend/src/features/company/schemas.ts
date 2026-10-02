@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { erreurIdentifiantFiscal } from "@/features/registration/referentiels";
+import {
+  erreurAdresseProfessionnelle,
+  erreurIdentifiantFiscal,
+} from "@/features/registration/referentiels";
 import { Currency, ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export { Currency, ReportType };
@@ -92,11 +95,19 @@ export const companyRegistrationFormSchema = z
       .string()
       .trim()
       .min(1, "L’adresse e-mail est requise")
-      .email("Adresse e-mail invalide"),
+      .email("Adresse e-mail invalide")
+      // Dès la saisie : pas de messagerie grand public (tâche 5.11).
+      .refine((email) => erreurAdresseProfessionnelle(email, "") === null, {
+        message: "Utilisez votre adresse e-mail professionnelle (pas une messagerie grand public).",
+      }),
     company_fax: z.string(),
     mandate_letter: lettreDeMandatSchema,
   })
   .superRefine((valeurs, ctx) => {
+    // Adresse sur le domaine du site, quand il est donné (tâche 5.11).
+    const erreurAdresse = erreurAdresseProfessionnelle(valeurs.contact_email, valeurs.website);
+    if (erreurAdresse)
+      ctx.addIssue({ code: "custom", path: ["contact_email"], message: erreurAdresse });
     if (!valeurs.tax_id || !/^[A-Za-z]{2}$/.test(valeurs.country)) return;
     const erreur = erreurIdentifiantFiscal(valeurs.country, valeurs.tax_id);
     if (erreur) ctx.addIssue({ code: "custom", path: ["tax_id"], message: erreur });

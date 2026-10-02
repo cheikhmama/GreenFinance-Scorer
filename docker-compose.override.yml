@@ -6,6 +6,14 @@
 x-environnement-dev: &environnement-dev
   DATABASE_URL: postgresql+psycopg://greenfinance:changeme@db:5432/greenfinance
   REDIS_URL: redis://redis:6379/0
+  # E-mails captés par Mailpit (service ci-dessous) : rien ne quitte la machine, tout se lit sur
+  # http://localhost:8025 (tâche 5.11).
+  MAIL_FROM: no-reply@greenfinance-demo.com
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  SMTP_USERNAME: ""
+  SMTP_PASSWORD: ""
+  SMTP_SECURITY: plain
 
 services:
   migrate:
@@ -37,3 +45,11 @@ services:
   redis:
     ports:
       - "6379:6379"
+
+  # Boîte de réception de développement (tâche 5.11) : SMTP sur 1025, interface web sur 8025.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped

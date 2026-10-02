@@ -232,7 +232,9 @@ def test_reouverture_impossible_si_un_identifiant_appartient_a_autre_chose(
     session.add(investisseur)
     session.commit()
 
-    reponse = inscrire_http(_demande(lei=lei, isin=None, contact_email=investisseur.email))
+    reponse = inscrire_http(
+        _demande(lei=lei, isin=None, contact_email=investisseur.email, website=None)
+    )
 
     assert reponse.status_code == 202
     session.expire_all()

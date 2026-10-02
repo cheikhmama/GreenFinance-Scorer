@@ -20,6 +20,12 @@ from pydantic import (
 )
 
 from app.auth.schemas import EmailNormalise
+from app.company.domaines import (
+    domaine_de_l_email,
+    domaine_du_site,
+    domaines_correspondent,
+    est_messagerie_grand_public,
+)
 from app.company.identifiers import (
     isin_valide,
     lei_valide,
@@ -188,6 +194,20 @@ class CompanyRegistrationRequest(BaseModel):
             raise ValueError("Adresse web attendue (https://…).")
         return valeur
 
+    @field_validator("contact_email")
+    @classmethod
+    def _adresse_professionnelle(cls, valeur: str, info: ValidationInfo) -> str:
+        # Déclaré après `website` : le site (s'il est valide) est déjà connu ici (tâche 5.11).
+        if est_messagerie_grand_public(valeur):
+            raise ValueError(
+                "Utilisez votre adresse e-mail professionnelle (pas une messagerie grand public)."
+            )
+        site = info.data.get("website")
+        domaine_site = domaine_du_site(site) if site else None
+        if domaine_site and not domaines_correspondent(domaine_de_l_email(valeur), domaine_site):
+            raise ValueError(f"L'adresse doit appartenir au domaine du site web ({domaine_site}).")
+        return valeur
+
     @field_validator("tax_id")
     @classmethod
     def _identifiant_fiscal(cls, valeur: str, info: ValidationInfo) -> str:
@@ -201,6 +221,24 @@ class CompanyRegistrationRequest(BaseModel):
     @property
     def tax_id_type(self) -> TaxIdType:
         return type_identifiant_fiscal(self.country)
+
+
+class RegistrationEmailVerification(BaseModel):
+    """POST /companies/registration/verify-email — le code à 6 chiffres reçu par e-mail (tâche
+    5.11), avec l'adresse de la demande."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: EmailNormalise
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class RegistrationEmailResend(BaseModel):
+    """POST /companies/registration/resend-code — un nouveau code pour cette adresse."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailNormalise
 
 
 class RegistrationStatusRequest(BaseModel):

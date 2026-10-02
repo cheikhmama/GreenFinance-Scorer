@@ -542,6 +542,7 @@ export type RegistrationStatus = typeof RegistrationStatus[keyof typeof Registra
 
 
 export const RegistrationStatus = {
+  EMAIL_VERIFICATION_PENDING: 'EMAIL_VERIFICATION_PENDING',
   PENDING_ONBOARDING: 'PENDING_ONBOARDING',
   INFO_REQUESTED: 'INFO_REQUESTED',
   ACTIVE: 'ACTIVE',
@@ -1834,6 +1835,23 @@ export interface ReferenceDatasetImportResult {
   imported: number;
   skipped: number;
   skipped_lines: SkippedLine[];
+}
+
+/**
+ * POST /companies/registration/resend-code — un nouveau code pour cette adresse.
+ */
+export interface RegistrationEmailResend {
+  email: string;
+}
+
+/**
+ * POST /companies/registration/verify-email — le code à 6 chiffres reçu par e-mail (tâche
+ * 5.11), avec l'adresse de la demande.
+ */
+export interface RegistrationEmailVerification {
+  email: string;
+  /** @pattern ^\d{6}$ */
+  code: string;
 }
 
 /**

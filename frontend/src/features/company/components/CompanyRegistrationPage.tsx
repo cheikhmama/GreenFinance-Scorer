@@ -3,6 +3,7 @@ import { ArrowLeft, Building2, ChevronDown, Download } from "lucide-react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link } from "react-router-dom";
+import { EmailVerificationStep } from "@/features/registration/components/EmailVerificationStep";
 import { RegistrationConfirmation } from "@/features/registration/components/RegistrationConfirmation";
 import {
   exempleIdentifiantFiscal,
@@ -65,6 +66,7 @@ export function CompanyRegistrationPage() {
   });
   const pays = useWatch({ control: form.control, name: "country" });
   const [complementsOuverts, setComplementsOuverts] = useState(false);
+  const [adresseConfirmee, setAdresseConfirmee] = useState(false);
   const champsSupplementairesEnErreur = Boolean(
     form.formState.errors.isin || form.formState.errors.lei || form.formState.errors.website,
   );
@@ -111,8 +113,14 @@ export function CompanyRegistrationPage() {
 
   return (
     <AuthLayout eyebrow="REJOINDRE LA PLATEFORME" title="Inscrire mon entreprise">
-      {register.isSuccess ? (
+      {adresseConfirmee ? (
         <RegistrationConfirmation />
+      ) : register.isSuccess && register.variables ? (
+        // La demande attend la confirmation de l'adresse (tâche 5.11).
+        <EmailVerificationStep
+          email={register.variables.contact_email}
+          onVerified={() => setAdresseConfirmee(true)}
+        />
       ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>

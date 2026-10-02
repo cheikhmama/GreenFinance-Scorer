@@ -29,6 +29,7 @@ from app.company.rapports import (
     rapport_de_lentreprise,
 )
 from app.company.registration import (
+    confirmer_adresse,
     consulter_suivi,
     enregistrer_demande,
     repondre_demande_infos,
@@ -37,11 +38,14 @@ from app.company.schemas import (
     CompanyRegistrationRequest,
     EntreprisePublic,
     ImporterRapportParURLRequest,
+    RegistrationEmailResend,
+    RegistrationEmailVerification,
     RegistrationStatusRequest,
     RegistrationStatusView,
     VerificationLei,
 )
 from app.company.upload_validation import TAILLE_MAX_MANDAT_OCTETS
+from app.company.verification_email import renvoyer_code
 from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import KycCheckResult, ReportStatus, ReportType, Role
@@ -111,6 +115,49 @@ def register_company(
     contenu = mandate_letter.file.read(TAILLE_MAX_MANDAT_OCTETS + 1)
     enregistrer_demande(
         session, payload, contenu, request.client.host if request.client else None, background_tasks
+    )
+
+
+@router.post(
+    "/companies/registration/verify-email",
+    status_code=204,
+    operation_id="verifyRegistrationEmail",
+    summary="Confirmer l'adresse du demandeur avec le code reçu par e-mail",
+    responses={
+        422: {"description": "Code invalide ou expiré (une seule réponse pour tout échec)."},
+        429: {"description": "Trop de tentatives depuis cette adresse IP."},
+    },
+)
+def verify_registration_email(
+    payload: RegistrationEmailVerification,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> None:
+    confirmer_adresse(
+        session,
+        payload.email,
+        payload.code,
+        request.client.host if request.client else None,
+        background_tasks,
+    )
+
+
+@router.post(
+    "/companies/registration/resend-code",
+    status_code=202,
+    operation_id="resendRegistrationCode",
+    summary="Recevoir un nouveau code de vérification (réponse identique dans tous les cas)",
+    responses={429: {"description": "Trop de demandes depuis cette adresse IP."}},
+)
+def resend_registration_code(
+    payload: RegistrationEmailResend,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> None:
+    renvoyer_code(
+        session, payload.email, request.client.host if request.client else None, background_tasks
     )
 
 
