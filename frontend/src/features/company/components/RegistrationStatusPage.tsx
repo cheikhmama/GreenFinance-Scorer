@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Clock, FileUp, MailCheck, XCircle } from "lucide-react";
+import { ArrowLeft, Check, Clock, FileUp, MailCheck, RotateCcw, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
@@ -12,6 +12,8 @@ import { AuthLayout } from "@/shared/layout/AuthLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { cn } from "@/shared/ui/cn";
+import { FileDrop } from "@/shared/ui/file-drop";
 import {
   Form,
   FormControl,
@@ -21,7 +23,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/shared/ui/form";
-import { Input } from "@/shared/ui/input";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Textarea } from "@/shared/ui/textarea";
 import { useRegistrationStatus, useReplyToRegistrationInfoRequest } from "../api";
@@ -70,7 +71,7 @@ export function RegistrationStatusPage() {
       )}
       <Link
         to="/login"
-        className="mt-6 flex items-center justify-center gap-2 rounded text-sm font-medium text-brand-green underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+        className="mt-6 flex items-center justify-center gap-2 rounded text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         Retour à la connexion
@@ -91,27 +92,116 @@ function LienInvalide() {
   );
 }
 
+/** Trois étapes vues par le demandeur : envoi, examen, décision. Une demande d'informations
+ * garde l'examen en cours, mais signale qu'une action est attendue de sa part. */
+type Etat = "fait" | "en-cours" | "action" | "refus" | "a-venir";
+
+function etapes(statut: RegistrationStatusView["status"]): { libelle: string; etat: Etat }[] {
+  const examen: Etat =
+    statut === "INFO_REQUESTED" ? "action" : statut === "PENDING_ONBOARDING" ? "en-cours" : "fait";
+  const decision: Etat =
+    statut === "REJECTED"
+      ? "refus"
+      : statut === "ACTIVE" || statut === "SUSPENDED"
+        ? "fait"
+        : "a-venir";
+  return [
+    { libelle: "Demande envoyée", etat: "fait" },
+    { libelle: "Examen (24h à 48h)", etat: examen },
+    { libelle: "Décision", etat: decision },
+  ];
+}
+
+const LIBELLE_ETAT: Record<Etat, string> = {
+  fait: "terminée",
+  "en-cours": "en cours",
+  action: "action requise",
+  refus: "refusée",
+  "a-venir": "à venir",
+};
+
+function Progression({ statut }: { statut: RegistrationStatusView["status"] }) {
+  const liste = etapes(statut);
+  return (
+    <ol aria-label="Avancement de la demande" className="flex items-start">
+      {liste.map(({ libelle, etat }, index) => (
+        <li
+          key={libelle}
+          aria-current={etat === "en-cours" || etat === "action" ? "step" : undefined}
+          className="relative flex flex-1 flex-col items-center gap-2 text-center"
+        >
+          {index > 0 ? (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "absolute top-3.5 right-1/2 h-px w-full -translate-x-4",
+                liste[index - 1].etat === "fait" ? "bg-primary" : "bg-border",
+              )}
+            />
+          ) : null}
+          <span
+            className={cn(
+              "relative z-10 flex size-7 items-center justify-center rounded-full border text-xs",
+              etat === "fait" && "border-primary bg-primary text-primary-foreground",
+              etat === "en-cours" &&
+                "border-primary bg-background text-primary ring-4 ring-primary/15",
+              etat === "action" &&
+                "border-amber-500 bg-background text-amber-600 ring-4 ring-amber-500/15",
+              etat === "refus" && "border-destructive bg-destructive text-white",
+              etat === "a-venir" && "border-border bg-muted text-muted-foreground",
+            )}
+          >
+            {etat === "fait" ? (
+              <Check className="size-3.5" aria-hidden="true" />
+            ) : etat === "refus" ? (
+              <XCircle className="size-3.5" aria-hidden="true" />
+            ) : etat === "action" ? (
+              <FileUp className="size-3.5" aria-hidden="true" />
+            ) : (
+              index + 1
+            )}
+          </span>
+          <span
+            className={cn(
+              "text-xs",
+              etat === "a-venir" ? "text-muted-foreground" : "font-medium text-foreground",
+            )}
+          >
+            {libelle}
+            <span className="sr-only"> ({LIBELLE_ETAT[etat]})</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Suivi({ vue, token }: { vue: RegistrationStatusView; token: string }) {
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-medium text-brand-blue">{vue.company_name}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-muted/30 px-4 py-3">
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-foreground">{vue.company_name}</p>
+          {vue.registered_at ? (
+            <p className="text-xs text-muted-foreground">
+              Demande envoyée le {dateCourte(vue.registered_at)}
+            </p>
+          ) : null}
+        </div>
         <Badge variant={variantStatutInscription(vue.status)}>
           {libelleStatutInscription(vue.status)}
         </Badge>
       </div>
-      {vue.registered_at ? (
-        <p className="text-sm text-brand-grey">
-          Demande envoyée le {dateCourte(vue.registered_at)}.
-        </p>
-      ) : null}
+
+      <Progression statut={vue.status} />
 
       {vue.status === "PENDING_ONBOARDING" ? (
         <Alert>
           <Clock aria-hidden="true" />
-          <AlertTitle>En cours d’examen</AlertTitle>
+          <AlertTitle>Examen en cours</AlertTitle>
           <AlertDescription>
-            Un administrateur examine votre demande. Vous serez prévenu par e-mail.
+            Un administrateur vérifie vos informations, généralement sous 24h à 48h ouvrées. Vous
+            serez prévenu par e-mail ; ce lien reste valable jusqu’à la décision.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -130,30 +220,40 @@ function Suivi({ vue, token }: { vue: RegistrationStatusView; token: string }) {
       ) : null}
 
       {vue.status === "REJECTED" ? (
-        <Alert variant="destructive">
-          <XCircle aria-hidden="true" />
-          <AlertTitle>Demande refusée le {dateCourte(vue.rejected_at)}</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p className="whitespace-pre-line">{vue.rejection_reason}</p>
-            <p>
-              Vous pouvez{" "}
-              <Link to="/inscription/entreprise" className="font-medium underline">
-                déposer une nouvelle demande
-              </Link>{" "}
-              avec les mêmes identifiants.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert variant="destructive">
+            <XCircle aria-hidden="true" />
+            <AlertTitle>Demande refusée le {dateCourte(vue.rejected_at)}</AlertTitle>
+            <AlertDescription>
+              <p className="whitespace-pre-line">{vue.rejection_reason}</p>
+            </AlertDescription>
+          </Alert>
+          <Button asChild variant="outline" className="h-11 w-full rounded-xl">
+            <Link to="/inscription/entreprise">
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Déposer une nouvelle demande
+            </Link>
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Avec les mêmes identifiants, votre demande précédente est rouverte.
+          </p>
+        </>
       ) : null}
 
       {vue.status === "ACTIVE" || vue.status === "SUSPENDED" ? (
-        <Alert className="border-brand-green/20 bg-brand-green-light/60">
-          <MailCheck aria-hidden="true" className="text-brand-green" />
-          <AlertTitle>Demande validée</AlertTitle>
-          <AlertDescription>
-            Utilisez le lien reçu par e-mail pour créer votre mot de passe, puis connectez-vous.
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert className="border-primary/20 bg-secondary/60">
+            <MailCheck aria-hidden="true" className="text-primary" />
+            <AlertTitle>Demande validée</AlertTitle>
+            <AlertDescription>
+              Ouvrez le lien d’activation reçu par e-mail pour créer votre mot de passe : vous
+              entrerez directement dans votre espace. Il est valable 72 heures.
+            </AlertDescription>
+          </Alert>
+          <Button asChild className="h-11 w-full rounded-xl">
+            <Link to="/login">J’ai déjà activé mon compte : me connecter</Link>
+          </Button>
+        </>
       ) : null}
     </div>
   );
@@ -190,17 +290,18 @@ function FormulaireReponse({ token }: { token: string }) {
           <FormField
             control={form.control}
             name="mandate_letter"
-            render={({ field: { onChange, onBlur, name, ref } }) => (
+            render={({ field: { value, onChange, onBlur, name, ref } }) => (
               <FormItem>
                 <FormLabel>Nouvelle lettre de mandat (PDF)</FormLabel>
                 <FormControl>
-                  <Input
-                    type="file"
+                  <FileDrop
                     accept="application/pdf"
+                    hint="PDF signé, 5 Mo au maximum"
+                    file={value}
+                    onFile={onChange}
                     name={name}
                     ref={ref}
                     onBlur={onBlur}
-                    onChange={(event) => onChange(event.target.files?.[0])}
                   />
                 </FormControl>
                 <FormMessage />

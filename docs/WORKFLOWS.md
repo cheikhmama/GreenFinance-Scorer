@@ -48,6 +48,9 @@ follows the request on a public page opened with a token received by e-mail.
 - A `PENDING_ONBOARDING`, `INFO_REQUESTED` or `REJECTED` company is invisible to every role except
   `ADMIN`; its applicant only sees it through the follow-up page.
 - Only an `ACTIVE` company can submit reports or receive new investments.
+- Opening the activation link (`POST /auth/activer-compte`, 72 hours, single use) sets the
+  password **and opens the session**: the user lands in their workspace without a separate login.
+  An expired link is renewed by the admin only, never self-service.
 - A `SUSPENDED` company stays visible to investors who already hold it (so they see the
   warning), but can't receive new positions.
 - Onboarding and **publication** are separate: `published_at` records when the admin last

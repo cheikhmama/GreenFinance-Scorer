@@ -159,15 +159,22 @@ def reinitialiser_mot_de_passe_route(
 
 @router.post(
     "/auth/activer-compte",
-    status_code=204,
+    response_model=UtilisateurPublic,
     operation_id="activateAccount",
-    summary="Poser son mot de passe et activer un compte à partir d'un jeton d'activation",
+    summary="Poser son mot de passe, activer le compte et ouvrir la session",
 )
 def activer_compte_route(
     payload: ActiverCompteRequest,
+    response: Response,
     session: Session = Depends(get_session),
-) -> None:
-    activer_compte(session, payload.token, payload.new_password)
+) -> User:
+    # Le titulaire du lien vient de choisir son mot de passe : la session s'ouvre ici, comme après
+    # un login, pour qu'il arrive directement dans son espace (rôle renvoyé au frontend).
+    user = activer_compte(session, payload.token, payload.new_password)
+    auditer(session, user.id, "login", "User", user.id, "success")
+    session.commit()
+    _ouvrir_session(response, user, current_generation(user.id))
+    return user
 
 
 @router.post(

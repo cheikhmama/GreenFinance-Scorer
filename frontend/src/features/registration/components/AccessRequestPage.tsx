@@ -30,18 +30,16 @@ const PROFILS = {
   investisseur: {
     role: "INVESTOR",
     titre: "Accès investisseur",
-    libelleRole: "Investisseur",
     email: "E-mail professionnel",
-    organisation: "Nom du fonds / Société d’investissement",
+    organisation: "Nom du fonds / Organisation",
     precision: "Type d’investisseur",
     options: Object.entries(LIBELLES_TYPE_INVESTISSEUR),
   },
   chercheur: {
     role: "RESEARCHER",
     titre: "Accès chercheur",
-    libelleRole: "Chercheur",
     email: "E-mail institutionnel",
-    organisation: "Université / Organisme de recherche",
+    organisation: "Université / Institut de recherche",
     precision: "Domaine de recherche",
     options: Object.entries(LIBELLES_DOMAINE_RECHERCHE),
   },
@@ -66,7 +64,7 @@ function messageErreur(error: unknown) {
     return "Plusieurs demandes ont été envoyées récemment depuis votre connexion. Réessayez dans une heure.";
   }
   if (error instanceof ApiError && error.status === 503) {
-    return "Le service d’inscription est momentanément indisponible. Réessayez plus tard.";
+    return "Le service de notification e-mail est momentanément indisponible. Veuillez réessayer plus tard.";
   }
   return "La demande n’a pas pu être envoyée. Vérifiez vos informations et réessayez.";
 }
@@ -101,7 +99,7 @@ export function AccessRequestPage({ profil }: { profil: Profil }) {
   return (
     <AuthLayout eyebrow="REJOINDRE LA PLATEFORME" title={config.titre}>
       {envoi.isSuccess ? (
-        <RegistrationConfirmation profil={config.libelleRole} />
+        <RegistrationConfirmation />
       ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>

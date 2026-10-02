@@ -84,3 +84,35 @@ def test_echec_d_envoi_journalise_sans_fuite(monkeypatch) -> None:
         {"event": "activation_delivery_failed", "error_type": "ConnectionError", "log_level": "error"}
     ]
     assert "jeton-secret" not in str(journaux) and "secret@example.com" not in str(journaux)
+
+
+def test_route_ouvre_la_session_et_renvoie_le_role(session) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    utilisateur = _compte(session)
+    jeton = _emettre(session, utilisateur)
+    client = TestClient(app, base_url="https://testserver")
+
+    reponse = client.post(
+        "/api/v1/auth/activer-compte", json={"token": jeton, "new_password": MOT_DE_PASSE}
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["role"] == Role.INVESTOR.value
+    assert client.get("/api/v1/auth/me").json()["email"] == utilisateur.email
+
+
+def test_route_jeton_invalide_aucune_session(session) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app, base_url="https://testserver")
+    reponse = client.post(
+        "/api/v1/auth/activer-compte", json={"token": "x" * 43, "new_password": MOT_DE_PASSE}
+    )
+
+    assert reponse.status_code == 422
+    assert "set-cookie" not in reponse.headers

@@ -99,9 +99,9 @@ def envoyer_lien_activation(
 
 
 def activer_compte(session: Session, jeton_clair: str, nouveau_mot_de_passe: str) -> User:
-    """Consomme le jeton, pose le mot de passe choisi et active le compte — aucune session n'est
-    ouverte ici (même choix que password_reset.py::reinitialiser_mot_de_passe), l'utilisateur se
-    connecte ensuite normalement."""
+    """Consomme le jeton, pose le mot de passe choisi et active le compte. La session est ouverte
+    par la route (app/auth/router.py::activer_compte_route), pas ici ; la réinitialisation du mot
+    de passe, elle, n'en ouvre toujours aucune."""
     jeton_hache = _hash_token(jeton_clair)
     entree = session.exec(
         select(AccountActivationToken).where(col(AccountActivationToken.token_hash) == jeton_hache)

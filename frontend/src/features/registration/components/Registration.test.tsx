@@ -37,7 +37,7 @@ describe("Inscription — choix du profil", () => {
 
     await user.click(screen.getByRole("link", { name: /Investisseur \/ Analyste/ }));
     expect(await screen.findByRole("heading", { name: "Accès investisseur" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Nom du fonds / Société d’investissement")).toBeInTheDocument();
+    expect(screen.getByLabelText("Nom du fonds / Organisation")).toBeInTheDocument();
     expect(screen.getByLabelText("Type d’investisseur")).toBeInTheDocument();
   });
 
@@ -58,17 +58,12 @@ describe("Inscription — investisseur et chercheur", () => {
 
     await user.type(await screen.findByLabelText("Nom & Prénom"), "Claire Martin");
     await user.type(screen.getByLabelText("E-mail professionnel"), "claire@fonds-sahel.com");
-    await user.type(
-      screen.getByLabelText("Nom du fonds / Société d’investissement"),
-      "Fonds Sahel Capital",
-    );
+    await user.type(screen.getByLabelText("Nom du fonds / Organisation"), "Fonds Sahel Capital");
     await user.selectOptions(screen.getByLabelText("Type d’investisseur"), "BUSINESS_ANGEL");
     await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
 
     expect(await screen.findByText("Demande d’inscription transmise")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Votre demande d’accès Investisseur a été enregistrée.*sous 24h à 48h/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/sous 24h à 48h.*dès validation/)).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/v1/access-requests");
     expect(JSON.parse(init?.body as string)).toEqual({
@@ -81,12 +76,37 @@ describe("Inscription — investisseur et chercheur", () => {
     });
   });
 
+  it("e-mail non configuré côté serveur (503) : message dédié, pas de confirmation", async () => {
+    fetchMock.mockResolvedValue(new Response("Error", { status: 503 }));
+    const user = userEvent.setup();
+    renderAt("/inscription/chercheur");
+
+    await user.type(await screen.findByLabelText("Nom & Prénom"), "Ahmed Salem");
+    await user.type(screen.getByLabelText("E-mail institutionnel"), "a.salem@univ-nkc.mr");
+    await user.type(
+      screen.getByLabelText("Université / Institut de recherche"),
+      "Université de Nouakchott",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Domaine de recherche"),
+      screen.getAllByRole("option")[1],
+    );
+    await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
+
+    expect(
+      await screen.findByText(
+        "Le service de notification e-mail est momentanément indisponible. Veuillez réessayer plus tard.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Demande d’inscription transmise")).not.toBeInTheDocument();
+  });
+
   it("chercheur : champs propres au profil, tous requis", async () => {
     const user = userEvent.setup();
     renderAt("/inscription/chercheur");
 
     expect(await screen.findByLabelText("E-mail institutionnel")).toBeInTheDocument();
-    expect(screen.getByLabelText("Université / Organisme de recherche")).toBeInTheDocument();
+    expect(screen.getByLabelText("Université / Institut de recherche")).toBeInTheDocument();
     const domaine = screen.getByLabelText("Domaine de recherche");
     expect(domaine).toHaveTextContent("Empreinte carbone");
 

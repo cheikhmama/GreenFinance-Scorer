@@ -15,6 +15,7 @@ import { AuthLayout } from "@/shared/layout/AuthLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
+import { FileDrop } from "@/shared/ui/file-drop";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { Select } from "@/shared/ui/select";
@@ -28,7 +29,7 @@ function messageErreur(error: unknown) {
     return "Plusieurs demandes ont été envoyées récemment depuis votre connexion. Réessayez dans une heure.";
   }
   if (error instanceof ApiError && error.status === 503) {
-    return "Le service d’inscription est momentanément indisponible. Réessayez plus tard.";
+    return "Le service de notification e-mail est momentanément indisponible. Veuillez réessayer plus tard.";
   }
   if (error instanceof ApiError && error.status === 422) {
     return "Certaines informations sont invalides : vérifiez les champs signalés et la lettre de mandat (PDF).";
@@ -111,7 +112,7 @@ export function CompanyRegistrationPage() {
   return (
     <AuthLayout eyebrow="REJOINDRE LA PLATEFORME" title="Inscrire mon entreprise">
       {register.isSuccess ? (
-        <RegistrationConfirmation profil="Entreprise" />
+        <RegistrationConfirmation />
       ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
@@ -177,7 +178,7 @@ export function CompanyRegistrationPage() {
                   placeholder: pays ? exempleIdentifiantFiscal(pays) : "Choisissez d’abord le pays",
                 })}
               </div>
-              {champTexte("contact_name", "Nom du responsable", {
+              {champTexte("contact_name", "Nom & Prénom du responsable", {
                 autoComplete: "name",
                 placeholder: "Prénom Nom",
               })}
@@ -189,7 +190,7 @@ export function CompanyRegistrationPage() {
               <FormField
                 control={form.control}
                 name="mandate_letter"
-                render={({ field: { onChange, onBlur, name, ref } }) => (
+                render={({ field: { value, onChange, onBlur, name, ref } }) => (
                   <FormItem className="sm:col-span-2">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <FormLabel>Lettre de mandat signée (PDF)</FormLabel>
@@ -203,14 +204,14 @@ export function CompanyRegistrationPage() {
                       </a>
                     </div>
                     <FormControl>
-                      <Input
-                        type="file"
+                      <FileDrop
                         accept="application/pdf"
-                        className={CLASSE_CHAMP}
+                        hint="PDF signé, 5 Mo au maximum"
+                        file={value}
+                        onFile={onChange}
                         name={name}
                         ref={ref}
                         onBlur={onBlur}
-                        onChange={(event) => onChange(event.target.files?.[0])}
                       />
                     </FormControl>
                     <FormMessage />

@@ -7,14 +7,14 @@ const ROLES = [
     to: "/inscription/entreprise",
     titre: "Entreprise (Émetteur)",
     description:
-      "Soumettez vos rapports ESG, suivez votre conformité et obtenez votre score officiel.",
+      "Soumettez vos déclarations ESG, gérez votre conformité et obtenez votre score officiel.",
     Icone: Building2,
   },
   {
     to: "/inscription/investisseur",
     titre: "Investisseur / Analyste",
     description:
-      "Consultez les scores ESG validés, analysez les rapports et évaluez vos portefeuilles.",
+      "Consultez les scores certifiés, analysez les rapports ESG et évaluez vos portefeuilles.",
     Icone: TrendingUp,
   },
   {
