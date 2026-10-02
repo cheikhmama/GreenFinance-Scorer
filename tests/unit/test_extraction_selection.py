@@ -151,7 +151,9 @@ def test_calculer_couverture_classe_les_trois_statuts() -> None:
     extraction = ExtractionEntreprise(
         entreprise="X",
         indicateurs=[
-            IndicateurExtrait(code="A", valeur=1.0, trouve=True),
+            # Trouvé = une valeur ET sa page (tâche 5.11 : sans page, pas de preuve).
+            IndicateurExtrait(code="A", valeur=1.0, trouve=True, page_source=4),
+            IndicateurExtrait(code="A2", valeur=2.0, trouve=True),
             IndicateurExtrait(
                 code="B",
                 valeur=None,
@@ -162,9 +164,9 @@ def test_calculer_couverture_classe_les_trois_statuts() -> None:
             IndicateurExtrait(code="C", valeur=None, trouve=False),
         ],
     )
-    codes = ["A", "B", "C"]
-    pages_examinees_par_code = {"A": 10, "B": 20, "C": 5}
-    recherche_exhaustive_par_code = {"A": False, "B": False, "C": False}
+    codes = ["A", "A2", "B", "C"]
+    pages_examinees_par_code = {"A": 10, "A2": 3, "B": 20, "C": 5}
+    recherche_exhaustive_par_code = {"A": False, "A2": False, "B": False, "C": False}
 
     couvertures = calculer_couverture(
         uuid.uuid4(), extraction, codes, pages_examinees_par_code, recherche_exhaustive_par_code
@@ -172,6 +174,7 @@ def test_calculer_couverture_classe_les_trois_statuts() -> None:
     par_code = {c.metric_code: c for c in couvertures}
 
     assert par_code["A"].status == MetricCoverageStatus.TROUVE
+    assert par_code["A2"].status == MetricCoverageStatus.NON_TROUVE
     assert par_code["B"].status == MetricCoverageStatus.ABSENT_CONFIRME
     assert par_code["C"].status == MetricCoverageStatus.NON_TROUVE
     # pages_examinees est bien lu par code, jamais un entier partagé.

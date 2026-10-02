@@ -11,6 +11,9 @@ _CHAMPS_REQUIS_VALIDES = {
     "default_scoring_config": "config/weights/default.yaml",
     "emission_factors_path": "config/carbon/emission_factors.yaml",
     "database_url": "postgresql+psycopg://greenfinance:un-vrai-mdp@db:5432/greenfinance",
+    # Explicite : le .env local du développeur peut viser Mailpit (`plain`, tâche 5.11), interdit
+    # en production — ces tests ne doivent pas en dépendre.
+    "smtp_security": "starttls",
 }
 
 

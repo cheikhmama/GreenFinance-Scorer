@@ -18,12 +18,13 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Card, CardContent } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { PageHeader } from "@/shared/ui/page-header";
 import { StatCard } from "@/shared/ui/stat-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { useAdminDashboard, useApercuActeurs } from "../api";
+import { useAdminDashboard, useApercuActeurs, usePendingRegistrations } from "../api";
 import { EsgPerformanceSection } from "./EsgPerformanceSection";
 import { RecentActivitySection } from "./RecentActivitySection";
 
@@ -36,6 +37,7 @@ import { RecentActivitySection } from "./RecentActivitySection";
  * la sidebar (roleNav.ts) donne déjà accès aux espaces principaux. */
 export function AdminDashboardPage() {
   const { data, dataUpdatedAt } = useAdminDashboard();
+  const { data: inscriptions } = usePendingRegistrations();
   const { data: apercu } = useApercuActeurs();
   const aucuneActionPrioritaire =
     data !== undefined &&
@@ -57,6 +59,24 @@ export function AdminDashboardPage() {
             : "Vue d'ensemble de la plateforme et des files de travail nécessitant une intervention."
         }
       />
+
+      {inscriptions && inscriptions.length > 0 ? (
+        <Alert className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+          <UserPlus aria-hidden="true" className="text-amber-700 dark:text-amber-400" />
+          <AlertTitle>
+            {inscriptions.length} inscription{inscriptions.length > 1 ? "s" : ""} d’entreprise à
+            valider
+          </AlertTitle>
+          <AlertDescription>
+            <Link
+              to="/admin/entreprises#inscriptions-a-valider"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Examiner les demandes
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Synthèse globale">
         <StatCard

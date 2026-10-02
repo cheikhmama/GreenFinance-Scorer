@@ -28,6 +28,7 @@ def test_report_status_values() -> None:
 
 def test_registration_status_values() -> None:
     assert [s.value for s in RegistrationStatus] == [
+        "EMAIL_VERIFICATION_PENDING",
         "PENDING_ONBOARDING",
         "INFO_REQUESTED",
         "ACTIVE",

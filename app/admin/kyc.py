@@ -17,7 +17,7 @@ import re
 import unicodedata
 import uuid
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -25,6 +25,12 @@ from sqlmodel import Session
 
 from app.admin.schemas import KycCheck, KycReport
 from app.auth.models import User
+from app.company.domaines import (
+    MESSAGERIES_GRAND_PUBLIC,
+    domaine_de_l_email,
+    domaine_du_site,
+    domaines_correspondent,
+)
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
@@ -46,12 +52,6 @@ FORMES_JURIDIQUES = {
 }
 
 # Messageries grand public : un domaine qui ne dit rien de l'entreprise.
-MESSAGERIES_GRAND_PUBLIC = {
-    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.fr", "hotmail.com", "hotmail.fr",
-    "outlook.com", "outlook.fr", "live.com", "live.fr", "msn.com", "icloud.com", "me.com",
-    "aol.com", "gmx.com", "gmx.fr", "proton.me", "protonmail.com", "orange.fr", "free.fr",
-    "laposte.net", "yandex.com", "mail.com",
-}
 
 
 class GleifIndisponible(Exception):
@@ -171,14 +171,6 @@ def controles_gleif(entreprise: Company) -> list[KycCheck]:
     return [controle_enregistrement, controle_nom]
 
 
-def _domaine_du_site(site: str) -> str | None:
-    hote = urlsplit(site).hostname
-    if not hote:
-        return None
-    hote = hote.lower().rstrip(".")
-    return hote.removeprefix("www.")
-
-
 def _controle_domaine(entreprise: Company, email: str | None) -> KycCheck:
     def controle(resultat: KycCheckResult, detail: str) -> KycCheck:
         return KycCheck(
@@ -191,23 +183,20 @@ def _controle_domaine(entreprise: Company, email: str | None) -> KycCheck:
 
     if email is None or "@" not in email:
         return controle(KycCheckResult.NOT_APPLICABLE, "Aucun compte titulaire.")
-    domaine_email = email.rsplit("@", 1)[1].lower()
+    domaine_email = domaine_de_l_email(email)
     if domaine_email in MESSAGERIES_GRAND_PUBLIC:
         return controle(
             KycCheckResult.FAILED,
             f"Adresse d'une messagerie grand public ({domaine_email}) : elle ne rattache pas le "
             "demandeur à l'entreprise.",
         )
-    domaine_site = _domaine_du_site(entreprise.website) if entreprise.website else None
+    domaine_site = domaine_du_site(entreprise.website) if entreprise.website else None
     if domaine_site is None:
         return controle(KycCheckResult.NOT_APPLICABLE, "Aucun site web déclaré.")
-    correspond = (
-        domaine_email == domaine_site
-        or domaine_email.endswith("." + domaine_site)
-        or domaine_site.endswith("." + domaine_email)
-    )
     return controle(
-        KycCheckResult.PASSED if correspond else KycCheckResult.FAILED,
+        KycCheckResult.PASSED
+        if domaines_correspondent(domaine_email, domaine_site)
+        else KycCheckResult.FAILED,
         f"E-mail @{domaine_email}, site {domaine_site}.",
     )
 

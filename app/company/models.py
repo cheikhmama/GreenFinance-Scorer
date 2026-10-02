@@ -48,6 +48,13 @@ class Company(SQLModel, table=True):
     # Identifiant fiscal (tâche 5.10) : exigé à l'inscription publique, absent des entreprises
     # créées avant ; sa nature (NIF, SIREN, EIN…) suit le pays. Recherche des doublons par
     # (pays, identifiant), d'où l'index.
+    # Vérification de l'adresse du demandeur (tâche 5.11) : code à 6 chiffres envoyé par e-mail,
+    # stocké seulement en empreinte HMAC (clé du serveur) ; tentatives comptées, validité bornée.
+    email_verification_code_hash: str | None = Field(default=None, max_length=64)
+    email_verification_sent_at: datetime | None = None
+    email_verification_expires_at: datetime | None = None
+    email_verification_attempts: int = Field(default=0)
+    email_verified_at: datetime | None = None
     tax_id: str | None = Field(default=None, max_length=32, index=True)
     tax_id_type: TaxIdType | None = Field(
         default=None, sa_column=sa_enum_column(TaxIdType, nullable=True)

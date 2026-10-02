@@ -13,6 +13,8 @@ import type {
   ImporterRapportParURLRequest,
   RapportESGDetail,
   RapportESGPublic,
+  RegistrationEmailResend,
+  RegistrationEmailVerification,
   RegistrationStatusRequest,
   RegistrationStatusView,
   VerificationLei
@@ -59,6 +61,64 @@ if(bodyRegisterCompany.company_fax !== undefined && bodyRegisterCompany.company_
     method: 'POST'
     ,
     body: formData
+  }
+);}
+
+
+export const getVerifyRegistrationEmailUrl = () => {
+
+
+
+
+  return `/companies/registration/verify-email`
+}
+
+/**
+ * @summary Confirmer l'adresse du demandeur avec le code reçu par e-mail
+ */
+export const verifyRegistrationEmail = async (registrationEmailVerification: RegistrationEmailVerification, options?: RequestInit): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<void>(getVerifyRegistrationEmailUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registrationEmailVerification)
+  }
+);}
+
+
+export const getResendRegistrationCodeUrl = () => {
+
+
+
+
+  return `/companies/registration/resend-code`
+}
+
+/**
+ * @summary Recevoir un nouveau code de vérification (réponse identique dans tous les cas)
+ */
+export const resendRegistrationCode = async (registrationEmailResend: RegistrationEmailResend, options?: RequestInit): Promise<unknown> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<unknown>(getResendRegistrationCodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registrationEmailResend)
   }
 );}
 

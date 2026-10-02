@@ -542,6 +542,7 @@ export type RegistrationStatus = typeof RegistrationStatus[keyof typeof Registra
 
 
 export const RegistrationStatus = {
+  EMAIL_VERIFICATION_PENDING: 'EMAIL_VERIFICATION_PENDING',
   PENDING_ONBOARDING: 'PENDING_ONBOARDING',
   INFO_REQUESTED: 'INFO_REQUESTED',
   ACTIVE: 'ACTIVE',
@@ -1583,6 +1584,23 @@ export interface PageUtilisateurPublic {
   pages: number;
 }
 
+/**
+ * Inscription qui attend la décision de l'Administrateur (tâche 5.11) : ce qu'il faut pour la
+ * repérer dans une liste ; le détail et la décision se trouvent dans la fenêtre KYC.
+ */
+export interface PendingRegistration {
+  company_id: string;
+  company_name: string;
+  sector: string;
+  country: string;
+  status: RegistrationStatus;
+  registered_at: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  tax_id: string | null;
+  tax_id_type: TaxIdType | null;
+}
+
 export interface TrancheScorePublic {
   lower_bound: number;
   upper_bound: number;
@@ -1834,6 +1852,23 @@ export interface ReferenceDatasetImportResult {
   imported: number;
   skipped: number;
   skipped_lines: SkippedLine[];
+}
+
+/**
+ * POST /companies/registration/resend-code — un nouveau code pour cette adresse.
+ */
+export interface RegistrationEmailResend {
+  email: string;
+}
+
+/**
+ * POST /companies/registration/verify-email — le code à 6 chiffres reçu par e-mail (tâche
+ * 5.11), avec l'adresse de la demande.
+ */
+export interface RegistrationEmailVerification {
+  email: string;
+  /** @pattern ^\d{6}$ */
+  code: string;
 }
 
 /**

@@ -40,6 +40,7 @@ from app.auth.models import User
 from app.company.models import Company
 from app.company.schemas import CompanyRegistrationRequest, RegistrationStatusView
 from app.company.upload_validation import TAILLE_MAX_MANDAT_OCTETS, valider_pdf
+from app.company.verification_email import emettre_code, envoyer_code, verifier_code
 from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
@@ -65,6 +66,9 @@ MAX_DEMANDES_PAR_IP = 3
 FENETRE_SECONDES = 60 * 60
 # Demande qui attend une décision de l'Administrateur.
 STATUTS_EN_EXAMEN = (RegistrationStatus.PENDING_ONBOARDING, RegistrationStatus.INFO_REQUESTED)
+# Demandes qu'une nouvelle inscription avec les mêmes identifiants reprend : refusée, ou jamais
+# confirmée par son code (tâche 5.11).
+STATUTS_REOUVRABLES = (RegistrationStatus.REJECTED, RegistrationStatus.EMAIL_VERIFICATION_PENDING)
 
 
 def _limiter_par_ip(adresse_ip: str, prefixe: str = "company_registrations") -> None:
@@ -136,7 +140,7 @@ def _demande_non_aboutie(email: str) -> None:
         "Demande d'inscription — GreenFinance-Scorer",
         (
             "Nous n'avons pas pu enregistrer votre demande d'inscription : cette adresse e-mail, "
-            "cet ISIN ou ce LEI est déjà associé à la plateforme.\n\n"
+            "cet identifiant fiscal, cet ISIN ou ce LEI est déjà associé à la plateforme.\n\n"
             "Si vous avez déjà un compte, utilisez « Mot de passe oublié » sur la page de "
             "connexion. Sinon, contactez-nous via le formulaire de contact.\n"
         ),
@@ -183,7 +187,7 @@ def _demande_existante(
         return None
     if len(entreprises) == 1:
         (entreprise,) = entreprises.values()
-        if entreprise.status == RegistrationStatus.REJECTED:
+        if entreprise.status in STATUTS_REOUVRABLES:
             return entreprise
     return _CONFLIT
 
@@ -283,22 +287,20 @@ def enregistrer_demande(
     entreprise.website = demande.website
     entreprise.tax_id = demande.tax_id
     entreprise.tax_id_type = demande.tax_id_type
-    entreprise.status = RegistrationStatus.PENDING_ONBOARDING
+    # En attente de la confirmation de l'adresse (tâche 5.11) : la demande n'est transmise — jeton
+    # de suivi, Administrateurs prévenus — qu'une fois le code saisi (confirmer_adresse).
+    entreprise.status = RegistrationStatus.EMAIL_VERIFICATION_PENDING
+    entreprise.email_verified_at = None
+    entreprise.status_token_hash = None
     entreprise.registered_at = utcnow()
-    jeton = nouveau_jeton_de_suivi(entreprise)
     session.add(entreprise)
     session.flush()
+    code = emettre_code(entreprise)
     entreprise.mandate_letter_path = _enregistrer_mandat(entreprise.id, lettre_de_mandat)
     entreprise.mandate_letter_uploaded_at = utcnow()
     session.add(entreprise)
 
     auditer(session, None, action, "Company", entreprise.id, "success")
-    _notifier_admins(
-        session,
-        "ENTREPRISE_INSCRITE",
-        f"{entreprise.name} demande à rejoindre la plateforme : inscription à valider.",
-        entreprise,
-    )
 
     try:
         session.commit()
@@ -310,9 +312,32 @@ def enregistrer_demande(
         return
 
     logger.info("company_registration_received", company_id=str(entreprise.id), action=action)
-    background_tasks.add_task(
-        _accuse_de_reception, demande.contact_email, demande.company_name, jeton
+    background_tasks.add_task(envoyer_code, demande.contact_email, demande.company_name, code)
+
+
+def confirmer_adresse(
+    session: Session,
+    email: str,
+    code: str,
+    adresse_ip: str | None,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Code juste : la demande passe à PENDING_ONBOARDING et part chez l'Administrateur — jeton
+    de suivi, accusé de réception avec le lien de suivi, notification (tâche 5.11)."""
+    entreprise = verifier_code(session, email, code, adresse_ip)
+    entreprise.status = RegistrationStatus.PENDING_ONBOARDING
+    jeton = nouveau_jeton_de_suivi(entreprise)
+    session.add(entreprise)
+    auditer(session, None, "registration_email_verified", "Company", entreprise.id, "success")
+    _notifier_admins(
+        session,
+        "ENTREPRISE_INSCRITE",
+        f"{entreprise.name} demande à rejoindre la plateforme : inscription à valider.",
+        entreprise,
     )
+    session.commit()
+    logger.info("company_registration_email_verified", company_id=str(entreprise.id))
+    background_tasks.add_task(_accuse_de_reception, email, entreprise.name, jeton)
 
 
 def _entreprise_du_jeton(session: Session, jeton: str, *, verrouiller: bool = False) -> Company:

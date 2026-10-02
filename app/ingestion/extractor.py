@@ -475,10 +475,60 @@ def _call_llm_extraction(
 
 
 def _indicateur_trouve(extraction: ExtractionEntreprise, code: str) -> bool:
-    """Même critère que completeness.calculer_couverture : un code compte comme trouvé seulement
-    si le LLM l'a explicitement marqué trouve=true ET fourni une valeur non nulle."""
+    """Même critère que completeness.calculer_couverture et que l'enregistrement : un code compte
+    comme trouvé seulement si le LLM l'a marqué trouve=true, avec une valeur ET sa page — une valeur
+    sans page n'a pas de preuve (garantie G1), elle n'est ni enregistrée ni comptée."""
     extrait = next((i for i in extraction.indicateurs if i.code == code), None)
-    return bool(extrait and extrait.trouve and extrait.valeur is not None)
+    return bool(
+        extrait and extrait.trouve and extrait.valeur is not None and extrait.page_source is not None
+    )
+
+
+def _deduire_pages_manquantes(
+    extraction: ExtractionEntreprise,
+    document: Any,
+    pages_vues_par_code: dict[str, set[int]],
+    rapport_id: uuid.UUID,
+) -> ExtractionEntreprise:
+    """Le LLM renvoie parfois une valeur trouvée sans sa page (constaté sur le Scope 2 d'un
+    rapport de test) : elle était alors écartée en silence. On cherche la valeur — sa citation,
+    sinon le nombre — parmi les pages montrées au LLM pour ce code, avec la localisation des
+    preuves (app/ingestion/localisation.py) ; une seule page qui la contient devient sa page.
+    Aucune ou plusieurs : la valeur reste sans page, donc écartée. Best-effort, jamais bloquant."""
+    completes = []
+    for indicateur in extraction.indicateurs:
+        if indicateur.trouve and indicateur.valeur is not None and indicateur.page_source is None:
+            pages = []
+            for page in sorted(pages_vues_par_code.get(indicateur.code, set())):
+                try:
+                    boites = localisation.localiser(
+                        document,
+                        page,
+                        citation=indicateur.citation_source,
+                        valeur_brute=indicateur.valeur_brute,
+                        valeur=indicateur.valeur,
+                    )
+                except Exception:  # noqa: BLE001 — best-effort assumé, voir ci-dessus.
+                    boites = []
+                if boites:
+                    pages.append(page)
+            if len(pages) == 1:
+                logger.info(
+                    "page_source_deduite",
+                    rapport_id=str(rapport_id),
+                    code=indicateur.code,
+                    page=pages[0],
+                )
+                indicateur = indicateur.model_copy(update={"page_source": pages[0]})
+            else:
+                logger.warning(
+                    "page_source_introuvable",
+                    rapport_id=str(rapport_id),
+                    code=indicateur.code,
+                    pages_candidates=len(pages),
+                )
+        completes.append(indicateur)
+    return ExtractionEntreprise(entreprise=extraction.entreprise, indicateurs=completes)
 
 
 def _fusionner_extractions(
@@ -716,6 +766,9 @@ def run_extraction_pipeline(
                     session.delete(ancienne_preuve)
             session.flush()
 
+            extraction = _deduire_pages_manquantes(
+                extraction, conversion.document, pages_vues_par_code, rapport_id
+            )
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}
             preuves_par_page: dict[int, Evidence] = {}
             # Le LLM peut renvoyer deux fois le même code : la première occurrence exploitable

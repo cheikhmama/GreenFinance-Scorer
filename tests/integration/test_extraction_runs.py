@@ -158,3 +158,68 @@ def test_executions_et_boites_visibles_de_l_administrateur(session, monkeypatch)
     assert corps["carbon_data"][0]["extraction_run_id"] == executions.json()[0]["id"]
     assert corps["carbon_data"][0]["proof_boxes"][0]["page"] == 3
     assert corps["metrics"][0]["proof_boxes"][0]["page"] == 3
+
+
+def _scope_1_sans_page(valeur: float, valeur_brute: str) -> ExtractionEntreprise:
+    """Le LLM trouve la valeur mais omet sa page (constaté sur un Scope 2, tâche 5.11)."""
+    return ExtractionEntreprise(
+        entreprise="Atlas Industries",
+        indicateurs=[
+            IndicateurExtrait(
+                code="scope_1", valeur=valeur, unite="tCO2e", page_source=None, trouve=True,
+                valeur_brute=valeur_brute,
+            ),
+        ],
+    )
+
+
+def _couverture(session, rapport_id, code: str):
+    from app.ingestion.models import MetricCoverage
+
+    session.expire_all()
+    return session.exec(
+        select(MetricCoverage).where(
+            col(MetricCoverage.report_id) == rapport_id, col(MetricCoverage.metric_code) == code
+        )
+    ).one()
+
+
+def test_page_omise_par_le_llm_retrouvee_dans_les_pages_montrees(session, monkeypatch) -> None:
+    from app.core.enums import MetricCoverageStatus
+    from app.ingestion.models import Evidence
+
+    document = DoclingDocument.load_from_json(ATLAS / "docling.json")
+    _simuler_pipeline_extraction(
+        monkeypatch, _scope_1_sans_page(12500.0, "12 500.0"), document=document
+    )
+    rapport = _rapport_a_extraire(session)
+
+    extractor.run_extraction_pipeline(rapport.id, 2025)
+
+    session.expire_all()
+    (scope_1,) = session.exec(
+        select(CarbonEmission).where(col(CarbonEmission.report_id) == rapport.id)
+    ).all()
+    assert scope_1.tonnes_co2e == 12500.0
+    preuve = session.get(Evidence, scope_1.proof_id)
+    assert preuve is not None and preuve.page_start == 3
+    assert _couverture(session, rapport.id, "scope_1").status == MetricCoverageStatus.TROUVE
+
+
+def test_valeur_sans_page_introuvable_ni_enregistree_ni_comptee(session, monkeypatch) -> None:
+    from app.core.enums import MetricCoverageStatus
+
+    document = DoclingDocument.load_from_json(ATLAS / "docling.json")
+    _simuler_pipeline_extraction(
+        monkeypatch, _scope_1_sans_page(98765.0, "98 765.0"), document=document
+    )
+    rapport = _rapport_a_extraire(session)
+
+    extractor.run_extraction_pipeline(rapport.id, 2025)
+
+    session.expire_all()
+    assert session.exec(
+        select(CarbonEmission).where(col(CarbonEmission.report_id) == rapport.id)
+    ).all() == []
+    # Plus d'écart entre la liste de complétude et ce qui est enregistré.
+    assert _couverture(session, rapport.id, "scope_1").status != MetricCoverageStatus.TROUVE

@@ -63,6 +63,9 @@ class RegistrationStatus(str, Enum):
     éventuellement, SUSPENDED : entreprise validée.
     """
 
+    # Adresse du demandeur pas encore confirmée par son code (tâche 5.11) : la demande n'est pas
+    # encore transmise à l'Administrateur.
+    EMAIL_VERIFICATION_PENDING = "EMAIL_VERIFICATION_PENDING"
     PENDING_ONBOARDING = "PENDING_ONBOARDING"
     INFO_REQUESTED = "INFO_REQUESTED"
     ACTIVE = "ACTIVE"

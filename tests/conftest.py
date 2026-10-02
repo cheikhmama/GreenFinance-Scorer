@@ -118,3 +118,25 @@ def gleif_hors_ligne(monkeypatch) -> None:
         raise httpx.ConnectError("réseau interdit pendant les tests")
 
     monkeypatch.setattr("app.admin.kyc.httpx.get", _reseau_interdit)
+
+
+CODE_DE_VERIFICATION = "123456"
+
+
+@pytest.fixture(autouse=True)
+def envoi_code_verification(monkeypatch):
+    """Vérification de l'adresse à l'inscription (tâche 5.11) : code fixe, e-mail du code capté
+    (jamais déposé dans la file réelle), limites par IP remises à zéro à chaque test."""
+    from unittest.mock import Mock
+
+    from app.core.redis import get_redis_client
+
+    monkeypatch.setattr(
+        "app.company.verification_email.secrets.randbelow", lambda _n: int(CODE_DE_VERIFICATION)
+    )
+    envoi = Mock()
+    monkeypatch.setattr("app.company.verification_email.envoyer_email_differe", envoi)
+    client = get_redis_client()
+    for cle in client.scan_iter("registration_email_*"):
+        client.delete(cle)
+    return envoi

@@ -27,6 +27,7 @@ import {
   listFailedExtractionReports,
   listOrphanReportsInValidation,
   listOverdueReports,
+  listPendingRegistrations,
   listPortfoliosAdmin,
   listProjectsAdmin,
   listPublishableCompanies,
@@ -83,6 +84,7 @@ import type {
   PageProjetAdmin,
   PageRapportESGPublic,
   PageUtilisateurPublic,
+  PendingRegistration,
   PerformanceESGAdmin,
   ProjectStatus,
   RapportESGDetail,
@@ -397,7 +399,19 @@ export function useOnboardCompany() {
       queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
       queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
       queryClient.invalidateQueries({ queryKey: kycKey(entrepriseId) });
+      queryClient.invalidateQueries({ queryKey: INSCRIPTIONS_A_EXAMINER_KEY });
     },
+  });
+}
+
+const INSCRIPTIONS_A_EXAMINER_KEY = ["admin", "pending-registrations"] as const;
+
+/** GET /admin/companies/pending-registrations — inscriptions confirmées qui attendent une
+ * décision, la plus ancienne d'abord (tâche 5.11). */
+export function usePendingRegistrations() {
+  return useQuery<PendingRegistration[], ApiError>({
+    queryKey: INSCRIPTIONS_A_EXAMINER_KEY,
+    queryFn: () => listPendingRegistrations(),
   });
 }
 

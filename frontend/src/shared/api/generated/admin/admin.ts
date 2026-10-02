@@ -42,6 +42,7 @@ import type {
   PageProjetAdmin,
   PageRapportESGPublic,
   PageUtilisateurPublic,
+  PendingRegistration,
   PerformanceESGAdmin,
   RapportESGDetail,
   RapportESGPublic,
@@ -865,6 +866,29 @@ return apiFetch<CompanyOnboardingResult>(getOnboardCompanyUrl(companyId),
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(companyOnboardingRequest)
+  }
+);}
+
+
+export const getListPendingRegistrationsUrl = () => {
+
+
+
+
+  return `/admin/companies/pending-registrations`
+}
+
+/**
+ * @summary Inscriptions d'entreprises en attente de décision (la plus ancienne d'abord)
+ */
+export const listPendingRegistrations = async ( options?: RequestInit): Promise<PendingRegistration[]> => {
+
+  return apiFetch<PendingRegistration[]>(getListPendingRegistrationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 
