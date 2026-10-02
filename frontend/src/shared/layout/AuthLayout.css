@@ -63,6 +63,10 @@
   padding-block: 14px 18px;
   outline: none;
 }
+.auth-main[data-layout="centered"] {
+  grid-template-columns: minmax(0, 960px);
+  justify-content: center;
+}
 .auth-kicker {
   display: inline-flex;
   align-items: center;
@@ -341,6 +345,9 @@
   .auth-main {
     gap: 40px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .auth-main[data-layout="centered"] {
+    grid-template-columns: minmax(0, 1fr);
   }
   .auth-form-panel {
     padding-inline: 28px;

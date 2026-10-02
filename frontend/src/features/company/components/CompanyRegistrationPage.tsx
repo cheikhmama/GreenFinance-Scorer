@@ -7,18 +7,18 @@ import { RegistrationConfirmation } from "@/features/registration/components/Reg
 import {
   exempleIdentifiantFiscal,
   libelleIdentifiantFiscal,
-  PAYS,
-  SECTEURS,
+  OPTIONS_PAYS,
+  OPTIONS_SECTEURS,
 } from "@/features/registration/referentiels";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
+import { Combobox } from "@/shared/ui/combobox";
 import { FileDrop } from "@/shared/ui/file-drop";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
-import { Select } from "@/shared/ui/select";
 import { useRegisterCompany } from "../api";
 import { type CompanyRegistrationForm, companyRegistrationFormSchema } from "../schemas";
 
@@ -132,20 +132,18 @@ export function CompanyRegistrationPage() {
               <FormField
                 control={form.control}
                 name="sector"
-                render={({ field }) => (
+                render={({ field: { value, onChange, ...field } }) => (
                   <FormItem>
                     <FormLabel>Secteur d’activité</FormLabel>
                     <FormControl>
-                      <Select className={CLASSE_CHAMP} {...field}>
-                        <option value="" disabled>
-                          Choisir…
-                        </option>
-                        {SECTEURS.map((secteur) => (
-                          <option key={secteur} value={secteur}>
-                            {secteur}
-                          </option>
-                        ))}
-                      </Select>
+                      <Combobox
+                        {...field}
+                        value={value}
+                        onValueChange={onChange}
+                        options={OPTIONS_SECTEURS}
+                        searchPlaceholder="Rechercher un secteur…"
+                        emptyText="Aucun secteur ne correspond."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -154,20 +152,18 @@ export function CompanyRegistrationPage() {
               <FormField
                 control={form.control}
                 name="country"
-                render={({ field }) => (
+                render={({ field: { value, onChange, ...field } }) => (
                   <FormItem>
                     <FormLabel>Pays</FormLabel>
                     <FormControl>
-                      <Select className={CLASSE_CHAMP} autoComplete="country" {...field}>
-                        <option value="" disabled>
-                          Choisir…
-                        </option>
-                        {PAYS.map(({ code, nom }) => (
-                          <option key={code} value={code}>
-                            {nom}
-                          </option>
-                        ))}
-                      </Select>
+                      <Combobox
+                        {...field}
+                        value={value}
+                        onValueChange={onChange}
+                        options={OPTIONS_PAYS}
+                        searchPlaceholder="Rechercher un pays…"
+                        emptyText="Aucun pays ne correspond."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

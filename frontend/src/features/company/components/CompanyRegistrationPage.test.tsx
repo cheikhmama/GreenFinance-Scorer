@@ -24,13 +24,27 @@ function renderPage() {
   );
 }
 
+const NOMS_PAYS: Record<string, string> = { MR: "Mauritanie", FR: "France", US: "États-Unis" };
+
+/** Ouvre la liste avec recherche, tape la recherche, puis choisit l'option. */
+async function choisir(
+  user: ReturnType<typeof userEvent.setup>,
+  champ: string,
+  recherche: string,
+  option: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: champ }));
+  await user.type(await screen.findByPlaceholderText(/Rechercher/), recherche);
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
 const MANDAT = new File(["%PDF-1.4"], "mandat.pdf", { type: "application/pdf" });
 
 async function remplirEtEnvoyer({ avecMandat = true, pays = "MR", identifiant = "12345678" } = {}) {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Nom de l’entreprise"), "Minière du Nord");
-  await user.selectOptions(screen.getByLabelText("Secteur d’activité"), "Mines et extraction");
-  await user.selectOptions(screen.getByLabelText("Pays"), pays);
+  await choisir(user, "Secteur d’activité", "mines", "Mines et extraction");
+  await choisir(user, "Pays", NOMS_PAYS[pays], NOMS_PAYS[pays]);
   await user.type(
     screen.getByRole("textbox", { name: /NIF|SIREN|EIN|Identifiant fiscal/ }),
     identifiant,
@@ -75,15 +89,33 @@ describe("CompanyRegistrationPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    for (const [pays, libelle] of [
-      ["MR", "NIF"],
-      ["FR", "SIREN"],
-      ["US", "EIN"],
-      ["SN", "Identifiant fiscal"],
+    for (const [recherche, pays, libelle] of [
+      ["Mau", "Mauritanie", "NIF"],
+      ["fra", "France", "SIREN"],
+      ["etats", "États-Unis", "EIN"],
+      ["sene", "Sénégal", "Identifiant fiscal"],
     ]) {
-      await user.selectOptions(screen.getByLabelText("Pays"), pays);
+      await choisir(user, "Pays", recherche, pays);
+      expect(screen.getByRole("combobox", { name: "Pays" })).toHaveTextContent(pays);
       expect(screen.getByRole("textbox", { name: libelle })).toBeInTheDocument();
     }
+  });
+
+  it("recherche sans tenir compte des accents ni de la casse, code ISO compris", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("combobox", { name: "Secteur d’activité" }));
+    await user.type(await screen.findByPlaceholderText("Rechercher un secteur…"), "ENERGIE");
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Énergie"]);
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("combobox", { name: "Pays" }));
+    await user.type(await screen.findByPlaceholderText("Rechercher un pays…"), "ci");
+    expect(screen.getByRole("option", { name: "Côte d’Ivoire" })).toBeInTheDocument();
+    await user.clear(screen.getByPlaceholderText("Rechercher un pays…"));
+    await user.type(screen.getByPlaceholderText("Rechercher un pays…"), "zzz");
+    expect(screen.getByText("Aucun pays ne correspond.")).toBeInTheDocument();
   });
 
   it("vérifie la forme de l’identifiant fiscal selon le pays avant tout envoi", async () => {

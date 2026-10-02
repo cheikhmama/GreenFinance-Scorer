@@ -8,6 +8,9 @@ type AuthLayoutProps = {
   eyebrow?: string;
   title?: string;
   description?: string;
+  /** « centered » : sans la colonne illustrée, panneau élargi et centré — pour un choix à
+   * plusieurs cartes (choix du profil d'inscription). */
+  layout?: "split" | "centered";
 };
 
 /** Cadre partagé par l’authentification et le contact publics. */
@@ -16,6 +19,7 @@ export function AuthLayout({
   eyebrow = "VOTRE ESPACE GREENFINANCE",
   title,
   description,
+  layout = "split",
 }: AuthLayoutProps) {
   const headingId = useId();
 
@@ -37,66 +41,68 @@ export function AuthLayout({
           </Link>
         </header>
 
-        <main id="auth-content" className="auth-main" tabIndex={-1}>
-          <section className="auth-story" aria-label="La plateforme GreenFinance-Scorer">
-            <div className="auth-kicker">
-              <Leaf size={15} aria-hidden="true" /> INTELLIGENCE ESG & CARBONE
-            </div>
-            <h2 className="auth-story-title">
-              La donnée éclaire.
-              <br />
-              <span>L’impact se mesure.</span>
-            </h2>
-            <div className="auth-illustration" aria-hidden="true">
-              <div className="auth-illustration-inner">
-                <div className="auth-illustration-grid" />
-                <div className="auth-orbit auth-orbit-outer" />
-                <div className="auth-orbit auth-orbit-inner" />
-                <div className="auth-growth-line">
-                  <svg viewBox="0 0 420 190" fill="none" aria-hidden="true">
-                    <path
-                      d="M10 162C73 162 73 115 135 115S206 140 254 81S329 91 397 24"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeDasharray="5 7"
-                    />
-                    <path
-                      d="m380 24 18-1-1 18"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div className="auth-pillar auth-pillar-social">
-                  <span>S</span>
-                  <span>Social</span>
-                </div>
-                <div className="auth-pillar auth-pillar-environment">
-                  <Leaf size={32} strokeWidth={1.4} />
-                  <span>E</span>
-                  <span>Environnement</span>
-                </div>
-                <div className="auth-pillar auth-pillar-governance">
-                  <span>G</span>
-                  <span>Gouvernance</span>
-                </div>
-                <span className="auth-illustration-caption">
-                  <ArrowUpRight size={16} /> Une vision commune. Un impact durable.
-                </span>
+        <main id="auth-content" className="auth-main" data-layout={layout} tabIndex={-1}>
+          {layout === "split" ? (
+            <section className="auth-story" aria-label="La plateforme GreenFinance-Scorer">
+              <div className="auth-kicker">
+                <Leaf size={15} aria-hidden="true" /> INTELLIGENCE ESG & CARBONE
               </div>
-            </div>
-
-            <div className="auth-story-footer">
-              <ShieldCheck size={20} aria-hidden="true" />
-              <p>
-                Un espace pour chaque acteur.
+              <h2 className="auth-story-title">
+                La donnée éclaire.
                 <br />
-                <span>Des entreprises aux investisseurs, de la recherche à l’audit.</span>
-              </p>
-            </div>
-          </section>
+                <span>L’impact se mesure.</span>
+              </h2>
+              <div className="auth-illustration" aria-hidden="true">
+                <div className="auth-illustration-inner">
+                  <div className="auth-illustration-grid" />
+                  <div className="auth-orbit auth-orbit-outer" />
+                  <div className="auth-orbit auth-orbit-inner" />
+                  <div className="auth-growth-line">
+                    <svg viewBox="0 0 420 190" fill="none" aria-hidden="true">
+                      <path
+                        d="M10 162C73 162 73 115 135 115S206 140 254 81S329 91 397 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeDasharray="5 7"
+                      />
+                      <path
+                        d="m380 24 18-1-1 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="auth-pillar auth-pillar-social">
+                    <span>S</span>
+                    <span>Social</span>
+                  </div>
+                  <div className="auth-pillar auth-pillar-environment">
+                    <Leaf size={32} strokeWidth={1.4} />
+                    <span>E</span>
+                    <span>Environnement</span>
+                  </div>
+                  <div className="auth-pillar auth-pillar-governance">
+                    <span>G</span>
+                    <span>Gouvernance</span>
+                  </div>
+                  <span className="auth-illustration-caption">
+                    <ArrowUpRight size={16} /> Une vision commune. Un impact durable.
+                  </span>
+                </div>
+              </div>
+
+              <div className="auth-story-footer">
+                <ShieldCheck size={20} aria-hidden="true" />
+                <p>
+                  Un espace pour chaque acteur.
+                  <br />
+                  <span>Des entreprises aux investisseurs, de la recherche à l’audit.</span>
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           <section className="auth-form-panel" aria-labelledby={headingId}>
             <div className="auth-panel-accent" />
