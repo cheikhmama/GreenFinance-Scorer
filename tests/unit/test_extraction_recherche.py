@@ -150,10 +150,12 @@ class _ClientGemini:
     def __init__(self, reponses: list[Any]) -> None:
         self._reponses = list(reponses)
         self.prompts: list[str] = []
+        self.modeles: list[str] = []
         self.models = self
 
     def generate_content(self, *, model: str, contents: str, config: Any) -> _Reponse:
         self.prompts.append(contents)
+        self.modeles.append(model)
         reponse = self._reponses.pop(0)
         if isinstance(reponse, Exception):
             raise reponse
@@ -201,6 +203,95 @@ def test_appel_llm_retente_une_erreur_serveur_puis_abandonne(monkeypatch) -> Non
     with pytest.raises(genai_errors.ServerError):
         extractor._call_llm_extraction(nom_entreprise="A", context="c", codes=["scope_1"])
     assert len(client.prompts) == extractor._TENTATIVES_APPEL_LLM
+
+
+def _quota_depasse(quota_id: str) -> genai_errors.ClientError:
+    return genai_errors.ClientError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "status": "RESOURCE_EXHAUSTED",
+                "details": [{"violations": [{"quotaId": quota_id, "quotaValue": "20"}]}],
+            }
+        },
+    )
+
+
+def test_quota_journalier_n_est_pas_transitoire() -> None:
+    """Le quota du jour ne se lève qu'au lendemain : reprendre le job ne ferait qu'attendre."""
+    journalier = _quota_depasse("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    par_minute = _quota_depasse("GenerateRequestsPerMinutePerProjectPerModel-FreeTier")
+
+    assert extractor.quota_journalier_epuise(journalier)
+    assert not extractor._est_transitoire(journalier)
+    assert not extractor.quota_journalier_epuise(par_minute)
+    assert extractor._est_transitoire(par_minute)
+
+
+def test_quota_journalier_du_modele_principal_bascule_sur_le_secours(monkeypatch) -> None:
+    journalier = _quota_depasse("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    client = _ClientGemini([journalier, _Reponse([_AppelOutil(_ARGS)])])
+    _utiliser(monkeypatch, client)
+
+    extraction, modele = extractor._appeler_avec_secours(
+        extractor.EXTRACTION_MODEL, nom_entreprise="A", context="c", codes=["scope_1"]
+    )
+
+    assert extraction.entreprise == "Atlas Industries"
+    assert modele == extractor.MODELE_SECOURS != extractor.EXTRACTION_MODEL
+    assert client.modeles == [extractor.EXTRACTION_MODEL, extractor.MODELE_SECOURS]
+
+
+def test_secours_epuise_ou_autre_erreur_remonte_telle_quelle(monkeypatch) -> None:
+    journalier = _quota_depasse("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    client = _ClientGemini([journalier, journalier])
+    _utiliser(monkeypatch, client)
+    with pytest.raises(genai_errors.ClientError) as erreur:
+        extractor._appeler_avec_secours(
+            extractor.EXTRACTION_MODEL, nom_entreprise="A", context="c", codes=["scope_1"]
+        )
+    assert extractor.quota_journalier_epuise(erreur.value)
+    assert len(client.modeles) == 2  # un essai par modèle, pas plus
+
+    # Un quota par minute n'est pas une raison de changer de modèle : la reprise du job s'en charge.
+    client = _ClientGemini([_quota_depasse("GenerateRequestsPerMinutePerProjectPerModel-FreeTier")])
+    _utiliser(monkeypatch, client)
+    with pytest.raises(genai_errors.ClientError):
+        extractor._appeler_avec_secours(
+            extractor.EXTRACTION_MODEL, nom_entreprise="A", context="c", codes=["scope_1"]
+        )
+    assert client.modeles == [extractor.EXTRACTION_MODEL]
+
+    # Déjà sur le secours (relance groupée) : appelé directement.
+    client = _ClientGemini([_Reponse([_AppelOutil(_ARGS)])])
+    _utiliser(monkeypatch, client)
+    _, modele = extractor._appeler_avec_secours(
+        extractor.MODELE_SECOURS, nom_entreprise="A", context="c", codes=["scope_1"]
+    )
+    assert client.modeles == [extractor.MODELE_SECOURS] and modele == extractor.MODELE_SECOURS
+
+
+def test_requetes_encodees_en_un_seul_appel(index_rapport) -> None:
+    """Toutes les requêtes en un encodage (≈45 s gagnées sur CPU), même classement qu'une à une."""
+
+    class _Compteur(_EncodeurMots):
+        appels = 0
+
+        def encode(self, textes: list[str], batch_size: int = 8) -> dict[str, np.ndarray]:
+            type(self).appels += 1
+            return super().encode(textes, batch_size)
+
+    codes = ["scope_1", "effectif_total", "taille_conseil"]
+    encodeur = _Compteur()
+    groupes = extractor._rechercher_par_code(index_rapport, encodeur, codes)
+
+    assert _Compteur.appels == 1
+    for code in codes:
+        un_a_un = extractor._consolidate_by_page(
+            extractor._search_all_chunks(index_rapport, _EncodeurMots(), extractor.REQUETES_PAR_CODE[code])
+        )
+        assert groupes[code] == un_a_un
 
 
 def test_appel_llm_sans_appel_d_outil_est_une_erreur_explicite(monkeypatch) -> None:

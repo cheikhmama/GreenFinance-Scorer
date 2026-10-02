@@ -69,7 +69,11 @@ export function DraftPanel({
 
         {etat === "ECHEC" ? (
           <Alert variant="destructive">
-            <AlertTitle>Le fichier n’a pas pu être lu</AlertTitle>
+            <AlertTitle>
+              {rapport.extraction_error === "quota_llm_epuise"
+                ? "Analyse momentanément impossible"
+                : "Le fichier n’a pas pu être lu"}
+            </AlertTitle>
             <AlertDescription>
               {libelleCauseExtraction(rapport.extraction_error)}. Joignez de nouveau le fichier.
             </AlertDescription>

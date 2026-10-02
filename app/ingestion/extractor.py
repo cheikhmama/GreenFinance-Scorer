@@ -69,11 +69,21 @@ logger = structlog.get_logger(__name__)
 
 
 
+def quota_journalier_epuise(exc: BaseException) -> bool:
+    """429 dû au quota JOURNALIER du fournisseur (palier gratuit Gemini : 20 requêtes par jour et
+    par modèle), distinct d'un dépassement par minute : il ne se lève qu'au lendemain. Reprendre le
+    job (3 tentatives, 1 puis 2 min d'attente, Docling et l'indexation refaits à chaque fois)
+    faisait patienter une dizaine de minutes pour un échec certain."""
+    if not isinstance(exc, genai_errors.ClientError) or getattr(exc, "code", None) != 429:
+        return False
+    return "PerDay" in str(getattr(exc, "details", None) or exc)
+
+
 def _est_transitoire(exc: BaseException) -> bool:
     if isinstance(exc, genai_errors.ServerError):
         return True
     if isinstance(exc, genai_errors.ClientError) and getattr(exc, "code", None) == 429:
-        return True
+        return not quota_journalier_epuise(exc)
     return isinstance(exc, ConnectionError | TimeoutError | httpx.TransportError)
 
 
@@ -154,6 +164,11 @@ TABLE_SCORE_BOOST = 1.15
 # valeurs, ≥85% pages, 0% hallucination, data_test/ground_truth.yaml) a été mesurée avec Claude à
 # l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
 EXTRACTION_MODEL = "gemini-3.6-flash"
+# Modèle de secours quand le quota JOURNALIER du modèle principal est épuisé (palier gratuit :
+# 20 requêtes par jour, compté par modèle). Même outil et même prompt ; la garantie G1 (pas de
+# valeur sans page de preuve) s'applique pareil. Le modèle réellement utilisé est enregistré sur
+# l'exécution (ExtractionRun.llm_model).
+MODELE_SECOURS = "gemini-3.5-flash"
 # Modèle enregistré sur une exécution en mode démonstration (clé GEMINI_API_KEY factice).
 MODELE_DEMO = "demo-synthetique"
 
@@ -243,13 +258,22 @@ def _search_all_chunks(
     """Recherche EXHAUSTIVE (k=ntotal) — IndexFlatIP calcule déjà la similarité avec tous les
     vecteurs en interne quel que soit k, donc demander k=ntotal donne un rang exact sans coût
     supplémentaire par rapport à une troncature arbitraire."""
-    q_emb = embed_model.encode([query])["dense_vecs"]
-    q_emb = np.asarray(q_emb, dtype="float32")
+    return _classer_tous_les_chunks(search_index, [query], embed_model)[0]
+
+
+def _classer_tous_les_chunks(
+    search_index: dict, requetes: list[str], embed_model: BGEM3FlagModel
+) -> list[list[tuple[dict, float]]]:
+    """_search_all_chunks pour plusieurs requêtes en UN seul encodage : encoder les ~20 requêtes
+    une à une coûtait ~45 s sur un rapport de 7 pages (CPU), l'essentiel du temps de recherche."""
+    q_emb = embed_model.encode(requetes, batch_size=len(requetes))["dense_vecs"]
+    q_emb = np.asarray(q_emb, dtype="float32").reshape(len(requetes), -1)
     faiss.normalize_L2(q_emb)
     k = search_index["index"].ntotal
     scores, idxs = search_index["index"].search(q_emb, k)
     return [
-        (search_index["chunks"][i], float(score)) for i, score in zip(idxs[0], scores[0]) if i != -1
+        [(search_index["chunks"][i], float(score)) for i, score in zip(ligne_idx, ligne_scores) if i != -1]
+        for ligne_idx, ligne_scores in zip(idxs, scores)
     ]
 
 
@@ -286,11 +310,11 @@ def _rechercher_par_code(
     """Une recherche FAISS exhaustive par code (REQUETES_PAR_CODE[code]), consolidée par page.
     REQUETES_PAR_CODE[code] (jamais .get) : un code sans requête dédiée doit lever une KeyError
     explicite plutôt que disparaître silencieusement de la recherche."""
+    classements = _classer_tous_les_chunks(
+        search_index, [REQUETES_PAR_CODE[code] for code in codes], embed_model
+    )
     return {
-        code: _consolidate_by_page(
-            _search_all_chunks(search_index, embed_model, REQUETES_PAR_CODE[code])
-        )
-        for code in codes
+        code: _consolidate_by_page(paires) for code, paires in zip(codes, classements, strict=True)
     }
 
 
@@ -436,7 +460,7 @@ _TENTATIVES_APPEL_LLM = 3
 
 
 def _call_llm_extraction(
-    *, nom_entreprise: str, context: str, codes: list[str]
+    *, nom_entreprise: str, context: str, codes: list[str], modele: str = EXTRACTION_MODEL
 ) -> ExtractionEntreprise:
     """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
     Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
@@ -456,7 +480,7 @@ def _call_llm_extraction(
     for tentative in range(1, _TENTATIVES_APPEL_LLM + 1):
         try:
             response = _get_gemini_client().models.generate_content(
-                model=EXTRACTION_MODEL, contents=prompt, config=config
+                model=modele, contents=prompt, config=config
             )
             break
         except genai_errors.ServerError:
@@ -472,6 +496,31 @@ def _call_llm_extraction(
             "Le modele n'a renvoye aucun appel a l'outil extraction_indicateurs."
         )
     return ExtractionEntreprise.model_validate(function_calls[0].args)
+
+
+def _appeler_avec_secours(
+    modele: str, *, nom_entreprise: str, context: str, codes: list[str]
+) -> tuple[ExtractionEntreprise, str]:
+    """Appelle `modele` ; si c'est le modèle principal et que son quota journalier est épuisé,
+    rejoue l'appel avec MODELE_SECOURS. Renvoie l'extraction et le modèle qui l'a produite."""
+    if modele == EXTRACTION_MODEL:
+        try:
+            # Sans `modele=` : les doubles de test de _call_llm_extraction gardent leur signature.
+            extraction = _call_llm_extraction(nom_entreprise=nom_entreprise, context=context, codes=codes)
+            return extraction, modele
+        except genai_errors.ClientError as exc:
+            if not quota_journalier_epuise(exc):
+                raise
+            logger.warning(
+                "quota_journalier_modele_principal_epuise",
+                modele=EXTRACTION_MODEL,
+                modele_secours=MODELE_SECOURS,
+            )
+            modele = MODELE_SECOURS
+    extraction = _call_llm_extraction(
+        nom_entreprise=nom_entreprise, context=context, codes=codes, modele=modele
+    )
+    return extraction, modele
 
 
 def _indicateur_trouve(extraction: ExtractionEntreprise, code: str) -> bool:
@@ -699,8 +748,8 @@ def run_extraction_pipeline(
                 )
                 extraction = _extraction_demo_synthetique(nom_entreprise=nom_entreprise, codes=codes)
             else:
-                extraction = _call_llm_extraction(
-                    nom_entreprise=nom_entreprise, context=context, codes=codes
+                extraction, modele = _appeler_avec_secours(
+                    EXTRACTION_MODEL, nom_entreprise=nom_entreprise, context=context, codes=codes
                 )
 
                 # Relance groupee (Phase 6) : UN SEUL appel supplementaire couvrant tous les codes
@@ -715,7 +764,8 @@ def run_extraction_pipeline(
                         search_index, embed_model, codes_manquants, CONTEXT_TOKEN_BUDGET_RETRY
                     )
                     if pages_retry:
-                        extraction_retry = _call_llm_extraction(
+                        extraction_retry, modele = _appeler_avec_secours(
+                            modele,
                             nom_entreprise=nom_entreprise,
                             context=contexte_retry,
                             codes=codes_manquants,
@@ -725,6 +775,11 @@ def run_extraction_pipeline(
                             pages_vues_par_code[code] |= set(pages_retry)
                         pages_par_code.update(pages_par_code_retry)
                     etape = "appel_llm_echoue"
+                if modele != EXTRACTION_MODEL:
+                    execution_en_cours = session.get(ExtractionRun, execution_id)
+                    if execution_en_cours is not None:
+                        execution_en_cours.llm_model = modele
+                        session.add(execution_en_cours)
             logger.info("extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo)
 
             etape = "persistance_echouee"
@@ -954,6 +1009,9 @@ def run_extraction_pipeline(
                     etape=etape,
                 )
                 raise ExtractionTransitoire(etape) from exc
+            if quota_journalier_epuise(exc):
+                # Cause dédiée : « réseau ou fournisseur indisponible » égarait (tâche 5.11).
+                etape = "quota_llm_epuise"
             marquer_echec(session, rapport, etape)
             session.commit()
             logger.error(

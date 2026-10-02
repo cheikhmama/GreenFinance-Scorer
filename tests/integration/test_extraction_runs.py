@@ -121,6 +121,26 @@ def test_echec_transitoire_puis_definitif_deux_executions(session, monkeypatch) 
     assert premiere.finished_at is not None and seconde.finished_at is not None
 
 
+def test_quota_journalier_epuise_echoue_aussitot_avec_sa_cause(session, monkeypatch) -> None:
+    """Pas de reprise (elle ferait attendre une dizaine de minutes pour rien) et une cause qui dit
+    ce qui se passe, au lieu de « réseau ou fournisseur indisponible »."""
+    from google.genai import errors as genai_errors
+
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2024)
+    quota = genai_errors.ClientError(
+        429, {"error": {"code": 429, "details": [{"violations": [{"quotaId": "RequestsPerDay"}]}]}}
+    )
+    _pipeline_qui_echoue(monkeypatch, quota)
+
+    extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=False)
+
+    [execution] = _executions(session, rapport.id)
+    assert (execution.status, execution.error) == (ExtractionRunStatus.FAILED, "quota_llm_epuise")
+    session.refresh(rapport)
+    assert rapport.extraction_error == "quota_llm_epuise"
+
+
 def test_execution_interrompue_close_par_la_supervision(session) -> None:
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     debut = utcnow() - timedelta(minutes=get_settings().extraction_timeout_minutes + 1)
