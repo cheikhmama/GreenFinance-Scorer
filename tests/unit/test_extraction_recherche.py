@@ -203,6 +203,52 @@ def test_appel_llm_retente_une_erreur_serveur_puis_abandonne(monkeypatch) -> Non
     assert len(client.prompts) == extractor._TENTATIVES_APPEL_LLM
 
 
+def _quota_depasse(quota_id: str) -> genai_errors.ClientError:
+    return genai_errors.ClientError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "status": "RESOURCE_EXHAUSTED",
+                "details": [{"violations": [{"quotaId": quota_id, "quotaValue": "20"}]}],
+            }
+        },
+    )
+
+
+def test_quota_journalier_n_est_pas_transitoire() -> None:
+    """Le quota du jour ne se lève qu'au lendemain : reprendre le job ne ferait qu'attendre."""
+    journalier = _quota_depasse("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    par_minute = _quota_depasse("GenerateRequestsPerMinutePerProjectPerModel-FreeTier")
+
+    assert extractor.quota_journalier_epuise(journalier)
+    assert not extractor._est_transitoire(journalier)
+    assert not extractor.quota_journalier_epuise(par_minute)
+    assert extractor._est_transitoire(par_minute)
+
+
+def test_requetes_encodees_en_un_seul_appel(index_rapport) -> None:
+    """Toutes les requêtes en un encodage (≈45 s gagnées sur CPU), même classement qu'une à une."""
+
+    class _Compteur(_EncodeurMots):
+        appels = 0
+
+        def encode(self, textes: list[str], batch_size: int = 8) -> dict[str, np.ndarray]:
+            type(self).appels += 1
+            return super().encode(textes, batch_size)
+
+    codes = ["scope_1", "effectif_total", "taille_conseil"]
+    encodeur = _Compteur()
+    groupes = extractor._rechercher_par_code(index_rapport, encodeur, codes)
+
+    assert _Compteur.appels == 1
+    for code in codes:
+        un_a_un = extractor._consolidate_by_page(
+            extractor._search_all_chunks(index_rapport, _EncodeurMots(), extractor.REQUETES_PAR_CODE[code])
+        )
+        assert groupes[code] == un_a_un
+
+
 def test_appel_llm_sans_appel_d_outil_est_une_erreur_explicite(monkeypatch) -> None:
     _utiliser(monkeypatch, _ClientGemini([_Reponse(None)]))
 

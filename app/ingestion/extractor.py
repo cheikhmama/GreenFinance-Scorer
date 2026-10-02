@@ -69,11 +69,21 @@ logger = structlog.get_logger(__name__)
 
 
 
+def quota_journalier_epuise(exc: BaseException) -> bool:
+    """429 dû au quota JOURNALIER du fournisseur (palier gratuit Gemini : 20 requêtes par jour et
+    par modèle), distinct d'un dépassement par minute : il ne se lève qu'au lendemain. Reprendre le
+    job (3 tentatives, 1 puis 2 min d'attente, Docling et l'indexation refaits à chaque fois)
+    faisait patienter une dizaine de minutes pour un échec certain."""
+    if not isinstance(exc, genai_errors.ClientError) or getattr(exc, "code", None) != 429:
+        return False
+    return "PerDay" in str(getattr(exc, "details", None) or exc)
+
+
 def _est_transitoire(exc: BaseException) -> bool:
     if isinstance(exc, genai_errors.ServerError):
         return True
     if isinstance(exc, genai_errors.ClientError) and getattr(exc, "code", None) == 429:
-        return True
+        return not quota_journalier_epuise(exc)
     return isinstance(exc, ConnectionError | TimeoutError | httpx.TransportError)
 
 
@@ -243,13 +253,22 @@ def _search_all_chunks(
     """Recherche EXHAUSTIVE (k=ntotal) — IndexFlatIP calcule déjà la similarité avec tous les
     vecteurs en interne quel que soit k, donc demander k=ntotal donne un rang exact sans coût
     supplémentaire par rapport à une troncature arbitraire."""
-    q_emb = embed_model.encode([query])["dense_vecs"]
-    q_emb = np.asarray(q_emb, dtype="float32")
+    return _classer_tous_les_chunks(search_index, [query], embed_model)[0]
+
+
+def _classer_tous_les_chunks(
+    search_index: dict, requetes: list[str], embed_model: BGEM3FlagModel
+) -> list[list[tuple[dict, float]]]:
+    """_search_all_chunks pour plusieurs requêtes en UN seul encodage : encoder les ~20 requêtes
+    une à une coûtait ~45 s sur un rapport de 7 pages (CPU), l'essentiel du temps de recherche."""
+    q_emb = embed_model.encode(requetes, batch_size=len(requetes))["dense_vecs"]
+    q_emb = np.asarray(q_emb, dtype="float32").reshape(len(requetes), -1)
     faiss.normalize_L2(q_emb)
     k = search_index["index"].ntotal
     scores, idxs = search_index["index"].search(q_emb, k)
     return [
-        (search_index["chunks"][i], float(score)) for i, score in zip(idxs[0], scores[0]) if i != -1
+        [(search_index["chunks"][i], float(score)) for i, score in zip(ligne_idx, ligne_scores) if i != -1]
+        for ligne_idx, ligne_scores in zip(idxs, scores)
     ]
 
 
@@ -286,11 +305,11 @@ def _rechercher_par_code(
     """Une recherche FAISS exhaustive par code (REQUETES_PAR_CODE[code]), consolidée par page.
     REQUETES_PAR_CODE[code] (jamais .get) : un code sans requête dédiée doit lever une KeyError
     explicite plutôt que disparaître silencieusement de la recherche."""
+    classements = _classer_tous_les_chunks(
+        search_index, [REQUETES_PAR_CODE[code] for code in codes], embed_model
+    )
     return {
-        code: _consolidate_by_page(
-            _search_all_chunks(search_index, embed_model, REQUETES_PAR_CODE[code])
-        )
-        for code in codes
+        code: _consolidate_by_page(paires) for code, paires in zip(codes, classements, strict=True)
     }
 
 
@@ -954,6 +973,9 @@ def run_extraction_pipeline(
                     etape=etape,
                 )
                 raise ExtractionTransitoire(etape) from exc
+            if quota_journalier_epuise(exc):
+                # Cause dédiée : « réseau ou fournisseur indisponible » égarait (tâche 5.11).
+                etape = "quota_llm_epuise"
             marquer_echec(session, rapport, etape)
             session.commit()
             logger.error(

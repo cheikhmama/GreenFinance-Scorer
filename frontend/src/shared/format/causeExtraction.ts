@@ -10,6 +10,8 @@ const LIBELLES: Record<string, string> = {
   docling_conversion_echouee: "Échec de la conversion du document (PDF illisible ou corrompu)",
   indexation_semantique_echouee: "Échec de l'indexation sémantique du document",
   appel_llm_echoue: "Échec de l'appel au modèle d'extraction (réseau ou fournisseur indisponible)",
+  quota_llm_epuise:
+    "Quota journalier du modèle d'extraction atteint — relancez l'analyse demain ou utilisez une clé API payante",
   persistance_echouee: "Échec de l'enregistrement des données extraites",
   erreur_inattendue: "Erreur inattendue",
   // Posée par la tâche planifiée du worker (tâche 4.1) : traitement interrompu au-delà du délai.
