@@ -27,7 +27,7 @@ from app.admin.apercu import (
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import lister_journal_audit
 from app.admin.kyc import rapport_kyc
-from app.admin.onboarding import decider_inscription
+from app.admin.onboarding import decider_inscription, lister_inscriptions_a_examiner
 from app.admin.review_queue import (
     consulter_entreprise_admin,
     demander_correction,
@@ -72,6 +72,7 @@ from app.admin.schemas import (
     JournalAuditPublic,
     KycReport,
     ModifierEntrepriseAdminRequest,
+    PendingRegistration,
     PerformanceESGAdmin,
     PortefeuilleAdmin,
     ProjetAdmin,
@@ -755,6 +756,19 @@ def onboard_company(
         background_tasks,
         message=payload.message,
     )
+
+
+@router.get(
+    "/admin/companies/pending-registrations",
+    response_model=list[PendingRegistration],
+    operation_id="listPendingRegistrations",
+    summary="Inscriptions d'entreprises en attente de décision (la plus ancienne d'abord)",
+)
+def list_pending_registrations(
+    _admin: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> list[PendingRegistration]:
+    return lister_inscriptions_a_examiner(session)
 
 
 @router.get(

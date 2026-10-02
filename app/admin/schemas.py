@@ -461,6 +461,22 @@ class KycCheck(BaseModel):
     source: str
 
 
+class PendingRegistration(BaseModel):
+    """Inscription qui attend la décision de l'Administrateur (tâche 5.11) : ce qu'il faut pour la
+    repérer dans une liste ; le détail et la décision se trouvent dans la fenêtre KYC."""
+
+    company_id: uuid.UUID
+    company_name: str
+    sector: str
+    country: str
+    status: RegistrationStatus
+    registered_at: datetime | None
+    contact_name: str | None
+    contact_email: str | None
+    tax_id: str | None
+    tax_id_type: TaxIdType | None
+
+
 class KycReport(BaseModel):
     """GET /admin/companies/{id}/kyc — de quoi décider d'une inscription dans une seule fenêtre :
     identité déclarée, contact, lettre de mandat, échanges avec le demandeur, contrôles."""

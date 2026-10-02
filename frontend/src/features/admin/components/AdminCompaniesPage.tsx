@@ -1,9 +1,11 @@
 import { useSearchParams } from "react-router-dom";
+import { useScrollToHash } from "@/shared/hooks/useScrollToHash";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { AllCompaniesSection } from "./AllCompaniesSection";
 import { CompaniesToRepublishSection } from "./CompaniesToRepublishSection";
 import { CompanyScoresSection } from "./CompanyScoresSection";
+import { PendingRegistrationsSection } from "./PendingRegistrationsSection";
 import { PublishableCompaniesSection } from "./PublishableCompaniesSection";
 
 type Onglet = "inscrites" | "publiables" | "a-republier" | "scores";
@@ -16,6 +18,7 @@ const ONGLETS_VALIDES: Onglet[] = ["inscrites", "publiables", "a-republier", "sc
  * cartes du tableau de bord Admin de déposer directement sur la bonne catégorie plutôt que sur
  * une page qu'il faut ensuite trier soi-même. */
 export function AdminCompaniesPage() {
+  useScrollToHash();
   const [searchParams, setSearchParams] = useSearchParams();
   const parametre = searchParams.get("onglet");
   const onglet: Onglet = ONGLETS_VALIDES.includes(parametre as Onglet)
@@ -28,6 +31,7 @@ export function AdminCompaniesPage() {
         title="Entreprises"
         description="Suivi de toutes les entreprises, et publication de celles prêtes à l'être."
       />
+      <PendingRegistrationsSection />
       <Tabs
         value={onglet}
         onValueChange={(valeur) =>

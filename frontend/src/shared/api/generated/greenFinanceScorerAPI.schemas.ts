@@ -1584,6 +1584,23 @@ export interface PageUtilisateurPublic {
   pages: number;
 }
 
+/**
+ * Inscription qui attend la décision de l'Administrateur (tâche 5.11) : ce qu'il faut pour la
+ * repérer dans une liste ; le détail et la décision se trouvent dans la fenêtre KYC.
+ */
+export interface PendingRegistration {
+  company_id: string;
+  company_name: string;
+  sector: string;
+  country: string;
+  status: RegistrationStatus;
+  registered_at: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  tax_id: string | null;
+  tax_id_type: TaxIdType | null;
+}
+
 export interface TrancheScorePublic {
   lower_bound: number;
   upper_bound: number;

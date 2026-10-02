@@ -185,3 +185,24 @@ def test_seul_ladministrateur_decide(session) -> None:
     )
 
     assert reponse.status_code == 403
+
+
+def test_les_inscriptions_a_examiner_sont_listees_pour_ladministrateur(session) -> None:
+    from tests.integration.test_company_registration import _demande
+
+    confirmee, entreprise = _inscrire(session)
+    non_confirmee = _demande()
+    inscrire_http(non_confirmee, confirmer=False)
+    admin = _admin(session)
+
+    reponse = admin.get("/api/v1/admin/companies/pending-registrations")
+
+    assert reponse.status_code == 200, reponse.text
+    ids = [ligne["company_id"] for ligne in reponse.json()]
+    assert str(entreprise.id) in ids
+    ligne = next(l for l in reponse.json() if l["company_id"] == str(entreprise.id))
+    assert ligne["status"] == "PENDING_ONBOARDING"
+    assert ligne["contact_email"] == confirmee["contact_email"].lower()
+    assert ligne["tax_id_type"] == "NIF"
+    # Une demande dont l'adresse n'est pas confirmée n'est pas encore transmise.
+    assert non_confirmee["company_name"] not in {l["company_name"] for l in reponse.json()}

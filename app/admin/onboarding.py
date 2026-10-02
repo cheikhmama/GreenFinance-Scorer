@@ -27,9 +27,13 @@ import uuid
 
 import structlog
 from fastapi import BackgroundTasks
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
-from app.admin.schemas import CompanyOnboardingResult, OnboardingDecision
+from app.admin.schemas import (
+    CompanyOnboardingResult,
+    OnboardingDecision,
+    PendingRegistration,
+)
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import User
 from app.company.models import Company
@@ -81,6 +85,33 @@ def _demander_informations(email: str, nom_entreprise: str, message: str, jeton:
         )
     except EmailDeliveryError as exc:
         logger.error("onboarding_info_request_notice_failed", error_type=type(exc.__cause__ or exc).__name__)
+
+
+def lister_inscriptions_a_examiner(session: Session) -> list[PendingRegistration]:
+    """Inscriptions confirmées qui attendent une décision (PENDING_ONBOARDING, INFO_REQUESTED), la
+    plus ancienne d'abord (tâche 5.11). Une demande dont l'adresse n'est pas encore confirmée
+    n'y figure pas : elle n'a pas encore été transmise."""
+    lignes = session.exec(
+        select(Company, User)
+        .join(User, col(User.id) == col(Company.owner_user_id), isouter=True)
+        .where(col(Company.status).in_(STATUTS_EN_EXAMEN))
+        .order_by(col(Company.registered_at).asc().nulls_last(), col(Company.name))
+    ).all()
+    return [
+        PendingRegistration(
+            company_id=entreprise.id,
+            company_name=entreprise.name,
+            sector=entreprise.sector,
+            country=entreprise.country,
+            status=entreprise.status,
+            registered_at=entreprise.registered_at,
+            contact_name=titulaire.name if titulaire else None,
+            contact_email=titulaire.email if titulaire else None,
+            tax_id=entreprise.tax_id,
+            tax_id_type=entreprise.tax_id_type,
+        )
+        for entreprise, titulaire in lignes
+    ]
 
 
 def decider_inscription(
