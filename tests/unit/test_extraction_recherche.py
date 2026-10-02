@@ -150,10 +150,12 @@ class _ClientGemini:
     def __init__(self, reponses: list[Any]) -> None:
         self._reponses = list(reponses)
         self.prompts: list[str] = []
+        self.modeles: list[str] = []
         self.models = self
 
     def generate_content(self, *, model: str, contents: str, config: Any) -> _Reponse:
         self.prompts.append(contents)
+        self.modeles.append(model)
         reponse = self._reponses.pop(0)
         if isinstance(reponse, Exception):
             raise reponse
@@ -225,6 +227,49 @@ def test_quota_journalier_n_est_pas_transitoire() -> None:
     assert not extractor._est_transitoire(journalier)
     assert not extractor.quota_journalier_epuise(par_minute)
     assert extractor._est_transitoire(par_minute)
+
+
+def test_quota_journalier_du_modele_principal_bascule_sur_le_secours(monkeypatch) -> None:
+    journalier = _quota_depasse("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    client = _ClientGemini([journalier, _Reponse([_AppelOutil(_ARGS)])])
+    _utiliser(monkeypatch, client)
+
+    extraction, modele = extractor._appeler_avec_secours(
+        extractor.EXTRACTION_MODEL, nom_entreprise="A", context="c", codes=["scope_1"]
+    )
+
+    assert extraction.entreprise == "Atlas Industries"
+    assert modele == extractor.MODELE_SECOURS != extractor.EXTRACTION_MODEL
+    assert client.modeles == [extractor.EXTRACTION_MODEL, extractor.MODELE_SECOURS]
+
+
+def test_secours_epuise_ou_autre_erreur_remonte_telle_quelle(monkeypatch) -> None:
+    journalier = _quota_depasse("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    client = _ClientGemini([journalier, journalier])
+    _utiliser(monkeypatch, client)
+    with pytest.raises(genai_errors.ClientError) as erreur:
+        extractor._appeler_avec_secours(
+            extractor.EXTRACTION_MODEL, nom_entreprise="A", context="c", codes=["scope_1"]
+        )
+    assert extractor.quota_journalier_epuise(erreur.value)
+    assert len(client.modeles) == 2  # un essai par modèle, pas plus
+
+    # Un quota par minute n'est pas une raison de changer de modèle : la reprise du job s'en charge.
+    client = _ClientGemini([_quota_depasse("GenerateRequestsPerMinutePerProjectPerModel-FreeTier")])
+    _utiliser(monkeypatch, client)
+    with pytest.raises(genai_errors.ClientError):
+        extractor._appeler_avec_secours(
+            extractor.EXTRACTION_MODEL, nom_entreprise="A", context="c", codes=["scope_1"]
+        )
+    assert client.modeles == [extractor.EXTRACTION_MODEL]
+
+    # Déjà sur le secours (relance groupée) : appelé directement.
+    client = _ClientGemini([_Reponse([_AppelOutil(_ARGS)])])
+    _utiliser(monkeypatch, client)
+    _, modele = extractor._appeler_avec_secours(
+        extractor.MODELE_SECOURS, nom_entreprise="A", context="c", codes=["scope_1"]
+    )
+    assert client.modeles == [extractor.MODELE_SECOURS] and modele == extractor.MODELE_SECOURS
 
 
 def test_requetes_encodees_en_un_seul_appel(index_rapport) -> None:

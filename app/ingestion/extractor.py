@@ -164,6 +164,11 @@ TABLE_SCORE_BOOST = 1.15
 # valeurs, ≥85% pages, 0% hallucination, data_test/ground_truth.yaml) a été mesurée avec Claude à
 # l'Étape 4 — pas encore revalidée avec ce modèle sur du contenu réel.
 EXTRACTION_MODEL = "gemini-3.6-flash"
+# Modèle de secours quand le quota JOURNALIER du modèle principal est épuisé (palier gratuit :
+# 20 requêtes par jour, compté par modèle). Même outil et même prompt ; la garantie G1 (pas de
+# valeur sans page de preuve) s'applique pareil. Le modèle réellement utilisé est enregistré sur
+# l'exécution (ExtractionRun.llm_model).
+MODELE_SECOURS = "gemini-3.5-flash"
 # Modèle enregistré sur une exécution en mode démonstration (clé GEMINI_API_KEY factice).
 MODELE_DEMO = "demo-synthetique"
 
@@ -455,7 +460,7 @@ _TENTATIVES_APPEL_LLM = 3
 
 
 def _call_llm_extraction(
-    *, nom_entreprise: str, context: str, codes: list[str]
+    *, nom_entreprise: str, context: str, codes: list[str], modele: str = EXTRACTION_MODEL
 ) -> ExtractionEntreprise:
     """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
     Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
@@ -475,7 +480,7 @@ def _call_llm_extraction(
     for tentative in range(1, _TENTATIVES_APPEL_LLM + 1):
         try:
             response = _get_gemini_client().models.generate_content(
-                model=EXTRACTION_MODEL, contents=prompt, config=config
+                model=modele, contents=prompt, config=config
             )
             break
         except genai_errors.ServerError:
@@ -491,6 +496,31 @@ def _call_llm_extraction(
             "Le modele n'a renvoye aucun appel a l'outil extraction_indicateurs."
         )
     return ExtractionEntreprise.model_validate(function_calls[0].args)
+
+
+def _appeler_avec_secours(
+    modele: str, *, nom_entreprise: str, context: str, codes: list[str]
+) -> tuple[ExtractionEntreprise, str]:
+    """Appelle `modele` ; si c'est le modèle principal et que son quota journalier est épuisé,
+    rejoue l'appel avec MODELE_SECOURS. Renvoie l'extraction et le modèle qui l'a produite."""
+    if modele == EXTRACTION_MODEL:
+        try:
+            # Sans `modele=` : les doubles de test de _call_llm_extraction gardent leur signature.
+            extraction = _call_llm_extraction(nom_entreprise=nom_entreprise, context=context, codes=codes)
+            return extraction, modele
+        except genai_errors.ClientError as exc:
+            if not quota_journalier_epuise(exc):
+                raise
+            logger.warning(
+                "quota_journalier_modele_principal_epuise",
+                modele=EXTRACTION_MODEL,
+                modele_secours=MODELE_SECOURS,
+            )
+            modele = MODELE_SECOURS
+    extraction = _call_llm_extraction(
+        nom_entreprise=nom_entreprise, context=context, codes=codes, modele=modele
+    )
+    return extraction, modele
 
 
 def _indicateur_trouve(extraction: ExtractionEntreprise, code: str) -> bool:
@@ -718,8 +748,8 @@ def run_extraction_pipeline(
                 )
                 extraction = _extraction_demo_synthetique(nom_entreprise=nom_entreprise, codes=codes)
             else:
-                extraction = _call_llm_extraction(
-                    nom_entreprise=nom_entreprise, context=context, codes=codes
+                extraction, modele = _appeler_avec_secours(
+                    EXTRACTION_MODEL, nom_entreprise=nom_entreprise, context=context, codes=codes
                 )
 
                 # Relance groupee (Phase 6) : UN SEUL appel supplementaire couvrant tous les codes
@@ -734,7 +764,8 @@ def run_extraction_pipeline(
                         search_index, embed_model, codes_manquants, CONTEXT_TOKEN_BUDGET_RETRY
                     )
                     if pages_retry:
-                        extraction_retry = _call_llm_extraction(
+                        extraction_retry, modele = _appeler_avec_secours(
+                            modele,
                             nom_entreprise=nom_entreprise,
                             context=contexte_retry,
                             codes=codes_manquants,
@@ -744,6 +775,11 @@ def run_extraction_pipeline(
                             pages_vues_par_code[code] |= set(pages_retry)
                         pages_par_code.update(pages_par_code_retry)
                     etape = "appel_llm_echoue"
+                if modele != EXTRACTION_MODEL:
+                    execution_en_cours = session.get(ExtractionRun, execution_id)
+                    if execution_en_cours is not None:
+                        execution_en_cours.llm_model = modele
+                        session.add(execution_en_cours)
             logger.info("extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo)
 
             etape = "persistance_echouee"
