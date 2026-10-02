@@ -1,6 +1,7 @@
 import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { libellePays } from "@/shared/format/pays";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -79,7 +80,9 @@ export function CompanyScoresSection() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-brand-grey">{entreprise.sector}</TableCell>
-                  <TableCell className="text-brand-grey">{entreprise.country}</TableCell>
+                  <TableCell className="text-brand-grey">
+                    {libellePays(entreprise.country)}
+                  </TableCell>
                   <TableCell className="font-semibold tabular-nums text-brand-blue">
                     {formatScore(entreprise.global_score)}
                   </TableCell>

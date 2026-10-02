@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import type { EntreprisePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { libellePays } from "@/shared/format/pays";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useMyLeiVerification } from "../api";
@@ -33,7 +34,7 @@ export function CompanyRegistrationsCard({ entreprise }: { entreprise: Entrepris
         <dl aria-label="Identité de l’entreprise" className="divide-y divide-border text-sm">
           <Ligne libelle="Raison sociale" valeur={entreprise.name} />
           <Ligne libelle="Secteur" valeur={entreprise.sector} />
-          <Ligne libelle="Pays" valeur={entreprise.country} />
+          <Ligne libelle="Pays" valeur={libellePays(entreprise.country)} />
           {entreprise.lei ? <Ligne libelle="LEI" valeur={entreprise.lei} code /> : null}
           {entreprise.isin ? <Ligne libelle="ISIN" valeur={entreprise.isin} code /> : null}
         </dl>

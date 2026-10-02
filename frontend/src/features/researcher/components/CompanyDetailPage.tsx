@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
 import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
+import { libellePays } from "@/shared/format/pays";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { useCompanyDetailForResearcher } from "../api";
@@ -17,7 +18,7 @@ export function CompanyDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={entreprise.name}
-        description={`${entreprise.sector} — ${entreprise.country}. ${entreprise.description ?? "Fiche entreprise publiée."}`}
+        description={`${entreprise.sector} — ${libellePays(entreprise.country)}. ${entreprise.description ?? "Fiche entreprise publiée."}`}
       />
 
       <Card>

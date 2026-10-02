@@ -2,6 +2,7 @@ import { Building2, Scale, Search } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
+import { libellePays } from "@/shared/format/pays";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -99,7 +100,7 @@ export function DonneesPage() {
                       {entreprise.name}
                     </Link>
                     <p className="text-sm text-brand-grey">
-                      {entreprise.sector} — {entreprise.country}
+                      {entreprise.sector} — {libellePays(entreprise.country)}
                     </p>
                   </div>
                 </div>

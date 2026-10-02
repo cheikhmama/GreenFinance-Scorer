@@ -5,11 +5,14 @@ import { ApiError } from "@/shared/api/errors";
 import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
 import { formatPourcentage } from "@/shared/format/etatPosition";
+import { formatValeur, libelleIndicateur, libellePilier } from "@/shared/format/indicateurs";
+import { libellePays } from "@/shared/format/pays";
 import {
   libelleDateRapport,
   libelleStatutRapport,
   variantStatutRapport,
 } from "@/shared/format/statut";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -60,31 +63,44 @@ export function AdminReportDetailPage() {
     return (
       <div className="p-8">
         <p className="text-destructive">Rapport introuvable.</p>
-        <Link to="/admin" className="text-brand-green underline underline-offset-2">
-          Retour au tableau de bord
+        <Link to="/admin/rapports" className="text-brand-green underline underline-offset-2">
+          Retour aux rapports
         </Link>
       </div>
     );
   }
 
+  // Le nom stocké d'une preuve est l'identifiant interne du fichier : on renvoie plutôt au PDF
+  // d'origine, ouvert directement à la bonne page.
+  const urlPdf = `/api/v1/admin/rapports/${rapport.id}/fichier`;
+  const lienPage = (page: number) => (
+    <a
+      href={`${urlPdf}#page=${page}`}
+      target="_blank"
+      rel="noreferrer"
+      className="text-brand-green underline-offset-2 hover:underline"
+    >
+      p. {page}
+    </a>
+  );
+
   return (
     <div className="space-y-8">
       <div>
-        <Link to="/admin" className="text-sm text-brand-green underline underline-offset-2">
-          ← Tableau de bord
+        <Link
+          to="/admin/rapports?onglet=tous"
+          className="text-sm text-brand-green underline underline-offset-2"
+        >
+          ← Rapports
         </Link>
       </div>
 
       <PageHeader
-        title={`Rapport ${rapport.type} — ${rapport.fiscal_year ?? "année inconnue"}`}
+        title={titreDeclaration(rapport)}
         description="Indicateurs extraits, données carbone, avis d'audit et décision."
         action={
           <Button asChild variant="outline">
-            <a
-              href={`/api/v1/admin/rapports/${rapport.id}/fichier`}
-              target="_blank"
-              rel="noreferrer"
-            >
+            <a href={urlPdf} target="_blank" rel="noreferrer">
               <FileText className="size-4" />
               Voir le PDF original
             </a>
@@ -99,7 +115,7 @@ export function AdminReportDetailPage() {
               <CompanyIdentity
                 nom={entreprise.name}
                 logo={entreprise.logo}
-                secteur={`${entreprise.sector} — ${entreprise.country}`}
+                secteur={`${entreprise.sector} — ${libellePays(entreprise.country)}`}
                 avatarClassName="size-12"
               />
             </Link>
@@ -148,12 +164,13 @@ export function AdminReportDetailPage() {
           {rapport.declared_global_score !== null ? (
             <p className="mb-3 text-sm">
               Score ESG global auto-déclaré par l'entreprise :{" "}
-              <strong className="text-brand-blue">{rapport.declared_global_score}/100</strong>
+              <strong className="text-brand-blue">
+                {formatValeur(rapport.declared_global_score)}/100
+              </strong>
               {rapport.declared_global_score_proof ? (
                 <span className="text-brand-grey">
                   {" "}
-                  — {rapport.declared_global_score_proof.document_name} — p.
-                  {rapport.declared_global_score_proof.page_start}
+                  — {lienPage(rapport.declared_global_score_proof.page_start)}
                 </span>
               ) : null}
             </p>
@@ -164,23 +181,25 @@ export function AdminReportDetailPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Indicateur</TableHead>
                   <TableHead>Pilier</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Valeur</TableHead>
+                  <TableHead className="text-right">Valeur</TableHead>
                   <TableHead>Preuve</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rapport.metrics.map((indicateur) => (
                   <TableRow key={indicateur.id}>
-                    <TableCell>{indicateur.pillar}</TableCell>
-                    <TableCell>{indicateur.metric_code}</TableCell>
-                    <TableCell>
-                      {indicateur.value} {indicateur.unit}
+                    <TableCell className="font-medium" title={indicateur.metric_code}>
+                      {libelleIndicateur(indicateur.metric_code)}
                     </TableCell>
                     <TableCell className="text-brand-grey">
-                      {indicateur.proof.document_name} — p.{indicateur.proof.page_start}
+                      {libellePilier(indicateur.pillar)}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatValeur(indicateur.value, indicateur.unit)}
+                    </TableCell>
+                    <TableCell>{lienPage(indicateur.proof.page_start)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -193,7 +212,7 @@ export function AdminReportDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
             <Cloud className="size-4" />
-            Émissions carbone (Scope 1/2/3)
+            Émissions carbone (Scopes 1, 2 et 3)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -205,7 +224,7 @@ export function AdminReportDetailPage() {
                 <TableRow>
                   <TableHead>Scope</TableHead>
                   <TableHead>Catégorie GES</TableHead>
-                  <TableHead>Valeur (tCO2e)</TableHead>
+                  <TableHead className="text-right">Valeur</TableHead>
                   <TableHead>Année</TableHead>
                   <TableHead>Qualité PCAF</TableHead>
                   <TableHead>Preuve</TableHead>
@@ -216,14 +235,14 @@ export function AdminReportDetailPage() {
                   <TableRow key={donnee.id}>
                     <TableCell>Scope {donnee.scope}</TableCell>
                     <TableCell>{donnee.ghg_category ?? "—"}</TableCell>
-                    <TableCell>{donnee.tonnes_co2e}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatValeur(donnee.tonnes_co2e, "tCO2e")}
+                    </TableCell>
                     <TableCell>{donnee.year}</TableCell>
                     <TableCell>
                       {donnee.pcaf_data_quality != null ? `${donnee.pcaf_data_quality}/5` : "—"}
                     </TableCell>
-                    <TableCell className="text-brand-grey">
-                      {donnee.proof.document_name} — p.{donnee.proof.page_start}
-                    </TableCell>
+                    <TableCell>{lienPage(donnee.proof.page_start)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

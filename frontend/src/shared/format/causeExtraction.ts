@@ -9,6 +9,7 @@ const LIBELLES: Record<string, string> = {
   chargement_modele_embedding_echoue: "Échec du chargement du modèle de recherche sémantique",
   docling_conversion_echouee: "Échec de la conversion du document (PDF illisible ou corrompu)",
   indexation_semantique_echouee: "Échec de l'indexation sémantique du document",
+  relance_llm_echouee: "Échec de la relance du modèle d'extraction sur les indicateurs manquants",
   appel_llm_echoue: "Échec de l'appel au modèle d'extraction (réseau ou fournisseur indisponible)",
   quota_llm_epuise:
     "Quota journalier des modèles d'extraction atteint — relancez l'analyse demain ou utilisez une clé API payante",

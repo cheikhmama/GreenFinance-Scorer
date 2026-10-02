@@ -55,11 +55,12 @@ export function libelleMethode(methode: DataMethod): string {
   return LIBELLES_METHODES[methode] ?? methode;
 }
 
-const UNITES: Record<string, string> = { m3: "m³", tco2e: "tCO₂e", tCO2e: "tCO₂e" };
+// « count » : un nombre sans unité (« 0 décès », pas « 0 count »).
+const UNITES: Record<string, string> = { m3: "m³", tco2e: "tCO₂e", tCO2e: "tCO₂e", count: "" };
 
 /** Valeur au format français (« 125 400 m³ », « 38,5 % »), unité normalisée. */
 export function formatValeur(valeur: number, unite?: string | null): string {
-  const nombre = valeur.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+  const nombre = valeur.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
   const u = unite ? (UNITES[unite] ?? unite) : "";
   return u ? `${nombre} ${u}` : nombre;
 }

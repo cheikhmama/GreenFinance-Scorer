@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type { EntrepriseAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { libellePays } from "@/shared/format/pays";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import {
   libelleStatutInscription,
@@ -132,7 +133,7 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
               {entreprise.name}
             </Link>
             <p className="text-sm text-brand-grey">
-              {entreprise.sector} — {entreprise.country}
+              {entreprise.sector} — {libellePays(entreprise.country)}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {entreprise.status !== "ACTIVE" ? (

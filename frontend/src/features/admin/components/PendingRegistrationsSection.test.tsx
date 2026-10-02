@@ -54,7 +54,7 @@ describe("Administration — inscriptions à valider", () => {
       "href",
       "/admin/entreprises/c1",
     );
-    expect(liste).toHaveTextContent("Énergie · MR · NIF 12345678");
+    expect(liste).toHaveTextContent("Énergie · Mauritanie · NIF 12345678");
     expect(liste).toHaveTextContent("Mohamed · mohamed@exemple.mr");
 
     await user.click(within(liste).getByRole("button", { name: /Examiner/ }));

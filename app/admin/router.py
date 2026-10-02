@@ -25,7 +25,7 @@ from app.admin.apercu import (
     lister_entreprises_avec_score,
 )
 from app.admin.dashboard import construire_tableau_de_bord
-from app.admin.journal import lister_journal_audit
+from app.admin.journal import avec_acteurs, lister_journal_audit
 from app.admin.kyc import rapport_kyc
 from app.admin.onboarding import decider_inscription, lister_inscriptions_a_examiner
 from app.admin.review_queue import (
@@ -969,7 +969,7 @@ def lister_journal_audit_route(
         page_size=page_size,
     )
     return Page[JournalAuditPublic](
-        items=items,
+        items=avec_acteurs(session, items),
         page=page,
         page_size=page_size,
         total=total,

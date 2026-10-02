@@ -131,6 +131,10 @@ class JournalAuditPublic(BaseModel):
     old_value: str | None
     new_value: str | None
     correlation_id: str | None
+    # Qui a agi, lisible sans recouper les identifiants (absent pour une action anonyme, ex. une
+    # inscription ou une connexion échouée, ou un compte supprimé depuis).
+    actor_name: str | None = None
+    actor_email: str | None = None
 
 
 class TableauDeBordAdmin(BaseModel):

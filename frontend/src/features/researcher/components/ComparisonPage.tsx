@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { formatScore } from "@/shared/format/etatPosition";
+import { libellePays } from "@/shared/format/pays";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { useCompareCompaniesForResearcher } from "../api";
@@ -40,7 +41,11 @@ export function ComparisonPage() {
               </thead>
               <tbody>
                 <Ligne titre="Secteur" entreprises={entreprises} render={(e) => e.sector} />
-                <Ligne titre="Pays" entreprises={entreprises} render={(e) => e.country} />
+                <Ligne
+                  titre="Pays"
+                  entreprises={entreprises}
+                  render={(e) => libellePays(e.country)}
+                />
                 <Ligne
                   titre="Score global"
                   entreprises={entreprises}

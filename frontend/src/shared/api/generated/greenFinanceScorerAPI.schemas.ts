@@ -1157,6 +1157,8 @@ export interface JournalAuditPublic {
   old_value: string | null;
   new_value: string | null;
   correlation_id: string | null;
+  actor_name?: string | null;
+  actor_email?: string | null;
 }
 
 /**

@@ -133,6 +133,17 @@ export function AdminCompanyDetailPage() {
 
   const form = useForm<ModifierEntrepriseForm>({
     resolver: zodResolver(modifierEntrepriseSchema),
+    // `values` n'arrive qu'après le premier rendu : sans valeurs de départ, chaque champ passait
+    // de non contrôlé à contrôlé (avertissement React).
+    defaultValues: {
+      name: "",
+      sector: "",
+      country: "",
+      description: "",
+      website: "",
+      impose_minimum: false,
+      minimum_investment_currency: DEVISES[0],
+    },
     values: entreprise
       ? {
           name: entreprise.name,

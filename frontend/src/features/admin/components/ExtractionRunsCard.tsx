@@ -1,5 +1,6 @@
 import { Cpu } from "lucide-react";
 import type { ExtractionRunStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
@@ -59,7 +60,9 @@ export function ExtractionRunsCard({ rapportId }: { rapportId: string }) {
                       {STATUTS[execution.status].libelle}
                     </Badge>
                     {execution.error ? (
-                      <span className="ml-2 text-xs text-brand-grey">{execution.error}</span>
+                      <span className="ml-2 text-xs text-brand-grey" title={execution.error}>
+                        {libelleCauseExtraction(execution.error)}
+                      </span>
                     ) : null}
                   </TableCell>
                   <TableCell>{execution.llm_model}</TableCell>

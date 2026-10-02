@@ -2,6 +2,7 @@ import { Calendar, Globe, MapPin, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { libellePays } from "@/shared/format/pays";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -90,7 +91,7 @@ export function CompaniesPage() {
 
                 <p className="flex items-center gap-1.5 text-sm text-brand-grey">
                   <MapPin className="size-3.5 shrink-0" />
-                  {entreprise.country}
+                  {libellePays(entreprise.country)}
                 </p>
 
                 {entreprise.description ? (

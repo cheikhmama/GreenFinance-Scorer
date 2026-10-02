@@ -10,7 +10,28 @@ from uuid import UUID
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, or_, select
 
+from app.admin.schemas import JournalAuditPublic
+from app.auth.models import User
 from app.core.models import AuditLogEntry
+
+
+def avec_acteurs(session: Session, entrees: list[AuditLogEntry]) -> list[JournalAuditPublic]:
+    """Joint le nom et l'e-mail de l'acteur à chaque entrée, en une seule requête par page."""
+    ids = {e.actor_id for e in entrees if e.actor_id is not None}
+    acteurs = (
+        {u.id: u for u in session.exec(select(User).where(col(User.id).in_(ids))).all()}
+        if ids
+        else {}
+    )
+    lignes = []
+    for entree in entrees:
+        acteur = acteurs.get(entree.actor_id) if entree.actor_id is not None else None
+        ligne = JournalAuditPublic.model_validate(entree)
+        if acteur is not None:
+            ligne.actor_name = acteur.name
+            ligne.actor_email = acteur.email
+        lignes.append(ligne)
+    return lignes
 
 
 def lister_journal_audit(
