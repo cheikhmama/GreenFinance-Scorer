@@ -16,9 +16,10 @@ from sqlmodel import col, select
 from app.auth.hashing import hash_password
 from app.auth.models import User
 from app.auth.tokens import CSRF_COOKIE_NAME, CSRF_HEADER_NAME
+from app.company.identifiers import normaliser_identifiant_fiscal
 from app.company.models import Company
 from app.company.registration import MAX_DEMANDES_PAR_IP
-from app.core.enums import RegistrationStatus, Role
+from app.core.enums import RegistrationStatus, Role, TaxIdType
 from app.core.models import Notification
 from app.core.redis import get_redis_client
 from app.main import app
@@ -74,6 +75,8 @@ def _demande(**surcharges) -> dict:
         "website": "https://exemple.mr",
         "contact_name": "Aïcha Ba",
         "contact_email": f"Contact-{uuid.uuid4()}@Exemple.MR",
+        # NIF mauritanien aléatoire (tâche 5.10) : la base de test persiste d'une exécution à l'autre.
+        "tax_id": f"{uuid.uuid4().int % 10**8:08d}",
     }
     valeurs.update(surcharges)
     return valeurs
@@ -279,3 +282,60 @@ def test_une_inscription_en_attente_ne_se_contourne_pas_par_les_actions_admin(se
     assert renvoyer.json()["error"]["code"] == "inscription_non_validee"
     assert detail.json()["status"] == RegistrationStatus.PENDING_ONBOARDING.value
     assert detail.json()["active"] is False
+
+
+def _siren_valide() -> str:
+    """SIREN aléatoire dont la clé de Luhn est juste (une des dix clés possibles l'est)."""
+    debut = f"{random.randrange(10**8):08d}"
+    for cle in range(10):
+        try:
+            return normaliser_identifiant_fiscal("FR", debut + str(cle))[1]
+        except ValueError:
+            continue
+    raise AssertionError("inatteignable")
+
+
+def test_inscription_enregistre_lidentifiant_fiscal_selon_le_pays(session, _envoi_simule) -> None:
+    siren = _siren_valide()
+    demande = _demande(country="fr", tax_id=f"{siren[:3]} {siren[3:6]} {siren[6:]}")
+
+    reponse = inscrire_http(demande)
+
+    assert reponse.status_code == 202, reponse.text
+    entreprise = _entreprise_par_nom(session, demande["company_name"])
+    assert entreprise is not None
+    assert entreprise.tax_id == siren
+    assert entreprise.tax_id_type == TaxIdType.SIREN
+
+
+@pytest.mark.parametrize(
+    ("pays", "identifiant", "extrait"),
+    [
+        ("MR", "1234567", "8 chiffres"),
+        ("FR", "732829321", "clé de contrôle"),
+        ("US", "12345", "EIN"),
+        ("SN", "", None),
+    ],
+)
+def test_identifiant_fiscal_invalide_refuse_sur_son_champ(
+    session, _envoi_simule, pays, identifiant, extrait
+) -> None:
+    reponse = inscrire_http(_demande(country=pays, tax_id=identifiant))
+
+    assert reponse.status_code == 422
+    champs = reponse.json()["error"]["fields"]
+    assert "tax_id" in champs, champs
+    if extrait:
+        assert extrait in champs["tax_id"]
+
+
+def test_un_identifiant_fiscal_deja_pris_dans_le_pays_naboutit_pas(session, _envoi_simule) -> None:
+    premiere = _demande()
+    assert inscrire_http(premiere).status_code == 202
+
+    doublon = _demande(tax_id=premiere["tax_id"])
+    reponse = inscrire_http(doublon)
+
+    # Même réponse que toute demande ; rien n'est créé, le demandeur l'apprend par e-mail.
+    assert reponse.status_code == 202
+    assert _entreprise_par_nom(session, doublon["company_name"]) is None

@@ -35,7 +35,7 @@ follows the request on a public page opened with a token received by e-mail.
 
 | Transition | Actor | Preconditions | Tx | Job |
 |---|---|---|---|---|
-| register (*tasks 1.3, 5.2*, multipart) | public | Identity (legal name, sector, country, ISIN/LEI with valid check digits if given, website), contact name and e-mail, **mandate letter PDF** (≤ 5 MB, PDF signature, not encrypted); email, ISIN and LEI not already known — or all of them pointing to one `REJECTED` request, which is then reopened; 3 requests per IP per hour; trap field empty. Same `202` answer whatever the outcome — the requester learns it by e-mail | company `PENDING_ONBOARDING` (or the reopened one) + owner user `ENTERPRISE` **without password** + mandate letter stored + follow-up token (SHA-256 stored, previous token invalidated) + audit log (`company_registered` / `registration_resubmitted`) + admin notification `ENTREPRISE_INSCRITE` | acknowledgment e-mail **with the follow-up link** (or "not processed" e-mail on a duplicate). The activation link is sent at onboarding, never before |
+| register (*tasks 1.3, 5.2, 5.10*, multipart) | public | Identity (legal name, sector, country, **tax ID** checked by country — NIF / SIREN / EIN / other —, ISIN/LEI with valid check digits if given, website), contact name and e-mail, **mandate letter PDF** (≤ 5 MB, PDF signature, not encrypted); email, ISIN, LEI and (country, tax ID) not already known — or all of them pointing to one `REJECTED` request, which is then reopened; 3 requests per IP per hour; trap field empty. Same `202` answer whatever the outcome — the requester learns it by e-mail | company `PENDING_ONBOARDING` (or the reopened one) + owner user `ENTERPRISE` **without password** + mandate letter stored + follow-up token (SHA-256 stored, previous token invalidated) + audit log (`company_registered` / `registration_resubmitted`) + admin notification `ENTREPRISE_INSCRITE` | acknowledgment e-mail **with the follow-up link** (or "not processed" e-mail on a duplicate). The activation link is sent at onboarding, never before |
 | follow request (*task 5.2*, `POST /companies/registration-status`) | public, token in the body | token known | — (read only: status, info request, rejection reason) | — |
 | reply to an info request (*task 5.2*, `POST /companies/registration-status/reply`) | public, token | `INFO_REQUESTED` (row locked); new mandate letter PDF; optional message ≤ 2 000 characters; 3 replies per IP per hour | status `PENDING_ONBOARDING`, new mandate letter, message kept, audit log `registration_info_provided`, admin notification `ENTREPRISE_INFOS_COMPLETEES` | — |
 | onboard — approve (*task 1.4*) | ADMIN | status `PENDING_ONBOARDING` or `INFO_REQUESTED` (row locked); owner account present. **No ISIN/LEI or financial data required** — many unlisted companies have none; the admin may complete the profile first, and PCAF (task 2.3) asks for figures when it needs them | status `ACTIVE`, onboarded_by/at, activation token (valid **72 hours** since task 5.2), audit log | activation e-mail to the owner |
@@ -57,6 +57,14 @@ follows the request on a public page opened with a token received by e-mail.
 *Current:* no public registration; the admin creates the user, the user activates by email link
 (`app/auth/activation.py`). Publication is a separate `date_publication` timestamp set by the
 admin. Decision D5 gates self-registration behind this onboarding step.
+
+**Investor and researcher sign-up** (*task 5.10*).
+
+| Transition | Actor | Preconditions | Tx | Job |
+|---|---|---|---|---|
+| request access (`POST /access-requests`) | public | full name, e-mail, organisation, investor type (investor) or research domain (researcher); e-mail unknown, or belonging to a `REJECTED` request (reopened); 3 requests per IP per hour; trap field empty. Same `202` whatever the outcome | user with the role and **no password** + `access_requests` row `PENDING_APPROVAL` + audit `access_requested` / `access_request_resubmitted` + admin notification `DEMANDE_ACCES` | acknowledgment e-mail (or « not processed » e-mail) |
+| approve (`PATCH /admin/access-requests/{id}`) | ADMIN | `PENDING_APPROVAL`; e-mail service up | `APPROVED`, decider and date, activation token, audit `access_request_approved` | activation e-mail |
+| reject (same route) | ADMIN | `PENDING_APPROVAL`; reason required | `REJECTED` with the reason, account deactivated, audit `access_request_rejected` | refusal e-mail with the reason |
 
 ### 1.2 Report lifecycle
 

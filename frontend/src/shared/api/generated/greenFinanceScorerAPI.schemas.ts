@@ -4,6 +4,116 @@
  * GreenFinance-Scorer API
  * OpenAPI spec version: v1
  */
+export type AccessDecision = typeof AccessDecision[keyof typeof AccessDecision];
+
+
+export const AccessDecision = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+export interface AccessDecisionRequest {
+  decision: AccessDecision;
+  reason?: string | null;
+}
+
+export type RequestedRole = typeof RequestedRole[keyof typeof RequestedRole];
+
+
+export const RequestedRole = {
+  INVESTOR: 'INVESTOR',
+  RESEARCHER: 'RESEARCHER',
+} as const;
+
+export type InvestorType = typeof InvestorType[keyof typeof InvestorType];
+
+
+export const InvestorType = {
+  INVESTMENT_FUND: 'INVESTMENT_FUND',
+  BANK_INSTITUTIONAL: 'BANK_INSTITUTIONAL',
+  BUSINESS_ANGEL: 'BUSINESS_ANGEL',
+  OTHER: 'OTHER',
+} as const;
+
+export type ResearchDomain = typeof ResearchDomain[keyof typeof ResearchDomain];
+
+
+export const ResearchDomain = {
+  SUSTAINABLE_FINANCE: 'SUSTAINABLE_FINANCE',
+  CARBON_FOOTPRINT: 'CARBON_FOOTPRINT',
+  GOVERNANCE: 'GOVERNANCE',
+  OTHER: 'OTHER',
+} as const;
+
+/**
+ * POST /access-requests — public. `organization` : le fonds ou la société d'investissement,
+ * l'université ou l'organisme de recherche. `website_fax` est un champ piège : un humain le
+ * laisse vide (même principe que l'inscription d'une entreprise).
+ */
+export interface AccessRequestCreate {
+  role: RequestedRole;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  full_name: string;
+  email: string;
+  /**
+     * @minLength 2
+     * @maxLength 200
+     */
+  organization: string;
+  investor_type?: InvestorType | null;
+  research_domain?: ResearchDomain | null;
+  website_fax?: string | null;
+}
+
+/**
+ * Demande d'accès d'un Investisseur ou d'un Chercheur (tâche 5.10) : en attente de
+ * l'Administrateur, approuvée (lien d'activation envoyé) ou refusée avec son motif.
+ */
+export type AccessRequestStatus = typeof AccessRequestStatus[keyof typeof AccessRequestStatus];
+
+
+export const AccessRequestStatus = {
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
+/**
+ * Rôles de la plateforme (docs/ARCHITECTURE.md §1) — INSTITUTION conservé (décision D1).
+ */
+export type Role = typeof Role[keyof typeof Role];
+
+
+export const Role = {
+  ADMIN: 'ADMIN',
+  ENTERPRISE: 'ENTERPRISE',
+  AUDITOR: 'AUDITOR',
+  INVESTOR: 'INVESTOR',
+  RESEARCHER: 'RESEARCHER',
+  INSTITUTION: 'INSTITUTION',
+} as const;
+
+/**
+ * Une demande vue par l'Administrateur.
+ */
+export interface AccessRequestView {
+  id: string;
+  user_id: string;
+  role: Role;
+  full_name: string | null;
+  email: string;
+  organization: string;
+  investor_type: InvestorType | null;
+  research_domain: ResearchDomain | null;
+  status: AccessRequestStatus;
+  requested_at: string;
+  decided_at: string | null;
+  rejection_reason: string | null;
+}
+
 /**
  * POST /auth/activer-compte — jeton reçu via le lien envoyé à la création du compte
  * (app/auth/activation.py::ACTIVATION_TOKEN_TTL, 72 heures, usage unique).
@@ -292,6 +402,7 @@ export interface BodyRegisterCompany {
   country: string;
   contact_name: string;
   contact_email: string;
+  tax_id: string;
   isin?: string | null;
   lei?: string | null;
   website?: string | null;
@@ -555,21 +666,6 @@ export interface CreerProjetRequest {
   planned_end_date?: string | null;
   deadline?: string | null;
 }
-
-/**
- * Rôles de la plateforme (docs/ARCHITECTURE.md §1) — INSTITUTION conservé (décision D1).
- */
-export type Role = typeof Role[keyof typeof Role];
-
-
-export const Role = {
-  ADMIN: 'ADMIN',
-  ENTERPRISE: 'ENTERPRISE',
-  AUDITOR: 'AUDITOR',
-  INVESTOR: 'INVESTOR',
-  RESEARCHER: 'RESEARCHER',
-  INSTITUTION: 'INSTITUTION',
-} as const;
 
 export interface CreerUtilisateurRequest {
   email: string;
@@ -1088,6 +1184,20 @@ export interface KycCheck {
 }
 
 /**
+ * Nature de l'identifiant fiscal d'une entreprise (tâche 5.10), déduite de son pays : NIF
+ * mauritanien, SIREN français, EIN américain, identifiant fiscal générique ailleurs.
+ */
+export type TaxIdType = typeof TaxIdType[keyof typeof TaxIdType];
+
+
+export const TaxIdType = {
+  NIF: 'NIF',
+  SIREN: 'SIREN',
+  EIN: 'EIN',
+  TAX_ID: 'TAX_ID',
+} as const;
+
+/**
  * GET /admin/companies/{id}/kyc — de quoi décider d'une inscription dans une seule fenêtre :
  * identité déclarée, contact, lettre de mandat, échanges avec le demandeur, contrôles.
  */
@@ -1095,6 +1205,9 @@ export interface KycReport {
   company_id: string;
   company_name: string;
   status: RegistrationStatus;
+  country: string;
+  tax_id: string | null;
+  tax_id_type: TaxIdType | null;
   lei: string | null;
   isin: string | null;
   website: string | null;
@@ -1949,6 +2062,10 @@ export interface VerificationLei {
 export interface VerifierMotDePasseRequest {
   password: string;
 }
+
+export type ListAccessRequestsParams = {
+status?: AccessRequestStatus | null;
+};
 
 export type ListMyNotificationsParams = {
 /**

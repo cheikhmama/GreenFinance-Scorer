@@ -3,7 +3,6 @@ import { AppShell } from "@/shared/layout/AppShell";
 import { RequireRole } from "@/shared/RequireRole";
 import { CompanyDashboardPage } from "./components/CompanyDashboardPage";
 import { CompanyDeclarationsPage } from "./components/CompanyDeclarationsPage";
-import { CompanyRegistrationPage } from "./components/CompanyRegistrationPage";
 import { CompanyReportDetailPage } from "./components/CompanyReportDetailPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { RegistrationStatusPage } from "./components/RegistrationStatusPage";
@@ -15,8 +14,7 @@ function AncienneDeclaration() {
 }
 
 export const companyRoutes: RouteObject[] = [
-  // Publique : inscription d'une entreprise, validée ensuite par l'Administrateur (décision D5).
-  { path: "/inscription-entreprise", element: <CompanyRegistrationPage /> },
+  // L'inscription elle-même vit dans features/registration (tâche 5.10).
   // Publique : suivi de la demande, avec le jeton reçu par e-mail (tâche 5.2).
   { path: "/inscription-entreprise/suivi", element: <RegistrationStatusPage /> },
   {

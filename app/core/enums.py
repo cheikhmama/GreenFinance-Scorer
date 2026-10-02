@@ -82,6 +82,39 @@ class KycCheckResult(str, Enum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
+class TaxIdType(str, Enum):
+    """Nature de l'identifiant fiscal d'une entreprise (tâche 5.10), déduite de son pays : NIF
+    mauritanien, SIREN français, EIN américain, identifiant fiscal générique ailleurs."""
+
+    NIF = "NIF"
+    SIREN = "SIREN"
+    EIN = "EIN"
+    TAX_ID = "TAX_ID"
+
+
+class AccessRequestStatus(str, Enum):
+    """Demande d'accès d'un Investisseur ou d'un Chercheur (tâche 5.10) : en attente de
+    l'Administrateur, approuvée (lien d'activation envoyé) ou refusée avec son motif."""
+
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class InvestorType(str, Enum):
+    INVESTMENT_FUND = "INVESTMENT_FUND"
+    BANK_INSTITUTIONAL = "BANK_INSTITUTIONAL"
+    BUSINESS_ANGEL = "BUSINESS_ANGEL"
+    OTHER = "OTHER"
+
+
+class ResearchDomain(str, Enum):
+    SUSTAINABLE_FINANCE = "SUSTAINABLE_FINANCE"
+    CARBON_FOOTPRINT = "CARBON_FOOTPRINT"
+    GOVERNANCE = "GOVERNANCE"
+    OTHER = "OTHER"
+
+
 class ReportType(str, Enum):
     RAPPORT_ANNUEL = "RAPPORT_ANNUEL"
     RAPPORT_ESG = "RAPPORT_ESG"

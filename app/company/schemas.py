@@ -10,12 +10,30 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from app.auth.schemas import EmailNormalise
-from app.company.identifiers import isin_valide, lei_valide
+from app.company.identifiers import (
+    isin_valide,
+    lei_valide,
+    normaliser_identifiant_fiscal,
+    type_identifiant_fiscal,
+)
 from app.company.models import Company
-from app.core.enums import Currency, KycCheckResult, RegistrationStatus, ReportType
+from app.core.enums import (
+    Currency,
+    KycCheckResult,
+    RegistrationStatus,
+    ReportType,
+    TaxIdType,
+)
 
 
 def company_vers_contrat(company: Company) -> dict[str, Any]:
@@ -124,6 +142,8 @@ class CompanyRegistrationRequest(BaseModel):
     website: str | None = Field(default=None, max_length=500)
     contact_name: str = Field(min_length=2, max_length=100)
     contact_email: EmailNormalise
+    # Identifiant fiscal (tâche 5.10) : exigé ; sa nature (NIF, SIREN, EIN…) se déduit du pays.
+    tax_id: str = Field(min_length=1, max_length=40)
     company_fax: str | None = None
 
     @field_validator("company_name", "sector", "contact_name")
@@ -167,6 +187,20 @@ class CompanyRegistrationRequest(BaseModel):
         if not valeur.startswith(("https://", "http://")):
             raise ValueError("Adresse web attendue (https://…).")
         return valeur
+
+    @field_validator("tax_id")
+    @classmethod
+    def _identifiant_fiscal(cls, valeur: str, info: ValidationInfo) -> str:
+        # Déclaré après `country` : le pays est déjà validé ici (absent s'il était invalide).
+        pays = info.data.get("country")
+        if pays is None:
+            return valeur
+        _nature, propre = normaliser_identifiant_fiscal(pays, valeur)
+        return propre
+
+    @property
+    def tax_id_type(self) -> TaxIdType:
+        return type_identifiant_fiscal(self.country)
 
 
 class RegistrationStatusRequest(BaseModel):

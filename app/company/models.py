@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Column, Numeric
 from sqlmodel import Field, Relationship, SQLModel
 
-from app.core.enums import Currency, RegistrationStatus, sa_enum_column
+from app.core.enums import Currency, RegistrationStatus, TaxIdType, sa_enum_column
 
 if TYPE_CHECKING:
     from app.auth.models import User
@@ -45,6 +45,13 @@ class Company(SQLModel, table=True):
     )
     # Identifiants de marché (ISO 6166 / ISO 17442) — uniques quand renseignés, clé de
     # rapprochement des positions importées (tâche 2.2) et des jeux de données publics (tâche 3.3).
+    # Identifiant fiscal (tâche 5.10) : exigé à l'inscription publique, absent des entreprises
+    # créées avant ; sa nature (NIF, SIREN, EIN…) suit le pays. Recherche des doublons par
+    # (pays, identifiant), d'où l'index.
+    tax_id: str | None = Field(default=None, max_length=32, index=True)
+    tax_id_type: TaxIdType | None = Field(
+        default=None, sa_column=sa_enum_column(TaxIdType, nullable=True)
+    )
     isin: str | None = Field(default=None, max_length=12, unique=True)
     lei: str | None = Field(default=None, max_length=20, unique=True)
     # Symbole boursier (tâche 2.2), en majuscules. Jamais unique : un même ticker peut désigner

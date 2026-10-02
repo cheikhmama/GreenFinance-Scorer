@@ -7,6 +7,7 @@ from alembic import context
 
 # Importés pour leur effet de bord : enregistrer chaque table dans
 # SQLModel.metadata avant que target_metadata ne soit lu par autogenerate.
+from app.access_requests import models as _access_request_models  # noqa: F401
 from app.audit import models as _audit_models  # noqa: F401
 from app.auth import models as _auth_models  # noqa: F401
 from app.company import models as _company_models  # noqa: F401

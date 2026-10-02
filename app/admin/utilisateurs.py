@@ -13,13 +13,14 @@ from fastapi import BackgroundTasks
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 
+from app.access_requests.models import AccessRequest
 from app.auth.activation import envoyer_lien_activation
 from app.auth.models import InstitutionProfile, User
 from app.auth.revocation import revoke_all_sessions
 from app.company.models import Company
 from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
-from app.core.enums import RegistrationStatus, Role
+from app.core.enums import AccessRequestStatus, RegistrationStatus, Role
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 from app.core.recherche import contient
 
@@ -78,11 +79,17 @@ def lister_utilisateurs_en_attente(session: Session) -> list[User]:
     les compter (utilisateurs_en_attente). lister_utilisateurs_par_role exige un rôle unique ;
     cette vue transverse sert le raccourci "Utilisateurs en attente" du tableau de bord, qui
     n'est scopé à aucun rôle précis."""
+    # Une demande d'accès pas encore approuvée (tâche 5.10) n'attend pas d'activation : aucun lien
+    # n'est parti. Elle se traite dans « Demandes d'accès ».
+    demandes_non_approuvees = select(AccessRequest.user_id).where(
+        col(AccessRequest.status) != AccessRequestStatus.APPROVED
+    )
     return list(
         session.exec(
             select(User).where(
                 col(User.activated_at).is_(None),
                 col(User.active).is_(True),
+                col(User.id).not_in(demandes_non_approuvees),
             )
         ).all()
     )

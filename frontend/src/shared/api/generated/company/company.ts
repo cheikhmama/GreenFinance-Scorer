@@ -39,6 +39,7 @@ formData.append(`sector`, bodyRegisterCompany.sector);
 formData.append(`country`, bodyRegisterCompany.country);
 formData.append(`contact_name`, bodyRegisterCompany.contact_name);
 formData.append(`contact_email`, bodyRegisterCompany.contact_email);
+formData.append(`tax_id`, bodyRegisterCompany.tax_id);
 if(bodyRegisterCompany.isin !== undefined && bodyRegisterCompany.isin !== null) {
  formData.append(`isin`, bodyRegisterCompany.isin);
  }

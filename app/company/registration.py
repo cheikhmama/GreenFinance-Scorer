@@ -34,7 +34,7 @@ import redis
 import structlog
 from fastapi import BackgroundTasks
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, col, or_, select
+from sqlmodel import Session, and_, col, or_, select
 
 from app.auth.models import User
 from app.company.models import Company
@@ -171,6 +171,8 @@ def _demande_existante(
         for condition in (
             col(Company.isin) == demande.isin if demande.isin else None,
             col(Company.lei) == demande.lei if demande.lei else None,
+            # Identifiant fiscal (tâche 5.10) : unique dans son pays.
+            and_(col(Company.country) == demande.country, col(Company.tax_id) == demande.tax_id),
         )
         if condition is not None
     ]
@@ -279,6 +281,8 @@ def enregistrer_demande(
     entreprise.isin = demande.isin
     entreprise.lei = demande.lei
     entreprise.website = demande.website
+    entreprise.tax_id = demande.tax_id
+    entreprise.tax_id_type = demande.tax_id_type
     entreprise.status = RegistrationStatus.PENDING_ONBOARDING
     entreprise.registered_at = utcnow()
     jeton = nouveau_jeton_de_suivi(entreprise)

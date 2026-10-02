@@ -14,6 +14,7 @@ l'instant — les routes réelles arrivent au fil des étapes 9 à 17.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.access_requests.router import router as access_requests_router
 from app.admin.router import router as admin_router
 from app.audit.router import router as audit_router
 from app.auth.csrf import CSRFMiddleware
@@ -94,6 +95,7 @@ api_app.add_middleware(
 api_app.add_middleware(CSRFMiddleware)
 
 api_app.include_router(auth_router)
+api_app.include_router(access_requests_router)
 api_app.include_router(contact_router)
 api_app.include_router(core_router)
 api_app.include_router(admin_router)

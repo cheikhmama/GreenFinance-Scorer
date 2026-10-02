@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { erreurIdentifiantFiscal } from "@/features/registration/referentiels";
 import { Currency, ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
 export { Currency, ReportType };
@@ -62,36 +63,44 @@ export const lettreDeMandatSchema = z
   .refine((f) => f.size <= TAILLE_MAX_MANDAT, "La lettre de mandat dépasse 5 Mo.");
 
 /** Formulaire d'inscription publique (POST /companies/register) — mêmes règles que le backend
- * (app/company/schemas.py::CompanyRegistrationRequest), qui reste seul juge des chiffres de
- * contrôle ISIN/LEI : ici, seulement la forme, pour un retour immédiat. */
-export const companyRegistrationFormSchema = z.object({
-  company_name: z.string().trim().min(2, "Le nom de l’entreprise est requis.").max(200),
-  sector: z.string().trim().min(2, "Le secteur est requis.").max(100),
-  country: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z]{2}$/, "Code pays à deux lettres (ex. MR)."),
-  isin: z
-    .string()
-    .trim()
-    .regex(/^$|^[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]$/, "Un ISIN compte 12 caractères (ex. MR…)."),
-  lei: z
-    .string()
-    .trim()
-    .regex(/^$|^[A-Za-z0-9]{18}[0-9]{2}$/, "Un LEI compte 20 caractères."),
-  website: z
-    .string()
-    .trim()
-    .regex(/^$|^https?:\/\//, "Adresse web attendue (https://…)."),
-  contact_name: z.string().trim().min(2, "Votre nom est requis.").max(100),
-  contact_email: z
-    .string()
-    .trim()
-    .min(1, "L’adresse e-mail est requise")
-    .email("Adresse e-mail invalide"),
-  company_fax: z.string(),
-  mandate_letter: lettreDeMandatSchema,
-});
+ * (app/company/schemas.py::CompanyRegistrationRequest), qui reste seul juge : ici, seulement la
+ * forme, pour un retour immédiat. Identifiant fiscal exigé, sa forme dépend du pays (tâche 5.10) ;
+ * ISIN, LEI et site web sont facultatifs. */
+export const companyRegistrationFormSchema = z
+  .object({
+    company_name: z.string().trim().min(2, "Le nom de l’entreprise est requis.").max(200),
+    sector: z.string().trim().min(2, "Le secteur est requis.").max(100),
+    country: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z]{2}$/, "Le pays est requis."),
+    tax_id: z.string().trim().min(1, "L’identifiant fiscal est requis."),
+    isin: z
+      .string()
+      .trim()
+      .regex(/^$|^[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]$/, "Un ISIN compte 12 caractères (ex. MR…)."),
+    lei: z
+      .string()
+      .trim()
+      .regex(/^$|^[A-Za-z0-9]{18}[0-9]{2}$/, "Un LEI compte 20 caractères."),
+    website: z
+      .string()
+      .trim()
+      .regex(/^$|^https?:\/\//, "Adresse web attendue (https://…)."),
+    contact_name: z.string().trim().min(2, "Votre nom est requis.").max(100),
+    contact_email: z
+      .string()
+      .trim()
+      .min(1, "L’adresse e-mail est requise")
+      .email("Adresse e-mail invalide"),
+    company_fax: z.string(),
+    mandate_letter: lettreDeMandatSchema,
+  })
+  .superRefine((valeurs, ctx) => {
+    if (!valeurs.tax_id || !/^[A-Za-z]{2}$/.test(valeurs.country)) return;
+    const erreur = erreurIdentifiantFiscal(valeurs.country, valeurs.tax_id);
+    if (erreur) ctx.addIssue({ code: "custom", path: ["tax_id"], message: erreur });
+  });
 
 export type CompanyRegistrationForm = z.infer<typeof companyRegistrationFormSchema>;
 

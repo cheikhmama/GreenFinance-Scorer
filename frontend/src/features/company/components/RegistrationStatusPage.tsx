@@ -137,7 +137,7 @@ function Suivi({ vue, token }: { vue: RegistrationStatusView; token: string }) {
             <p className="whitespace-pre-line">{vue.rejection_reason}</p>
             <p>
               Vous pouvez{" "}
-              <Link to="/inscription-entreprise" className="font-medium underline">
+              <Link to="/inscription/entreprise" className="font-medium underline">
                 déposer une nouvelle demande
               </Link>{" "}
               avec les mêmes identifiants.

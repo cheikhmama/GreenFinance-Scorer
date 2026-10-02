@@ -22,6 +22,7 @@ from app.core.enums import (
     RegistrationStatus,
     ReportStatus,
     Role,
+    TaxIdType,
 )
 
 
@@ -467,6 +468,10 @@ class KycReport(BaseModel):
     company_id: uuid.UUID
     company_name: str
     status: RegistrationStatus
+    country: str
+    # Identifiant fiscal déclaré (tâche 5.10) : NIF, SIREN, EIN… selon le pays.
+    tax_id: str | None
+    tax_id_type: TaxIdType | None
     lei: str | None
     isin: str | None
     website: str | None

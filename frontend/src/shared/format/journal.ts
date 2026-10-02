@@ -2,6 +2,10 @@
  * app/core/audit.py) ; une valeur inconnue s'affiche telle quelle plutôt que de disparaître. */
 
 const ACTIONS: Record<string, string> = {
+  access_request_approved: "Approbation d'une demande d'accès",
+  access_request_rejected: "Refus d'une demande d'accès",
+  access_request_resubmitted: "Nouvelle demande d'accès après refus",
+  access_requested: "Demande d'accès",
   account_activated: "Activation du compte",
   account_created: "Création du compte",
   account_deactivated: "Désactivation du compte",

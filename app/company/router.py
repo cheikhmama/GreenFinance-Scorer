@@ -59,6 +59,7 @@ def _demande_inscription(
     country: str = Form(),
     contact_name: str = Form(),
     contact_email: str = Form(),
+    tax_id: str = Form(),
     isin: str | None = Form(default=None),
     lei: str | None = Form(default=None),
     website: str | None = Form(default=None),
@@ -73,13 +74,19 @@ def _demande_inscription(
             country=country,
             contact_name=contact_name,
             contact_email=contact_email,
+            tax_id=tax_id,
             isin=isin,
             lei=lei,
             website=website,
             company_fax=company_fax,
         )
     except pydantic.ValidationError as exc:
-        raise RequestValidationError(exc.errors(include_url=False)) from exc
+        # Emplacement préfixé par « body », comme une validation FastAPI native : le gestionnaire
+        # d'erreurs en tire le nom du champ (`fields`), que le formulaire affiche sous l'entrée.
+        erreurs = [
+            {**erreur, "loc": ("body", *erreur["loc"])} for erreur in exc.errors(include_url=False)
+        ]
+        raise RequestValidationError(erreurs) from exc
 
 
 @router.post(

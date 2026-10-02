@@ -132,12 +132,12 @@ export function LoginPage() {
         Un accès sécurisé à votre espace professionnel
       </p>
       <p className="mt-3 text-center text-sm text-muted-foreground">
-        Votre entreprise n’est pas encore sur la plateforme ?{" "}
+        Pas encore de compte ?{" "}
         <Link
-          to="/inscription-entreprise"
+          to="/inscription"
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
-          Inscrire mon entreprise
+          Créer un compte
         </Link>
       </p>
 

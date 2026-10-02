@@ -107,7 +107,7 @@ describe("RegistrationStatusPage", () => {
     expect(await screen.findByText("Mandat non conforme.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "déposer une nouvelle demande" })).toHaveAttribute(
       "href",
-      "/inscription-entreprise",
+      "/inscription/entreprise",
     );
   });
 

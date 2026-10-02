@@ -1,6 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import {
+  decideAccessRequest,
+  listAccessRequests,
+} from "@/shared/api/generated/access-requests/access-requests";
+import {
   assignReportAuditor,
   createUser,
   deactivateUser,
@@ -50,6 +54,9 @@ import {
   verifyReportScorability,
 } from "@/shared/api/generated/admin/admin";
 import type {
+  AccessDecision,
+  AccessRequestStatus,
+  AccessRequestView,
   AffecterAuditeurRequest,
   AnalysisStatus,
   ApercuActeursAdmin,
@@ -702,5 +709,31 @@ export function useProjectsAdmin(statut?: ProjectStatus) {
       listProjectsAdmin({ statut, page: pageParam as number, page_size: TAILLE_PAGE_ADMIN }),
     initialPageParam: 1,
     getNextPageParam: pageSuivante,
+  });
+}
+
+const DEMANDES_ACCES_KEY = ["admin", "access-requests"] as const;
+
+/** GET /admin/access-requests — demandes d'accès Investisseur / Chercheur (tâche 5.10). */
+export function useAccessRequests(status: AccessRequestStatus | undefined) {
+  return useQuery<AccessRequestView[], ApiError>({
+    queryKey: [...DEMANDES_ACCES_KEY, status ?? "toutes"],
+    queryFn: () => listAccessRequests(status ? { status } : undefined),
+  });
+}
+
+/** PATCH /admin/access-requests/{id} — approuver (lien d'activation) ou refuser (motif). */
+export function useDecideAccessRequest() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    AccessRequestView,
+    ApiError,
+    { id: string; decision: AccessDecision; reason?: string }
+  >({
+    mutationFn: ({ id, ...corps }) => decideAccessRequest(id, corps),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DEMANDES_ACCES_KEY });
+      queryClient.invalidateQueries({ queryKey: UTILISATEURS_EN_ATTENTE_KEY });
+    },
   });
 }
