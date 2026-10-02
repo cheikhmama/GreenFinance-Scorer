@@ -35,7 +35,7 @@ async function remplirEtEnvoyer({ avecMandat = true, pays = "MR", identifiant = 
     screen.getByRole("textbox", { name: /NIF|SIREN|EIN|Identifiant fiscal/ }),
     identifiant,
   );
-  await user.type(screen.getByLabelText("Nom du responsable"), "Aïcha Ba");
+  await user.type(screen.getByLabelText("Nom & Prénom du responsable"), "Aïcha Ba");
   await user.type(screen.getByLabelText("E-mail professionnel"), "aicha@miniere.mr");
   if (avecMandat) {
     await user.upload(screen.getByLabelText("Lettre de mandat signée (PDF)"), MANDAT);
@@ -51,9 +51,7 @@ describe("CompanyRegistrationPage", () => {
     await remplirEtEnvoyer();
 
     expect(await screen.findByText("Demande d’inscription transmise")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Votre demande d’accès Entreprise a été enregistrée/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/sous 24h à 48h.*dès validation/)).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/v1/companies/register");
     const corps = init?.body as FormData;

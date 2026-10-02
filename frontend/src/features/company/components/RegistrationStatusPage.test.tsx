@@ -52,7 +52,11 @@ describe("RegistrationStatusPage", () => {
     fetchMock.mockResolvedValue(Response.json(vue()));
     renderPage(`/inscription-entreprise/suivi?token=${JETON}`);
 
-    expect(await screen.findByText("En cours d’examen")).toBeInTheDocument();
+    expect(await screen.findByText("Examen en cours")).toBeInTheDocument();
+    expect(screen.getByText(/24h à 48h ouvrées/)).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Avancement de la demande" })).toHaveTextContent(
+      "Examen (24h à 48h) (en cours)",
+    );
     expect(screen.getByText("Inscription à valider")).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/v1/companies/registration-status");
@@ -76,14 +80,19 @@ describe("RegistrationStatusPage", () => {
     const user = userEvent.setup();
 
     expect(await screen.findByText("La lettre n’est pas signée.")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Avancement de la demande" })).toHaveTextContent(
+      "Examen (24h à 48h) (action requise)",
+    );
     await user.upload(
       screen.getByLabelText("Nouvelle lettre de mandat (PDF)"),
       new File(["%PDF-1.4"], "signee.pdf", { type: "application/pdf" }),
     );
+    // La zone de dépôt nomme le fichier choisi.
+    expect(screen.getByText("signee.pdf")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Message (facultatif)"), "Version signée.");
     await user.click(screen.getByRole("button", { name: "Envoyer ma réponse" }));
 
-    expect(await screen.findByText("En cours d’examen")).toBeInTheDocument();
+    expect(await screen.findByText("Examen en cours")).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[1];
     expect(url).toBe("/api/v1/companies/registration-status/reply");
     const corps = init?.body as FormData;
@@ -105,7 +114,7 @@ describe("RegistrationStatusPage", () => {
     renderPage(`/inscription-entreprise/suivi?token=${JETON}`);
 
     expect(await screen.findByText("Mandat non conforme.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "déposer une nouvelle demande" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Déposer une nouvelle demande" })).toHaveAttribute(
       "href",
       "/inscription/entreprise",
     );

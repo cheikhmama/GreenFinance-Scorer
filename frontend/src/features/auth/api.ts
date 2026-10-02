@@ -75,10 +75,17 @@ export function useResetPassword() {
 
 /** Consomme le lien d'activation reçu à la création du compte (app/auth/activation.py) et pose
  * le premier mot de passe, sans ouvrir de session — même contrat que useResetPassword. */
+/** L'activation ouvre la session (app/auth/router.py::activer_compte_route) : l'utilisateur
+ * renvoyé alimente le cache comme après un login, pour que l'espace s'ouvre sans nouvel appel. */
 export function useActivateAccount() {
-  return useMutation<void, ApiError, ActiverCompteRequest>({
+  const queryClient = useQueryClient();
+
+  return useMutation<User, ApiError, ActiverCompteRequest>({
     mutationFn: (payload) => activateAccount(payload),
     retry: false,
+    onSuccess: (user) => {
+      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user);
+    },
   });
 }
 

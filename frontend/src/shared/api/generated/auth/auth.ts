@@ -115,9 +115,9 @@ export const getActivateAccountUrl = () => {
 }
 
 /**
- * @summary Poser son mot de passe et activer un compte à partir d'un jeton d'activation
+ * @summary Poser son mot de passe, activer le compte et ouvrir la session
  */
-export const activateAccount = async (activerCompteRequest: ActiverCompteRequest, options?: RequestInit): Promise<void> => {
+export const activateAccount = async (activerCompteRequest: ActiverCompteRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -125,7 +125,7 @@ export const activateAccount = async (activerCompteRequest: ActiverCompteRequest
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return apiFetch<void>(getActivateAccountUrl(),
+return apiFetch<UtilisateurPublic>(getActivateAccountUrl(),
   {
     ...options,
     method: 'POST',

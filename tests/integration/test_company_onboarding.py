@@ -88,11 +88,15 @@ def test_parcours_complet_inscription_validation_activation_connexion(session, m
     assert entreprise.onboarded_at is not None
     assert entreprise.onboarded_by_id is not None
 
-    activation = TestClient(app, base_url="https://testserver").post(
+    nouveau = TestClient(app, base_url="https://testserver")
+    activation = nouveau.post(
         "/api/v1/auth/activer-compte",
         json={"token": jeton, "new_password": "premier-secret-12"},
     )
-    assert activation.status_code == 204
+    assert activation.status_code == 200
+    assert activation.json()["role"] == "ENTERPRISE"
+    # La session est ouverte par l'activation elle-même : l'espace répond sans nouveau login.
+    assert nouveau.get("/api/v1/company/profil").status_code == 200
 
     titulaire = _client_connecte(demande["contact_email"].lower(), "premier-secret-12")
     profil = titulaire.get("/api/v1/company/profil")

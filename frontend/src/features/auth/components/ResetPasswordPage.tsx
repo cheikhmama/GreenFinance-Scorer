@@ -2,34 +2,23 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Link, useSearchParams } from "react-router-dom";
+import { useForm, useWatch } from "react-hook-form";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/shared/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { useActivateAccount, useResetPassword } from "../api";
-import {
-  MOT_DE_PASSE_LONGUEUR_MIN,
-  type NouveauMotDePasseForm,
-  resetPasswordFormSchema,
-} from "../schemas";
+import { type NouveauMotDePasseForm, resetPasswordFormSchema } from "../schemas";
+import { PasswordCriteria } from "./PasswordCriteria";
 import { PasswordInput } from "./PasswordInput";
 
 // secrets.token_urlsafe(32), émis par app/auth/password_reset.py et app/auth/activation.py.
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 type TokenPasswordMutation = UseMutationResult<
-  void,
+  unknown,
   ApiError,
   { token: string; new_password: string }
 >;
@@ -57,9 +46,13 @@ interface Textes {
 function TokenPasswordPage({
   mutation,
   textes,
+  apresSucces,
 }: {
   mutation: TokenPasswordMutation;
   textes: Textes;
+  /** Remplace l'écran de confirmation (activation : la session est ouverte, on entre dans
+   * l'espace). */
+  apresSucces?: () => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const tokens = searchParams.getAll("token");
@@ -73,6 +66,10 @@ function TokenPasswordPage({
     defaultValues: { nouveauMotDePasse: "", confirmation: "" },
   });
   const invalidLink = !tokenIsWellFormed || rejectedToken === token;
+  const [motDePasse, confirmation] = useWatch({
+    control: form.control,
+    name: ["nouveauMotDePasse", "confirmation"],
+  });
 
   function onSubmit(values: NouveauMotDePasseForm) {
     if (mutation.isPending || invalidLink) return;
@@ -81,6 +78,10 @@ function TokenPasswordPage({
       { token, new_password: values.nouveauMotDePasse },
       {
         onSuccess: () => {
+          if (apresSucces) {
+            apresSucces();
+            return;
+          }
           form.reset();
           mutation.reset();
           setDone(true);
@@ -155,7 +156,6 @@ function TokenPasswordPage({
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>{MOT_DE_PASSE_LONGUEUR_MIN} caractères minimum.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -178,6 +178,7 @@ function TokenPasswordPage({
                 </FormItem>
               )}
             />
+            <PasswordCriteria value={motDePasse ?? ""} confirmation={confirmation ?? ""} />
             <Button type="submit" className="h-12 w-full rounded-xl" disabled={mutation.isPending}>
               {mutation.isPending ? textes.boutonEnCours : "Enregistrer le mot de passe"}
             </Button>
@@ -226,12 +227,16 @@ export function ResetPasswordPage() {
 }
 
 /** Cible du lien envoyé à la création d'un compte (app/auth/activation.py::_construire_lien).
- * Un lien expiré ne se renouvelle pas en libre-service : seul l'Administrateur peut renvoyer une
- * invitation (POST /admin/utilisateurs/{id}/renvoyer-activation). */
+ * L'activation ouvre la session : l'utilisateur entre aussitôt dans son espace, via /dashboard
+ * qui choisit la route de son rôle (shared/DashboardRedirect.tsx). Un lien expiré ne se renouvelle
+ * pas en libre-service : seul l'Administrateur peut renvoyer une invitation
+ * (POST /admin/utilisateurs/{id}/renvoyer-activation). */
 export function ActivateAccountPage() {
+  const navigate = useNavigate();
   return (
     <TokenPasswordPage
       mutation={useActivateAccount()}
+      apresSucces={() => navigate("/dashboard", { replace: true })}
       textes={{
         eyebrow: "BIENVENUE",
         title: "Activez votre compte",
