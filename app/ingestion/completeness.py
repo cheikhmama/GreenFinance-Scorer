@@ -57,7 +57,14 @@ def calculer_couverture(
     couvertures = []
     for code in codes:
         extrait = extraits_par_code.get(code)
-        trouve = bool(extrait and extrait.trouve and extrait.valeur is not None)
+        # Même critère que l'enregistrement : une valeur sans page n'a pas de preuve, elle n'est
+        # pas enregistrée — elle ne compte donc pas comme trouvée (tâche 5.11).
+        trouve = bool(
+            extrait
+            and extrait.trouve
+            and extrait.valeur is not None
+            and extrait.page_source is not None
+        )
         if trouve:
             statut = MetricCoverageStatus.TROUVE
         elif _absence_confirmee(extrait, recherche_exhaustive_par_code.get(code, False)):
