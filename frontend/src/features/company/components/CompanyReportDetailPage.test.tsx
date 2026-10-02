@@ -129,7 +129,7 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
 
     await user.click(within(dialogue).getByRole("button", { name: "Terminer" }));
     const bandeau = await screen.findByRole("region", { name: "Déclaration verrouillée" });
-    expect(bandeau).toHaveTextContent(/🔒 Soumis le 2 septembre 2026 à \d{2}:30 — lecture seule/);
+    expect(bandeau).toHaveTextContent(/Soumis le 2 septembre 2026 à \d{2}:30 — lecture seule/);
     expect(bandeau).toHaveTextContent(SHA);
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Examen");
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
@@ -185,5 +185,139 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     expect(screen.getByLabelText("Remplacer le fichier")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
     await waitFor(() => expect(appels("GET", "/checklist")).toHaveLength(0));
+  });
+});
+
+const PREUVE = {
+  id: "p1",
+  document_name: "rapport-2025.pdf",
+  year: 2025,
+  total_pages: 80,
+  page_start: 44,
+  page_end: 44,
+  excerpt_pdf_path: "",
+};
+
+const SOUMIS = {
+  submitted_at: "2026-09-02T08:30:00Z",
+  metrics: [
+    {
+      id: "m1",
+      pillar: "ENVIRONNEMENT",
+      metric_code: "consommation_eau_m3",
+      value: 125400,
+      unit: "m3",
+      method: "RAPPORTEE",
+      proof: PREUVE,
+      raw_value: null,
+      section: null,
+      proof_text: null,
+      value_year: 2025,
+      confidence: null,
+    },
+    {
+      id: "m2",
+      pillar: "GOUVERNANCE",
+      metric_code: "femmes_conseil_pourcentage",
+      value: 33.3,
+      unit: "%",
+      method: "CALCULEE",
+      proof: { ...PREUVE, page_start: 58, page_end: 59 },
+      raw_value: null,
+      section: null,
+      proof_text: null,
+      value_year: 2025,
+      confidence: null,
+    },
+  ],
+  carbon_data: [
+    {
+      id: "c1",
+      scope: 1,
+      ghg_category: null,
+      tonnes_co2e: 18450.2,
+      year: 2025,
+      method: "ESTIMEE",
+      pcaf_data_quality: 2,
+      proof: PREUVE,
+      raw_value: null,
+      section: null,
+      proof_text: null,
+      value_year: 2025,
+      confidence: null,
+    },
+  ],
+};
+
+describe("Espace Entreprise — déclaration soumise ou décidée", () => {
+  it("validée : score officiel par pilier, synthèse PDF, examen dit terminé", async () => {
+    fetchMock.mockImplementation(async () =>
+      Response.json(
+        rapport({
+          ...SOUMIS,
+          status: "VALIDATED",
+          synthesis_available: true,
+          official_score: {
+            global_score: 71.4,
+            environmental_score: 68.2,
+            social_score: 74.9,
+            governance_score: 72,
+            coverage_rate: 0.86,
+            config_version: 3,
+          },
+        }),
+      ),
+    );
+    renderPage();
+
+    const score = await screen.findByRole("region", { name: "Score officiel" });
+    expect(score).toHaveTextContent("71,4/100");
+    expect(score).toHaveTextContent("couverture 86 %");
+    expect(within(score).getByRole("progressbar", { name: "Social" })).toHaveAttribute(
+      "aria-valuenow",
+      "74.9",
+    );
+    expect(screen.getByRole("link", { name: /Synthèse PDF/ })).toHaveAttribute(
+      "href",
+      `/api/v1/company/rapports/${ID}/synthese/fichier`,
+    );
+    expect(screen.getByRole("region", { name: "Déclaration verrouillée" })).toHaveTextContent(
+      "L’examen est terminé",
+    );
+  });
+
+  it("valeurs extraites : libellés lisibles, nombres au format français, page source", async () => {
+    fetchMock.mockImplementation(async () =>
+      Response.json(rapport({ ...SOUMIS, status: "IN_AUDIT" })),
+    );
+    renderPage();
+
+    const [indicateurs, carbone] = await screen.findAllByRole("table");
+    const ligneEau = within(indicateurs).getByRole("row", { name: /consommation/i });
+    expect(ligneEau).toHaveTextContent("Environnement");
+    expect(ligneEau).toHaveTextContent("125 400 m³");
+    expect(ligneEau).toHaveTextContent("Publiée");
+    expect(ligneEau).toHaveTextContent("p. 44");
+    const ligneConseil = within(indicateurs).getByRole("row", {
+      name: /Part de femmes au conseil/,
+    });
+    expect(ligneConseil).toHaveTextContent("33,3 %");
+    expect(ligneConseil).toHaveTextContent("p. 58–59");
+    expect(carbone).toHaveTextContent("18 450,2 tCO₂e");
+    expect(document.body.textContent).not.toMatch(/RAPPORTEE|ENVIRONNEMENT|femmes_conseil/);
+    expect(screen.getByRole("region", { name: "Déclaration verrouillée" })).toHaveTextContent(
+      "pendant l’examen",
+    );
+    expect(screen.queryByRole("region", { name: "Score officiel" })).not.toBeInTheDocument();
+  });
+
+  it("correction demandée : l’exercice proposé est celui de la déclaration", async () => {
+    fetchMock.mockImplementation(async () =>
+      Response.json(rapport({ ...SOUMIS, status: "REVISION_REQUESTED", fiscal_year: 2023 })),
+    );
+    renderPage();
+
+    expect(await screen.findByLabelText("Exercice")).toHaveValue(2023);
+    expect(screen.getByLabelText("Fichier PDF corrigé")).toBeInTheDocument();
   });
 });

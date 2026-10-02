@@ -7,8 +7,8 @@ export function CompletenessChecklist({ groupes }: { groupes: GroupeCompletude[]
   const total = totaux(groupes);
   return (
     <section aria-label="Liste de complétude" className="space-y-3">
-      <p className="text-sm text-brand-grey">
-        <span className="font-semibold text-brand-blue">
+      <p className="text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground">
           Indicateurs détectés : {total.found}/{total.expected}
         </span>{" "}
         — les valeurs ne sont pas affichées : elles seront relues par l’auditeur après la
@@ -21,11 +21,11 @@ export function CompletenessChecklist({ groupes }: { groupes: GroupeCompletude[]
           return (
             <li key={groupe.group} className="space-y-2 p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                <span className="font-medium text-brand-blue">{libelleGroupe(groupe.group)}</span>
+                <span className="font-medium text-foreground">{libelleGroupe(groupe.group)}</span>
                 <span className="tabular-nums">
                   {groupe.found} / {groupe.expected} trouvé(s)
                   {manquants > 0 ? (
-                    <span className="ml-2 text-brand-grey">· {manquants} manquant(s)</span>
+                    <span className="ml-2 text-muted-foreground">· {manquants} manquant(s)</span>
                   ) : null}
                 </span>
               </div>
@@ -37,7 +37,7 @@ export function CompletenessChecklist({ groupes }: { groupes: GroupeCompletude[]
                 aria-valuemax={groupe.expected}
                 aria-valuenow={groupe.found}
               >
-                <div className="h-full rounded-full bg-brand-green" style={{ width: `${part}%` }} />
+                <div className="h-full rounded-full bg-primary" style={{ width: `${part}%` }} />
               </div>
             </li>
           );

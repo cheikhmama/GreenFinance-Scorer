@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
-import { Input } from "@/shared/ui/input";
+import { FileDrop } from "@/shared/ui/file-drop";
 import { Label } from "@/shared/ui/label";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useAttachDraftFile, useDiscardDraft } from "../api";
@@ -60,7 +60,7 @@ export function DraftPanel({
       </CardHeader>
       <CardContent className="space-y-5">
         {etat === "ANALYSE" ? (
-          <p className="flex items-center gap-2 text-sm text-brand-blue" aria-live="polite">
+          <p className="flex items-center gap-2 text-sm text-foreground" aria-live="polite">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             Lecture de « {rapport.original_filename ?? "votre fichier"} » en cours — la liste de
             complétude s’affiche dès qu’elle est terminée.
@@ -148,21 +148,28 @@ function JoindreFichier({
   return (
     <form onSubmit={envoyer} className="space-y-2" noValidate>
       <Label htmlFor={id}>{libelle}</Label>
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <FileDrop
           id={id}
-          type="file"
+          className="min-w-0 flex-1"
           accept="application/pdf"
-          className="max-w-md"
+          hint="PDF du rapport, 50 Mo au maximum"
           aria-invalid={erreur !== null}
-          onChange={(event) => setFichier(event.target.files?.[0] ?? null)}
+          file={fichier ?? undefined}
+          onFile={(choisi) => setFichier(choisi ?? null)}
+          disabled={joindre.isPending}
         />
-        <Button type="submit" variant="outline" disabled={joindre.isPending}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="h-[66px] shrink-0"
+          disabled={joindre.isPending}
+        >
           <FileUp className="size-4" aria-hidden="true" />
           {joindre.isPending ? "Envoi…" : bouton}
         </Button>
       </div>
-      {erreur ? <p className="text-sm text-destructive">{erreur}</p> : null}
+      {erreur ? <p className="text-sm text-destructive dark:text-red-400">{erreur}</p> : null}
     </form>
   );
 }
