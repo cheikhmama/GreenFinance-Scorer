@@ -140,7 +140,7 @@ def _demande_non_aboutie(email: str) -> None:
         "Demande d'inscription — GreenFinance-Scorer",
         (
             "Nous n'avons pas pu enregistrer votre demande d'inscription : cette adresse e-mail, "
-            "cet ISIN ou ce LEI est déjà associé à la plateforme.\n\n"
+            "cet identifiant fiscal, cet ISIN ou ce LEI est déjà associé à la plateforme.\n\n"
             "Si vous avez déjà un compte, utilisez « Mot de passe oublié » sur la page de "
             "connexion. Sinon, contactez-nous via le formulaire de contact.\n"
         ),
