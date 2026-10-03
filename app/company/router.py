@@ -36,7 +36,7 @@ from app.company.registration import (
 )
 from app.company.schemas import (
     CompanyRegistrationRequest,
-    EntreprisePublic,
+    EntrepriseProfil,
     ImporterRapportParURLRequest,
     RegistrationEmailResend,
     RegistrationEmailVerification,
@@ -211,7 +211,7 @@ def _entreprise_id(current_user: User) -> uuid.UUID:
 
 @router.get(
     "/company/profil",
-    response_model=EntreprisePublic,
+    response_model=EntrepriseProfil,
     operation_id="getMyCompanyProfile",
     summary="Consulter la fiche de mon entreprise, telle que vue par les investisseurs",
 )

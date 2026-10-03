@@ -14,7 +14,7 @@ import type {
   BodyRegisterCompany,
   BodyReplyToRegistrationInfoRequest,
   BodySubmitCompanyReportCorrection,
-  EntreprisePublic,
+  EntrepriseProfil,
   GroupeCompletude,
   RapportESGDetail,
   RapportESGPublic,
@@ -119,7 +119,7 @@ export function useDiscardDraft(rapportId: string) {
 /** GET /company/profil — la fiche entreprise telle que vue par les investisseurs, en lecture
  * seule (l'édition reste réservée à l'Admin, voir ARCHITECTURE.md gouvernance Phase 0). */
 export function useMyCompanyProfile() {
-  return useQuery<EntreprisePublic, ApiError>({
+  return useQuery<EntrepriseProfil, ApiError>({
     queryKey: ["company", "profil"],
     queryFn: () => getMyCompanyProfile(),
   });
