@@ -981,6 +981,45 @@ export interface EntreprisePerimetrePublic {
   added_at: string;
 }
 
+/**
+ * Nature de l'identifiant fiscal d'une entreprise (tâche 5.10), déduite de son pays : NIF
+ * mauritanien, SIREN français, EIN américain, identifiant fiscal générique ailleurs.
+ */
+export type TaxIdType = typeof TaxIdType[keyof typeof TaxIdType];
+
+
+export const TaxIdType = {
+  NIF: 'NIF',
+  SIREN: 'SIREN',
+  EIN: 'EIN',
+  TAX_ID: 'TAX_ID',
+} as const;
+
+/**
+ * Fiche de l'entreprise connectée (GET /company/profil) : EntreprisePublic plus son
+ * identifiant fiscal (tâche 5.10). Réservé à l'entreprise elle-même — jamais dans
+ * EntreprisePublic, que les vues Investisseur étendent.
+ */
+export interface EntrepriseProfil {
+  id: string;
+  name: string;
+  sector: string;
+  country: string;
+  logo: string | null;
+  description: string | null;
+  website: string | null;
+  active: boolean;
+  status: RegistrationStatus;
+  minimum_investment_amount: number | null;
+  minimum_investment_currency: Currency | null;
+  published_at: string | null;
+  isin?: string | null;
+  lei?: string | null;
+  ticker?: string | null;
+  tax_id?: string | null;
+  tax_id_type?: TaxIdType | null;
+}
+
 export interface EntreprisePublic {
   id: string;
   name: string;
@@ -1183,20 +1222,6 @@ export interface KycCheck {
   detail: string;
   source: string;
 }
-
-/**
- * Nature de l'identifiant fiscal d'une entreprise (tâche 5.10), déduite de son pays : NIF
- * mauritanien, SIREN français, EIN américain, identifiant fiscal générique ailleurs.
- */
-export type TaxIdType = typeof TaxIdType[keyof typeof TaxIdType];
-
-
-export const TaxIdType = {
-  NIF: 'NIF',
-  SIREN: 'SIREN',
-  EIN: 'EIN',
-  TAX_ID: 'TAX_ID',
-} as const;
 
 /**
  * GET /admin/companies/{id}/kyc — de quoi décider d'une inscription dans une seule fenêtre :

@@ -91,6 +91,26 @@ def test_consulter_mon_profil_retourne_la_fiche_entreprise(session) -> None:
     assert body["country"] == "France"
 
 
+def test_mon_profil_montre_mon_identifiant_fiscal_mais_pas_la_vue_investisseur(session) -> None:
+    from app.company.models import Company as Entreprise
+    from app.core.enums import TaxIdType
+    from app.investor.schemas import EntreprisePublieePublic
+
+    user = _create_entreprise_utilisateur(session, password="s3cret-pass")
+    entreprise = session.exec(
+        select(Entreprise).where(Entreprise.owner_user_id == user.id)
+    ).one()
+    entreprise.tax_id, entreprise.tax_id_type = "12345678", TaxIdType.NIF
+    session.add(entreprise)
+    session.commit()
+
+    body = _login(user.email, "s3cret-pass").get("/api/v1/company/profil").json()
+
+    assert (body["tax_id"], body["tax_id_type"]) == ("12345678", "NIF")
+    # L'identifiant fiscal reste propre à l'entreprise : la fiche Investisseur ne le porte pas.
+    assert "tax_id" not in EntreprisePublieePublic.model_fields
+
+
 def test_consulter_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(session) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass", avec_entreprise=False)
     authed_client = _login(user.email, "s3cret-pass")

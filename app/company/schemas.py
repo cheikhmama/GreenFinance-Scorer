@@ -100,6 +100,26 @@ class EntreprisePublic(CompanyContractMixin):
     ticker: str | None = None
 
 
+class EntrepriseProfil(EntreprisePublic):
+    """Fiche de l'entreprise connectée (GET /company/profil) : EntreprisePublic plus son
+    identifiant fiscal (tâche 5.10). Réservé à l'entreprise elle-même — jamais dans
+    EntreprisePublic, que les vues Investisseur étendent."""
+
+    tax_id: str | None = None
+    tax_id_type: TaxIdType | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _depuis_company(cls, data: Any) -> Any:
+        if isinstance(data, Company):
+            return {
+                **company_vers_contrat(data),
+                "tax_id": data.tax_id,
+                "tax_id_type": data.tax_id_type,
+            }
+        return data
+
+
 class VerificationLei(BaseModel):
     """GET /company/lei-verification (tâche 5.9) : le LEI déclaré, confirmé ou non par la GLEIF.
     `result` vaut PASSED seulement si l'enregistrement est actif ET le nom légal correspond ;

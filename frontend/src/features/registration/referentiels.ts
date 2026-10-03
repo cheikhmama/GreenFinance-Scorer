@@ -13,7 +13,16 @@ const CODES_ISO =
   );
 
 const nomsDePays = new Intl.DisplayNames(["fr"], { type: "region" });
-const nomDuPays = (code: string) => nomsDePays.of(code) ?? code;
+/** Nom français d'un pays à partir de son code ISO ; une valeur ancienne déjà en toutes lettres
+ * (« France ») est rendue telle quelle. */
+export function nomDuPays(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code)) return code;
+  try {
+    return nomsDePays.of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 export const PAYS: { code: string; nom: string }[] = CODES_ISO.map((code) => ({
   code,

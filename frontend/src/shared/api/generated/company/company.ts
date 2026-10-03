@@ -9,7 +9,7 @@ import type {
   BodyReplyToRegistrationInfoRequest,
   BodySubmitCompanyReport,
   BodySubmitCompanyReportCorrection,
-  EntreprisePublic,
+  EntrepriseProfil,
   ImporterRapportParURLRequest,
   RapportESGDetail,
   RapportESGPublic,
@@ -192,9 +192,9 @@ export const getGetMyCompanyProfileUrl = () => {
 /**
  * @summary Consulter la fiche de mon entreprise, telle que vue par les investisseurs
  */
-export const getMyCompanyProfile = async ( options?: RequestInit): Promise<EntreprisePublic> => {
+export const getMyCompanyProfile = async ( options?: RequestInit): Promise<EntrepriseProfil> => {
 
-  return apiFetch<EntreprisePublic>(getGetMyCompanyProfileUrl(),
+  return apiFetch<EntrepriseProfil>(getGetMyCompanyProfileUrl(),
   {
     ...options,
     method: 'GET'
