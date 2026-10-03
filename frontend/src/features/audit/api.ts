@@ -11,11 +11,12 @@ import {
 } from "@/shared/api/generated/audit/audit";
 import type {
   AvisAuditAdmin,
+  AvisHistorique,
+  DossierAuditeur,
+  DossierAuditeurDetail,
   MetricReviewEntry,
   MetricReviewRequest,
   PreScore,
-  RapportESGDetail,
-  RapportESGPublic,
   SoumettreAvisRequest,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
@@ -28,7 +29,7 @@ const preScoreQueryKey = (rapportId: string) =>
 
 /** GET /audit/rapports — dossiers affectés, en attente d'avis. */
 export function useAssignedReports() {
-  return useQuery<RapportESGPublic[], ApiError>({
+  return useQuery<DossierAuditeur[], ApiError>({
     queryKey: DOSSIERS_QUERY_KEY,
     queryFn: () => listAssignedReports(),
   });
@@ -36,7 +37,7 @@ export function useAssignedReports() {
 
 /** GET /audit/rapports/{id} — reste accessible après avis rendu (pas de restriction de statut). */
 export function useAssignedReport(rapportId: string) {
-  return useQuery<RapportESGDetail, ApiError>({
+  return useQuery<DossierAuditeurDetail, ApiError>({
     queryKey: dossierQueryKey(rapportId),
     queryFn: () => getAssignedReport(rapportId),
     enabled: rapportId.length > 0,
@@ -45,7 +46,7 @@ export function useAssignedReport(rapportId: string) {
 
 /** GET /audit/historique — tous les avis déjà rendus par l'auditeur connecté. */
 export function useAuditHistory() {
-  return useQuery<AvisAuditAdmin[], ApiError>({
+  return useQuery<AvisHistorique[], ApiError>({
     queryKey: HISTORIQUE_QUERY_KEY,
     queryFn: () => listMyAuditOpinions(),
   });

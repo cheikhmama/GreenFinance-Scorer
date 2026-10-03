@@ -3,6 +3,7 @@ import type { TrancheScorePublic } from "@/shared/api/generated/greenFinanceScor
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { usePerformanceESG } from "../api";
+import { uneDecimale } from "@/shared/format/etatPosition";
 
 const CARTES = [
   {
@@ -66,7 +67,7 @@ export function EsgPerformanceSection() {
                 <CardContent className="px-5">
                   <p className="text-sm font-medium text-muted-foreground">{carte.title}</p>
                   <p className={`mt-2 text-3xl font-semibold tabular-nums ${carte.tone}`}>
-                    {valeur !== null ? valeur.toFixed(1) : "—"}
+                    {valeur !== null ? uneDecimale(valeur) : "—"}
                     <span className="ml-1 text-base font-normal text-muted-foreground">/100</span>
                   </p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">{carte.definition}</p>

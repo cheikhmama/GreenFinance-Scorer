@@ -7,6 +7,7 @@ import type {
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { formatScore, variantScore } from "@/shared/format/etatPosition";
+import { libelleIndicateur, libelleScope } from "@/shared/format/indicateurs";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -219,7 +220,7 @@ function construireLignesIndicateurs(
   }
   return Array.from(parCode.entries()).map(([code, { pillar, parEntreprise }]) => ({
     categorie: libellePilier(pillar),
-    libelle: code,
+    libelle: libelleIndicateur(code),
     valeurs: new Map(
       entreprises.map((entreprise) => {
         const indicateur = parEntreprise.get(entreprise.id);
@@ -247,7 +248,7 @@ function construireLignesCarbone(entreprises: EntrepriseDetailInvestisseur[]): L
   for (const entreprise of entreprises) {
     for (const donnee of entreprise.carbon_data) {
       const cle = `${donnee.scope}-${donnee.ghg_category ?? ""}`;
-      const libelle = `Scope ${donnee.scope}${donnee.ghg_category ? ` — ${donnee.ghg_category}` : ""}`;
+      const libelle = libelleScope(donnee.scope, donnee.ghg_category);
       if (!parCle.has(cle)) parCle.set(cle, { libelle, parEntreprise: new Map() });
       parCle.get(cle)?.parEntreprise.set(entreprise.id, donnee);
     }

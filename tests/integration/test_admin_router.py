@@ -504,6 +504,9 @@ def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
     assert str(qualifiant.id) in ids
     assert str(non_extrait.id) not in ids
     assert str(en_cours.id) not in ids
+    # Chaque ligne nomme l'entreprise (sinon seuls le type et l'année distinguent deux rapports).
+    ligne = next(item for item in response.json() if item["id"] == str(qualifiant.id))
+    assert ligne["company_name"] == entreprise.name
 
 
 def test_affecter_happy_path(session) -> None:

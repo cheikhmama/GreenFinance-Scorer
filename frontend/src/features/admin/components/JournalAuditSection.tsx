@@ -31,6 +31,9 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
     });
 
   const entrees = data?.pages.flatMap((page) => page.items) ?? [];
+  // Seuls les changements (rôle, état du compte, e-mail) ont un avant/après : une colonne
+  // toujours vide n'est affichée que si au moins une entrée chargée en a un.
+  const avecDetail = entrees.some((entree) => entree.old_value && entree.new_value);
 
   return (
     <Card>
@@ -93,7 +96,7 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
                 <TableHead>Par</TableHead>
                 <TableHead>Ressource</TableHead>
                 <TableHead>Résultat</TableHead>
-                <TableHead>Détail</TableHead>
+                {avecDetail ? <TableHead>Détail</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,11 +117,13 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
                   </TableCell>
                   <TableCell>{libelleTypeRessource(entree.resource_type)}</TableCell>
                   <TableCell>{libelleResultatJournal(entree.result)}</TableCell>
-                  <TableCell className="text-brand-grey">
-                    {entree.old_value && entree.new_value
-                      ? `${libelleValeurJournal(entree.old_value)} → ${libelleValeurJournal(entree.new_value)}`
-                      : "—"}
-                  </TableCell>
+                  {avecDetail ? (
+                    <TableCell className="text-brand-grey">
+                      {entree.old_value && entree.new_value
+                        ? `${libelleValeurJournal(entree.old_value)} → ${libelleValeurJournal(entree.new_value)}`
+                        : "—"}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>

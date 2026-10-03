@@ -9,6 +9,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { Select } from "@/shared/ui/select";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAllReports } from "../api";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 const STATUTS: ReportStatus[] = [
   "EXTRACTING",
@@ -81,7 +82,8 @@ export function AllReportsSection() {
                     {libelleStatutRapport(rapport.status)}
                   </Badge>
                   <span className="text-brand-blue">
-                    {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                    {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                   </span>
                 </div>
                 <Button asChild size="sm" variant="outline">

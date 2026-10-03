@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useOverdueReports } from "../api";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 /** Rapports affectés à un auditeur depuis plus longtemps que le délai attendu, sans décision
  * rendue — voir app/admin/review_queue.py::lister_rapports_en_retard. Affichée dans l'onglet
@@ -27,7 +28,8 @@ export function OverdueAuditsSection() {
             {rapports.map((rapport) => (
               <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
                 <p className="text-sm font-medium text-brand-blue">
-                  {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                  {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                 </p>
                 <Button asChild size="sm" variant="outline">
                   <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>

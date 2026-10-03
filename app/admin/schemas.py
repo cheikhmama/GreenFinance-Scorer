@@ -24,6 +24,7 @@ from app.core.enums import (
     Role,
     TaxIdType,
 )
+from app.ingestion.schemas import RapportESGPublic
 
 
 class AffecterAuditeurRequest(BaseModel):
@@ -463,6 +464,13 @@ class KycCheck(BaseModel):
     result: KycCheckResult
     detail: str
     source: str
+
+
+class RapportAdminListe(RapportESGPublic):
+    """Ligne d'une file de rapports de l'Administrateur, avec l'entreprise : sans son nom, deux
+    rapports ne se distinguaient que par leur type et leur année."""
+
+    company_name: str = ""
 
 
 class PendingRegistration(BaseModel):

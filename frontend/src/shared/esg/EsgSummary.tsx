@@ -3,6 +3,7 @@ import type {
   ScoreEntreprisePublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
+import { formatValeur } from "@/shared/format/indicateurs";
 
 const TEINTES_PILIER: Record<"global" | "E" | "S" | "G", string> = {
   global: "bg-brand-green",
@@ -68,7 +69,7 @@ export function ScoreSummary({ score }: { score: ScoreEntreprisePublic }) {
 }
 
 function formatTonnes(valeur: number | null): string {
-  return valeur === null ? "—" : `${valeur.toLocaleString("fr-FR")} tCO2e`;
+  return valeur === null ? "—" : formatValeur(valeur, "tCO2e");
 }
 
 export function CarbonSummary({ carbone }: { carbone: DonneesCarboneAgregees }) {
@@ -79,12 +80,12 @@ export function CarbonSummary({ carbone }: { carbone: DonneesCarboneAgregees }) 
         <dd className="mt-0.5 font-medium">{formatTonnes(carbone.scope_1)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Scope 2 (market)</dt>
+        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Scope 2 (marché)</dt>
         <dd className="mt-0.5 font-medium">{formatTonnes(carbone.scope_2_market_based)}</dd>
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-          Scope 2 (location)
+          Scope 2 (localisation)
         </dt>
         <dd className="mt-0.5 font-medium">{formatTonnes(carbone.scope_2_location_based)}</dd>
       </div>

@@ -29,6 +29,7 @@ from app.admin.journal import avec_acteurs, lister_journal_audit
 from app.admin.kyc import rapport_kyc
 from app.admin.onboarding import decider_inscription, lister_inscriptions_a_examiner
 from app.admin.review_queue import (
+    avec_entreprises,
     consulter_entreprise_admin,
     demander_correction,
     lister_avis,
@@ -76,6 +77,7 @@ from app.admin.schemas import (
     PerformanceESGAdmin,
     PortefeuilleAdmin,
     ProjetAdmin,
+    RapportAdminListe,
     ReportFinancials,
     ReportFinancialsRequest,
     ScoreRecalculeAdmin,
@@ -275,7 +277,7 @@ def reactiver_utilisateur_route(
 
 @router.get(
     "/admin/rapports",
-    response_model=Page[RapportESGPublic],
+    response_model=Page[RapportAdminListe],
     operation_id="listAllReports",
     summary="Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut",
 )
@@ -285,10 +287,10 @@ def lister_tous_les_rapports_route(
     page_size: int = Query(3, ge=1, le=50),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Page[RapportESGPublic]:
+) -> Page[RapportAdminListe]:
     items, total = lister_tous_les_rapports(session, statut=statut, page=page, page_size=page_size)
-    return Page[RapportESGPublic](
-        items=items,
+    return Page[RapportAdminListe](
+        items=avec_entreprises(session, items),
         page=page,
         page_size=page_size,
         total=total,
@@ -298,41 +300,41 @@ def lister_tous_les_rapports_route(
 
 @router.get(
     "/admin/rapports/en-retard",
-    response_model=list[RapportESGPublic],
+    response_model=list[RapportAdminListe],
     operation_id="listOverdueReports",
     summary="Lister les rapports affectés à un auditeur au-delà du délai attendu, sans décision rendue",
 )
 def lister_rapports_en_retard_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return lister_rapports_en_retard(session)
+) -> list[RapportAdminListe]:
+    return avec_entreprises(session, lister_rapports_en_retard(session))
 
 
 @router.get(
     "/admin/rapports/a-affecter",
-    response_model=list[RapportESGPublic],
+    response_model=list[RapportAdminListe],
     operation_id="listReportsToAssign",
     summary="Lister les rapports extraits en attente d'affectation",
 )
 def lister_rapports_a_affecter_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return lister_rapports_a_affecter(session)
+) -> list[RapportAdminListe]:
+    return avec_entreprises(session, lister_rapports_a_affecter(session))
 
 
 @router.get(
     "/admin/rapports/echec-extraction",
-    response_model=list[RapportESGPublic],
+    response_model=list[RapportAdminListe],
     operation_id="listFailedExtractionReports",
     summary="Lister les rapports dont l'extraction automatique a échoué",
 )
 def lister_rapports_echec_extraction_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return lister_rapports_echec_extraction(session)
+) -> list[RapportAdminListe]:
+    return avec_entreprises(session, lister_rapports_echec_extraction(session))
 
 
 @router.post(
@@ -402,28 +404,28 @@ def lister_charge_auditeurs_route(
 
 @router.get(
     "/admin/rapports/en-validation",
-    response_model=list[RapportESGPublic],
+    response_model=list[RapportAdminListe],
     operation_id="listReportsInValidation",
     summary="Lister les rapports en attente de décision, avis d'audit déjà rendu",
 )
 def lister_rapports_en_validation_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return lister_rapports_en_validation(session)
+) -> list[RapportAdminListe]:
+    return avec_entreprises(session, lister_rapports_en_validation(session))
 
 
 @router.get(
     "/admin/rapports/orphelins",
-    response_model=list[RapportESGPublic],
+    response_model=list[RapportAdminListe],
     operation_id="listOrphanReportsInValidation",
     summary="Lister les rapports en attente de décision mais sans aucun avis d'audit (état incohérent)",
 )
 def lister_rapports_orphelins_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return lister_rapports_orphelins_en_validation(session)
+) -> list[RapportAdminListe]:
+    return avec_entreprises(session, lister_rapports_orphelins_en_validation(session))
 
 
 @router.get(

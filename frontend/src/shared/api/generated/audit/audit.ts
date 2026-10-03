@@ -6,11 +6,12 @@
  */
 import type {
   AvisAuditAdmin,
+  AvisHistorique,
+  DossierAuditeur,
+  DossierAuditeurDetail,
   MetricReviewEntry,
   MetricReviewRequest,
   PreScore,
-  RapportESGDetail,
-  RapportESGPublic,
   SoumettreAvisRequest
 } from '../greenFinanceScorerAPI.schemas';
 
@@ -27,9 +28,9 @@ export const getListAssignedReportsUrl = () => {
 /**
  * @summary Lister les dossiers affectés à l'auditeur, en attente d'avis
  */
-export const listAssignedReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listAssignedReports = async ( options?: RequestInit): Promise<DossierAuditeur[]> => {
 
-  return apiFetch<RapportESGPublic[]>(getListAssignedReportsUrl(),
+  return apiFetch<DossierAuditeur[]>(getListAssignedReportsUrl(),
   {
     ...options,
     method: 'GET'
@@ -50,9 +51,9 @@ export const getGetAssignedReportUrl = (rapportId: string,) => {
 /**
  * @summary Consulter le détail d'un dossier affecté à l'auditeur
  */
-export const getAssignedReport = async (rapportId: string, options?: RequestInit): Promise<RapportESGDetail> => {
+export const getAssignedReport = async (rapportId: string, options?: RequestInit): Promise<DossierAuditeurDetail> => {
 
-  return apiFetch<RapportESGDetail>(getGetAssignedReportUrl(rapportId),
+  return apiFetch<DossierAuditeurDetail>(getGetAssignedReportUrl(rapportId),
   {
     ...options,
     method: 'GET'
@@ -98,9 +99,9 @@ export const getListMyAuditOpinionsUrl = () => {
 /**
  * @summary Lister l'historique des avis déjà rendus par l'auditeur
  */
-export const listMyAuditOpinions = async ( options?: RequestInit): Promise<AvisAuditAdmin[]> => {
+export const listMyAuditOpinions = async ( options?: RequestInit): Promise<AvisHistorique[]> => {
 
-  return apiFetch<AvisAuditAdmin[]>(getListMyAuditOpinionsUrl(),
+  return apiFetch<AvisHistorique[]>(getListMyAuditOpinionsUrl(),
   {
     ...options,
     method: 'GET'

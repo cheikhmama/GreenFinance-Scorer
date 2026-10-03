@@ -82,12 +82,13 @@ import type {
   PageJournalAuditPublic,
   PagePortefeuilleAdmin,
   PageProjetAdmin,
-  PageRapportESGPublic,
+  PageRapportAdminListe,
   PageUtilisateurPublic,
   PendingRegistration,
   PerformanceESGAdmin,
   ProjectStatus,
   RapportESGDetail,
+  RapportAdminListe,
   RapportESGPublic,
   ReportFinancials,
   ReportFinancialsRequest,
@@ -100,9 +101,10 @@ import type {
   UtilisateurPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-// Chargement initial de 3 éléments, puis +3 par clic sur "Voir plus", jusqu'à épuisement réel de
-// la liste côté serveur (voir UsersSection / PublishableCompaniesSection).
-export const TAILLE_PAGE_ADMIN = 3;
+// Chargement initial de 10 éléments, puis +10 par clic sur "Voir plus", jusqu'à épuisement réel
+// de la liste côté serveur (voir UsersSection / PublishableCompaniesSection). 3 obligeait à
+// cliquer sans cesse pour retrouver une entreprise (audit de l'interface, tâche 5.12).
+export const TAILLE_PAGE_ADMIN = 10;
 
 const A_AFFECTER_KEY = ["admin", "rapports", "a-affecter"] as const;
 const EN_VALIDATION_KEY = ["admin", "rapports", "en-validation"] as const;
@@ -153,14 +155,14 @@ export function useAdminDashboard() {
 }
 
 export function useReportsToAssign() {
-  return useQuery<RapportESGPublic[], ApiError>({
+  return useQuery<RapportAdminListe[], ApiError>({
     queryKey: A_AFFECTER_KEY,
     queryFn: () => listReportsToAssign(),
   });
 }
 
 export function useReportsInValidation() {
-  return useQuery<RapportESGPublic[], ApiError>({
+  return useQuery<RapportAdminListe[], ApiError>({
     queryKey: EN_VALIDATION_KEY,
     queryFn: () => listReportsInValidation(),
   });
@@ -169,7 +171,7 @@ export function useReportsInValidation() {
 /** Rapports dont l'extraction automatique a échoué (extraction_erreur renseigné) — invisibles de
  * la file d'affectation normale, voir app/admin/review_queue.py::lister_rapports_echec_extraction. */
 export function useFailedExtractionReports() {
-  return useQuery<RapportESGPublic[], ApiError>({
+  return useQuery<RapportAdminListe[], ApiError>({
     queryKey: ECHEC_EXTRACTION_KEY,
     queryFn: () => listFailedExtractionReports(),
   });
@@ -178,7 +180,7 @@ export function useFailedExtractionReports() {
 /** Rapports PENDING_DECISION sans aucun avis d'audit — état incohérent normalement inatteignable via
  * l'API seule, gardé en visibilité de défense (voir lister_rapports_orphelins_en_validation). */
 export function useOrphanReportsInValidation() {
-  return useQuery<RapportESGPublic[], ApiError>({
+  return useQuery<RapportAdminListe[], ApiError>({
     queryKey: ORPHELINS_KEY,
     queryFn: () => listOrphanReportsInValidation(),
   });
@@ -201,7 +203,7 @@ export function useRetryExtraction() {
 /** Rapports affectés à un auditeur au-delà du délai attendu (settings.sla_audit_jours), sans
  * décision rendue — voir app/admin/review_queue.py::lister_rapports_en_retard. */
 export function useOverdueReports() {
-  return useQuery<RapportESGPublic[], ApiError>({
+  return useQuery<RapportAdminListe[], ApiError>({
     queryKey: EN_RETARD_KEY,
     queryFn: () => listOverdueReports(),
   });
@@ -211,7 +213,7 @@ export function useOverdueReports() {
  * (voir app/admin/review_queue.py::lister_tous_les_rapports) — sert le suivi transverse depuis le
  * tableau de bord (ex. "rapports validés"), distinct des files scopées à une étape du workflow. */
 export function useAllReports(statut?: ReportStatus) {
-  return useInfiniteQuery<PageRapportESGPublic, ApiError>({
+  return useInfiniteQuery<PageRapportAdminListe, ApiError>({
     queryKey: [...TOUS_RAPPORTS_KEY, statut ?? "tous"],
     queryFn: ({ pageParam }) =>
       listAllReports({ statut, page: pageParam as number, page_size: TAILLE_PAGE_ADMIN }),

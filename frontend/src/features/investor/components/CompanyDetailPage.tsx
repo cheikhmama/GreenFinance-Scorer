@@ -3,6 +3,7 @@ import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
 import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
 import { libellePays } from "@/shared/format/pays";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { useCompanyDetail } from "../api";
@@ -16,6 +17,7 @@ export function CompanyDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/investor/entreprises">Entreprises</BackLink>
       <PageHeader
         title={entreprise.name}
         description={`${entreprise.sector} — ${libellePays(entreprise.country)}. ${entreprise.description ?? "Fiche entreprise publiée."}`}
@@ -43,7 +45,7 @@ export function CompanyDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Émissions Scope 1/2/3</CardTitle>
+          <CardTitle>Émissions (Scopes 1, 2 et 3)</CardTitle>
         </CardHeader>
         <CardContent>
           <CarbonSummary carbone={entreprise.carbon} />

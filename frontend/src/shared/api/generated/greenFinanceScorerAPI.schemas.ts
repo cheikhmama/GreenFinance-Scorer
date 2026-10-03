@@ -353,6 +353,32 @@ export interface AvisAuditAdmin {
   auditor_id: string;
 }
 
+export type ReportType = typeof ReportType[keyof typeof ReportType];
+
+
+export const ReportType = {
+  RAPPORT_ANNUEL: 'RAPPORT_ANNUEL',
+  RAPPORT_ESG: 'RAPPORT_ESG',
+  RAPPORT_CLIMAT: 'RAPPORT_CLIMAT',
+} as const;
+
+/**
+ * Un avis de l'historique de l'auditeur, avec le dossier concerné : sans lui, cinq avis
+ * « Favorable avec réserves » se lisaient à l'identique.
+ */
+export interface AvisHistorique {
+  id: string;
+  report_id: string;
+  decision: AuditDecision;
+  comment: string | null;
+  submitted_at: string;
+  auditor_id: string;
+  company_name: string;
+  report_type: ReportType;
+  fiscal_year: number | null;
+  report_version: number;
+}
+
 /**
  * Ensemble de référence d'une explication de score (tâche 3.2) : les pairs du même secteur,
  * ou toutes les entreprises publiées.
@@ -418,15 +444,6 @@ export interface BodyReplyToRegistrationInfoRequest {
   token: string;
   message?: string | null;
 }
-
-export type ReportType = typeof ReportType[keyof typeof ReportType];
-
-
-export const ReportType = {
-  RAPPORT_ANNUEL: 'RAPPORT_ANNUEL',
-  RAPPORT_ESG: 'RAPPORT_ESG',
-  RAPPORT_CLIMAT: 'RAPPORT_CLIMAT',
-} as const;
 
 export interface BodySubmitCompanyReport {
   fichier: Blob;
@@ -834,6 +851,14 @@ export interface DonneesCarboneAgregees {
   scope_3: number | null;
 }
 
+export type SubmissionChannel = typeof SubmissionChannel[keyof typeof SubmissionChannel];
+
+
+export const SubmissionChannel = {
+  AUTOMATIQUE: 'AUTOMATIQUE',
+  ENTREPRISE: 'ENTREPRISE',
+} as const;
+
 /**
  * Cycle de vie d'un rapport (docs/WORKFLOWS.md §1.2), extraction comprise (tâche 5.1 : un
  * seul statut, l'ancien ExtractionStatus est fondu ici).
@@ -855,6 +880,110 @@ export const ReportStatus = {
   VALIDATED: 'VALIDATED',
   REJECTED: 'REJECTED',
 } as const;
+
+/**
+ * Dossier affecté, avec l'entreprise concernée : sans son nom, la liste de l'auditeur ne
+ * distinguait deux dossiers que par leur type et leur année.
+ */
+export interface DossierAuditeur {
+  id: string;
+  company_id: string;
+  type: ReportType;
+  channel: SubmissionChannel;
+  created_at: string;
+  submitted_at: string | null;
+  status: ReportStatus;
+  source_file: string | null;
+  original_filename: string | null;
+  fiscal_year: number | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
+  extraction_attempts: number;
+  version: number;
+  previous_report_id: string | null;
+  checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
+  company_name: string;
+  company_sector: string;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
+}
+
+export type Pillar = typeof Pillar[keyof typeof Pillar];
+
+
+export const Pillar = {
+  ENVIRONNEMENT: 'ENVIRONNEMENT',
+  SOCIAL: 'SOCIAL',
+  GOUVERNANCE: 'GOUVERNANCE',
+} as const;
+
+export interface IndicateurESGDetail {
+  id: string;
+  pillar: Pillar;
+  metric_code: string;
+  value: number;
+  unit: string;
+  method: DataMethod;
+  proof: PreuveDocumentairePublic;
+  raw_value: string | null;
+  section: string | null;
+  proof_text: string | null;
+  value_year: number | null;
+  confidence: ConfidenceLevel | null;
+  extraction_run_id?: string | null;
+  proof_boxes?: ProofBox[];
+  review_status?: MetricReviewStatus | null;
+  audited_value?: number | null;
+}
+
+/**
+ * Le Score officiel d'un rapport (app/scoring/engine.py::score_officiel), jamais un score
+ * personnalisé ni un score auto-déclaré par l'entreprise -- ces deux-là restent ailleurs (voir
+ * app/ingestion/schemas.py::RapportESGDetail pour la distinction explicite).
+ */
+export interface ScoreESGPublic {
+  global_score: number;
+  environmental_score: number | null;
+  social_score: number | null;
+  governance_score: number | null;
+  coverage_rate: number | null;
+  config_version: number;
+}
+
+export interface DossierAuditeurDetail {
+  id: string;
+  company_id: string;
+  type: ReportType;
+  channel: SubmissionChannel;
+  created_at: string;
+  submitted_at: string | null;
+  status: ReportStatus;
+  source_file: string | null;
+  original_filename: string | null;
+  fiscal_year: number | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
+  extraction_attempts: number;
+  version: number;
+  previous_report_id: string | null;
+  checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
+  metrics: IndicateurESGDetail[];
+  carbon_data: DonneeCarboneDetail[];
+  declared_global_score: number | null;
+  declared_global_score_proof: PreuveDocumentairePublic | null;
+  official_score?: ScoreESGPublic | null;
+  company_name: string;
+  company_sector: string;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
+  readonly coverage: CouvertureResume;
+}
 
 /**
  * Vue Administrateur d'une entreprise, quel que soit son statut — contrairement à
@@ -913,34 +1042,6 @@ export interface ScoreEntreprisePublic {
   governance_score: number | null;
   coverage_rate?: number | null;
   config_version: number | null;
-}
-
-export type Pillar = typeof Pillar[keyof typeof Pillar];
-
-
-export const Pillar = {
-  ENVIRONNEMENT: 'ENVIRONNEMENT',
-  SOCIAL: 'SOCIAL',
-  GOUVERNANCE: 'GOUVERNANCE',
-} as const;
-
-export interface IndicateurESGDetail {
-  id: string;
-  pillar: Pillar;
-  metric_code: string;
-  value: number;
-  unit: string;
-  method: DataMethod;
-  proof: PreuveDocumentairePublic;
-  raw_value: string | null;
-  section: string | null;
-  proof_text: string | null;
-  value_year: number | null;
-  confidence: ConfidenceLevel | null;
-  extraction_run_id?: string | null;
-  proof_boxes?: ProofBox[];
-  review_status?: MetricReviewStatus | null;
-  audited_value?: number | null;
 }
 
 /**
@@ -1501,15 +1602,11 @@ export interface PageProjetAdmin {
   pages: number;
 }
 
-export type SubmissionChannel = typeof SubmissionChannel[keyof typeof SubmissionChannel];
-
-
-export const SubmissionChannel = {
-  AUTOMATIQUE: 'AUTOMATIQUE',
-  ENTREPRISE: 'ENTREPRISE',
-} as const;
-
-export interface RapportESGPublic {
+/**
+ * Ligne d'une file de rapports de l'Administrateur, avec l'entreprise : sans son nom, deux
+ * rapports ne se distinguaient que par leur type et leur année.
+ */
+export interface RapportAdminListe {
   id: string;
   company_id: string;
   type: ReportType;
@@ -1529,12 +1626,13 @@ export interface RapportESGPublic {
   official_global_score?: number | null;
   coverage_rate?: number | null;
   config_hash?: string | null;
+  company_name?: string;
   /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
   readonly synthesis_available: boolean;
 }
 
-export interface PageRapportESGPublic {
-  items: RapportESGPublic[];
+export interface PageRapportAdminListe {
+  items: RapportAdminListe[];
   page: number;
   page_size: number;
   total: number;
@@ -1782,20 +1880,6 @@ export interface ProjetPublic {
 }
 
 /**
- * Le Score officiel d'un rapport (app/scoring/engine.py::score_officiel), jamais un score
- * personnalisé ni un score auto-déclaré par l'entreprise -- ces deux-là restent ailleurs (voir
- * app/ingestion/schemas.py::RapportESGDetail pour la distinction explicite).
- */
-export interface ScoreESGPublic {
-  global_score: number;
-  environmental_score: number | null;
-  social_score: number | null;
-  governance_score: number | null;
-  coverage_rate: number | null;
-  config_version: number;
-}
-
-/**
  * Étend RapportESGPublic avec les données extraites. Ne contient JAMAIS l'avis de l'auditeur
  * (app/audit/schemas.py::AuditOpinion*) — l'auditeur_id ne doit jamais pouvoir fuiter vers une
  * réponse Entreprise par accident de composition de schéma, pas seulement par discipline.
@@ -1828,6 +1912,30 @@ export interface RapportESGDetail {
   /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
   readonly synthesis_available: boolean;
   readonly coverage: CouvertureResume;
+}
+
+export interface RapportESGPublic {
+  id: string;
+  company_id: string;
+  type: ReportType;
+  channel: SubmissionChannel;
+  created_at: string;
+  submitted_at: string | null;
+  status: ReportStatus;
+  source_file: string | null;
+  original_filename: string | null;
+  fiscal_year: number | null;
+  extraction_finished_at: string | null;
+  extraction_error: string | null;
+  extraction_attempts: number;
+  version: number;
+  previous_report_id: string | null;
+  checksum_sha256: string | null;
+  official_global_score?: number | null;
+  coverage_rate?: number | null;
+  config_hash?: string | null;
+  /** Le PDF de synthèse peut être téléchargé (tâche 5.9). */
+  readonly synthesis_available: boolean;
 }
 
 export interface RattachementPublic {

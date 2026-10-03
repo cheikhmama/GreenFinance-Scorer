@@ -16,6 +16,7 @@ import {
   variantEtatPosition,
 } from "@/shared/format/etatPosition";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -83,6 +84,7 @@ export function PortfolioDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/investor/portefeuilles">Portefeuilles</BackLink>
       <PageHeader
         title={portefeuille.name}
         description={`Créé le ${new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}.`}

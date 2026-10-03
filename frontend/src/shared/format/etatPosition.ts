@@ -27,8 +27,13 @@ export function variantEtatPosition(etat: EtatPosition) {
 
 /** Formatte un pourcentage 0-100 (score, couverture) avec une décimale, jamais plus — cohérence
  * d'affichage entre les espaces Investisseur/Chercheur/Institution. */
+/** « 66,7 » : virgule décimale française, une décimale (« 70,0 » reste « 70,0 »). */
+export function uneDecimale(valeur: number): string {
+  return valeur.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 export function formatScore(valeur: number | null): string {
-  return valeur === null ? "—" : `${valeur.toFixed(1)}/100`;
+  return valeur === null ? "—" : `${uneDecimale(valeur)}/100`;
 }
 
 /** Seuils d'appréciation d'un score ESG (0-100) pour un badge visuellement remarquable —

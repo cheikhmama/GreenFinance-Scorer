@@ -85,6 +85,10 @@ def test_lister_mes_dossiers_ne_montre_que_mes_rapports_affectes(session) -> Non
     ids = [item["id"] for item in response.json()]
     assert str(mon_rapport.id) in ids
     assert len(ids) == 1
+    # L'entreprise est nommée : sans elle, deux dossiers ne se distinguaient que par type et année.
+    entreprise = session.get(Company, mon_rapport.company_id)
+    [dossier] = response.json()
+    assert (dossier["company_name"], dossier["company_sector"]) == (entreprise.name, entreprise.sector)
 
 
 def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
@@ -279,6 +283,15 @@ def test_historique_liste_mes_avis_les_plus_recents_dabord(session) -> None:
     assert str(rapport_dautrui.id) not in rapport_ids
     # Le plus récent (rapport_b, soumis en second) apparaît avant rapport_a.
     assert rapport_ids.index(str(rapport_b.id)) < rapport_ids.index(str(rapport_a.id))
+    # Chaque avis dit sur quel dossier il porte (entreprise, type, exercice, version).
+    ligne = next(item for item in response.json() if item["report_id"] == str(rapport_a.id))
+    entreprise = session.get(Company, rapport_a.company_id)
+    assert ligne["company_name"] == entreprise.name
+    assert (ligne["report_type"], ligne["fiscal_year"], ligne["report_version"]) == (
+        rapport_a.type.value,
+        rapport_a.fiscal_year,
+        rapport_a.version,
+    )
 
 
 def test_historique_sans_authentification_est_rejete() -> None:

@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -35,6 +36,7 @@ export function AnalyseDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/researcher/analyses">Analyses</BackLink>
       <PageHeader
         title={analyse.title}
         description={`Version ${analyse.version} — analyse comparative sur des entreprises publiées.`}

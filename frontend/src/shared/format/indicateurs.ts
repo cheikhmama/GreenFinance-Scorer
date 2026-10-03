@@ -35,6 +35,26 @@ export function libelleIndicateur(code: string): string {
   return texte.charAt(0).toUpperCase() + texte.slice(1);
 }
 
+/** Liste lisible d'indicateurs (« Taille du conseil, Effectif total »), pour dire ce qui manque. */
+export function listeIndicateurs(codes: readonly string[]): string {
+  return codes.map(libelleIndicateur).join(", ");
+}
+
+const METHODES_SCOPE_2: Record<string, string> = {
+  market_based: "méthode marché",
+  location_based: "méthode localisation",
+};
+
+/** « méthode marché » plutôt que « market_based » (app/ingestion/cibles.py). */
+export function libelleCategorieGes(categorie: string): string {
+  return METHODES_SCOPE_2[categorie] ?? categorie;
+}
+
+/** « Scope 2 (méthode marché) » plutôt que « Scope 2 — market_based ». */
+export function libelleScope(scope: number, categorie?: string | null): string {
+  return categorie ? `Scope ${scope} (${libelleCategorieGes(categorie)})` : `Scope ${scope}`;
+}
+
 const LIBELLES_PILIERS: Record<Pillar, string> = {
   ENVIRONNEMENT: "Environnement",
   SOCIAL: "Social",
@@ -57,6 +77,10 @@ export function libelleMethode(methode: DataMethod): string {
 
 // « count » : un nombre sans unité (« 0 décès », pas « 0 count »).
 const UNITES: Record<string, string> = { m3: "m³", tco2e: "tCO₂e", tCO2e: "tCO₂e", count: "" };
+
+export function libelleUnite(unite?: string | null): string {
+  return unite ? (UNITES[unite] ?? unite) : "";
+}
 
 /** Valeur au format français (« 125 400 m³ », « 38,5 % »), unité normalisée. */
 export function formatValeur(valeur: number, unite?: string | null): string {

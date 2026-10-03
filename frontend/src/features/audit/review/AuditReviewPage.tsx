@@ -2,8 +2,10 @@ import { ArrowLeft, ClipboardCheck, Keyboard } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { formatValeur, listeIndicateurs } from "@/shared/format/indicateurs";
 import { libelleStatutRevue, variantStatutRevue } from "@/shared/format/revue";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -17,10 +19,6 @@ import { prochaineARevoir, type ValeurARevoir, valeursARevoir } from "./valeurs"
 
 function urlPreuve(rapportId: string, preuveId: string) {
   return `/api/v1/audit/rapports/${rapportId}/preuves/${preuveId}/fichier`;
-}
-
-function nombre(valeur: number) {
-  return valeur.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 }
 
 /** Espace de revue de l'Auditeur (tâche 5.7), pleine largeur, en trois volets : la liste des
@@ -125,8 +123,12 @@ export function AuditReviewPage() {
             Mes dossiers
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-brand-blue">
-            Dossier {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+            {rapport.company_name || "Dossier"}
           </h1>
+          <p className="text-sm text-brand-grey">
+            {titreDeclaration(rapport)}
+            {rapport.company_sector ? ` · ${rapport.company_sector}` : ""}
+          </p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge variant={variantStatutRapport(rapport.status)}>
               {libelleStatutRapport(rapport.status)}
@@ -157,10 +159,10 @@ export function AuditReviewPage() {
       {rapport.declared_global_score !== null || rapport.coverage.missing_codes.length > 0 ? (
         <p className="text-sm text-brand-grey">
           {rapport.declared_global_score !== null
-            ? `Score global auto-déclaré : ${rapport.declared_global_score}/100. `
+            ? `Score global auto-déclaré : ${formatValeur(rapport.declared_global_score)}/100. `
             : ""}
           {rapport.coverage.missing_codes.length > 0
-            ? `Indicateurs attendus absents du rapport : ${rapport.coverage.missing_codes.join(", ")}.`
+            ? `Indicateurs attendus absents du rapport : ${listeIndicateurs(rapport.coverage.missing_codes)}.`
             : ""}
         </p>
       ) : null}
@@ -202,7 +204,7 @@ export function AuditReviewPage() {
                         {valeur.libelle}
                       </span>
                       <span className="block text-xs text-brand-grey">
-                        {nombre(valeur.valeurAuditee ?? valeur.valeur)} {valeur.unite}
+                        {formatValeur(valeur.valeurAuditee ?? valeur.valeur, valeur.unite)}
                       </span>
                     </span>
                     <Badge variant={variantStatutRevue(valeur.statut)} className="shrink-0">
@@ -276,11 +278,11 @@ function PreScoreBandeau({ etat }: { etat: ReturnType<typeof useAuditPreScore> }
     >
       <span className="text-sm text-brand-grey">Pré-score (valeurs revues, non officiel)</span>
       <span className="text-xl font-semibold text-brand-blue">
-        {nombre(score.global_score ?? 0)} / 100
+        {formatValeur(score.global_score ?? 0)} / 100
       </span>
       {piliers.map(([pilier, valeur]) => (
         <span key={pilier} className="text-sm">
-          {pilier} {valeur === null ? "—" : nombre(valeur)}
+          {pilier} {valeur === null ? "—" : formatValeur(valeur)}
         </span>
       ))}
       {score.coverage_rate !== null ? (

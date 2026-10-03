@@ -11,6 +11,7 @@ import {
   useOrphanReportsInValidation,
   useRetryExtraction,
 } from "../api";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 function BoutonRelancer({ rapportId }: { rapportId: string }) {
   const retry = useRetryExtraction();
@@ -75,7 +76,8 @@ export function ReportAnomaliesSection() {
                 <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
                   <div>
                     <p className="text-sm font-medium text-brand-blue">
-                      {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                      {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                     </p>
                     <p className="text-sm text-brand-grey">
                       {libelleCauseExtraction(rapport.extraction_error)}
@@ -104,7 +106,8 @@ export function ReportAnomaliesSection() {
               {orphelins.map((rapport) => (
                 <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
                   <p className="text-sm font-medium text-brand-blue">
-                    {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                    {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                   </p>
                   <Button asChild size="sm" variant="outline">
                     <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>

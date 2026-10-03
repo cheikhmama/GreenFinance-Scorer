@@ -10,9 +10,10 @@ import { Input } from "@/shared/ui/input";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useCompaniesWithScore } from "../api";
+import { uneDecimale } from "@/shared/format/etatPosition";
 
 function formatScore(valeur: number | null | undefined): string {
-  return valeur !== null && valeur !== undefined ? valeur.toFixed(1) : "—";
+  return valeur !== null && valeur !== undefined ? uneDecimale(valeur) : "—";
 }
 
 /** Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque entreprise

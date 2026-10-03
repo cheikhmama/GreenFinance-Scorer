@@ -5,6 +5,7 @@ import { ApiError } from "@/shared/api/errors";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -50,6 +51,7 @@ export function AnalyseDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/institution/analyses">Analyses</BackLink>
       <PageHeader
         title={analyse.title}
         description={`Version ${analyse.version} — ${analyse.company_ids.length} entreprise(s) comparée(s).`}

@@ -7,6 +7,13 @@ import type {
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import {
+  formatValeur,
+  libelleIndicateur,
+  libellePilier,
+  libelleScope,
+  listeIndicateurs,
+} from "@/shared/format/indicateurs";
 
 function libellePreuve(preuve: PreuveDocumentairePublic): string {
   return preuve.page_start === preuve.page_end
@@ -95,7 +102,7 @@ function CouvertureNote({ couverture }: { couverture: CouvertureResume }) {
       {couverture.found}/{couverture.total_targets} indicateurs cibles communiqués par l'entreprise.
       {couverture.missing_codes.length > 0 ? (
         <span className="block text-xs">
-          Non communiqués : {couverture.missing_codes.join(", ")}
+          Non communiqués : {listeIndicateurs(couverture.missing_codes)}
         </span>
       ) : null}
     </p>
@@ -128,8 +135,8 @@ export function IndicatorsTable({
               <thead>
                 <tr className="border-b text-left text-brand-grey">
                   <th className="py-2 pr-4 font-medium">Pilier</th>
-                  <th className="py-2 pr-4 font-medium">Code</th>
-                  <th className="py-2 pr-4 font-medium">Valeur</th>
+                  <th className="py-2 pr-4 font-medium">Indicateur</th>
+                  <th className="py-2 pr-4 text-right font-medium">Valeur</th>
                   <th className="py-2 font-medium">Preuve (source)</th>
                 </tr>
               </thead>
@@ -141,12 +148,14 @@ export function IndicatorsTable({
                         className="py-2 pr-4 align-middle font-medium text-brand-blue"
                         rowSpan={groupesPilier.get(i)}
                       >
-                        {indicateur.pillar}
+                        {libellePilier(indicateur.pillar)}
                       </td>
                     ) : null}
-                    <td className="py-2 pr-4">{indicateur.metric_code}</td>
-                    <td className="py-2 pr-4">
-                      {indicateur.value} {indicateur.unit}
+                    <td className="py-2 pr-4" title={indicateur.metric_code}>
+                      {libelleIndicateur(indicateur.metric_code)}
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums">
+                      {formatValeur(indicateur.value, indicateur.unit)}
                     </td>
                     <td className="py-2">
                       <PreuveLien
@@ -175,7 +184,7 @@ export function CarbonTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Données carbone (Scope 1/2/3)</CardTitle>
+        <CardTitle>Données carbone (Scopes 1, 2 et 3)</CardTitle>
       </CardHeader>
       <CardContent>
         {donneesCarbone.length === 0 ? (
@@ -186,19 +195,16 @@ export function CarbonTable({
               <thead>
                 <tr className="border-b text-left text-brand-grey">
                   <th className="py-2 pr-4 font-medium">Scope</th>
-                  <th className="py-2 pr-4 font-medium">Valeur</th>
+                  <th className="py-2 pr-4 text-right font-medium">Valeur</th>
                   <th className="py-2 font-medium">Preuve (source)</th>
                 </tr>
               </thead>
               <tbody>
                 {donneesCarbone.map((donnee) => (
                   <tr key={donnee.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4">
-                      Scope {donnee.scope}
-                      {donnee.ghg_category ? ` — ${donnee.ghg_category}` : ""}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {donnee.tonnes_co2e.toLocaleString("fr-FR")} tCO2e
+                    <td className="py-2 pr-4">{libelleScope(donnee.scope, donnee.ghg_category)}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">
+                      {formatValeur(donnee.tonnes_co2e, "tCO2e")}
                     </td>
                     <td className="py-2">
                       <PreuveLien

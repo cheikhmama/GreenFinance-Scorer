@@ -2,6 +2,7 @@ import { Building2, FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -30,6 +31,7 @@ export function ProjetDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/researcher/projets">Mes projets</BackLink>
       <PageHeader
         title={projet.name}
         description={`${projet.institution_email} — ${projet.objective ?? "Aucun objectif renseigné par l'institution."}`}

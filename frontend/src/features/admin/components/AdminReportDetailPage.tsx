@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
-import { formatPourcentage } from "@/shared/format/etatPosition";
+import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
 import { formatValeur, libelleIndicateur, libellePilier } from "@/shared/format/indicateurs";
 import { libellePays } from "@/shared/format/pays";
 import {
@@ -309,7 +309,7 @@ function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
     return (
       <Alert>
         <AlertTitle>Score recalculé</AlertTitle>
-        <AlertDescription>Valeur globale : {recalculer.data.global_score}/100.</AlertDescription>
+        <AlertDescription>Valeur globale : {formatScore(recalculer.data.global_score)}.</AlertDescription>
       </Alert>
     );
   }

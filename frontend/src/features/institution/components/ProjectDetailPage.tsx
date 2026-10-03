@@ -6,6 +6,7 @@ import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -50,6 +51,7 @@ export function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/institution/projets">Projets</BackLink>
       <PageHeader
         title={projet.name}
         description={projet.objective ?? projet.description ?? "Aucune description."}
