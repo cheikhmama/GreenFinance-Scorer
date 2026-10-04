@@ -55,17 +55,23 @@ describe("RequireRole", () => {
       isError: false,
     });
 
-    // Une phrase lisible : l'espace demandé et le compte connecté, jamais le code « ENTERPRISE ».
-    expect(
-      screen.getByRole("heading", { name: "Cette page n’est pas pour ce compte" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/espace Administrateur/)).toHaveTextContent(
-      "Elle fait partie de l’espace Administrateur. Vous êtes connecté avec le compte Entreprise entreprise@example.com.",
+    // Écran 403 lisible : badge, titre, rôle et compte connectés, destination — jamais « ENTERPRISE ».
+    expect(screen.getByText("Accès restreint (403)")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Accès non autorisé" })).toBeInTheDocument();
+    expect(screen.getByText(/ne dispose pas des autorisations/)).toHaveTextContent(
+      "Votre compte actuel (Entreprise — entreprise@example.com) ne dispose pas des autorisations nécessaires pour accéder à l’espace Administrateur.",
+    );
+    expect(screen.getByText("Rôle connecté").nextElementSibling).toHaveTextContent("Entreprise");
+    expect(screen.getByText("Compte").nextElementSibling).toHaveTextContent(
+      "entreprise@example.com",
+    );
+    expect(screen.getByText("Destination demandée").nextElementSibling).toHaveTextContent(
+      "Espace Administrateur",
     );
     expect(screen.queryByText(/ENTERPRISE/)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Aller à mon espace" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Aller à mon espace Entreprise" })).toHaveAttribute(
       "href",
-      "/dashboard",
+      "/company",
     );
     expect(screen.getByRole("button", { name: "Changer de compte" })).toBeInTheDocument();
   });
