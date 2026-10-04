@@ -113,14 +113,16 @@ export function useConfirmEmailChange(token: string | null) {
   });
 }
 
-/** POST /auth/logout (204, pas de corps). Vide le cache de useCurrentUser pour que
- * RequireRole redirige immédiatement vers /login sans attendre un refetch. */
+/** POST /auth/logout (204, pas de corps). Vide TOUT le cache — rien de ce que le compte quitté
+ * a chargé ne doit rester en mémoire pour le compte suivant sur ce navigateur — puis celui de
+ * useCurrentUser, pour que RequireRole redirige immédiatement vers /login. */
 export function useLogout() {
   const queryClient = useQueryClient();
 
   return useMutation<void, ApiError, void>({
     mutationFn: () => logout(),
     onSuccess: () => {
+      queryClient.clear();
       queryClient.setQueryData(CURRENT_USER_QUERY_KEY, undefined);
       queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
     },

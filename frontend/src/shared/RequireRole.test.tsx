@@ -9,6 +9,7 @@ import { RequireRole } from "./RequireRole";
 
 vi.mock("@/features/auth/api", () => ({
   useCurrentUser: vi.fn(),
+  useLogout: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
 function renderProtectedRoute(mockResult: Partial<UseQueryResult<User, ApiError>>) {
@@ -54,7 +55,19 @@ describe("RequireRole", () => {
       isError: false,
     });
 
-    expect(screen.getByText("Accès non autorisé")).toBeInTheDocument();
+    // Une phrase lisible : l'espace demandé et le compte connecté, jamais le code « ENTERPRISE ».
+    expect(
+      screen.getByRole("heading", { name: "Cette page n’est pas pour ce compte" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/espace Administrateur/)).toHaveTextContent(
+      "Elle fait partie de l’espace Administrateur. Vous êtes connecté avec le compte Entreprise entreprise@example.com.",
+    );
+    expect(screen.queryByText(/ENTERPRISE/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Aller à mon espace" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
+    expect(screen.getByRole("button", { name: "Changer de compte" })).toBeInTheDocument();
   });
 
   it("affiche le contenu protégé si le rôle correspond", () => {

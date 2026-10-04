@@ -1,17 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useCurrentUser } from "@/features/auth/api";
-import type { Role } from "@/features/auth/schemas";
-
-/** Un seul espace par rôle (voir Utilisateur.role, table à discriminant unique —
- * app/auth/models.py côté backend) : la correspondance est donc directe, sans liste. */
-const ROLE_HOME: Record<Role, string> = {
-  ADMIN: "/admin",
-  ENTERPRISE: "/company",
-  AUDITOR: "/audit",
-  INVESTOR: "/investor",
-  RESEARCHER: "/researcher",
-  INSTITUTION: "/institution",
-};
+import { ROLE_HOME } from "@/shared/roleHome";
 
 /**
  * Cible générique de redirection après connexion (features/auth/components/LoginPage.tsx

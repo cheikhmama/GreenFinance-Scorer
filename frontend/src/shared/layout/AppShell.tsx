@@ -1,6 +1,6 @@
 import { ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { Fragment, useState } from "react";
-import { Link, NavLink, Outlet, useMatches } from "react-router-dom";
+import { Link, NavLink, Outlet, useMatches, useNavigate } from "react-router-dom";
 import { useCurrentUser, useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/shared/notifications/NotificationBell";
 import { UserAvatar } from "@/shared/profile/UserAvatar";
@@ -22,6 +22,7 @@ import { roleNavConfig } from "./roleNav";
 export function AppShell() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
+  const navigate = useNavigate();
   const confirm = useConfirm();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -48,7 +49,9 @@ export function AppShell() {
       cancelLabel: "Annuler",
     });
     if (!confirme) return;
-    logout.mutate();
+    // Déconnexion volontaire : aucune page à rouvrir après la prochaine connexion (ce sera
+    // peut-être un autre compte) — contrairement à une session expirée.
+    logout.mutate(undefined, { onSuccess: () => navigate("/login", { replace: true }) });
   }
 
   const sidebar = (

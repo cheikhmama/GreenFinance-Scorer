@@ -13,19 +13,62 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function renderLoginPage() {
+function renderLoginPage(depuis?: string) {
   const queryClient = new QueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/login"]}>
+      <MemoryRouter
+        initialEntries={[depuis ? { pathname: "/login", state: { depuis } } : "/login"]}
+      >
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<h1>Espace connecté</h1>} />
+          <Route path="/researcher/analyses" element={<h1>Analyses du chercheur</h1>} />
+          <Route path="/admin/rapports" element={<h1>Page Admin</h1>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
+
+function chercheur() {
+  return Response.json({
+    id: "u2",
+    email: "chercheur@example.com",
+    name: "Moussa Diop",
+    avatar: null,
+    role: "RESEARCHER",
+    created_at: "",
+    active: true,
+    activated_at: "2026-09-01T00:00:00Z",
+  });
+}
+
+async function seConnecter() {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("E-mail"), "chercheur@example.com");
+  await user.type(screen.getByLabelText("Mot de passe"), "mot-de-passe");
+  await user.click(screen.getByRole("button", { name: "Se connecter" }));
+}
+
+describe("LoginPage — page rouverte après connexion", () => {
+  it("rouvre la page quittée quand le compte peut la voir", async () => {
+    fetchMock.mockResolvedValue(chercheur());
+    renderLoginPage("/researcher/analyses");
+    await seConnecter();
+    expect(
+      await screen.findByRole("heading", { name: "Analyses du chercheur" }),
+    ).toBeInTheDocument();
+  });
+
+  it("envoie vers son propre espace après un changement de compte, jamais vers « accès refusé »", async () => {
+    fetchMock.mockResolvedValue(chercheur());
+    renderLoginPage("/admin/rapports");
+    await seConnecter();
+    expect(await screen.findByRole("heading", { name: "Espace connecté" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Page Admin" })).not.toBeInTheDocument();
+  });
+});
 
 describe("LoginPage", () => {
   it("affiche les champs e-mail et mot de passe ainsi que le bouton de connexion", () => {

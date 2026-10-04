@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isPrototypeEnabled } from "@/features/prototype/routes";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
+import { cheminAutorisePour } from "@/shared/roleHome";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
@@ -37,8 +38,14 @@ export function LoginPage() {
     if (login.isPending) return;
     setServerError(null);
     login.mutate(values, {
-      // Retour à la page quittée pour cause de session expirée, sinon l'espace du rôle.
-      onSuccess: () => navigate(pageDeRetour(location.state) ?? "/dashboard", { replace: true }),
+      // Retour à la page quittée pour cause de session expirée, si ce compte peut la voir ;
+      // sinon l'espace de son rôle (connexion avec un autre compte que celui qui l'avait ouverte).
+      onSuccess: (utilisateur) => {
+        const depuis = pageDeRetour(location.state);
+        const cible =
+          depuis && cheminAutorisePour(utilisateur.role, depuis) ? depuis : "/dashboard";
+        navigate(cible, { replace: true });
+      },
       onError: (error: ApiError) => {
         // 401 invalid_credentials est le seul cas métier attendu du contrat
         // POST /auth/login ; tout autre code (panne réseau, 500) reste un message
