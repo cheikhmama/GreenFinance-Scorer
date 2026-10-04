@@ -258,3 +258,10 @@ Decisions taken before starting (2026-10-01):
   - [x] Admin report queues (to assign, in validation, overdue, failed extraction, orphans, all reports) name the company (`RapportAdminListe.company_name`, one query per list).
   - [x] Back link to the list on every detail page of the investor, researcher and institution spaces (`shared/ui/back-link.tsx`, same form as the company's « Mes déclarations »).
   - [x] Phone: no page wider than the screen any more — cards can shrink inside grids (`Card` `min-w-0`) and a table's scroll box contains its screen-reader-only header (`relative`), which was widening `/audit` (489 px) and `/company/declarations` (662 px); `/investor` was 412 px.
+- [x] 5.14 Remaining spaces in the redesigned style (decision of 2026-10-04: bring admin, investor, researcher and institution to the conventions of the redesigned company and auditor spaces, then push)
+  - [x] Theme tokens: `text-brand-blue` / `text-brand-grey` replaced by `text-foreground` / `text-muted-foreground` in the admin, investor, researcher and institution spaces and `shared/esg` (58 files; same colours, light and dark).
+  - [x] Tables: the five hand-built `<table>` (investor comparison and portfolio, researcher comparison and cross-validation, shared evidence tables) use the shared `Table` components.
+  - [x] Loading: « Chargement... » texts replaced by skeletons (`PageSkeleton` for a detail page, `CardListSkeleton` for a list) on 12 pages.
+  - [x] Researcher dashboard: besides the counters, an alert opening the analysis to correct, the latest analyses (to correct first) and the projects with their deadline; counters link to their page.
+  - [x] Institution dashboard: the analyses waiting for a decision (oldest first, « Décider ») and the projects (open first, nearest deadline first) instead of a lone « Voir tous les projets » link.
+  - Checked on the demo: 35 pages of the six spaces captured, no console error, no failed call, no page wider than a phone screen.

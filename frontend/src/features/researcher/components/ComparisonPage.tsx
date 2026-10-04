@@ -3,6 +3,8 @@ import { formatScore } from "@/shared/format/etatPosition";
 import { libellePays } from "@/shared/format/pays";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useCompareCompaniesForResearcher } from "../api";
 
 export function ComparisonPage() {
@@ -18,28 +20,28 @@ export function ComparisonPage() {
       />
 
       {entrepriseIds.length < 2 ? (
-        <p className="text-brand-grey">
+        <p className="text-muted-foreground">
           Sélectionne au moins deux entreprises depuis « Données » pour les comparer.
         </p>
       ) : null}
-      {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+      {isLoading ? <CardListSkeleton count={2} /> : null}
       {isError ? <p className="text-destructive">Impossible de charger la comparaison.</p> : null}
 
       {entreprises && entreprises.length >= 2 ? (
         <Card>
           <CardContent className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-brand-grey">
-                  <th className="py-2 pr-4 font-medium">Critère</th>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Critère</TableHead>
                   {entreprises.map((entreprise) => (
-                    <th key={entreprise.id} className="py-2 pr-4 font-medium text-brand-blue">
+                    <TableHead key={entreprise.id} className="text-foreground">
                       {entreprise.name}
-                    </th>
+                    </TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 <Ligne titre="Secteur" entreprises={entreprises} render={(e) => e.sector} />
                 <Ligne
                   titre="Pays"
@@ -86,8 +88,8 @@ export function ComparisonPage() {
                   entreprises={entreprises}
                   render={(e) => e.carbon.scope_3?.toLocaleString("fr-FR") ?? "—"}
                 />
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       ) : null}
@@ -105,14 +107,12 @@ function Ligne<T>({
   render: (entreprise: T) => string;
 }) {
   return (
-    <tr className="border-b last:border-0">
-      <td className="py-2 pr-4 font-medium text-brand-grey">{titre}</td>
+    <TableRow>
+      <TableCell className="font-medium text-muted-foreground">{titre}</TableCell>
       {entreprises.map((entreprise, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: lignes stables, une seule mise à jour par rendu
-        <td key={index} className="py-2 pr-4">
-          {render(entreprise)}
-        </td>
+        <TableCell key={index}>{render(entreprise)}</TableCell>
       ))}
-    </tr>
+    </TableRow>
   );
 }

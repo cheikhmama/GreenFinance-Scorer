@@ -56,7 +56,7 @@ export function EntrepriseCombobox({
           onMouseDown={(event) => event.preventDefault()}
         >
           {resultats.length === 0 ? (
-            <p className="p-3 text-sm text-brand-grey">Aucun résultat.</p>
+            <p className="p-3 text-sm text-muted-foreground">Aucun résultat.</p>
           ) : (
             resultats.map((entreprise) => (
               <button
@@ -68,8 +68,8 @@ export function EntrepriseCombobox({
                 onClick={() => choisir(entreprise)}
               >
                 <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-7" />
-                <span className="font-medium text-brand-blue">{entreprise.name}</span>
-                <span className="text-brand-grey">{entreprise.sector}</span>
+                <span className="font-medium text-foreground">{entreprise.name}</span>
+                <span className="text-muted-foreground">{entreprise.sector}</span>
               </button>
             ))
           )}

@@ -120,7 +120,7 @@ export function AdminReportDetailPage() {
               />
             </Link>
           ) : (
-            <span className="text-sm text-brand-grey">Entreprise…</span>
+            <span className="text-sm text-muted-foreground">Entreprise…</span>
           )}
           <Badge variant={variantStatutRapport(rapport.status)}>
             {libelleStatutRapport(rapport.status)}
@@ -130,7 +130,7 @@ export function AdminReportDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <MessageSquare className="size-4" />
             Avis d'audit
           </CardTitle>
@@ -142,10 +142,10 @@ export function AdminReportDetailPage() {
             <ul className="divide-y">
               {avis.map((item) => (
                 <li key={item.id} className="py-3">
-                  <p className="font-medium text-brand-blue">
+                  <p className="font-medium text-foreground">
                     {libelleDecisionAudit(item.decision)}
                   </p>
-                  {item.comment ? <p className="text-sm text-brand-grey">{item.comment}</p> : null}
+                  {item.comment ? <p className="text-sm text-muted-foreground">{item.comment}</p> : null}
                 </li>
               ))}
             </ul>
@@ -155,7 +155,7 @@ export function AdminReportDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <FileText className="size-4" />
             Indicateurs ESG
           </CardTitle>
@@ -164,11 +164,11 @@ export function AdminReportDetailPage() {
           {rapport.declared_global_score !== null ? (
             <p className="mb-3 text-sm">
               Score ESG global auto-déclaré par l'entreprise :{" "}
-              <strong className="text-brand-blue">
+              <strong className="text-foreground">
                 {formatValeur(rapport.declared_global_score)}/100
               </strong>
               {rapport.declared_global_score_proof ? (
-                <span className="text-brand-grey">
+                <span className="text-muted-foreground">
                   {" "}
                   — {lienPage(rapport.declared_global_score_proof.page_start)}
                 </span>
@@ -193,7 +193,7 @@ export function AdminReportDetailPage() {
                     <TableCell className="font-medium" title={indicateur.metric_code}>
                       {libelleIndicateur(indicateur.metric_code)}
                     </TableCell>
-                    <TableCell className="text-brand-grey">
+                    <TableCell className="text-muted-foreground">
                       {libellePilier(indicateur.pillar)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -210,7 +210,7 @@ export function AdminReportDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <Cloud className="size-4" />
             Émissions carbone (Scopes 1, 2 et 3)
           </CardTitle>
@@ -257,7 +257,7 @@ export function AdminReportDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <History className="size-4" />
             Historique des versions
           </CardTitle>
@@ -270,11 +270,11 @@ export function AdminReportDetailPage() {
               {versions.map((version) => (
                 <li key={version.id} className="flex items-center justify-between py-3">
                   <div>
-                    <p className="font-medium text-brand-blue">
+                    <p className="font-medium text-foreground">
                       Version {version.version}
                       {version.id === rapport.id ? " (celle-ci)" : ""}
                     </p>
-                    <p className="text-sm text-brand-grey">
+                    <p className="text-sm text-muted-foreground">
                       {libelleStatutRapport(version.status)} —{" "}
                       {libelleDateRapport(version).toLowerCase()}
                     </p>
@@ -318,10 +318,10 @@ function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
     <Card className="shadow-none">
       <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
         <div>
-          <p className="text-sm font-medium text-brand-blue">
+          <p className="text-sm font-medium text-foreground">
             Score manquant sur ce rapport validé ?
           </p>
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             À utiliser uniquement si l'entreprise reste bloquée en publication faute de score.
           </p>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -388,7 +388,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
           <FileCheck2 className="size-4" />
           Décision
         </CardTitle>
@@ -411,7 +411,7 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
           </Alert>
         ) : null}
         {verificationScore?.computable && verificationScore.coverage_rate != null ? (
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             Couverture des indicateurs de la méthodologie :{" "}
             {formatPourcentage(verificationScore.coverage_rate * 100)}.
           </p>

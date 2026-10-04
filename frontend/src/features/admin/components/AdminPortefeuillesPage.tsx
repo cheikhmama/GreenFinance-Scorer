@@ -36,7 +36,7 @@ export function AdminPortefeuillesPage() {
         <CardContent className="space-y-4">
           <label htmlFor="portefeuilles-recherche" className="relative block max-w-sm">
             <span className="sr-only">Rechercher par nom de portefeuille ou e-mail</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="portefeuilles-recherche"
               value={recherche}
@@ -68,15 +68,15 @@ export function AdminPortefeuillesPage() {
               <TableBody>
                 {portefeuilles.map((portefeuille) => (
                   <TableRow key={portefeuille.id}>
-                    <TableCell className="font-medium text-brand-blue">
+                    <TableCell className="font-medium text-foreground">
                       {portefeuille.name}
                     </TableCell>
-                    <TableCell className="text-brand-grey">{portefeuille.investor_email}</TableCell>
+                    <TableCell className="text-muted-foreground">{portefeuille.investor_email}</TableCell>
                     <TableCell className="tabular-nums">{portefeuille.position_count}</TableCell>
                     <TableCell className="tabular-nums">
                       {formatMontant(portefeuille.total_amount, portefeuille.reference_currency)}
                     </TableCell>
-                    <TableCell className="text-brand-grey">
+                    <TableCell className="text-muted-foreground">
                       {new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}
                     </TableCell>
                   </TableRow>

@@ -54,7 +54,7 @@ export function DonneesPage() {
 
       <label htmlFor="donnees-recherche" className="relative block max-w-sm">
         <span className="sr-only">Rechercher une entreprise</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           id="donnees-recherche"
           value={recherche}
@@ -70,7 +70,7 @@ export function DonneesPage() {
         <EmptyState icon={Building2} message="Aucune entreprise ne correspond à cette recherche." />
       ) : null}
       {plafondAtteint ? (
-        <p className="text-sm text-brand-grey">
+        <p className="text-sm text-muted-foreground">
           Maximum {MAX_ENTREPRISES_COMPARAISON} entreprises pour une comparaison — décochez-en une
           pour en choisir une autre.
         </p>
@@ -95,11 +95,11 @@ export function DonneesPage() {
                   <div>
                     <Link
                       to={`/researcher/entreprises/${entreprise.id}`}
-                      className="text-base font-semibold text-brand-blue underline-offset-2 hover:underline"
+                      className="text-base font-semibold text-foreground underline-offset-2 hover:underline"
                     >
                       {entreprise.name}
                     </Link>
-                    <p className="text-sm text-brand-grey">
+                    <p className="text-sm text-muted-foreground">
                       {entreprise.sector} — {libellePays(entreprise.country)}
                     </p>
                   </div>

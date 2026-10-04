@@ -103,7 +103,7 @@ export function UsersSection() {
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="utilisateurs-recherche" className="relative min-w-56 flex-1">
               <span className="sr-only">Rechercher un utilisateur par e-mail ou nom</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="utilisateurs-recherche"
                 value={recherche}
@@ -112,7 +112,7 @@ export function UsersSection() {
                 className="pl-9"
               />
             </label>
-            <span className="text-sm text-brand-grey">Rôle :</span>
+            <span className="text-sm text-muted-foreground">Rôle :</span>
             <Select
               value={roleAffiche}
               onChange={(event) =>
@@ -162,9 +162,9 @@ export function UsersSection() {
                       <div className="flex items-center gap-2">
                         <div className="min-w-0">
                           {utilisateur.name ? (
-                            <p className="font-medium text-brand-blue">{utilisateur.name}</p>
+                            <p className="font-medium text-foreground">{utilisateur.name}</p>
                           ) : null}
-                          <p className="truncate text-sm text-brand-grey">{utilisateur.email}</p>
+                          <p className="truncate text-sm text-muted-foreground">{utilisateur.email}</p>
                         </div>
                         {!utilisateur.active ? <Badge variant="secondary">désactivé</Badge> : null}
                       </div>

@@ -6,13 +6,14 @@ import { libellePays } from "@/shared/format/pays";
 import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
+import { PageSkeleton } from "@/shared/ui/skeleton";
 import { useCompanyDetailForResearcher } from "../api";
 
 export function CompanyDetailPage() {
   const { entrepriseId = "" } = useParams();
   const { data: entreprise, isLoading, isError } = useCompanyDetailForResearcher(entrepriseId);
 
-  if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (isError || !entreprise) return <p className="text-destructive">Entreprise introuvable.</p>;
 
   return (

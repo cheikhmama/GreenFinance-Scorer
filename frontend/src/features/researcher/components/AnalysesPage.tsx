@@ -42,7 +42,7 @@ export function AnalysesPage() {
       />
 
       {projetsOuverts.length === 0 ? (
-        <p className="text-brand-grey">
+        <p className="text-muted-foreground">
           Aucun projet ouvert ne vous est encore affecté — une analyse ne peut être créée que dans
           le cadre d'un projet.
         </p>
@@ -69,8 +69,8 @@ export function AnalysesPage() {
             <Card className="h-full transition hover:border-brand-green hover:shadow-md">
               <CardContent className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-brand-blue">{analyse.title}</p>
-                  <p className="text-sm text-brand-grey">
+                  <p className="font-medium text-foreground">{analyse.title}</p>
+                  <p className="text-sm text-muted-foreground">
                     {nomProjet(analyse.project_id)} — version {analyse.version}
                   </p>
                 </div>
@@ -111,7 +111,7 @@ function CompaniesPicker({
 
   if (!isLoading && (perimetre ?? []).length === 0) {
     return (
-      <p className="rounded-md border border-dashed p-3 text-xs text-brand-grey">
+      <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
         Aucune entreprise n'a encore été autorisée par l'institution pour ce projet.
       </p>
     );
@@ -136,7 +136,7 @@ function CompaniesPicker({
           </label>
         ))}
         {!isLoading && entreprises.length === 0 ? (
-          <p className="text-xs text-brand-grey">Aucun résultat.</p>
+          <p className="text-xs text-muted-foreground">Aucun résultat.</p>
         ) : null}
       </div>
     </div>

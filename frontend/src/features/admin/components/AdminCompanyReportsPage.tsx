@@ -40,10 +40,10 @@ export function AdminCompanyReportsPage() {
           {rapports.map((rapport) => (
             <li key={rapport.id} className="flex items-center justify-between gap-4 p-4">
               <div>
-                <p className="font-medium text-brand-blue">
+                <p className="font-medium text-foreground">
                   {titreDeclaration(rapport)}
                 </p>
-                <p className="text-xs text-brand-grey">
+                <p className="text-xs text-muted-foreground">
                   {libelleDateRapport(rapport)} — version {rapport.version}
                 </p>
               </div>

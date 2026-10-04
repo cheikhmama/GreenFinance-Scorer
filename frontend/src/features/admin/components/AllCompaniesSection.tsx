@@ -46,7 +46,7 @@ export function AllCompaniesSection() {
       <CardContent>
         <label htmlFor="toutes-entreprises-recherche" className="relative mb-4 block max-w-sm">
           <span className="sr-only">Rechercher une entreprise</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="toutes-entreprises-recherche"
             value={recherche}
@@ -123,11 +123,11 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
         <div className="min-w-0">
           <Link
             to={`/admin/entreprises/${entreprise.id}`}
-            className="font-semibold text-brand-blue hover:underline"
+            className="font-semibold text-foreground hover:underline"
           >
             {entreprise.name}
           </Link>
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             {entreprise.sector} — {libellePays(entreprise.country)}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

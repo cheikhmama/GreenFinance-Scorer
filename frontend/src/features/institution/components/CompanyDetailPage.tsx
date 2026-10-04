@@ -6,6 +6,7 @@ import { libellePays } from "@/shared/format/pays";
 import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
+import { PageSkeleton } from "@/shared/ui/skeleton";
 import { useCompanyDetailForInstitution } from "../api";
 
 /** Fiche entreprise publiée, consultée depuis le périmètre d'un projet (voir
@@ -15,7 +16,7 @@ export function CompanyDetailPage() {
   const { entrepriseId = "" } = useParams();
   const { data: entreprise, isLoading, isError } = useCompanyDetailForInstitution(entrepriseId);
 
-  if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (isError || !entreprise) return <p className="text-destructive">Entreprise introuvable.</p>;
 
   return (

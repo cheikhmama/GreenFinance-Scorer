@@ -17,6 +17,7 @@ import { InitialsAvatar } from "@/shared/ui/initials-avatar";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
+import { PageSkeleton } from "@/shared/ui/skeleton";
 import {
   useAddCompanyToScope,
   useAddDocument,
@@ -42,7 +43,7 @@ export function ProjectDetailPage() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [perimetreOuvert, setPerimetreOuvert] = useState(false);
 
-  if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (isError || !projet) return <p className="text-destructive">Projet introuvable.</p>;
 
   const dejaAffectes = new Set(projet.assignments.map((a) => a.researcher_id));
@@ -102,7 +103,7 @@ export function ProjectDetailPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <UserPlus className="size-4" />
             Chercheurs affectés
           </CardTitle>
@@ -151,10 +152,10 @@ export function ProjectDetailPage() {
                 className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
               >
                 <InitialsAvatar nom={affectation.researcher_email} size="sm" />
-                <span className="flex-1 font-medium text-brand-blue">
+                <span className="flex-1 font-medium text-foreground">
                   {affectation.researcher_email}
                 </span>
-                <span className="text-brand-grey">
+                <span className="text-muted-foreground">
                   depuis le {formatDate(affectation.assigned_at)}
                 </span>
               </div>
@@ -165,7 +166,7 @@ export function ProjectDetailPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <Building2 className="size-4" />
             Périmètre autorisé ({projet.companies.length})
           </CardTitle>
@@ -176,7 +177,7 @@ export function ProjectDetailPage() {
           ) : null}
         </CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-xs text-brand-grey">
+          <p className="text-xs text-muted-foreground">
             Seules ces entreprises pourront être comparées dans une analyse de ce projet.
           </p>
           {projet.companies.length === 0 ? (
@@ -193,7 +194,7 @@ export function ProjectDetailPage() {
                 <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
                 <Link
                   to={`/institution/entreprises/${entreprise.company_id}`}
-                  className="flex-1 font-medium text-brand-blue underline-offset-2 hover:underline"
+                  className="flex-1 font-medium text-foreground underline-offset-2 hover:underline"
                 >
                   {entreprise.company_name}
                 </Link>
@@ -210,7 +211,7 @@ export function ProjectDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <FileText className="size-4" />
             Documents mis à disposition ({projet.documents.length})
           </CardTitle>
@@ -228,11 +229,11 @@ export function ProjectDetailPage() {
                 className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
               >
                 <CompanyAvatar nom={document.company_name} logo={null} className="size-8" />
-                <span className="flex-1 font-medium text-brand-blue">{document.company_name}</span>
+                <span className="flex-1 font-medium text-foreground">{document.company_name}</span>
                 {document.fiscal_year ? (
-                  <span className="text-brand-grey">{document.fiscal_year}</span>
+                  <span className="text-muted-foreground">{document.fiscal_year}</span>
                 ) : null}
-                <span className="text-xs text-brand-grey">
+                <span className="text-xs text-muted-foreground">
                   ajouté le {formatDate(document.added_at)}
                 </span>
               </div>
@@ -243,7 +244,7 @@ export function ProjectDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base text-brand-blue">Analyses reçues</CardTitle>
+          <CardTitle className="text-base text-foreground">Analyses reçues</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {projet.analyses.length === 0 ? (
@@ -255,7 +256,7 @@ export function ProjectDetailPage() {
                 to={`/institution/analyses/${analyse.id}`}
                 className="flex items-center justify-between border-b py-2 text-sm last:border-0 hover:bg-muted"
               >
-                <span className="font-medium text-brand-blue">
+                <span className="font-medium text-foreground">
                   {analyse.title} (v{analyse.version})
                 </span>
                 <Badge variant={variantStatutAnalyse(analyse.status)}>
@@ -280,8 +281,8 @@ export function ProjectDetailPage() {
 function Champ({ label, valeur }: { label: string; valeur: string }) {
   return (
     <div>
-      <p className="text-xs text-brand-grey">{label}</p>
-      <p className="font-medium text-brand-blue">{valeur}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-medium text-foreground">{valeur}</p>
     </div>
   );
 }
@@ -299,7 +300,9 @@ function BoutonMettreADisposition({
 
   if (!rapportId) {
     return (
-      <span className="text-xs text-brand-grey">Aucun rapport publié à mettre à disposition.</span>
+      <span className="text-xs text-muted-foreground">
+        Aucun rapport publié à mettre à disposition.
+      </span>
     );
   }
 
@@ -358,7 +361,7 @@ function SelectionEntrepriseDialog({
         <div className="space-y-3">
           <label htmlFor="recherche-perimetre" className="relative block">
             <span className="sr-only">Rechercher une entreprise publiée</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="recherche-perimetre"
               value={recherche}
@@ -373,8 +376,8 @@ function SelectionEntrepriseDialog({
               <div key={entreprise.id} className="flex items-center gap-3 rounded-md border p-2">
                 <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-brand-blue">{entreprise.name}</p>
-                  <p className="truncate text-xs text-brand-grey">{entreprise.sector}</p>
+                  <p className="truncate text-sm font-medium text-foreground">{entreprise.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{entreprise.sector}</p>
                 </div>
                 <Button
                   size="sm"
@@ -396,7 +399,7 @@ function SelectionEntrepriseDialog({
               </div>
             ))}
             {entreprises.length === 0 ? (
-              <p className="p-2 text-sm text-brand-grey">Aucun résultat.</p>
+              <p className="p-2 text-sm text-muted-foreground">Aucun résultat.</p>
             ) : null}
           </div>
         </div>

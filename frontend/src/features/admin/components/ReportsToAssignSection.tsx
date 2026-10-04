@@ -80,11 +80,11 @@ function LigneAffectation({
       <div>
         <Link
           to={`/admin/rapports/${rapportId}`}
-          className="font-semibold text-brand-blue hover:underline"
+          className="font-semibold text-foreground hover:underline"
         >
           {entreprise || titre}
         </Link>
-        {entreprise ? <p className="text-sm text-brand-grey">{titre}</p> : null}
+        {entreprise ? <p className="text-sm text-muted-foreground">{titre}</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
       <div className="flex w-full items-center gap-2 sm:w-auto">

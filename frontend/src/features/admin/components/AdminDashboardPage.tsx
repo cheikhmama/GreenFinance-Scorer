@@ -106,7 +106,7 @@ export function AdminDashboardPage() {
       </section>
 
       <section className="space-y-3" aria-label="Actions prioritaires">
-        <h2 className="text-base font-semibold text-brand-blue">Actions prioritaires</h2>
+        <h2 className="text-base font-semibold text-foreground">Actions prioritaires</h2>
         {aucuneActionPrioritaire ? (
           <EmptyState icon={PartyPopper} message="Rien à traiter pour l'instant." />
         ) : (
@@ -158,12 +158,12 @@ export function AdminDashboardPage() {
       </section>
 
       <section className="space-y-3" aria-label="Performance ESG">
-        <h2 className="text-base font-semibold text-brand-blue">Performance ESG</h2>
+        <h2 className="text-base font-semibold text-foreground">Performance ESG</h2>
         <EsgPerformanceSection />
       </section>
 
       <section className="space-y-3" aria-label="Statistiques par acteur">
-        <h2 className="text-base font-semibold text-brand-blue">Statistiques par acteur</h2>
+        <h2 className="text-base font-semibold text-foreground">Statistiques par acteur</h2>
         <Tabs defaultValue="entreprise">
           <TabsList>
             <TabsTrigger value="entreprise">Entreprise</TabsTrigger>
@@ -377,12 +377,12 @@ function ActionCard({
               {icon}
             </span>
             <div>
-              <p className="text-sm font-medium text-brand-blue">{label}</p>
+              <p className="text-sm font-medium text-foreground">{label}</p>
               <p className="text-xs text-muted-foreground">À traiter</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <span className="text-xl font-semibold tabular-nums text-brand-blue">
+            <span className="text-xl font-semibold tabular-nums text-foreground">
               {count ?? "—"}
             </span>
             <ChevronRight className="size-4 text-muted-foreground" />

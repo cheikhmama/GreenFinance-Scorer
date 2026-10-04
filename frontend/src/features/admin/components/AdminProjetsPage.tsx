@@ -67,15 +67,15 @@ export function AdminProjetsPage() {
               <TableBody>
                 {projets.map((projet) => (
                   <TableRow key={projet.id}>
-                    <TableCell className="font-medium text-brand-blue">{projet.name}</TableCell>
+                    <TableCell className="font-medium text-foreground">{projet.name}</TableCell>
                     <TableCell>
                       <Badge variant={variantStatutProjet(projet.status)}>
                         {libelleStatutProjet(projet.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-brand-grey">{projet.institution_email}</TableCell>
+                    <TableCell className="text-muted-foreground">{projet.institution_email}</TableCell>
                     <TableCell className="tabular-nums">{projet.researcher_count}</TableCell>
-                    <TableCell className="text-brand-grey">
+                    <TableCell className="text-muted-foreground">
                       {projet.deadline
                         ? new Date(projet.deadline).toLocaleDateString("fr-FR")
                         : "—"}

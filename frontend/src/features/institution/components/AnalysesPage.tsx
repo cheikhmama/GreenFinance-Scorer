@@ -49,12 +49,12 @@ export function AnalysesPage() {
             <Card className="h-full transition hover:border-brand-green hover:shadow-md">
               <CardContent className="space-y-2">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-brand-blue">{analyse.title}</p>
+                  <p className="font-medium text-foreground">{analyse.title}</p>
                   <Badge variant={variantStatutAnalyse(analyse.status)}>
                     {libelleStatutAnalyse(analyse.status)}
                   </Badge>
                 </div>
-                <p className="text-sm text-brand-grey">
+                <p className="text-sm text-muted-foreground">
                   {analyse.project_name} — version {analyse.version}
                 </p>
               </CardContent>

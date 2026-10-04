@@ -104,7 +104,7 @@ function LogoEditor({
           type="button"
           onClick={retirerLogo}
           disabled={enCours}
-          className="flex items-center gap-1 text-xs text-brand-grey hover:text-destructive"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
         >
           <X className="size-3" />
           Retirer le logo
@@ -229,7 +229,7 @@ export function AdminCompanyDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base text-brand-blue">Statut</CardTitle>
+          <CardTitle className="text-base text-foreground">Statut</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
@@ -428,7 +428,7 @@ export function AdminCompanyDetailPage() {
                   name="impose_minimum"
                   render={({ field }) => (
                     <FormItem>
-                      <label className="flex items-center gap-2 text-sm text-brand-grey">
+                      <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         <input
                           type="checkbox"
                           checked={field.value}

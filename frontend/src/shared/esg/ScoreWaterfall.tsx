@@ -7,8 +7,8 @@ import {
   type MetricContribution,
   type ScoreExplanation,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { Skeleton } from "@/shared/ui/skeleton";
 import { libelleIndicateur } from "@/shared/format/indicateurs";
+import { Skeleton } from "@/shared/ui/skeleton";
 
 const LIBELLES_PILIER: Record<string, string> = {
   ENVIRONNEMENT: "Environnement",
@@ -58,7 +58,7 @@ function Ligne({
     <li className="grid grid-cols-[minmax(0,18rem)_1fr_4.5rem] items-center gap-3 text-sm">
       <span className="truncate" title={aide ? `${libelle} — ${aide}` : libelle}>
         {libelle}
-        {aide ? <span className="text-xs text-brand-grey"> ({aide})</span> : null}
+        {aide ? <span className="text-xs text-muted-foreground"> ({aide})</span> : null}
       </span>
       <Barre debut={debut} fin={fin} teinte={teinte} />
       <span className="text-right tabular-nums">{valeur}</span>
@@ -137,7 +137,7 @@ export function ScoreWaterfall({ rapportId }: { rapportId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-brand-grey">
+        <p className="text-sm text-muted-foreground">
           {data
             ? data.baseline.used === BaselineScope.SECTOR
               ? `Comparé à ${data.baseline.peer_count} entreprise(s) du secteur ${data.baseline.sector}.`

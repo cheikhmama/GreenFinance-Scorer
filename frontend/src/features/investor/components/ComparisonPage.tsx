@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { usePublishedCompanies } from "../api";
 import { MAX_SELECTION_COMPARAISON } from "../schemas";
 
@@ -80,7 +81,7 @@ export function ComparisonPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base text-brand-blue">Sélection</CardTitle>
+          <CardTitle className="text-base text-foreground">Sélection</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {selection.length > 0 ? (
@@ -99,7 +100,7 @@ export function ComparisonPage() {
                       type="button"
                       onClick={() => retirer(id)}
                       aria-label={`Retirer ${entreprise?.name ?? "cette entreprise"} de la comparaison`}
-                      className="rounded-full px-1 text-brand-grey hover:bg-muted hover:text-brand-blue"
+                      className="rounded-full px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
                       ×
                     </button>
@@ -108,18 +109,18 @@ export function ComparisonPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-brand-grey">
+            <p className="text-sm text-muted-foreground">
               Aucune entreprise sélectionnée pour l'instant — ajoutez-en au moins deux ci-dessous.
             </p>
           )}
 
           {selection.length === 1 ? (
-            <p className="text-sm text-brand-grey">
+            <p className="text-sm text-muted-foreground">
               Ajoutez au moins une deuxième entreprise pour pouvoir lancer la comparaison.
             </p>
           ) : null}
           {selection.length >= MAX_SELECTION_COMPARAISON ? (
-            <p className="text-sm text-brand-grey">
+            <p className="text-sm text-muted-foreground">
               Maximum de {MAX_SELECTION_COMPARAISON} entreprises atteint — retirez-en une pour en
               ajouter une autre.
             </p>
@@ -146,9 +147,9 @@ export function ComparisonPage() {
             </Select>
           </div>
 
-          {chargementRecherche ? <p className="text-sm text-brand-grey">Chargement...</p> : null}
+          {chargementRecherche ? <CardListSkeleton count={2} /> : null}
           {!chargementRecherche && entreprisesTrouvees.length === 0 ? (
-            <p className="text-sm text-brand-grey">
+            <p className="text-sm text-muted-foreground">
               Aucune entreprise ne correspond à cette recherche.
             </p>
           ) : null}
@@ -174,14 +175,14 @@ export function ComparisonPage() {
                 >
                   <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-brand-blue">
+                    <span className="block truncate font-medium text-foreground">
                       {entreprise.name}
                     </span>
-                    <span className="block truncate text-xs text-brand-grey">
+                    <span className="block truncate text-xs text-muted-foreground">
                       {entreprise.sector}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs font-medium text-brand-blue">
+                  <span className="shrink-0 text-xs font-medium text-foreground">
                     {dejaSelectionnee ? "Retirer" : "Ajouter"}
                   </span>
                 </button>

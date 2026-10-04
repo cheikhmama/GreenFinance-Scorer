@@ -112,13 +112,13 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
                         {entree.actor_name ?? entree.actor_email}
                       </span>
                     ) : (
-                      <span className="text-brand-grey">Anonyme</span>
+                      <span className="text-muted-foreground">Anonyme</span>
                     )}
                   </TableCell>
                   <TableCell>{libelleTypeRessource(entree.resource_type)}</TableCell>
                   <TableCell>{libelleResultatJournal(entree.result)}</TableCell>
                   {avecDetail ? (
-                    <TableCell className="text-brand-grey">
+                    <TableCell className="text-muted-foreground">
                       {entree.old_value && entree.new_value
                         ? `${libelleValeurJournal(entree.old_value)} → ${libelleValeurJournal(entree.new_value)}`
                         : "—"}

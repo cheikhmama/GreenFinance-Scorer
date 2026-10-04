@@ -40,7 +40,7 @@ const RESULTATS: Record<
   PASSED: { libelle: "Conforme", icone: CheckCircle2, couleur: "text-brand-green" },
   FAILED: { libelle: "Écart", icone: XCircle, couleur: "text-destructive" },
   NOT_VERIFIABLE: { libelle: "Non vérifiable", icone: CircleHelp, couleur: "text-amber-600" },
-  NOT_APPLICABLE: { libelle: "Sans objet", icone: MinusCircle, couleur: "text-brand-grey" },
+  NOT_APPLICABLE: { libelle: "Sans objet", icone: MinusCircle, couleur: "text-muted-foreground" },
 };
 
 type Action = "approve" | "request_info" | "reject";
@@ -114,7 +114,7 @@ function Contenu({
       <section className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
         <Champ libelle="Entreprise" valeur={rapport.company_name} />
         <div>
-          <p className="text-xs text-brand-grey">Statut</p>
+          <p className="text-xs text-muted-foreground">Statut</p>
           <Badge variant={variantStatutInscription(rapport.status)}>
             {libelleStatutInscription(rapport.status)}
           </Badge>
@@ -128,7 +128,7 @@ function Contenu({
           valeur={[rapport.contact_name, rapport.contact_email].filter(Boolean).join(" — ") || "—"}
         />
         <div>
-          <p className="text-xs text-brand-grey">Lettre de mandat</p>
+          <p className="text-xs text-muted-foreground">Lettre de mandat</p>
           {rapport.mandate_letter_available ? (
             <a
               href={`/api/v1/admin/companies/${entrepriseId}/mandate-letter`}
@@ -147,7 +147,7 @@ function Contenu({
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-brand-blue">Contrôles automatiques</h3>
+          <h3 className="text-sm font-semibold text-foreground">Contrôles automatiques</h3>
           <Button size="sm" variant="ghost" onClick={relancer} disabled={enRelance}>
             <RefreshCw className="size-4" aria-hidden="true" />
             Relancer
@@ -162,15 +162,15 @@ function Contenu({
 
       {rapport.info_request_message ? (
         <section className="space-y-2 text-sm">
-          <h3 className="font-semibold text-brand-blue">Échanges avec le demandeur</h3>
+          <h3 className="font-semibold text-foreground">Échanges avec le demandeur</h3>
           <p>
-            <span className="text-brand-grey">
+            <span className="text-muted-foreground">
               Informations demandées le {date(rapport.info_requested_at)} :{" "}
             </span>
             <span className="whitespace-pre-line">{rapport.info_request_message}</span>
           </p>
           <p>
-            <span className="text-brand-grey">Réponse : </span>
+            <span className="text-muted-foreground">Réponse : </span>
             {rapport.info_response_message ? (
               <span className="whitespace-pre-line">{rapport.info_response_message}</span>
             ) : rapport.status === "INFO_REQUESTED" ? (
@@ -190,8 +190,8 @@ function Contenu({
 function Champ({ libelle, valeur }: { libelle: string; valeur: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-brand-grey">{libelle}</p>
-      <p className="truncate font-medium text-brand-blue">{valeur}</p>
+      <p className="text-xs text-muted-foreground">{libelle}</p>
+      <p className="truncate font-medium text-foreground">{valeur}</p>
     </div>
   );
 }
@@ -203,11 +203,11 @@ function Controle({ controle }: { controle: KycCheck }) {
       <Icone className={`mt-0.5 size-5 shrink-0 ${couleur}`} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="font-medium text-brand-blue">{controle.label}</p>
+          <p className="font-medium text-foreground">{controle.label}</p>
           <span className={`text-xs font-semibold ${couleur}`}>{libelle}</span>
         </div>
         <p>{controle.detail}</p>
-        <p className="text-xs text-brand-grey">Source : {controle.source}</p>
+        <p className="text-xs text-muted-foreground">Source : {controle.source}</p>
       </div>
     </li>
   );

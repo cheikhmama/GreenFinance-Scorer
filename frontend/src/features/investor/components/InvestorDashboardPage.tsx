@@ -75,11 +75,11 @@ export function InvestorDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-brand-blue">Publications récentes</CardTitle>
+            <CardTitle className="text-base text-foreground">Publications récentes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {!data || data.recent_publications.length === 0 ? (
-              <p className="text-sm text-brand-grey">Aucune publication récente.</p>
+              <p className="text-sm text-muted-foreground">Aucune publication récente.</p>
             ) : (
               data.recent_publications.map((entreprise) => (
                 <Link
@@ -89,8 +89,8 @@ export function InvestorDashboardPage() {
                 >
                   <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-brand-blue">{entreprise.name}</p>
-                    <p className="truncate text-xs text-brand-grey">{entreprise.sector}</p>
+                    <p className="truncate font-medium text-foreground">{entreprise.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{entreprise.sector}</p>
                   </div>
                   <Badge variant={variantScore(entreprise.score.global_score)} className="shrink-0">
                     {formatScore(entreprise.score.global_score)}
@@ -121,15 +121,15 @@ function RepartitionSecteurCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base text-brand-blue">Répartition par secteur</CardTitle>
+        <CardTitle className="text-base text-foreground">Répartition par secteur</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {!repartition || repartition.length === 0 ? (
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             Aucune position pour l'instant —{" "}
             <Link
               to="/investor/entreprises"
-              className="text-brand-blue underline-offset-2 hover:underline"
+              className="text-foreground underline-offset-2 hover:underline"
             >
               découvrez les entreprises publiées
             </Link>{" "}
@@ -154,12 +154,12 @@ function RepartitionSecteurCard({
                     <div className="flex items-center justify-between text-sm">
                       <span
                         className={
-                          selectionnee ? "font-semibold text-brand-blue" : "text-brand-grey"
+                          selectionnee ? "font-semibold text-foreground" : "text-muted-foreground"
                         }
                       >
                         {ligne.sector}
                       </span>
-                      <span className="font-medium tabular-nums text-brand-blue">
+                      <span className="font-medium tabular-nums text-foreground">
                         {ligne.amount_usd.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} USD
                       </span>
                     </div>
@@ -178,13 +178,13 @@ function RepartitionSecteurCard({
 
             {secteurActif ? (
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                <span className="text-brand-grey">
+                <span className="text-muted-foreground">
                   Entreprises disponibles dans{" "}
-                  <strong className="text-brand-blue">{secteurActif}</strong>
+                  <strong className="text-foreground">{secteurActif}</strong>
                 </span>
                 <Link
                   to={`/investor/entreprises?secteur=${encodeURIComponent(secteurActif)}`}
-                  className="font-semibold text-brand-blue underline-offset-2 hover:underline"
+                  className="font-semibold text-foreground underline-offset-2 hover:underline"
                 >
                   {nombreDisponibles ?? "…"}
                 </Link>

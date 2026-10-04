@@ -35,31 +35,31 @@ export function ScoreSummary({ score }: { score: ScoreEntreprisePublic }) {
     <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">Score global</dt>
-        <dd className="mt-0.5 font-semibold text-brand-blue">{formatScore(score.global_score)}</dd>
+        <dd className="mt-0.5 font-semibold text-foreground">{formatScore(score.global_score)}</dd>
         <BarreScore valeur={score.global_score} teinte={TEINTES_PILIER.global} />
         {/* Un score ne se lit jamais sans sa couverture (tâche 3.1) : part pondérée des
             indicateurs de la méthodologie effectivement publiés par l'entreprise. */}
         {score.coverage_rate != null ? (
-          <dd className="mt-1 text-xs text-brand-grey">
+          <dd className="mt-1 text-xs text-muted-foreground">
             Couverture {formatPourcentage(score.coverage_rate * 100)}
           </dd>
         ) : null}
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">E</dt>
-        <dd className="mt-0.5 font-semibold text-brand-blue">
+        <dd className="mt-0.5 font-semibold text-foreground">
           {formatScore(score.environmental_score)}
         </dd>
         <BarreScore valeur={score.environmental_score} teinte={TEINTES_PILIER.E} />
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">S</dt>
-        <dd className="mt-0.5 font-semibold text-brand-blue">{formatScore(score.social_score)}</dd>
+        <dd className="mt-0.5 font-semibold text-foreground">{formatScore(score.social_score)}</dd>
         <BarreScore valeur={score.social_score} teinte={TEINTES_PILIER.S} />
       </div>
       <div>
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">G</dt>
-        <dd className="mt-0.5 font-semibold text-brand-blue">
+        <dd className="mt-0.5 font-semibold text-foreground">
           {formatScore(score.governance_score)}
         </dd>
         <BarreScore valeur={score.governance_score} teinte={TEINTES_PILIER.G} />

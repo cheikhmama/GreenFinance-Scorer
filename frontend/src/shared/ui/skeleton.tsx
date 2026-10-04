@@ -30,3 +30,18 @@ export function CardListSkeleton({ count = 3 }: { count?: number }) {
     </div>
   );
 }
+
+/** Page de détail en cours de chargement : titre, sous-titre puis deux cartes — même silhouette
+ * que la page finale, au lieu d'un « Chargement... » isolé en haut d'une page vide. */
+export function PageSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Chargement">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-1/2" />
+        <Skeleton className="h-4 w-1/3" />
+      </div>
+      <Skeleton className="h-36 w-full rounded-xl" />
+      <Skeleton className="h-64 w-full rounded-xl" />
+    </div>
+  );
+}

@@ -21,7 +21,7 @@ export function RecentActivitySection() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
           <History className="size-4" />
           Activité récente
         </CardTitle>
@@ -50,7 +50,7 @@ export function RecentActivitySection() {
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Badge variant="outline">{libelleActionJournal(entree.action)}</Badge>
-                  <span className="truncate text-brand-grey">
+                  <span className="truncate text-muted-foreground">
                     {entree.actor_name ?? entree.actor_email ?? "Anonyme"}
                   </span>
                 </div>

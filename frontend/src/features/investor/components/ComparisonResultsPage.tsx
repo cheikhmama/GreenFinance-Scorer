@@ -11,6 +11,7 @@ import { libelleIndicateur, libelleScope } from "@/shared/format/indicateurs";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useCompareCompanies } from "../api";
 
 const COULEURS = ["#2563eb", "#059669", "#d97706", "#7c3aed"];
@@ -43,7 +44,7 @@ export function ComparisonResultsPage() {
         action={
           <Link
             to={`/investor/comparaison?ids=${idsParam}`}
-            className="text-sm text-brand-blue underline-offset-2 hover:underline"
+            className="text-sm text-foreground underline-offset-2 hover:underline"
           >
             Modifier la sélection
           </Link>
@@ -51,11 +52,11 @@ export function ComparisonResultsPage() {
       />
 
       {selection.length < 2 ? (
-        <p className="text-brand-grey">
+        <p className="text-muted-foreground">
           Il faut au moins deux entreprises pour une comparaison —{" "}
           <Link
             to="/investor/comparaison"
-            className="text-brand-blue underline-offset-2 hover:underline"
+            className="text-foreground underline-offset-2 hover:underline"
           >
             retournez à la sélection
           </Link>
@@ -63,7 +64,7 @@ export function ComparisonResultsPage() {
         </p>
       ) : null}
       {selection.length >= 2 && isLoading ? (
-        <p className="text-brand-grey">Chargement de la comparaison...</p>
+        <p className="text-muted-foreground">Chargement de la comparaison...</p>
       ) : null}
       {selection.length >= 2 && isError ? (
         <p className="text-destructive">Impossible de charger la comparaison.</p>
@@ -85,7 +86,7 @@ export function ComparisonResultsPage() {
                       logo={entreprise.logo}
                       className="size-8"
                     />
-                    <p className="truncate font-medium text-brand-blue">{entreprise.name}</p>
+                    <p className="truncate font-medium text-foreground">{entreprise.name}</p>
                   </div>
                   <Badge variant={variantScore(entreprise.score.global_score)}>
                     Score global : {formatScore(entreprise.score.global_score)}
@@ -99,7 +100,7 @@ export function ComparisonResultsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base text-brand-blue">Radar ESG</CardTitle>
+              <CardTitle className="text-base text-foreground">Radar ESG</CardTitle>
             </CardHeader>
             <CardContent>
               <EsgRadarChart entreprises={comparaison} />
@@ -319,90 +320,85 @@ function ComparisonTable({ entreprises }: { entreprises: EntrepriseDetailInvesti
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base text-brand-blue">Comparaison détaillée</CardTitle>
+        <CardTitle className="text-base text-foreground">Comparaison détaillée</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="mb-3 text-xs text-brand-grey">
+        <p className="mb-3 text-xs text-muted-foreground">
           Les valeurs les plus hautes et les plus basses d'une ligne ne sont mises en évidence que
           lorsque toutes les entreprises comparées partagent la même unité, la même période et la
           même méthode — sinon la comparaison ne serait pas fiable.
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-brand-grey">
-                <th className="py-2 pr-4 font-medium">Indicateur</th>
-                {entreprises.map((entreprise) => (
-                  <th key={entreprise.id} className="py-2 pr-4 font-medium text-brand-blue">
-                    {entreprise.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((categorie) => (
-                <Fragment key={categorie}>
-                  <tr className="border-b bg-muted/50">
-                    <td
-                      colSpan={entreprises.length + 1}
-                      className="py-1.5 pr-4 text-xs font-semibold uppercase tracking-wide text-brand-grey"
-                    >
-                      {categorie}
-                    </td>
-                  </tr>
-                  {lignes
-                    .filter((ligne) => ligne.categorie === categorie)
-                    .map((ligne) => {
-                      const comparable = estComparable(ligne.valeurs);
-                      const valeursPresentes = Array.from(ligne.valeurs.values()).filter(
-                        (v) => v !== null,
-                      ) as { value: number; unit: string; year: number; method: string }[];
-                      const max = comparable
-                        ? Math.max(...valeursPresentes.map((v) => v.value))
-                        : null;
-                      const min = comparable
-                        ? Math.min(...valeursPresentes.map((v) => v.value))
-                        : null;
-                      return (
-                        <tr
-                          key={`${categorie}-${ligne.libelle}`}
-                          className="border-b last:border-0"
-                        >
-                          <td className="py-2 pr-4 text-brand-grey">{ligne.libelle}</td>
-                          {entreprises.map((entreprise) => {
-                            const cellule = ligne.valeurs.get(entreprise.id) ?? null;
-                            if (!cellule) {
-                              return (
-                                <td key={entreprise.id} className="py-2 pr-4 text-brand-grey">
-                                  Non disponible
-                                </td>
-                              );
-                            }
-                            const estExtreme =
-                              comparable && (cellule.value === max || cellule.value === min);
-                            return (
-                              <td
-                                key={entreprise.id}
-                                className={`py-2 pr-4 ${estExtreme ? "font-semibold text-brand-blue" : ""}`}
-                              >
-                                {cellule.value.toLocaleString("fr-FR")} {cellule.unit}
-                                {cellule.year > 0 ? (
-                                  <span className="ml-1 text-xs text-brand-grey">
-                                    ({cellule.year}
-                                    {cellule.method ? `, ${libelleMethode(cellule.method)}` : ""})
-                                  </span>
-                                ) : null}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                </Fragment>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Indicateur</TableHead>
+              {entreprises.map((entreprise) => (
+                <TableHead key={entreprise.id} className="text-foreground">
+                  {entreprise.name}
+                </TableHead>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {categories.map((categorie) => (
+              <Fragment key={categorie}>
+                <TableRow className="bg-muted/50">
+                  <TableCell
+                    colSpan={entreprises.length + 1}
+                    className="py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    {categorie}
+                  </TableCell>
+                </TableRow>
+                {lignes
+                  .filter((ligne) => ligne.categorie === categorie)
+                  .map((ligne) => {
+                    const comparable = estComparable(ligne.valeurs);
+                    const valeursPresentes = Array.from(ligne.valeurs.values()).filter(
+                      (v) => v !== null,
+                    ) as { value: number; unit: string; year: number; method: string }[];
+                    const max = comparable
+                      ? Math.max(...valeursPresentes.map((v) => v.value))
+                      : null;
+                    const min = comparable
+                      ? Math.min(...valeursPresentes.map((v) => v.value))
+                      : null;
+                    return (
+                      <TableRow key={`${categorie}-${ligne.libelle}`}>
+                        <TableCell className="text-muted-foreground">{ligne.libelle}</TableCell>
+                        {entreprises.map((entreprise) => {
+                          const cellule = ligne.valeurs.get(entreprise.id) ?? null;
+                          if (!cellule) {
+                            return (
+                              <TableCell key={entreprise.id} className="text-muted-foreground">
+                                Non disponible
+                              </TableCell>
+                            );
+                          }
+                          const estExtreme =
+                            comparable && (cellule.value === max || cellule.value === min);
+                          return (
+                            <TableCell
+                              key={entreprise.id}
+                              className={`py-2 pr-4 ${estExtreme ? "font-semibold text-foreground" : ""}`}
+                            >
+                              {cellule.value.toLocaleString("fr-FR")} {cellule.unit}
+                              {cellule.year > 0 ? (
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  ({cellule.year}
+                                  {cellule.method ? `, ${libelleMethode(cellule.method)}` : ""})
+                                </span>
+                              ) : null}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

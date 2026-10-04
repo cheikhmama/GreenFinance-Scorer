@@ -81,7 +81,7 @@ export function AllReportsSection() {
                   <Badge variant={variantStatutRapport(rapport.status)}>
                     {libelleStatutRapport(rapport.status)}
                   </Badge>
-                  <span className="text-brand-blue">
+                  <span className="text-foreground">
                     {rapport.company_name ? `${rapport.company_name} · ` : ""}
 {titreDeclaration(rapport)}
                   </span>

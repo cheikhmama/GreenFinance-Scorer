@@ -25,7 +25,7 @@ export function ExtractionRunsCard({ rapportId }: { rapportId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
           <Cpu className="size-4" aria-hidden="true" />
           Provenance de l’extraction
         </CardTitle>
@@ -34,7 +34,7 @@ export function ExtractionRunsCard({ rapportId }: { rapportId: string }) {
         {isPending ? <Skeleton className="h-16 w-full" /> : null}
         {isError ? <p className="text-destructive">Impossible de charger les exécutions.</p> : null}
         {data && data.length === 0 ? (
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             Aucune exécution enregistrée (rapport extrait avant le suivi de provenance).
           </p>
         ) : null}
@@ -60,7 +60,7 @@ export function ExtractionRunsCard({ rapportId }: { rapportId: string }) {
                       {STATUTS[execution.status].libelle}
                     </Badge>
                     {execution.error ? (
-                      <span className="ml-2 text-xs text-brand-grey" title={execution.error}>
+                      <span className="ml-2 text-xs text-muted-foreground" title={execution.error}>
                         {libelleCauseExtraction(execution.error)}
                       </span>
                     ) : null}

@@ -49,7 +49,7 @@ export function PortfolioCarbonCard({ portefeuilleId }: { portefeuilleId: string
       </CardHeader>
       <CardContent className="space-y-4">
         {data.positions.length === 0 ? (
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             Aucune position active : l’empreinte porte sur les encours détenus aujourd’hui.
           </p>
         ) : (
@@ -86,7 +86,7 @@ export function PortfolioCarbonCard({ portefeuilleId }: { portefeuilleId: string
               />
             </dl>
             {exclusions.size > 0 ? (
-              <div className="text-sm text-brand-grey">
+              <div className="text-sm text-muted-foreground">
                 <p>Positions hors du calcul des Scopes 1+2 :</p>
                 <ul className="mt-1 list-disc pl-5">
                   {[...exclusions].map(([motif, nombreLignes]) => (
@@ -118,8 +118,8 @@ function Indicateur({
   return (
     <div className="rounded-lg border p-4">
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold text-brand-blue">{valeur}</dd>
-      <dd className="text-xs text-brand-grey">
+      <dd className="mt-1 text-lg font-semibold text-foreground">{valeur}</dd>
+      <dd className="text-xs text-muted-foreground">
         {couverture !== undefined ? `Couverture ${formatPourcentage(couverture * 100)}` : aide}
       </dd>
     </div>

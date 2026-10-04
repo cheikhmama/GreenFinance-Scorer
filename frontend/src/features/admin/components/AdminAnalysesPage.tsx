@@ -70,16 +70,16 @@ export function AdminAnalysesPage() {
               <TableBody>
                 {analyses.map((analyse) => (
                   <TableRow key={analyse.id}>
-                    <TableCell className="font-medium text-brand-blue">{analyse.title}</TableCell>
+                    <TableCell className="font-medium text-foreground">{analyse.title}</TableCell>
                     <TableCell>
                       <Badge variant={variantStatutAnalyse(analyse.status)}>
                         {libelleStatutAnalyse(analyse.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-brand-grey">{analyse.researcher_email}</TableCell>
-                    <TableCell className="text-brand-grey">{analyse.project_name}</TableCell>
+                    <TableCell className="text-muted-foreground">{analyse.researcher_email}</TableCell>
+                    <TableCell className="text-muted-foreground">{analyse.project_name}</TableCell>
                     <TableCell className="tabular-nums">{analyse.version}</TableCell>
-                    <TableCell className="text-brand-grey">
+                    <TableCell className="text-muted-foreground">
                       {analyse.submitted_at
                         ? new Date(analyse.submitted_at).toLocaleDateString("fr-FR")
                         : "—"}

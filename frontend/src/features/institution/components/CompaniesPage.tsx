@@ -34,7 +34,7 @@ export function CompaniesPage() {
 
       <label htmlFor="institution-entreprises-recherche" className="relative block max-w-sm">
         <span className="sr-only">Rechercher une entreprise</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           id="institution-entreprises-recherche"
           value={recherche}
@@ -57,11 +57,11 @@ export function CompaniesPage() {
               <div>
                 <Link
                   to={`/institution/entreprises/${entreprise.id}`}
-                  className="text-base font-semibold text-brand-blue underline-offset-2 hover:underline"
+                  className="text-base font-semibold text-foreground underline-offset-2 hover:underline"
                 >
                   {entreprise.name}
                 </Link>
-                <p className="text-sm text-brand-grey">
+                <p className="text-sm text-muted-foreground">
                   {entreprise.sector} — {libellePays(entreprise.country)}
                 </p>
               </div>

@@ -23,7 +23,7 @@ export function UsersAwaitingActivationSection() {
           <ul className="divide-y">
             {utilisateurs.map((utilisateur) => (
               <li key={utilisateur.id} className="flex items-center gap-3 py-2">
-                <span className="text-brand-blue">{utilisateur.email}</span>
+                <span className="text-foreground">{utilisateur.email}</span>
                 <Badge variant="secondary">{utilisateur.role}</Badge>
               </li>
             ))}

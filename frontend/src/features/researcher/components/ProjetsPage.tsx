@@ -54,17 +54,17 @@ export function ProjetsPage() {
                 <CardContent className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-brand-blue">{projet.name}</p>
-                      <p className="text-sm text-brand-grey">{projet.institution_email}</p>
+                      <p className="font-medium text-foreground">{projet.name}</p>
+                      <p className="text-sm text-muted-foreground">{projet.institution_email}</p>
                     </div>
                     <Badge variant={variantStatutProjet(projet.status)}>
                       {libelleStatutProjet(projet.status)}
                     </Badge>
                   </div>
                   {projet.objective ? (
-                    <p className="text-sm text-brand-grey">{projet.objective}</p>
+                    <p className="text-sm text-muted-foreground">{projet.objective}</p>
                   ) : null}
-                  {periode ? <p className="text-xs text-brand-grey">{periode}</p> : null}
+                  {periode ? <p className="text-xs text-muted-foreground">{periode}</p> : null}
                 </CardContent>
               </Card>
             </Link>
