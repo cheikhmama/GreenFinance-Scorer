@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -35,9 +36,9 @@ export function AuditDashboardPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
+                  <TableHead>Entreprise</TableHead>
+                  <TableHead>Déclaration</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Année</TableHead>
                   <TableHead>Déposé le</TableHead>
                   <TableHead>
                     <span className="sr-only">Actions</span>
@@ -48,12 +49,15 @@ export function AuditDashboardPage() {
                 {dossiers.map((dossier) => (
                   <TableRow key={dossier.id}>
                     <TableCell>
+                      <p className="font-medium text-foreground">{dossier.company_name}</p>
+                      <p className="text-xs text-muted-foreground">{dossier.company_sector}</p>
+                    </TableCell>
+                    <TableCell className="text-foreground">{titreDeclaration(dossier)}</TableCell>
+                    <TableCell>
                       <Badge variant={variantStatutRapport(dossier.status)}>
                         {libelleStatutRapport(dossier.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-foreground">{dossier.type}</TableCell>
-                    <TableCell className="tabular-nums">{dossier.fiscal_year ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {dossier.submitted_at
                         ? new Date(dossier.submitted_at).toLocaleDateString("fr-FR")

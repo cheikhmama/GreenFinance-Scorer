@@ -3,13 +3,14 @@ import type { TrancheScorePublic } from "@/shared/api/generated/greenFinanceScor
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { usePerformanceESG } from "../api";
+import { uneDecimale } from "@/shared/format/etatPosition";
 
 const CARTES = [
   {
     cle: "average_global_score" as const,
     title: "Score ESG global moyen",
     definition: "Moyenne pondérée E/S/G, un score admissible par entreprise (rapport validé).",
-    tone: "text-brand-blue",
+    tone: "text-foreground",
   },
   {
     cle: "average_environmental_score" as const,
@@ -66,7 +67,7 @@ export function EsgPerformanceSection() {
                 <CardContent className="px-5">
                   <p className="text-sm font-medium text-muted-foreground">{carte.title}</p>
                   <p className={`mt-2 text-3xl font-semibold tabular-nums ${carte.tone}`}>
-                    {valeur !== null ? valeur.toFixed(1) : "—"}
+                    {valeur !== null ? uneDecimale(valeur) : "—"}
                     <span className="ml-1 text-base font-normal text-muted-foreground">/100</span>
                   </p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">{carte.definition}</p>
@@ -79,15 +80,15 @@ export function EsgPerformanceSection() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-base text-brand-blue">Couverture et distribution</CardTitle>
+          <CardTitle className="text-base text-foreground">Couverture et distribution</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-brand-grey">
-            <span className="font-semibold text-brand-blue tabular-nums">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">
               {data.companies_with_score}
             </span>{" "}
             entreprise{data.companies_with_score > 1 ? "s" : ""} sur{" "}
-            <span className="font-semibold text-brand-blue tabular-nums">
+            <span className="font-semibold text-foreground tabular-nums">
               {data.companies_in_scope}
             </span>{" "}
             publiée{data.companies_in_scope > 1 ? "s" : ""} disposent d'un score exploitable.
@@ -104,7 +105,7 @@ function DistributionBars({ distribution }: { distribution: TrancheScorePublic[]
 
   if (total === 0) {
     return (
-      <p className="text-sm text-brand-grey">
+      <p className="text-sm text-muted-foreground">
         Aucune entreprise avec un score exploitable pour l'instant.
       </p>
     );
@@ -117,7 +118,7 @@ function DistributionBars({ distribution }: { distribution: TrancheScorePublic[]
           key={`${tranche.lower_bound}-${tranche.upper_bound}`}
           className="flex items-center gap-3"
         >
-          <span className="w-16 shrink-0 text-xs text-brand-grey">
+          <span className="w-16 shrink-0 text-xs text-muted-foreground">
             {tranche.lower_bound}–{tranche.upper_bound}
           </span>
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
@@ -126,7 +127,7 @@ function DistributionBars({ distribution }: { distribution: TrancheScorePublic[]
               style={{ width: `${(tranche.company_count / total) * 100}%` }}
             />
           </div>
-          <span className="w-6 shrink-0 text-right text-xs tabular-nums text-brand-blue">
+          <span className="w-6 shrink-0 text-right text-xs tabular-nums text-foreground">
             {tranche.company_count}
           </span>
         </div>

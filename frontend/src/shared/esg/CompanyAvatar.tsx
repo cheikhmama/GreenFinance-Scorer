@@ -65,8 +65,8 @@ export function CompanyIdentity({
     <div className="flex items-center gap-2">
       <CompanyAvatar nom={nom} logo={logo} className={avatarClassName} />
       <div className="min-w-0">
-        <p className="truncate font-medium text-brand-blue">{nom}</p>
-        {secteur ? <p className="truncate text-xs text-brand-grey">{secteur}</p> : null}
+        <p className="truncate font-medium text-foreground">{nom}</p>
+        {secteur ? <p className="truncate text-xs text-muted-foreground">{secteur}</p> : null}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type { EntrepriseAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { libellePays } from "@/shared/format/pays";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import {
   libelleStatutInscription,
@@ -45,7 +46,7 @@ export function AllCompaniesSection() {
       <CardContent>
         <label htmlFor="toutes-entreprises-recherche" className="relative mb-4 block max-w-sm">
           <span className="sr-only">Rechercher une entreprise</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="toutes-entreprises-recherche"
             value={recherche}
@@ -62,11 +63,11 @@ export function AllCompaniesSection() {
         ) : null}
 
         {entreprises.length > 0 ? (
-          <div className="space-y-3">
+          <ul className="divide-y rounded-lg border">
             {entreprises.map((entreprise) => (
               <EntrepriseLigne key={entreprise.id} entreprise={entreprise} />
             ))}
-          </div>
+          </ul>
         ) : null}
 
         {entreprises.length > 0 && hasNextPage ? (
@@ -116,102 +117,96 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
   }
 
   return (
-    <Card className="shadow-none">
-      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <CompanyAvatar
-            nom={entreprise.name}
-            logo={entreprise.logo}
-            className="size-14 shrink-0"
-          />
-          <div className="min-w-0">
-            <Link
-              to={`/admin/entreprises/${entreprise.id}`}
-              className="font-semibold text-brand-blue hover:underline"
-            >
-              {entreprise.name}
-            </Link>
-            <p className="text-sm text-brand-grey">
-              {entreprise.sector} — {entreprise.country}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {entreprise.status !== "ACTIVE" ? (
-                <Badge variant={variantStatutInscription(entreprise.status)}>
-                  {libelleStatutInscription(entreprise.status)}
-                </Badge>
-              ) : null}
-              {entreprise.latest_report_status ? (
-                <Badge variant={variantStatutRapport(entreprise.latest_report_status)}>
-                  {libelleStatutRapport(entreprise.latest_report_status)}
-                </Badge>
-              ) : (
-                <Badge variant="secondary">Aucun rapport</Badge>
-              )}
-              <Badge variant={entreprise.owner_user_id ? "success" : "outline"}>
-                {entreprise.owner_user_id ? "Compte lié" : "Sans compte"}
+    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-10 shrink-0" />
+        <div className="min-w-0">
+          <Link
+            to={`/admin/entreprises/${entreprise.id}`}
+            className="font-semibold text-foreground hover:underline"
+          >
+            {entreprise.name}
+          </Link>
+          <p className="text-sm text-muted-foreground">
+            {entreprise.sector} — {libellePays(entreprise.country)}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {entreprise.status !== "ACTIVE" ? (
+              <Badge variant={variantStatutInscription(entreprise.status)}>
+                {libelleStatutInscription(entreprise.status)}
               </Badge>
-            </div>
-            {actionError ? <p className="mt-1 text-xs text-destructive">{actionError}</p> : null}
+            ) : null}
+            {entreprise.latest_report_status ? (
+              <Badge variant={variantStatutRapport(entreprise.latest_report_status)}>
+                {libelleStatutRapport(entreprise.latest_report_status)}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Aucun rapport</Badge>
+            )}
+            <Badge variant={entreprise.owner_user_id ? "success" : "outline"}>
+              {entreprise.owner_user_id ? "Compte lié" : "Sans compte"}
+            </Badge>
           </div>
+          {actionError ? <p className="mt-1 text-xs text-destructive">{actionError}</p> : null}
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-          {entreprise.latest_report_id ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>
-                <FileText className="size-4" />
-                Voir le rapport
-              </Link>
-            </Button>
-          ) : null}
-          {enAttenteDeDecision && entreprise.latest_report_id ? (
-            <Button
-              size="sm"
-              disabled={validate.isPending}
-              onClick={() => {
-                setActionError(null);
-                validate.mutate(
-                  { comment: null },
-                  {
-                    onError: (err) =>
-                      setActionError(
-                        err instanceof ApiError ? err.message : "Échec de la validation.",
-                      ),
-                  },
-                );
-              }}
-            >
-              <CheckCircle2 className="size-4" />
-              Valider
-            </Button>
-          ) : null}
-          {/* Une inscription en attente ne se suspend ni ne se réactive : seule sa validation
-              (tâche 1.4) la rend active. */}
-          {entreprise.status === "ACTIVE" ? (
-            <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
-              Suspendre
-            </Button>
-          ) : null}
-          {entreprise.status === "SUSPENDED" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={reactivate.isPending}
-              onClick={() => {
-                setActionError(null);
-                reactivate.mutate(entreprise.id, {
+      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+        {entreprise.latest_report_id ? (
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>
+              <FileText className="size-4" />
+              Voir le rapport
+            </Link>
+          </Button>
+        ) : null}
+        {enAttenteDeDecision && entreprise.latest_report_id ? (
+          <Button
+            size="sm"
+            disabled={validate.isPending}
+            onClick={() => {
+              setActionError(null);
+              validate.mutate(
+                { comment: null },
+                {
                   onError: (err) =>
                     setActionError(
-                      err instanceof ApiError ? err.message : "Échec de la réactivation.",
+                      err instanceof ApiError ? err.message : "Échec de la validation.",
                     ),
-                });
-              }}
-            >
-              Réactiver
-            </Button>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
+                },
+              );
+            }}
+          >
+            <CheckCircle2 className="size-4" />
+            Valider
+          </Button>
+        ) : null}
+        {/* Une inscription en attente ne se suspend ni ne se réactive : seule sa validation
+              (tâche 1.4) la rend active. */}
+        {entreprise.status === "ACTIVE" ? (
+          <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
+            Suspendre
+          </Button>
+        ) : null}
+        {entreprise.status === "SUSPENDED" ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={reactivate.isPending}
+            onClick={() => {
+              setActionError(null);
+              reactivate.mutate(entreprise.id, {
+                onError: (err) =>
+                  setActionError(
+                    err instanceof ApiError ? err.message : "Échec de la réactivation.",
+                  ),
+              });
+            }}
+          >
+            Réactiver
+          </Button>
+        ) : null}
+      </div>
+    </li>
   );
 }

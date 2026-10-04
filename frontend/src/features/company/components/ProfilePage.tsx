@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { EntreprisePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { formatMontant } from "@/shared/format/etatPosition";
+import { libellePays } from "@/shared/format/pays";
 import { PageShell } from "@/shared/layout/PageShell";
 import { ProfileIdentityCard } from "@/shared/profile/ProfileIdentityCard";
 import { Badge } from "@/shared/ui/badge";
@@ -75,7 +76,7 @@ function FicheEntreprise({ entreprise }: { entreprise: EntreprisePublic }) {
           <div className="min-w-0">
             <p className="font-semibold text-foreground">{entreprise.name}</p>
             <p className="text-sm text-muted-foreground">
-              {entreprise.sector} — {entreprise.country}
+              {entreprise.sector} — {libellePays(entreprise.country)}
             </p>
           </div>
         </div>

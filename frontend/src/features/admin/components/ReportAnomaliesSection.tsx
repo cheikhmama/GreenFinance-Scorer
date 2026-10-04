@@ -11,6 +11,7 @@ import {
   useOrphanReportsInValidation,
   useRetryExtraction,
 } from "../api";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 function BoutonRelancer({ rapportId }: { rapportId: string }) {
   const retry = useRetryExtraction();
@@ -67,17 +68,18 @@ export function ReportAnomaliesSection() {
         ) : null}
         {echecsExtraction && echecsExtraction.length > 0 ? (
           <div>
-            <p className="mb-2 text-sm font-medium text-brand-blue">
+            <p className="mb-2 text-sm font-medium text-foreground">
               Extractions en échec ({echecsExtraction.length})
             </p>
             <ul className="divide-y">
               {echecsExtraction.map((rapport) => (
                 <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
                   <div>
-                    <p className="text-sm font-medium text-brand-blue">
-                      {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                    <p className="text-sm font-medium text-foreground">
+                      {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                     </p>
-                    <p className="text-sm text-brand-grey">
+                    <p className="text-sm text-muted-foreground">
                       {libelleCauseExtraction(rapport.extraction_error)}
                       {rapport.extraction_attempts > 0
                         ? ` — ${rapport.extraction_attempts} tentative(s)`
@@ -97,14 +99,15 @@ export function ReportAnomaliesSection() {
         ) : null}
         {orphelins && orphelins.length > 0 ? (
           <div>
-            <p className="mb-2 text-sm font-medium text-brand-blue">
+            <p className="mb-2 text-sm font-medium text-foreground">
               En attente de décision, sans avis d'audit ({orphelins.length})
             </p>
             <ul className="divide-y">
               {orphelins.map((rapport) => (
                 <li key={rapport.id} className="flex items-center justify-between gap-4 py-2">
-                  <p className="text-sm font-medium text-brand-blue">
-                    {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                  <p className="text-sm font-medium text-foreground">
+                    {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                   </p>
                   <Button asChild size="sm" variant="outline">
                     <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>

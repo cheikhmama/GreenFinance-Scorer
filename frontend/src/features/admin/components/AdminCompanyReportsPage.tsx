@@ -11,6 +11,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { PageHeader } from "@/shared/ui/page-header";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useCompanyReports } from "../api";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 export function AdminCompanyReportsPage() {
   const { entrepriseId } = useParams<{ entrepriseId: string }>();
@@ -39,10 +40,10 @@ export function AdminCompanyReportsPage() {
           {rapports.map((rapport) => (
             <li key={rapport.id} className="flex items-center justify-between gap-4 p-4">
               <div>
-                <p className="font-medium text-brand-blue">
-                  {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                <p className="font-medium text-foreground">
+                  {titreDeclaration(rapport)}
                 </p>
-                <p className="text-xs text-brand-grey">
+                <p className="text-xs text-muted-foreground">
                   {libelleDateRapport(rapport)} — version {rapport.version}
                 </p>
               </div>

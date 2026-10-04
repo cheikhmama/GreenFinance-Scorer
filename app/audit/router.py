@@ -18,6 +18,9 @@ from app.audit.preuves import fichier_preuve
 from app.audit.revue import enregistrer_revue, lister_revues_de_l_auditeur, pre_score
 from app.audit.schemas import (
     AvisAuditAdmin,
+    AvisHistorique,
+    DossierAuditeur,
+    DossierAuditeurDetail,
     MetricReviewEntry,
     MetricReviewRequest,
     PreScore,
@@ -25,6 +28,7 @@ from app.audit.schemas import (
 )
 from app.auth.models import User
 from app.auth.permissions import require_role
+from app.company.models import Company
 from app.core import storage
 from app.core.dependencies import get_session
 from app.core.enums import ReportStatus, Role
@@ -38,27 +42,38 @@ router = APIRouter(tags=["audit"])
 
 @router.get(
     "/audit/rapports",
-    response_model=list[RapportESGPublic],
+    response_model=list[DossierAuditeur],
     operation_id="listAssignedReports",
     summary="Lister les dossiers affectés à l'auditeur, en attente d'avis",
 )
 def lister_mes_dossiers(
     current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
-) -> list[ESGReport]:
-    return list(
-        session.exec(
-            select(ESGReport).where(
-                ESGReport.auditor_id == current_user.id,
-                ESGReport.status == ReportStatus.IN_AUDIT,
-            )
-        ).all()
-    )
+) -> list[DossierAuditeur]:
+    lignes = session.exec(
+        select(ESGReport, Company)
+        .join(Company, col(Company.id) == col(ESGReport.company_id))
+        .where(
+            ESGReport.auditor_id == current_user.id,
+            ESGReport.status == ReportStatus.IN_AUDIT,
+        )
+        .order_by(col(ESGReport.submitted_at).asc())
+    ).all()
+    return [
+        DossierAuditeur.model_validate(
+            {
+                **RapportESGPublic.model_validate(rapport).model_dump(),
+                "company_name": entreprise.name,
+                "company_sector": entreprise.sector,
+            }
+        )
+        for rapport, entreprise in lignes
+    ]
 
 
 @router.get(
     "/audit/rapports/{rapport_id}",
-    response_model=RapportESGDetail,
+    response_model=DossierAuditeurDetail,
     operation_id="getAssignedReport",
     summary="Consulter le détail d'un dossier affecté à l'auditeur",
 )
@@ -66,14 +81,22 @@ def consulter_dossier(
     rapport_id: uuid.UUID,
     current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
-) -> RapportESGDetail:
+) -> DossierAuditeurDetail:
     rapport = session.get(ESGReport, rapport_id)
     # Pas de restriction de statut ici (contrairement à la liste ci-dessus) : un auditeur peut
     # rouvrir un dossier sur lequel il a déjà rendu un avis.
     if rapport is None or rapport.auditor_id != current_user.id:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
+    entreprise = session.get(Company, rapport.company_id)
+    return DossierAuditeurDetail.model_validate(
+        {
+            **detail.model_dump(),
+            "official_score": score_public(session, rapport_id),
+            "company_name": entreprise.name if entreprise else "",
+            "company_sector": entreprise.sector if entreprise else "",
+        }
+    )
 
 
 @router.get(
@@ -93,21 +116,33 @@ def consulter_preuve_route(
 
 @router.get(
     "/audit/historique",
-    response_model=list[AvisAuditAdmin],
+    response_model=list[AvisHistorique],
     operation_id="listMyAuditOpinions",
     summary="Lister l'historique des avis déjà rendus par l'auditeur",
 )
 def lister_historique_route(
     current_user: User = Depends(require_role(Role.AUDITOR)),
     session: Session = Depends(get_session),
-) -> list[AuditOpinion]:
-    return list(
-        session.exec(
-            select(AuditOpinion)
-            .where(AuditOpinion.auditor_id == current_user.id)
-            .order_by(col(AuditOpinion.submitted_at).desc())
-        ).all()
-    )
+) -> list[AvisHistorique]:
+    lignes = session.exec(
+        select(AuditOpinion, ESGReport, Company)
+        .join(ESGReport, col(ESGReport.id) == col(AuditOpinion.report_id))
+        .join(Company, col(Company.id) == col(ESGReport.company_id))
+        .where(AuditOpinion.auditor_id == current_user.id)
+        .order_by(col(AuditOpinion.submitted_at).desc())
+    ).all()
+    return [
+        AvisHistorique.model_validate(
+            {
+                **AvisAuditAdmin.model_validate(avis).model_dump(),
+                "company_name": entreprise.name,
+                "report_type": rapport.type,
+                "fiscal_year": rapport.fiscal_year,
+                "report_version": rapport.version,
+            }
+        )
+        for avis, rapport, entreprise in lignes
+    ]
 
 
 @router.post(

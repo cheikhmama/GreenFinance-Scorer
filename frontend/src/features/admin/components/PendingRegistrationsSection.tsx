@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { libellePays } from "@/shared/format/pays";
 import {
   libelleStatutInscription,
   variantStatutInscription,
@@ -61,7 +62,7 @@ export function PendingRegistrationsSection() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {inscription.sector} · {inscription.country}
+                    {inscription.sector} · {libellePays(inscription.country)}
                     {inscription.tax_id
                       ? ` · ${inscription.tax_id_type ?? "ID"} ${inscription.tax_id}`
                       : ""}

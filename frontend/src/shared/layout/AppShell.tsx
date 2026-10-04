@@ -1,5 +1,5 @@
 import { ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, NavLink, Outlet, useMatches } from "react-router-dom";
 import { useCurrentUser, useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/shared/notifications/NotificationBell";
@@ -74,28 +74,37 @@ export function AppShell() {
         </Button>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-6" aria-label={`Navigation ${config.label}`}>
+      <nav
+        className="flex-1 space-y-1 overflow-y-auto px-3 py-6"
+        aria-label={`Navigation ${config.label}`}
+      >
         <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Espace {config.label}
         </p>
-        {config.items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              cn(
-                "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
-                isActive
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white",
-              )
-            }
-          >
-            <item.icon className="size-[18px]" />
-            {item.label}
-          </NavLink>
+        {config.items.map((item, i) => (
+          <Fragment key={item.to}>
+            {item.groupe && item.groupe !== config.items[i - 1]?.groupe ? (
+              <p className="mb-2 mt-5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {item.groupe}
+              </p>
+            ) : null}
+            <NavLink
+              to={item.to}
+              end={item.end}
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                cn(
+                  "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
+                  isActive
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-300 hover:bg-white/5 hover:text-white",
+                )
+              }
+            >
+              <item.icon className="size-[18px]" />
+              {item.label}
+            </NavLink>
+          </Fragment>
         ))}
       </nav>
 

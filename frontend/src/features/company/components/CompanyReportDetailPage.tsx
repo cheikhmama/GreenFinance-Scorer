@@ -11,6 +11,7 @@ import type {
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import {
   formatValeur,
+  libelleCategorieGes,
   libelleIndicateur,
   libelleMethode,
   libellePilier,
@@ -329,7 +330,7 @@ function ValeursExtraites({ rapport }: { rapport: RapportESGDetail }) {
                       Scope {donnee.scope}
                       {donnee.ghg_category ? (
                         <span className="block text-xs font-normal text-muted-foreground">
-                          {donnee.ghg_category}
+                          {libelleCategorieGes(donnee.ghg_category)}
                         </span>
                       ) : null}
                     </TableCell>

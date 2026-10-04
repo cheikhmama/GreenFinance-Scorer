@@ -35,7 +35,7 @@ export function AdminAuditeursPage() {
         <CardContent className="space-y-4">
           <label htmlFor="auditeurs-recherche" className="relative block max-w-sm">
             <span className="sr-only">Rechercher un auditeur par e-mail</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="auditeurs-recherche"
               value={recherche}
@@ -66,16 +66,16 @@ export function AdminAuditeursPage() {
               <TableBody>
                 {auditeurs.map((auditeur) => (
                   <TableRow key={auditeur.auditor_id}>
-                    <TableCell className="font-medium text-brand-blue">{auditeur.email}</TableCell>
+                    <TableCell className="font-medium text-foreground">{auditeur.email}</TableCell>
                     <TableCell className="tabular-nums">{auditeur.assigned_reports}</TableCell>
                     <TableCell>
                       {auditeur.overdue_reports > 0 ? (
                         <Badge variant="warning">{auditeur.overdue_reports}</Badge>
                       ) : (
-                        <span className="tabular-nums text-brand-grey">0</span>
+                        <span className="tabular-nums text-muted-foreground">0</span>
                       )}
                     </TableCell>
-                    <TableCell className="tabular-nums text-brand-grey">
+                    <TableCell className="tabular-nums text-muted-foreground">
                       {auditeur.opinions_submitted}
                     </TableCell>
                   </TableRow>

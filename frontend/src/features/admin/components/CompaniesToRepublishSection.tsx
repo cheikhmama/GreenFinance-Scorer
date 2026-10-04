@@ -37,7 +37,7 @@ export function CompaniesToRepublishSection() {
           <ul className="divide-y">
             {entreprises.map((entreprise) => (
               <li key={entreprise.id} className="flex items-center justify-between gap-4 py-3">
-                <span className="text-brand-blue">
+                <span className="text-foreground">
                   {entreprise.name} — {entreprise.sector}
                 </span>
                 <Button

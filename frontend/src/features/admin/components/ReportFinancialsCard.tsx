@@ -55,7 +55,7 @@ export function ReportFinancialsCard({ rapportId }: { rapportId: string }) {
       <CardHeader>
         <CardTitle>Données financières de l’exercice (PCAF)</CardTitle>
         {data && data.status !== "VALIDATED" ? (
-          <p className="text-sm text-brand-grey">
+          <p className="text-sm text-muted-foreground">
             Prises en compte dans l’empreinte carbone une fois ce rapport validé.
           </p>
         ) : null}
@@ -121,7 +121,7 @@ function FormulaireFinancier({
   const erreurServeur = mutation.error;
   return (
     <form onSubmit={enregistrer} className="space-y-4" noValidate>
-      <p className="text-sm text-brand-grey">
+      <p className="text-sm text-muted-foreground">
         Le chiffre d’affaires sert à la WACI, l’EVIC (valeur d’entreprise trésorerie incluse) au
         facteur d’attribution des émissions financées.
       </p>
@@ -174,7 +174,7 @@ function FormulaireFinancier({
         </Alert>
       ) : null}
       {mutation.isSuccess ? (
-        <p role="status" className="text-sm text-brand-grey">
+        <p role="status" className="text-sm text-muted-foreground">
           Données financières enregistrées.
         </p>
       ) : null}

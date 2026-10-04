@@ -16,6 +16,7 @@ from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, func, select
 
+from app.admin.schemas import RapportAdminListe
 from app.audit.models import AuditOpinion
 from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Company
@@ -26,8 +27,25 @@ from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
 from app.ingestion.models import ESGReport
+from app.ingestion.schemas import RapportESGPublic
 from app.scoring.engine import calculer_score, score_officiel
 from app.scoring.models import Score
+
+
+def avec_entreprises(session: Session, rapports: list[ESGReport]) -> list[RapportAdminListe]:
+    """Joint le nom de l'entreprise à chaque rapport d'une file, en une requête."""
+    ids = {r.company_id for r in rapports}
+    noms = (
+        dict(session.exec(select(Company.id, Company.name).where(col(Company.id).in_(ids))).all())
+        if ids
+        else {}
+    )
+    return [
+        RapportAdminListe.model_validate(
+            {**RapportESGPublic.model_validate(r).model_dump(), "company_name": noms.get(r.company_id, "")}
+        )
+        for r in rapports
+    ]
 from app.worker.queue import FileIndisponible, enfiler
 
 logger = structlog.get_logger(__name__)

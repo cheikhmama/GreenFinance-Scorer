@@ -504,6 +504,9 @@ def test_lister_rapports_a_affecter_filtre_correctement(session) -> None:
     assert str(qualifiant.id) in ids
     assert str(non_extrait.id) not in ids
     assert str(en_cours.id) not in ids
+    # Chaque ligne nomme l'entreprise (sinon seuls le type et l'année distinguent deux rapports).
+    ligne = next(item for item in response.json() if item["id"] == str(qualifiant.id))
+    assert ligne["company_name"] == entreprise.name
 
 
 def test_affecter_happy_path(session) -> None:
@@ -1245,6 +1248,27 @@ def test_lister_journal_audit_pagine_et_filtre_par_action(session) -> None:
     assert body["pages"] == 2
     assert len(body["items"]) == 2
     assert all(item["action"] == marqueur_action for item in body["items"])
+
+
+def test_journal_audit_nomme_l_acteur(session) -> None:
+    """L'administrateur lit qui a agi sans recouper les identifiants ; une action anonyme (ex.
+    inscription publique) reste sans acteur."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    marqueur = f"action-acteur-{uuid.uuid4()}"
+    auditer(session, admin.id, marqueur, "User", admin.id, "success")
+    auditer(session, None, marqueur, "Company", None, "success")
+    session.commit()
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/journal-audit", params={"action": marqueur}
+    )
+
+    assert response.status_code == 200
+    par_type = {item["resource_type"]: item for item in response.json()["items"]}
+    assert par_type["User"]["actor_name"] == admin.name
+    assert par_type["User"]["actor_email"] == admin.email
+    assert par_type["Company"]["actor_name"] is None
+    assert par_type["Company"]["actor_email"] is None
 
 
 def _dashboard(authed_client: TestClient) -> dict:

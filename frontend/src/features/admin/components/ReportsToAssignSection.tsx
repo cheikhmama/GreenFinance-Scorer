@@ -9,6 +9,7 @@ import { Select } from "@/shared/ui/select";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAssignReport, useReportsToAssign, useUtilisateursSelectionnables } from "../api";
 import { Role } from "../schemas";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 /** File d'affectation (Phase 4 §4.4) — un rapport n'apparaît ici que l'extraction terminée
  * (app/admin/review_queue.py::lister_rapports_a_affecter). Auditeur choisi parmi les comptes
@@ -34,7 +35,8 @@ export function ReportsToAssignSection() {
               <LigneAffectation
                 key={rapport.id}
                 rapportId={rapport.id}
-                type={rapport.type}
+                titre={titreDeclaration(rapport)}
+                entreprise={rapport.company_name ?? ""}
                 auditeurs={auditeurs ?? []}
               />
             ))}
@@ -47,11 +49,13 @@ export function ReportsToAssignSection() {
 
 function LigneAffectation({
   rapportId,
-  type,
+  titre,
+  entreprise,
   auditeurs,
 }: {
   rapportId: string;
-  type: string;
+  titre: string;
+  entreprise: string;
   auditeurs: { id: string; email: string }[];
 }) {
   const assign = useAssignReport(rapportId);
@@ -76,14 +80,15 @@ function LigneAffectation({
       <div>
         <Link
           to={`/admin/rapports/${rapportId}`}
-          className="font-semibold text-brand-blue hover:underline"
+          className="font-semibold text-foreground hover:underline"
         >
-          {type}
+          {entreprise || titre}
         </Link>
+        {entreprise ? <p className="text-sm text-muted-foreground">{titre}</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
-      <div className="flex items-center gap-2">
-        <Select value={auditeurId} onChange={(e) => setAuditeurId(e.target.value)} className="w-56">
+      <div className="flex w-full items-center gap-2 sm:w-auto">
+        <Select value={auditeurId} onChange={(e) => setAuditeurId(e.target.value)} className="w-full sm:w-56">
           <option value="">Choisir un auditeur…</option>
           {auditeurs.map((auditeur) => (
             <option key={auditeur.id} value={auditeur.id}>

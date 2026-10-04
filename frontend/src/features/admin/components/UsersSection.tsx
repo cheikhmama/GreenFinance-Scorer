@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { libelleRole } from "@/shared/format/role";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -102,7 +103,7 @@ export function UsersSection() {
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="utilisateurs-recherche" className="relative min-w-56 flex-1">
               <span className="sr-only">Rechercher un utilisateur par e-mail ou nom</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="utilisateurs-recherche"
                 value={recherche}
@@ -111,7 +112,7 @@ export function UsersSection() {
                 className="pl-9"
               />
             </label>
-            <span className="text-sm text-brand-grey">Rôle :</span>
+            <span className="text-sm text-muted-foreground">Rôle :</span>
             <Select
               value={roleAffiche}
               onChange={(event) =>
@@ -127,7 +128,7 @@ export function UsersSection() {
             >
               {ROLES_CONSULTABLES.map((role) => (
                 <option key={role} value={role}>
-                  {role}
+                  {libelleRole(role)}
                 </option>
               ))}
             </Select>
@@ -159,7 +160,12 @@ export function UsersSection() {
                   <TableRow key={utilisateur.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span className="text-brand-blue">{utilisateur.email}</span>
+                        <div className="min-w-0">
+                          {utilisateur.name ? (
+                            <p className="font-medium text-foreground">{utilisateur.name}</p>
+                          ) : null}
+                          <p className="truncate text-sm text-muted-foreground">{utilisateur.email}</p>
+                        </div>
                         {!utilisateur.active ? <Badge variant="secondary">désactivé</Badge> : null}
                       </div>
                     </TableCell>
@@ -303,7 +309,7 @@ function FormulaireCreation({
                 <Select {...field}>
                   {ROLES_ATTRIBUABLES.map((role) => (
                     <option key={role} value={role}>
-                      {role}
+                      {libelleRole(role)}
                     </option>
                   ))}
                 </Select>

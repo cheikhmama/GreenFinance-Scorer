@@ -2,8 +2,11 @@ import { useParams } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
 import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
+import { libellePays } from "@/shared/format/pays";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
+import { PageSkeleton } from "@/shared/ui/skeleton";
 import { useCompanyDetailForInstitution } from "../api";
 
 /** Fiche entreprise publiée, consultée depuis le périmètre d'un projet (voir
@@ -13,14 +16,15 @@ export function CompanyDetailPage() {
   const { entrepriseId = "" } = useParams();
   const { data: entreprise, isLoading, isError } = useCompanyDetailForInstitution(entrepriseId);
 
-  if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (isError || !entreprise) return <p className="text-destructive">Entreprise introuvable.</p>;
 
   return (
     <div className="space-y-6">
+      <BackLink to="/institution/entreprises">Entreprises</BackLink>
       <PageHeader
         title={entreprise.name}
-        description={`${entreprise.sector} — ${entreprise.country}. ${entreprise.description ?? "Fiche entreprise publiée."}`}
+        description={`${entreprise.sector} — ${libellePays(entreprise.country)}. ${entreprise.description ?? "Fiche entreprise publiée."}`}
       />
 
       <Card>
@@ -45,7 +49,7 @@ export function CompanyDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Émissions Scope 1/2/3</CardTitle>
+          <CardTitle>Émissions (Scopes 1, 2 et 3)</CardTitle>
         </CardHeader>
         <CardContent>
           <CarbonSummary carbone={entreprise.carbon} />

@@ -13,6 +13,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import {
   useCrossValidationReport,
   useDeleteReferenceDataset,
@@ -99,7 +100,7 @@ function FormulaireImport({ onImporte }: { onImporte: (datasetId: string) => voi
 
   return (
     <form onSubmit={envoyer} className="space-y-4" noValidate>
-      <p className="text-sm text-brand-grey">
+      <p className="text-sm text-muted-foreground">
         Fichier CSV avec une colonne <code>isin</code> ou <code>lei</code> et au moins une colonne{" "}
         <code>environmental</code>, <code>social</code>, <code>governance</code> ou{" "}
         <code>total</code>. Les autres colonnes sont ignorées ; le rapprochement ne se fait jamais
@@ -178,82 +179,84 @@ function FormulaireImport({ onImporte }: { onImporte: (datasetId: string) => voi
 function Rapport({ rapport }: { rapport: CrossValidationReport }) {
   return (
     <div className="space-y-6">
-      <p className="text-sm text-brand-grey">
+      <p className="text-sm text-muted-foreground">
         {rapport.matched} entreprise(s) rapprochée(s), {rapport.unmatched} ligne(s) hors
         comparaison. Scores du jeu ramenés sur 0-100 avant l’écart moyen ; la corrélation de rang
         n’en dépend pas.
       </p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-muted-foreground">
-            <th className="py-2 pr-4 font-medium">Score</th>
-            <th className="py-2 pr-4 font-medium">Paires</th>
-            <th className="py-2 pr-4 font-medium">Spearman</th>
-            <th className="py-2 font-medium">Écart absolu moyen (/100)</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Score</TableHead>
+            <TableHead>Paires</TableHead>
+            <TableHead>Spearman</TableHead>
+            <TableHead>Écart absolu moyen (/100)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rapport.agreement.map((accord) => (
-            <tr key={accord.score} className="border-t">
-              <td className="py-2 pr-4">{LIBELLES_SCORE[accord.score] ?? accord.score}</td>
-              <td className="py-2 pr-4 tabular-nums">{accord.pairs}</td>
-              <td className="py-2 pr-4 tabular-nums">{nombre(accord.spearman, 2)}</td>
-              <td className="py-2 tabular-nums">{nombre(accord.mean_absolute_difference)}</td>
-            </tr>
+            <TableRow key={accord.score} className="border-t">
+              <TableCell>{LIBELLES_SCORE[accord.score] ?? accord.score}</TableCell>
+              <TableCell className="tabular-nums">{accord.pairs}</TableCell>
+              <TableCell className="tabular-nums">{nombre(accord.spearman, 2)}</TableCell>
+              <TableCell className="tabular-nums">
+                {nombre(accord.mean_absolute_difference)}
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
       {rapport.matches.length > 0 ? (
-        <table className="w-full text-sm">
+        <Table>
           <caption className="pb-2 text-left font-medium">
             Entreprises rapprochées (score global)
           </caption>
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-2 pr-4 font-medium">Ligne</th>
-              <th className="py-2 pr-4 font-medium">Entreprise</th>
-              <th className="py-2 pr-4 font-medium">Jeu de données</th>
-              <th className="py-2 font-medium">Plateforme</th>
-            </tr>
-          </thead>
-          <tbody>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ligne</TableHead>
+              <TableHead>Entreprise</TableHead>
+              <TableHead>Jeu de données</TableHead>
+              <TableHead>Plateforme</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rapport.matches.map((correspondance) => (
-              <tr key={correspondance.line} className="border-t">
-                <td className="py-2 pr-4 tabular-nums">{correspondance.line}</td>
-                <td className="py-2 pr-4">{correspondance.company_name}</td>
-                <td className="py-2 pr-4 tabular-nums">
+              <TableRow key={correspondance.line} className="border-t">
+                <TableCell className="tabular-nums">{correspondance.line}</TableCell>
+                <TableCell>{correspondance.company_name}</TableCell>
+                <TableCell className="tabular-nums">
                   {nombre(correspondance.dataset_scores.GLOBAL)}
-                </td>
-                <td className="py-2 tabular-nums">
+                </TableCell>
+                <TableCell className="tabular-nums">
                   {nombre(correspondance.platform_scores.GLOBAL)}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       ) : null}
       {rapport.unmatched_lines.length > 0 ? (
-        <table className="w-full text-sm">
+        <Table>
           <caption className="pb-2 text-left font-medium">Lignes hors comparaison</caption>
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-2 pr-4 font-medium">Ligne</th>
-              <th className="py-2 pr-4 font-medium">Identifiant</th>
-              <th className="py-2 pr-4 font-medium">Nom (fichier)</th>
-              <th className="py-2 font-medium">Motif</th>
-            </tr>
-          </thead>
-          <tbody>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ligne</TableHead>
+              <TableHead>Identifiant</TableHead>
+              <TableHead>Nom (fichier)</TableHead>
+              <TableHead>Motif</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rapport.unmatched_lines.map((ligne) => (
-              <tr key={ligne.line} className="border-t">
-                <td className="py-2 pr-4 tabular-nums">{ligne.line}</td>
-                <td className="py-2 pr-4 font-mono">{ligne.isin ?? ligne.lei}</td>
-                <td className="py-2 pr-4">{ligne.company_name ?? "—"}</td>
-                <td className="py-2">{LIBELLES_MOTIF[ligne.reason]}</td>
-              </tr>
+              <TableRow key={ligne.line} className="border-t">
+                <TableCell className="tabular-nums">{ligne.line}</TableCell>
+                <TableCell className="font-mono">{ligne.isin ?? ligne.lei}</TableCell>
+                <TableCell>{ligne.company_name ?? "—"}</TableCell>
+                <TableCell>{LIBELLES_MOTIF[ligne.reason]}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       ) : null}
     </div>
   );
@@ -301,14 +304,14 @@ export function CrossValidationPage() {
         </CardHeader>
         <CardContent>
           {jeux && jeux.length === 0 ? (
-            <p className="text-sm text-brand-grey">Aucun jeu de données importé.</p>
+            <p className="text-sm text-muted-foreground">Aucun jeu de données importé.</p>
           ) : null}
           <ul className="divide-y">
             {jeux?.map((jeu) => (
               <li key={jeu.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <div className="text-sm">
                   <p className="font-medium">{jeu.name}</p>
-                  <p className="text-brand-grey">
+                  <p className="text-muted-foreground">
                     {jeu.row_count} ligne(s) · {jeu.licence} ·{" "}
                     <a href={jeu.source_url} className="underline" target="_blank" rel="noreferrer">
                       source
@@ -338,7 +341,7 @@ export function CrossValidationPage() {
             <CardTitle>Comparaison</CardTitle>
           </CardHeader>
           <CardContent>
-            {rapport.isLoading ? <p className="text-brand-grey">Calcul…</p> : null}
+            {rapport.isLoading ? <p className="text-muted-foreground">Calcul…</p> : null}
             {rapport.isError ? <p className="text-destructive">Comparaison indisponible.</p> : null}
             {rapport.data ? <Rapport rapport={rapport.data} /> : null}
           </CardContent>

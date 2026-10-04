@@ -24,6 +24,7 @@ from app.core.enums import (
     Role,
     TaxIdType,
 )
+from app.ingestion.schemas import RapportESGPublic
 
 
 class AffecterAuditeurRequest(BaseModel):
@@ -131,6 +132,10 @@ class JournalAuditPublic(BaseModel):
     old_value: str | None
     new_value: str | None
     correlation_id: str | None
+    # Qui a agi, lisible sans recouper les identifiants (absent pour une action anonyme, ex. une
+    # inscription ou une connexion échouée, ou un compte supprimé depuis).
+    actor_name: str | None = None
+    actor_email: str | None = None
 
 
 class TableauDeBordAdmin(BaseModel):
@@ -459,6 +464,13 @@ class KycCheck(BaseModel):
     result: KycCheckResult
     detail: str
     source: str
+
+
+class RapportAdminListe(RapportESGPublic):
+    """Ligne d'une file de rapports de l'Administrateur, avec l'entreprise : sans son nom, deux
+    rapports ne se distinguaient que par leur type et leur année."""
+
+    company_name: str = ""
 
 
 class PendingRegistration(BaseModel):

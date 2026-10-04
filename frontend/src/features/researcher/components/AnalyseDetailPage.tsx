@@ -5,12 +5,14 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
+import { PageSkeleton } from "@/shared/ui/skeleton";
 import { Textarea } from "@/shared/ui/textarea";
 import {
   useAnalysisDetail,
@@ -27,7 +29,7 @@ export function AnalyseDetailPage() {
   const soumettre = useSubmitAnalysis(analyseId);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (isError || !analyse) return <p className="text-destructive">Analyse introuvable.</p>;
 
   const modifiable = analyse.status === "BROUILLON";
@@ -35,6 +37,7 @@ export function AnalyseDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/researcher/analyses">Analyses</BackLink>
       <PageHeader
         title={analyse.title}
         description={`Version ${analyse.version} — analyse comparative sur des entreprises publiées.`}
@@ -60,9 +63,9 @@ export function AnalyseDetailPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-brand-blue">Contenu</CardTitle>
+            <CardTitle className="text-base text-foreground">Contenu</CardTitle>
           </CardHeader>
-          <CardContent className="whitespace-pre-wrap text-sm text-brand-grey">
+          <CardContent className="whitespace-pre-wrap text-sm text-muted-foreground">
             {analyse.content}
           </CardContent>
         </Card>
@@ -102,7 +105,7 @@ function HistoriqueVersions({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base text-brand-blue">Historique des versions</CardTitle>
+        <CardTitle className="text-base text-foreground">Historique des versions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {versions.map((version) => (
@@ -114,14 +117,14 @@ function HistoriqueVersions({
               <span
                 className={
                   version.version === versionActuelle
-                    ? "font-semibold text-brand-blue"
-                    : "text-brand-grey"
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground"
                 }
               >
                 Version {version.version}
               </span>
               {version.version === versionActuelle ? (
-                <span className="text-xs text-brand-grey">(consultée)</span>
+                <span className="text-xs text-muted-foreground">(consultée)</span>
               ) : null}
             </div>
             <div className="flex items-center gap-2">

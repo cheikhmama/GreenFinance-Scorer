@@ -8,7 +8,21 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.core.enums import AuditDecision, MetricReviewStatus, ReviewReason
+from app.core.enums import AuditDecision, MetricReviewStatus, ReportType, ReviewReason
+from app.ingestion.schemas import RapportESGDetail, RapportESGPublic
+
+
+class DossierAuditeur(RapportESGPublic):
+    """Dossier affecté, avec l'entreprise concernée : sans son nom, la liste de l'auditeur ne
+    distinguait deux dossiers que par leur type et leur année."""
+
+    company_name: str
+    company_sector: str
+
+
+class DossierAuditeurDetail(RapportESGDetail):
+    company_name: str
+    company_sector: str
 
 
 class AvisAuditPublic(BaseModel):
@@ -30,6 +44,16 @@ class AvisAuditAdmin(AvisAuditPublic):
     app/audit/models.py::AuditOpinion.auditor_id)."""
 
     auditor_id: uuid.UUID
+
+
+class AvisHistorique(AvisAuditAdmin):
+    """Un avis de l'historique de l'auditeur, avec le dossier concerné : sans lui, cinq avis
+    « Favorable avec réserves » se lisaient à l'identique."""
+
+    company_name: str
+    report_type: ReportType
+    fiscal_year: int | None
+    report_version: int
 
 
 class SoumettreAvisRequest(BaseModel):

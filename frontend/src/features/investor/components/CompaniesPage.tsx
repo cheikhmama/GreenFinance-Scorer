@@ -2,12 +2,14 @@ import { Calendar, Globe, MapPin, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { libellePays } from "@/shared/format/pays";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { usePublishedCompanies } from "../api";
 
 /** Liste des entreprises publiées, présentées en cards volontairement sobres (logo, nom,
@@ -36,7 +38,7 @@ export function CompaniesPage() {
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="entreprises-recherche" className="relative block max-w-sm flex-1">
           <span className="sr-only">Rechercher une entreprise</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="entreprises-recherche"
             value={recherche}
@@ -59,10 +61,10 @@ export function CompaniesPage() {
         ) : null}
       </div>
 
-      {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+      {isLoading ? <CardListSkeleton count={2} /> : null}
       {isError ? <p className="text-destructive">Impossible de charger les entreprises.</p> : null}
       {!isLoading && !isError && entreprises.length === 0 ? (
-        <p className="text-brand-grey">Aucune entreprise publiée pour l'instant.</p>
+        <p className="text-muted-foreground">Aucune entreprise publiée pour l'instant.</p>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -81,20 +83,22 @@ export function CompaniesPage() {
                     className="size-14 shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-brand-blue">{entreprise.name}</p>
+                    <p className="truncate font-semibold text-foreground">{entreprise.name}</p>
                     <Badge variant="secondary" className="mt-1">
                       {entreprise.sector}
                     </Badge>
                   </div>
                 </div>
 
-                <p className="flex items-center gap-1.5 text-sm text-brand-grey">
+                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <MapPin className="size-3.5 shrink-0" />
-                  {entreprise.country}
+                  {libellePays(entreprise.country)}
                 </p>
 
                 {entreprise.description ? (
-                  <p className="line-clamp-2 text-sm text-brand-grey">{entreprise.description}</p>
+                  <p className="line-clamp-2 text-sm text-muted-foreground">
+                    {entreprise.description}
+                  </p>
                 ) : null}
 
                 <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3 text-xs text-muted-foreground">

@@ -24,6 +24,8 @@ export interface NavItem {
   /** Correspond à `end` de NavLink — évite qu'un lien de tableau de bord reste actif
    * quand on est sur une sous-route (ex. /admin/rapports/:id). */
   end?: boolean;
+  /** Intertitre affiché avant le premier lien d'un groupe (ex. « Supervision »). */
+  groupe?: string;
 }
 
 export interface RoleNavConfig {
@@ -49,6 +51,11 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/admin/entreprises", label: "Entreprises", icon: Building2 },
       { to: "/admin/rapports", label: "Rapports", icon: FileText },
       { to: "/admin/journal-audit", label: "Journal d'audit", icon: History },
+      // Pages de suivi déjà atteignables depuis le tableau de bord, jusqu'ici absentes du menu.
+      { to: "/admin/auditeurs", label: "Auditeurs", icon: ClipboardCheck, groupe: "Supervision" },
+      { to: "/admin/portefeuilles", label: "Portefeuilles", icon: Wallet, groupe: "Supervision" },
+      { to: "/admin/projets", label: "Projets", icon: FolderKanban, groupe: "Supervision" },
+      { to: "/admin/analyses", label: "Analyses", icon: FlaskConical, groupe: "Supervision" },
     ],
   },
   [Role.ENTERPRISE]: {

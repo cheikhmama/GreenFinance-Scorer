@@ -78,7 +78,7 @@ export function CompanyIdentifiersCard({ entreprise }: { entreprise: EntrepriseA
                   onChange={(event) => setValeurs({ ...valeurs, [champ]: event.target.value })}
                   aria-invalid={erreur instanceof ApiError && Boolean(erreur.fields?.[champ])}
                 />
-                <p className="text-xs text-brand-grey">
+                <p className="text-xs text-muted-foreground">
                   {erreur instanceof ApiError && erreur.fields?.[champ]
                     ? erreur.fields[champ]
                     : aide}
@@ -96,7 +96,7 @@ export function CompanyIdentifiersCard({ entreprise }: { entreprise: EntrepriseA
             </Alert>
           ) : null}
           {mutation.isSuccess && modifies.length === 0 ? (
-            <p role="status" className="text-sm text-brand-grey">
+            <p role="status" className="text-sm text-muted-foreground">
               Identifiants enregistrés.
             </p>
           ) : null}

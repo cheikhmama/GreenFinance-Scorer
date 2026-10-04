@@ -4,6 +4,7 @@ import type {
   ProofBox,
   RapportESGDetail,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { libelleIndicateur, libellePilier, libelleScope } from "@/shared/format/indicateurs";
 
 /** Une valeur à revoir dans l'espace de travail de l'Auditeur (tâche 5.7) : un indicateur ESG ou une
  * donnée carbone, sous une forme commune pour la liste, le visualiseur et le panneau de détail. */
@@ -26,11 +27,7 @@ export interface ValeurARevoir {
   valeurAuditee: number | null;
 }
 
-const ORDRE_GROUPES = ["Carbone", "ENVIRONNEMENT", "SOCIAL", "GOUVERNANCE"];
-
-function libelleScope(scope: number, categorie: string | null): string {
-  return categorie ? `Scope ${scope} — ${categorie}` : `Scope ${scope}`;
-}
+const ORDRE_GROUPES = ["Carbone", "Environnement", "Social", "Gouvernance"];
 
 /** Valeurs du dossier dans l'ordre de revue : données carbone, puis indicateurs par pilier. */
 export function valeursARevoir(dossier: RapportESGDetail): ValeurARevoir[] {
@@ -56,8 +53,8 @@ export function valeursARevoir(dossier: RapportESGDetail): ValeurARevoir[] {
     cle: `metric:${m.id}`,
     type: "metric",
     id: m.id,
-    libelle: m.metric_code,
-    groupe: m.pillar,
+    libelle: libelleIndicateur(m.metric_code),
+    groupe: libellePilier(m.pillar),
     valeur: m.value,
     unite: m.unit,
     brute: m.raw_value,

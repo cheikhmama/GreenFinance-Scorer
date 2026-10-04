@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
+import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useCreatePortfolio, useMyPortfolios } from "../api";
 import { type CreerPortefeuilleForm, creerPortefeuilleSchema } from "../schemas";
 
@@ -60,7 +61,7 @@ export function PortfoliosPage() {
         </Select>
         <label htmlFor="portefeuilles-recherche" className="relative min-w-56 flex-1">
           <span className="sr-only">Rechercher un portefeuille</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-brand-grey" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="portefeuilles-recherche"
             value={recherche}
@@ -71,12 +72,12 @@ export function PortfoliosPage() {
         </label>
       </div>
 
-      {isLoading ? <p className="text-brand-grey">Chargement...</p> : null}
+      {isLoading ? <CardListSkeleton count={2} /> : null}
       {isError ? (
         <p className="text-destructive">Impossible de charger les portefeuilles.</p>
       ) : null}
       {!isLoading && !isError && portefeuilles.length === 0 ? (
-        <p className="text-brand-grey">Aucun portefeuille pour ce filtre.</p>
+        <p className="text-muted-foreground">Aucun portefeuille pour ce filtre.</p>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -84,15 +85,15 @@ export function PortfoliosPage() {
           <Link key={portefeuille.id} to={`/investor/portefeuilles/${portefeuille.id}`}>
             <Card className="h-full transition hover:border-brand-green">
               <CardHeader className="flex flex-row items-start justify-between gap-2">
-                <CardTitle className="text-base text-brand-blue">{portefeuille.name}</CardTitle>
+                <CardTitle className="text-base text-foreground">{portefeuille.name}</CardTitle>
                 {portefeuille.archived ? <Badge variant="secondary">archivé</Badge> : null}
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <p className="text-2xl font-semibold tabular-nums text-brand-blue">
+                <p className="text-2xl font-semibold tabular-nums text-foreground">
                   {portefeuille.total_amount.toLocaleString("fr-FR")}{" "}
                   {portefeuille.reference_currency}
                 </p>
-                <p className="text-brand-grey">{portefeuille.position_count} position(s)</p>
+                <p className="text-muted-foreground">{portefeuille.position_count} position(s)</p>
                 <div className="flex items-center gap-4 pt-1">
                   <span>
                     Score : <strong>{formatScore(portefeuille.aggregated_esg_score)}</strong>

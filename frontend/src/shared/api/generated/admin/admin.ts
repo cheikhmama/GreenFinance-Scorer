@@ -40,10 +40,11 @@ import type {
   PageJournalAuditPublic,
   PagePortefeuilleAdmin,
   PageProjetAdmin,
-  PageRapportESGPublic,
+  PageRapportAdminListe,
   PageUtilisateurPublic,
   PendingRegistration,
   PerformanceESGAdmin,
+  RapportAdminListe,
   RapportESGDetail,
   RapportESGPublic,
   ReportFinancials,
@@ -229,9 +230,9 @@ export const getListAllReportsUrl = (params?: ListAllReportsParams,) => {
 /**
  * @summary Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut
  */
-export const listAllReports = async (params?: ListAllReportsParams, options?: RequestInit): Promise<PageRapportESGPublic> => {
+export const listAllReports = async (params?: ListAllReportsParams, options?: RequestInit): Promise<PageRapportAdminListe> => {
 
-  return apiFetch<PageRapportESGPublic>(getListAllReportsUrl(params),
+  return apiFetch<PageRapportAdminListe>(getListAllReportsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -252,9 +253,9 @@ export const getListOverdueReportsUrl = () => {
 /**
  * @summary Lister les rapports affectés à un auditeur au-delà du délai attendu, sans décision rendue
  */
-export const listOverdueReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listOverdueReports = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
 
-  return apiFetch<RapportESGPublic[]>(getListOverdueReportsUrl(),
+  return apiFetch<RapportAdminListe[]>(getListOverdueReportsUrl(),
   {
     ...options,
     method: 'GET'
@@ -275,9 +276,9 @@ export const getListReportsToAssignUrl = () => {
 /**
  * @summary Lister les rapports extraits en attente d'affectation
  */
-export const listReportsToAssign = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listReportsToAssign = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
 
-  return apiFetch<RapportESGPublic[]>(getListReportsToAssignUrl(),
+  return apiFetch<RapportAdminListe[]>(getListReportsToAssignUrl(),
   {
     ...options,
     method: 'GET'
@@ -298,9 +299,9 @@ export const getListFailedExtractionReportsUrl = () => {
 /**
  * @summary Lister les rapports dont l'extraction automatique a échoué
  */
-export const listFailedExtractionReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listFailedExtractionReports = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
 
-  return apiFetch<RapportESGPublic[]>(getListFailedExtractionReportsUrl(),
+  return apiFetch<RapportAdminListe[]>(getListFailedExtractionReportsUrl(),
   {
     ...options,
     method: 'GET'
@@ -404,9 +405,9 @@ export const getListReportsInValidationUrl = () => {
 /**
  * @summary Lister les rapports en attente de décision, avis d'audit déjà rendu
  */
-export const listReportsInValidation = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listReportsInValidation = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
 
-  return apiFetch<RapportESGPublic[]>(getListReportsInValidationUrl(),
+  return apiFetch<RapportAdminListe[]>(getListReportsInValidationUrl(),
   {
     ...options,
     method: 'GET'
@@ -427,9 +428,9 @@ export const getListOrphanReportsInValidationUrl = () => {
 /**
  * @summary Lister les rapports en attente de décision mais sans aucun avis d'audit (état incohérent)
  */
-export const listOrphanReportsInValidation = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listOrphanReportsInValidation = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
 
-  return apiFetch<RapportESGPublic[]>(getListOrphanReportsInValidationUrl(),
+  return apiFetch<RapportAdminListe[]>(getListOrphanReportsInValidationUrl(),
   {
     ...options,
     method: 'GET'

@@ -1,6 +1,7 @@
 import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { libellePays } from "@/shared/format/pays";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -9,9 +10,10 @@ import { Input } from "@/shared/ui/input";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useCompaniesWithScore } from "../api";
+import { uneDecimale } from "@/shared/format/etatPosition";
 
 function formatScore(valeur: number | null | undefined): string {
-  return valeur !== null && valeur !== undefined ? valeur.toFixed(1) : "—";
+  return valeur !== null && valeur !== undefined ? uneDecimale(valeur) : "—";
 }
 
 /** Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque entreprise
@@ -73,23 +75,25 @@ export function CompanyScoresSection() {
                   <TableCell>
                     <Link
                       to={`/admin/entreprises/${entreprise.id}`}
-                      className="font-medium text-brand-blue hover:underline"
+                      className="font-medium text-foreground hover:underline"
                     >
                       {entreprise.name}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-brand-grey">{entreprise.sector}</TableCell>
-                  <TableCell className="text-brand-grey">{entreprise.country}</TableCell>
-                  <TableCell className="font-semibold tabular-nums text-brand-blue">
+                  <TableCell className="text-muted-foreground">{entreprise.sector}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {libellePays(entreprise.country)}
+                  </TableCell>
+                  <TableCell className="font-semibold tabular-nums text-foreground">
                     {formatScore(entreprise.global_score)}
                   </TableCell>
-                  <TableCell className="tabular-nums text-brand-grey">
+                  <TableCell className="tabular-nums text-muted-foreground">
                     {formatScore(entreprise.environmental_score)}
                   </TableCell>
-                  <TableCell className="tabular-nums text-brand-grey">
+                  <TableCell className="tabular-nums text-muted-foreground">
                     {formatScore(entreprise.social_score)}
                   </TableCell>
-                  <TableCell className="tabular-nums text-brand-grey">
+                  <TableCell className="tabular-nums text-muted-foreground">
                     {formatScore(entreprise.governance_score)}
                   </TableCell>
                 </TableRow>

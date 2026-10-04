@@ -1,6 +1,6 @@
 import { History } from "lucide-react";
 import { Link } from "react-router-dom";
-import { libelleActionJournal, libelleTypeRessource } from "@/shared/format/journal";
+import { libelleActionJournal } from "@/shared/format/journal";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -21,7 +21,7 @@ export function RecentActivitySection() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
           <History className="size-4" />
           Activité récente
         </CardTitle>
@@ -44,11 +44,14 @@ export function RecentActivitySection() {
         {entrees.length > 0 ? (
           <ul className="divide-y">
             {entrees.map((entree) => (
-              <li key={entree.id} className="flex items-center justify-between gap-4 py-2 text-sm">
-                <div className="flex items-center gap-2">
+              <li
+                key={entree.id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-sm"
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Badge variant="outline">{libelleActionJournal(entree.action)}</Badge>
-                  <span className="text-brand-grey">
-                    {libelleTypeRessource(entree.resource_type)}
+                  <span className="truncate text-muted-foreground">
+                    {entree.actor_name ?? entree.actor_email ?? "Anonyme"}
                   </span>
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground">

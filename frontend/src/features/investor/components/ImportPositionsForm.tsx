@@ -39,7 +39,7 @@ export function ImportPositionsForm({ portefeuilleId }: { portefeuilleId: string
       className="mt-4 w-full max-w-lg space-y-3 rounded-xl border p-4 text-left"
     >
       <p className="text-sm font-medium">Ou importer un fichier de positions</p>
-      <p className="text-xs text-brand-grey">
+      <p className="text-xs text-muted-foreground">
         CSV ou JSON : colonne <code>identifier</code> (ISIN, ou ticker avec{" "}
         <code>identifier_type=TICKER</code>), puis <code>outstanding_amount</code> et{" "}
         <code>currency</code>, ou <code>weight</code> (la somme des poids vaut 1).

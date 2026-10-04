@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useReportsInValidation } from "../api";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 
 /** File de décision (Phase 4 §4.4) — un avis d'audit a déjà été rendu ; la décision elle-même
  * (valider/rejeter/demander correction) se prend depuis le détail du rapport. */
@@ -32,8 +33,9 @@ export function ReportsInValidationSection() {
                   <Badge variant={variantStatutRapport(rapport.status)}>
                     {libelleStatutRapport(rapport.status)}
                   </Badge>
-                  <span className="text-brand-blue">
-                    {rapport.type} — {rapport.fiscal_year ?? "année inconnue"}
+                  <span className="text-foreground">
+                    {rapport.company_name ? `${rapport.company_name} · ` : ""}
+{titreDeclaration(rapport)}
                   </span>
                 </div>
                 <Button asChild size="sm">

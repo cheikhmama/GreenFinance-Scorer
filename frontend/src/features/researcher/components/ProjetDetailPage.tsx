@@ -2,10 +2,12 @@ import { Building2, FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { PageHeader } from "@/shared/ui/page-header";
+import { CardListSkeleton, PageSkeleton } from "@/shared/ui/skeleton";
 import { useMyAssignedProjects, useProjectDocuments, useProjectScope } from "../api";
 
 function formatDate(iso: string): string {
@@ -25,11 +27,12 @@ export function ProjetDetailPage() {
 
   const projet = projets?.find((p) => p.id === projetId);
 
-  if (chargementProjets) return <p className="text-brand-grey">Chargement...</p>;
+  if (chargementProjets) return <PageSkeleton />;
   if (!projet) return <p className="text-destructive">Projet introuvable.</p>;
 
   return (
     <div className="space-y-6">
+      <BackLink to="/researcher/projets">Mes projets</BackLink>
       <PageHeader
         title={projet.name}
         description={`${projet.institution_email} — ${projet.objective ?? "Aucun objectif renseigné par l'institution."}`}
@@ -58,13 +61,13 @@ export function ProjetDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <Building2 className="size-4" />
             Entreprises autorisées ({perimetre?.length ?? 0})
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {chargementPerimetre ? <p className="text-brand-grey">Chargement...</p> : null}
+          {chargementPerimetre ? <CardListSkeleton count={2} /> : null}
           {!chargementPerimetre && perimetre?.length === 0 ? (
             <EmptyState
               icon={Building2}
@@ -78,7 +81,7 @@ export function ProjetDetailPage() {
               className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
             >
               <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
-              <span className="font-medium text-brand-blue">{entreprise.company_name}</span>
+              <span className="font-medium text-foreground">{entreprise.company_name}</span>
             </Link>
           ))}
         </CardContent>
@@ -86,13 +89,13 @@ export function ProjetDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <FileText className="size-4" />
             Documents mis à disposition ({documents?.length ?? 0})
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {chargementDocuments ? <p className="text-brand-grey">Chargement...</p> : null}
+          {chargementDocuments ? <CardListSkeleton count={2} /> : null}
           {!chargementDocuments && documents?.length === 0 ? (
             <EmptyState
               icon={FileText}
@@ -106,9 +109,9 @@ export function ProjetDetailPage() {
               className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
             >
               <CompanyAvatar nom={document.company_name} logo={null} className="size-8" />
-              <span className="font-medium text-brand-blue">{document.company_name}</span>
+              <span className="font-medium text-foreground">{document.company_name}</span>
               {document.fiscal_year ? (
-                <span className="text-brand-grey"> — {document.fiscal_year}</span>
+                <span className="text-muted-foreground"> — {document.fiscal_year}</span>
               ) : null}
             </Link>
           ))}
@@ -121,8 +124,8 @@ export function ProjetDetailPage() {
 function Champ({ label, valeur }: { label: string; valeur: string }) {
   return (
     <div>
-      <p className="text-xs text-brand-grey">{label}</p>
-      <p className="font-medium text-brand-blue">{valeur}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-medium text-foreground">{valeur}</p>
     </div>
   );
 }

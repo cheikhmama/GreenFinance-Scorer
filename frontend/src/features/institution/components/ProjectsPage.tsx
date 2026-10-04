@@ -78,15 +78,15 @@ export function ProjectsPage() {
               <Card className="h-full gap-3 transition hover:border-brand-green hover:shadow-md">
                 <CardContent className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-base font-semibold text-brand-blue">{projet.name}</p>
+                    <p className="text-base font-semibold text-foreground">{projet.name}</p>
                     <Badge variant={variantStatutProjet(projet.status)}>
                       {libelleStatutProjet(projet.status)}
                     </Badge>
                   </div>
-                  <p className="text-sm text-brand-grey">
+                  <p className="text-sm text-muted-foreground">
                     {projet.objective ?? projet.description ?? "Aucune description."}
                   </p>
-                  {periode ? <p className="text-xs text-brand-grey">{periode}</p> : null}
+                  {periode ? <p className="text-xs text-muted-foreground">{periode}</p> : null}
                 </CardContent>
               </Card>
             </Link>

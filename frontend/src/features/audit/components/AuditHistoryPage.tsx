@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -34,7 +35,15 @@ export function AuditHistoryPage() {
                   className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-foreground">
+                    <p className="font-medium text-foreground">{item.company_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {titreDeclaration({
+                        type: item.report_type,
+                        fiscal_year: item.fiscal_year,
+                        version: item.report_version,
+                      })}
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-foreground">
                       {libelleDecisionAudit(item.decision)}
                     </p>
                     {item.comment ? (

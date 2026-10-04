@@ -10,6 +10,7 @@ import { prototypeRoutes } from "@/features/prototype/routes";
 import { registrationRoutes } from "@/features/registration/routes";
 import { researcherRoutes } from "@/features/researcher/routes";
 import { DashboardRedirect } from "@/shared/DashboardRedirect";
+import { NotFoundPage } from "@/shared/NotFoundPage";
 
 /**
  * Assemblage des routes de chaque module `features/*`. App.tsx ne connaît que la
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
   ...researcherRoutes,
   ...institutionRoutes,
   ...prototypeRoutes,
+  { path: "*", element: <NotFoundPage /> },
 ]);
 
 export function App() {

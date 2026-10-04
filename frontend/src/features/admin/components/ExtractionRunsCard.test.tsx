@@ -51,7 +51,7 @@ describe("ExtractionRunsCard", () => {
 
     expect(await screen.findByText("Réussie")).toBeInTheDocument();
     expect(screen.getByText("Reprise programmée")).toBeInTheDocument();
-    expect(screen.getByText("appel_llm_echoue")).toBeInTheDocument();
+    expect(screen.getByText(/Échec de l.appel au modèle d.extraction/)).toBeInTheDocument();
     expect(screen.getAllByText("gemini-3.6-flash")).toHaveLength(2);
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/v1/admin/reports/${ID}/extraction-runs`);
   });

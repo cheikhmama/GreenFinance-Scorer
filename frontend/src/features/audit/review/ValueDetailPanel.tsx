@@ -4,6 +4,7 @@ import type {
   MetricReviewEntry,
   ReviewReason,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { libelleUnite } from "@/shared/format/indicateurs";
 import {
   libelleMotifRevue,
   libelleStatutRevue,
@@ -72,7 +73,7 @@ export function ValueDetailPanel({
         <h2 className="break-words text-lg font-semibold text-brand-blue">{valeur.libelle}</h2>
         <div className="mt-2 flex flex-wrap items-baseline gap-2">
           <span className="text-2xl font-semibold text-brand-blue">
-            {nombre(valeur.valeurAuditee ?? valeur.valeur)} {valeur.unite}
+            {nombre(valeur.valeurAuditee ?? valeur.valeur)} {libelleUnite(valeur.unite)}
           </span>
           {valeur.valeurAuditee !== null ? (
             <span className="text-sm text-brand-grey line-through">{nombre(valeur.valeur)}</span>

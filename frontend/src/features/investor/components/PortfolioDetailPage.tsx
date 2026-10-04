@@ -16,6 +16,7 @@ import {
   variantEtatPosition,
 } from "@/shared/format/etatPosition";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
+import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -25,6 +26,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
+import { PageSkeleton } from "@/shared/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import {
   exportPortfolioFile,
   useAddPosition,
@@ -65,7 +68,7 @@ export function PortfolioDetailPage() {
   const [positionAFermer, setPositionAFermer] = useState<PositionDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (isLoading) return <p className="text-brand-grey">Chargement...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (isError || !portefeuille)
     return <p className="text-destructive">Portefeuille introuvable.</p>;
 
@@ -83,6 +86,7 @@ export function PortfolioDetailPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/investor/portefeuilles">Portefeuilles</BackLink>
       <PageHeader
         title={portefeuille.name}
         description={`Créé le ${new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}.`}
@@ -173,7 +177,9 @@ export function PortfolioDetailPage() {
           {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
           {portefeuille.positions.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <p className="text-brand-grey">Ce portefeuille ne contient encore aucune position.</p>
+              <p className="text-muted-foreground">
+                Ce portefeuille ne contient encore aucune position.
+              </p>
               {!portefeuille.archived ? (
                 <>
                   <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
@@ -183,28 +189,28 @@ export function PortfolioDetailPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <p className="pb-2 text-xs text-brand-grey">
+              <p className="pb-2 text-xs text-muted-foreground">
                 « Modifier » et « Supprimer » ne sont proposés que pour une position encore
                 planifiée (non commencée) — une position déjà active fait partie de l'historique
                 réel du portefeuille et ne peut plus être effacée.
               </p>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-brand-grey">
-                    <th className="py-2 pr-4 font-medium">Entreprise</th>
-                    <th className="py-2 pr-4 font-medium">Montant</th>
-                    <th className="py-2 pr-4 font-medium">Poids</th>
-                    <th className="py-2 pr-4 font-medium">Durée</th>
-                    <th className="py-2 pr-4 font-medium">État</th>
-                    <th className="py-2 pr-4 font-medium">Date de fermeture</th>
-                    <th className="py-2 pr-4 font-medium">Score ESG</th>
-                    <th className="py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Entreprise</TableHead>
+                    <TableHead>Montant</TableHead>
+                    <TableHead>Poids</TableHead>
+                    <TableHead>Durée</TableHead>
+                    <TableHead>État</TableHead>
+                    <TableHead>Date de fermeture</TableHead>
+                    <TableHead>Score ESG</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {portefeuille.positions.map((position) => (
-                    <tr key={position.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">
+                    <TableRow key={position.id}>
+                      <TableCell>
                         {position.company ? (
                           <CompanyIdentity
                             nom={position.company.name}
@@ -222,11 +228,11 @@ export function PortfolioDetailPage() {
                             </Badge>
                           </div>
                         )}
-                      </td>
-                      <td className="py-2 pr-4">
+                      </TableCell>
+                      <TableCell>
                         <p>{formatMontant(position.outstanding_amount, position.currency)}</p>
                         {position.fx_rate_used ? (
-                          <p className="text-xs text-brand-grey">
+                          <p className="text-xs text-muted-foreground">
                             ={" "}
                             {formatMontant(
                               position.converted_amount,
@@ -234,25 +240,25 @@ export function PortfolioDetailPage() {
                             )}
                           </p>
                         ) : null}
-                      </td>
-                      <td className="py-2 pr-4 tabular-nums">
+                      </TableCell>
+                      <TableCell className="tabular-nums">
                         {formatPourcentage(position.weight * 100)}
-                      </td>
-                      <td className="py-2 pr-4">
+                      </TableCell>
+                      <TableCell>
                         {position.duration_type === DurationType.FIXE ? "Fixe" : "Ouverte"}
-                      </td>
-                      <td className="py-2 pr-4">
+                      </TableCell>
+                      <TableCell>
                         <Badge variant={variantEtatPosition(position.state)}>
                           {libelleEtatPosition(position.state)}
                         </Badge>
-                      </td>
-                      <td className="py-2 pr-4">
+                      </TableCell>
+                      <TableCell>
                         {position.end_date
                           ? new Date(position.end_date).toLocaleDateString("fr-FR")
                           : "—"}
-                      </td>
-                      <td className="py-2 pr-4">{formatScore(position.score.global_score)}</td>
-                      <td className="py-2">
+                      </TableCell>
+                      <TableCell>{formatScore(position.score.global_score)}</TableCell>
+                      <TableCell>
                         <div className="flex flex-wrap gap-2">
                           {position.company ? (
                             <Button size="sm" variant="outline" asChild>
@@ -288,11 +294,11 @@ export function PortfolioDetailPage() {
                             </Button>
                           ) : null}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -361,7 +367,7 @@ function Synthese({ label, value }: { label: string; value: string }) {
     <Card className="gap-2 py-4 shadow-none">
       <CardContent className="px-5">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-lg font-semibold text-brand-blue">{value}</p>
+        <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
       </CardContent>
     </Card>
   );
@@ -478,7 +484,7 @@ function FormulaireFermeture({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-brand-grey">
+      <p className="text-sm text-muted-foreground">
         Position sur <strong>{position.company?.name ?? position.identifier}</strong>, ouverte le{" "}
         {new Date(position.start_date).toLocaleDateString("fr-FR")}.
       </p>
@@ -635,9 +641,9 @@ function FormulairePosition({
               logo={entrepriseActive.logo}
               avatarClassName="size-8"
             />
-            <p className="text-sm text-brand-grey">
+            <p className="text-sm text-muted-foreground">
               Montant minimum requis :{" "}
-              <strong className={montantInsuffisant ? "text-destructive" : "text-brand-blue"}>
+              <strong className={montantInsuffisant ? "text-destructive" : "text-foreground"}>
                 {minimumPourDevise === null
                   ? "aucun minimum imposé"
                   : formatMontant(minimumPourDevise, deviseChoisie)}

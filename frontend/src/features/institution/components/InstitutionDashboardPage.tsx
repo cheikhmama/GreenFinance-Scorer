@@ -1,7 +1,11 @@
 import { ArrowRight, FlaskConical, FolderKanban, UserCheck, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Card, CardContent } from "@/shared/ui/card";
-import { PageHeader } from "@/shared/ui/page-header";
+import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
+import { PageShell } from "@/shared/layout/PageShell";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { ProgressBar } from "@/shared/ui/progress-bar";
 import { StatCard } from "@/shared/ui/stat-card";
 import {
@@ -10,6 +14,8 @@ import {
   useMyProjects,
   useMyResearchers,
 } from "../api";
+
+const APERCU = 5;
 
 /** Synthèse calculée côté client à partir des listes déjà exposées — aucune route de tableau de
  * bord dédiée côté backend, même logique que ResearcherDashboardPage. */
@@ -22,7 +28,16 @@ export function InstitutionDashboardPage() {
   const chercheursAcceptes = rattachements?.filter((r) => r.status === "ACCEPTE").length ?? 0;
   const invitationsEnAttente = rattachements?.filter((r) => r.status === "EN_ATTENTE").length ?? 0;
   const projetsOuverts = projets?.filter((p) => p.status === "OUVERT").length ?? 0;
-  const analysesADecider = analyses?.filter((a) => a.status === "SOUMISE").length ?? 0;
+  const aDecider = (analyses ?? [])
+    .filter((a) => a.status === "SOUMISE")
+    .sort((a, b) => (a.submitted_at ?? "").localeCompare(b.submitted_at ?? ""));
+  const analysesADecider = aDecider.length;
+  // Projets ouverts d'abord, échéance la plus proche en tête.
+  const projetsTries = [...(projets ?? [])].sort(
+    (a, b) =>
+      Number(b.status === "OUVERT") - Number(a.status === "OUVERT") ||
+      (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"),
+  );
 
   // Taux réel d'acceptation des invitations envoyées — jamais un pourcentage fabriqué (ex. un
   // quota d'export sans plafond connu côté API, voir InstitutionProfilPublic) : ce ratio se
@@ -32,12 +47,10 @@ export function InstitutionDashboardPage() {
     invitationsEnvoyees > 0 ? Math.round((chercheursAcceptes / invitationsEnvoyees) * 100) : 0;
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Tableau de bord"
-        description="Vue d'ensemble de vos chercheurs rattachés, de vos projets et des analyses à décider."
-      />
-
+    <PageShell
+      title="Tableau de bord"
+      description="Vos chercheurs, vos projets et les analyses qui attendent votre décision."
+    >
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicateurs clés">
         <StatCard
           label="Chercheurs rattachés"
@@ -76,10 +89,10 @@ export function InstitutionDashboardPage() {
         <Card>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-brand-blue">
+              <span className="font-medium text-foreground">
                 Taux d'acceptation des invitations
               </span>
-              <span className="text-brand-grey">
+              <span className="text-muted-foreground">
                 {chercheursAcceptes}/{invitationsEnvoyees} accepté(s)
               </span>
             </div>
@@ -99,13 +112,82 @@ export function InstitutionDashboardPage() {
         </Link>
       ) : null}
 
-      <Link
-        to="/institution/projets"
-        className="flex items-center justify-between rounded-xl border border-border bg-muted p-4 text-sm font-medium text-brand-blue transition hover:border-brand-green"
-      >
-        Voir tous les projets
-        <ArrowRight className="size-4" />
-      </Link>
-    </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardTitle className="text-base">Analyses à décider</CardTitle>
+            <Button asChild variant="link" size="sm">
+              <Link to="/institution/analyses">Toutes les analyses</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {aDecider.length === 0 ? (
+              <EmptyState icon={FlaskConical} message="Aucune analyse en attente de décision." />
+            ) : (
+              <ul className="divide-y">
+                {aDecider.slice(0, APERCU).map((analyse) => (
+                  <li key={analyse.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <Link
+                        to={`/institution/analyses/${analyse.id}`}
+                        className="block truncate font-medium text-foreground hover:underline"
+                      >
+                        {analyse.title}
+                      </Link>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {analyse.project_name} · version {analyse.version}
+                        {analyse.submitted_at
+                          ? ` · soumise le ${new Date(analyse.submitted_at).toLocaleDateString("fr-FR")}`
+                          : ""}
+                      </p>
+                    </div>
+                    <Button asChild size="sm" variant="outline" className="shrink-0">
+                      <Link to={`/institution/analyses/${analyse.id}`}>Décider</Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardTitle className="text-base">Projets</CardTitle>
+            <Button asChild variant="link" size="sm">
+              <Link to="/institution/projets">Tous les projets</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {projets && projets.length === 0 ? (
+              <EmptyState icon={FolderKanban} message="Aucun projet pour l’instant." />
+            ) : (
+              <ul className="divide-y">
+                {projetsTries.slice(0, APERCU).map((projet) => (
+                  <li key={projet.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <Link
+                        to={`/institution/projets/${projet.id}`}
+                        className="block truncate font-medium text-foreground hover:underline"
+                      >
+                        {projet.name}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {projet.deadline
+                          ? `Échéance le ${new Date(projet.deadline).toLocaleDateString("fr-FR")}`
+                          : "Sans échéance"}
+                      </p>
+                    </div>
+                    <Badge variant={variantStatutProjet(projet.status)} className="shrink-0">
+                      {libelleStatutProjet(projet.status)}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </PageShell>
   );
 }

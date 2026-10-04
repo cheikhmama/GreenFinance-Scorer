@@ -38,7 +38,7 @@ export function ResearchersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <Users className="size-4" />
             Chercheurs disponibles
           </CardTitle>
@@ -60,10 +60,10 @@ export function ResearchersPage() {
                 <div className="flex items-center gap-3">
                   <InitialsAvatar nom={chercheur.name ?? chercheur.email} size="sm" />
                   <div>
-                    <p className="text-sm font-medium text-brand-blue">
+                    <p className="text-sm font-medium text-foreground">
                       {chercheur.name ?? chercheur.email}
                     </p>
-                    <p className="text-xs text-brand-grey">{chercheur.email}</p>
+                    <p className="text-xs text-muted-foreground">{chercheur.email}</p>
                   </div>
                 </div>
                 <Button
@@ -82,7 +82,7 @@ export function ResearchersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-brand-blue">
+          <CardTitle className="flex items-center gap-2 text-base text-foreground">
             <UserCheck className="size-4" />
             Mes rattachements
           </CardTitle>
@@ -101,10 +101,10 @@ export function ResearchersPage() {
                     size="sm"
                   />
                   <div>
-                    <p className="font-medium text-brand-blue">
+                    <p className="font-medium text-foreground">
                       {rattachement.researcher_name ?? rattachement.researcher_email}
                     </p>
-                    <p className="text-xs text-brand-grey">
+                    <p className="text-xs text-muted-foreground">
                       Invité le {new Date(rattachement.invited_at).toLocaleDateString("fr-FR")}
                     </p>
                   </div>
@@ -114,7 +114,7 @@ export function ResearchersPage() {
                 </Badge>
               </div>
               {rattachement.collaboration_terms ? (
-                <p className="rounded-md border-l-4 border-brand-green bg-brand-green-light/40 p-2 text-xs text-brand-blue">
+                <p className="rounded-md border-l-4 border-brand-green bg-brand-green-light/40 p-2 text-xs text-foreground">
                   {rattachement.collaboration_terms}
                 </p>
               ) : null}

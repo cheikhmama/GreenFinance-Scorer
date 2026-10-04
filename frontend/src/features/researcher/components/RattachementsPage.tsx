@@ -47,10 +47,10 @@ export function RattachementsPage() {
                     size="sm"
                   />
                   <div>
-                    <p className="font-medium text-brand-blue">
+                    <p className="font-medium text-foreground">
                       {rattachement.institution_name ?? rattachement.institution_email}
                     </p>
-                    <p className="text-xs text-brand-grey">
+                    <p className="text-xs text-muted-foreground">
                       Invité le {new Date(rattachement.invited_at).toLocaleDateString("fr-FR")}
                     </p>
                   </div>
@@ -61,7 +61,7 @@ export function RattachementsPage() {
               </div>
 
               {rattachement.collaboration_terms ? (
-                <p className="rounded-md border-l-4 border-brand-green bg-brand-green-light/40 p-3 text-sm text-brand-blue">
+                <p className="rounded-md border-l-4 border-brand-green bg-brand-green-light/40 p-3 text-sm text-foreground">
                   {rattachement.collaboration_terms}
                 </p>
               ) : null}
