@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import type {
   AnalyseDetail,
@@ -11,7 +11,6 @@ import type {
   EntreprisePerimetrePublic,
   EntreprisePublieePublic,
   ModifierAnalyseRequest,
-  PageEntreprisePublieePublic,
   ProjetAffecte,
   RattachementPublic,
   ReferenceDatasetImportResult,
@@ -39,8 +38,8 @@ import {
   submitAnalysis,
   updateAnalysis,
 } from "@/shared/api/generated/researcher/researcher";
+import { chargerToutesLesPages, TAILLE_PAGE_TABLE } from "@/shared/api/toutesLesPages";
 
-export const TAILLE_PAGE_RESEARCHER = 10;
 /** Plafond serveur pour /researcher/comparaison (app/investor/entreprises.py::
  * _MAX_ENTREPRISES_COMPARAISON) — dupliqué ici pour guider la sélection côté UI avant l'appel,
  * jamais pour remplacer la vérification serveur. */
@@ -58,23 +57,15 @@ const ANALYSES_KEY = ["researcher", "analyses"] as const;
 const analyseKey = (id: string) => ["researcher", "analyses", id] as const;
 const historiqueKey = (id: string) => ["researcher", "analyses", id, "historique"] as const;
 
-function pageSuivante<T extends { page: number; pages: number }>(
-  dernierePage: T,
-): number | undefined {
-  return dernierePage.page < dernierePage.pages ? dernierePage.page + 1 : undefined;
-}
-
-export function usePublishedCompaniesForResearcher(filtres: { recherche?: string }) {
-  return useInfiniteQuery<PageEntreprisePublieePublic, ApiError>({
-    queryKey: [...ENTREPRISES_KEY, filtres],
-    queryFn: ({ pageParam }) =>
-      listPublishedCompaniesForResearcher({
-        recherche: filtres.recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_RESEARCHER,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
+/** Toutes les entreprises publiées, pour la table de données de la page Données (tâche 5.18) :
+ * recherche, filtres, tri et pagination se font ensuite côté navigateur. */
+export function useTableEntreprisesChercheur() {
+  return useQuery<EntreprisePublieePublic[], ApiError>({
+    queryKey: [...ENTREPRISES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listPublishedCompaniesForResearcher({ page, page_size: TAILLE_PAGE_TABLE }),
+      ),
   });
 }
 

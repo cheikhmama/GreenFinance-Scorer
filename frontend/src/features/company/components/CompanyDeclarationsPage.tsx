@@ -1,19 +1,30 @@
 import { Download, Info, Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RapportESGPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   libelleStatutRapportEntreprise,
   variantStatutRapportEntreprise,
 } from "@/shared/format/statut";
-import { titreDeclaration } from "@/shared/format/typeRapport";
+import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent } from "@/shared/ui/card";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useCompanyReports } from "../api";
 import { libelleExercice, separerDeclarations } from "../session/etat";
 import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
@@ -31,9 +42,16 @@ function date(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString("fr-FR") : "—";
 }
 
+function score(rapport: RapportESGPublic) {
+  return rapport.official_global_score != null
+    ? `${rapport.official_global_score.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}/100`
+    : "—";
+}
+
 /** Mes déclarations (tâche 5.9) : l'action « Nouvelle déclaration » dans l'en-tête, la règle
  * « une seule déclaration à la fois » en bandeau, les déclarations en cours avec leur stepper,
- * puis l'historique (score officiel, PDF de synthèse, empreinte du fichier). */
+ * puis l'historique en table de données (tâche 5.18) : couverture, empreinte du fichier et PDF de
+ * synthèse dans le tiroir de chaque ligne. */
 export function CompanyDeclarationsPage() {
   const { data: rapports, isPending, isError } = useCompanyReports();
   const [creation, setCreation] = useState(false);
@@ -123,102 +141,158 @@ export function CompanyDeclarationsPage() {
         </section>
       ) : null}
 
-      {rapports ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Historique</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {historique.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucune déclaration close pour l’instant.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Exercice</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Soumis le</TableHead>
-                    <TableHead>Score officiel</TableHead>
-                    <TableHead>SHA-256</TableHead>
-                    <TableHead>Synthèse</TableHead>
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {historique.map((rapport) => (
-                    <TableRow key={rapport.id}>
-                      <TableCell className="font-medium text-foreground">
-                        {libelleExercice(rapport.fiscal_year)}
-                        <span className="block text-xs font-normal text-muted-foreground">
-                          {titreDeclaration(rapport)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <StatutEntreprise rapport={rapport} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {date(rapport.submitted_at)}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {rapport.official_global_score != null ? (
-                          <>
-                            {rapport.official_global_score.toLocaleString("fr-FR", {
-                              maximumFractionDigits: 1,
-                            })}
-                            /100
-                            {rapport.coverage_rate != null ? (
-                              <span className="block text-xs text-muted-foreground">
-                                couverture {Math.round(rapport.coverage_rate * 100)} %
-                              </span>
-                            ) : null}
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {rapport.checksum_sha256 ? (
-                          <code
-                            className="font-mono text-xs text-muted-foreground"
-                            title={rapport.checksum_sha256}
-                          >
-                            {rapport.checksum_sha256.slice(0, 8)}…
-                            {rapport.checksum_sha256.slice(-4)}
-                          </code>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {rapport.synthesis_available ? (
-                          <a
-                            href={`/api/v1/company/rapports/${rapport.id}/synthese/fichier`}
-                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                          >
-                            <Download className="size-4" aria-hidden="true" />
-                            PDF
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link to={`/company/declarations/${rapport.id}`}>Détail</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+      {rapports ? <Historique rapports={historique} /> : null}
     </PageShell>
+  );
+}
+
+function Historique({ rapports }: { rapports: RapportESGPublic[] }) {
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
+  const colonnes = useMemo<ColonneTable<RapportESGPublic>[]>(
+    () => [
+      {
+        id: "exercice",
+        entete: "Exercice",
+        masquable: false,
+        valeurTri: (r) => r.fiscal_year,
+        cellule: (r) => (
+          <span className="font-semibold text-foreground">{libelleExercice(r.fiscal_year)}</span>
+        ),
+      },
+      {
+        id: "type",
+        entete: "Type de rapport",
+        valeurTri: (r) => libelleTypeRapport(r.type),
+        cellule: (r) => libelleTypeRapport(r.type),
+      },
+      {
+        id: "statut",
+        entete: "Statut",
+        alignement: "centre",
+        valeurTri: (r) => libelleStatutRapportEntreprise(r.status),
+        valeurExport: (r) => libelleStatutRapportEntreprise(r.status),
+        cellule: (r) => <StatutEntreprise rapport={r} />,
+      },
+      {
+        id: "soumis",
+        entete: "Soumis le",
+        alignement: "droite",
+        valeurTri: (r) => r.submitted_at,
+        cellule: (r) => <span className="font-mono">{date(r.submitted_at)}</span>,
+      },
+      {
+        id: "score",
+        entete: "Score officiel",
+        alignement: "droite",
+        valeurTri: (r) => r.official_global_score ?? null,
+        valeurExport: (r) => r.official_global_score ?? null,
+        cellule: (r) => <span className="font-mono font-semibold tabular-nums">{score(r)}</span>,
+      },
+    ],
+    [],
+  );
+  const ouvert = rapports.find((r) => r.id === ouvertId) ?? null;
+
+  return (
+    <section aria-labelledby="titre-historique" className="space-y-3">
+      <h2 id="titre-historique" className="text-lg font-semibold tracking-tight text-foreground">
+        Historique
+      </h2>
+      <DataTable
+        libelle="Historique des déclarations"
+        lignes={rapports}
+        colonnes={colonnes}
+        cle={(r) => r.id}
+        rechercheDans={(r) => `${libelleExercice(r.fiscal_year)} ${titreDeclaration(r)}`}
+        placeholderRecherche="Exercice, type…"
+        filtres={[
+          {
+            id: "statut",
+            libelle: "Statut",
+            valeur: (r) => libelleStatutRapportEntreprise(r.status),
+          },
+          { id: "type", libelle: "Type", valeur: (r) => libelleTypeRapport(r.type) },
+        ]}
+        triInitial={{ colonne: "exercice", sens: "desc" }}
+        surOuvrir={(r) => setOuvertId(r.id)}
+        libelleLigne={(r) => `${libelleExercice(r.fiscal_year)}, ${titreDeclaration(r)}`}
+        ligneActive={ouvertId}
+        messageVide="Aucune déclaration close pour l’instant."
+        nomExport="historique-declarations"
+        memoire="company-historique"
+      />
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{libelleExercice(ouvert.fiscal_year)}</SheetTitle>
+              <SheetDescription>{titreDeclaration(ouvert)}</SheetDescription>
+              <div className="flex">
+                <StatutEntreprise rapport={ouvert} />
+              </div>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Résultat">
+                <SheetFields
+                  champs={[
+                    {
+                      libelle: "Score officiel",
+                      valeur: <span className="font-mono font-semibold">{score(ouvert)}</span>,
+                    },
+                    {
+                      libelle: "Couverture",
+                      valeur:
+                        ouvert.coverage_rate != null
+                          ? `${Math.round(ouvert.coverage_rate * 100)} %`
+                          : null,
+                    },
+                    {
+                      libelle: "Synthèse",
+                      valeur: ouvert.synthesis_available ? (
+                        <a
+                          href={`/api/v1/company/rapports/${ouvert.id}/synthese/fichier`}
+                          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                        >
+                          <Download className="size-4" aria-hidden="true" />
+                          PDF
+                        </a>
+                      ) : null,
+                    },
+                  ]}
+                />
+              </SheetSection>
+              <SheetSection titre="Dépôt">
+                <SheetFields
+                  champs={[
+                    { libelle: "Soumis le", valeur: date(ouvert.submitted_at) },
+                    {
+                      libelle: "Version",
+                      valeur: <span className="font-mono">{ouvert.version}</span>,
+                    },
+                    { libelle: "Fichier", valeur: ouvert.original_filename },
+                    {
+                      libelle: "SHA-256",
+                      valeur: ouvert.checksum_sha256 ? (
+                        <code
+                          className="font-mono text-xs text-muted-foreground"
+                          title={ouvert.checksum_sha256}
+                        >
+                          {ouvert.checksum_sha256.slice(0, 8)}…{ouvert.checksum_sha256.slice(-4)}
+                        </code>
+                      ) : null,
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/company/declarations/${ouvert.id}`}>Voir la déclaration</Link>
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
+    </section>
   );
 }

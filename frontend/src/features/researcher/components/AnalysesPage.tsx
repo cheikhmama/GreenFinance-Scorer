@@ -1,33 +1,90 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FlaskConical } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type { AnalysePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent } from "@/shared/ui/card";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-import { EmptyState } from "@/shared/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
 import { Textarea } from "@/shared/ui/textarea";
 import { useCreateAnalysis, useMyAnalyses, useMyAssignedProjects, useProjectScope } from "../api";
 import { type AnalyseForm, analyseFormSchema } from "../schemas";
 
+const dateFr = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : null);
+
 /** Mes analyses, tous projets confondus — la création se fait toujours dans le contexte d'un
- * projet affecté (voir FormulaireCreation), jamais hors sol. */
+ * projet affecté (voir FormulaireCreation), jamais hors sol. Table de données (tâche 5.18) :
+ * commentaire de l'institution et dates dans le tiroir. */
 export function AnalysesPage() {
   const { data: analyses, isLoading, isError } = useMyAnalyses();
   const { data: projets } = useMyAssignedProjects();
   const [creationOuverte, setCreationOuverte] = useState(false);
+  const [ouverteId, setOuverteId] = useState<string | null>(null);
   const projetsOuverts = projets?.filter((p) => p.status === "OUVERT") ?? [];
-  const nomProjet = (projetId: string) => projets?.find((p) => p.id === projetId)?.name ?? "—";
+
+  const colonnes = useMemo<ColonneTable<AnalysePublic>[]>(() => {
+    const nomProjet = (projetId: string) => projets?.find((p) => p.id === projetId)?.name ?? "—";
+    return [
+      {
+        id: "titre",
+        entete: "Titre",
+        masquable: false,
+        valeurTri: (a) => a.title,
+        cellule: (a) => <span className="font-semibold text-foreground">{a.title}</span>,
+      },
+      {
+        id: "projet",
+        entete: "Projet",
+        valeurTri: (a) => nomProjet(a.project_id),
+        cellule: (a) => <span className="text-muted-foreground">{nomProjet(a.project_id)}</span>,
+      },
+      {
+        id: "statut",
+        entete: "Statut",
+        alignement: "centre",
+        valeurTri: (a) => libelleStatutAnalyse(a.status),
+        cellule: (a) => (
+          <Badge variant={variantStatutAnalyse(a.status)}>{libelleStatutAnalyse(a.status)}</Badge>
+        ),
+      },
+      {
+        id: "version",
+        entete: "Version",
+        alignement: "droite",
+        valeurTri: (a) => a.version,
+        cellule: (a) => <span className="font-mono">{a.version}</span>,
+      },
+      {
+        id: "cree",
+        entete: "Créée le",
+        alignement: "droite",
+        valeurTri: (a) => a.created_at,
+        cellule: (a) => <span className="font-mono">{dateFr(a.created_at)}</span>,
+      },
+    ];
+  }, [projets]);
+
+  const nomProjet = (projetId: string) => projets?.find((p) => p.id === projetId)?.name ?? null;
+  const ouverte = analyses?.find((a) => a.id === ouverteId) ?? null;
 
   return (
     <div className="space-y-6">
@@ -57,31 +114,63 @@ export function AnalysesPage() {
         </DialogContent>
       </Dialog>
 
-      {isLoading ? <CardListSkeleton /> : null}
-      {isError ? <p className="text-destructive">Impossible de charger les analyses.</p> : null}
-      {!isLoading && !isError && analyses?.length === 0 ? (
-        <EmptyState icon={FlaskConical} message="Aucune analyse pour l'instant." />
-      ) : null}
+      <DataTable
+        libelle="Mes analyses"
+        lignes={analyses}
+        colonnes={colonnes}
+        cle={(a) => a.id}
+        rechercheDans={(a) => `${a.title} ${nomProjet(a.project_id) ?? ""}`}
+        placeholderRecherche="Titre, projet…"
+        filtres={[
+          { id: "statut", libelle: "Statut", valeur: (a) => libelleStatutAnalyse(a.status) },
+          { id: "projet", libelle: "Projet", valeur: (a) => nomProjet(a.project_id) },
+        ]}
+        triInitial={{ colonne: "cree", sens: "desc" }}
+        surOuvrir={(a) => setOuverteId(a.id)}
+        libelleLigne={(a) => a.title}
+        ligneActive={ouverteId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucune analyse pour l’instant."
+        nomExport="mes-analyses"
+        memoire="chercheur-analyses"
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {analyses?.map((analyse) => (
-          <Link key={analyse.id} to={`/researcher/analyses/${analyse.id}`}>
-            <Card className="h-full transition hover:border-brand-green hover:shadow-md">
-              <CardContent className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium text-foreground">{analyse.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {nomProjet(analyse.project_id)} — version {analyse.version}
-                  </p>
-                </div>
-                <Badge variant={variantStatutAnalyse(analyse.status)}>
-                  {libelleStatutAnalyse(analyse.status)}
-                </Badge>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      <Sheet open={ouverte !== null} onOpenChange={(o) => !o && setOuverteId(null)}>
+        {ouverte ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouverte.title}</SheetTitle>
+              <SheetDescription>
+                {nomProjet(ouverte.project_id) ?? "Projet"} · version {ouverte.version}
+              </SheetDescription>
+              <Badge variant={variantStatutAnalyse(ouverte.status)} className="w-fit">
+                {libelleStatutAnalyse(ouverte.status)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Suivi">
+                <SheetFields
+                  champs={[
+                    { libelle: "Créée le", valeur: dateFr(ouverte.created_at) },
+                    { libelle: "Soumise le", valeur: dateFr(ouverte.submitted_at) },
+                    { libelle: "Décidée le", valeur: dateFr(ouverte.decided_at) },
+                    {
+                      libelle: "Commentaire de l’institution",
+                      valeur: ouverte.institution_comment,
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/researcher/analyses/${ouverte.id}`}>Ouvrir l’analyse</Link>
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

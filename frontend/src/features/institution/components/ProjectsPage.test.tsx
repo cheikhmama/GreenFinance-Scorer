@@ -65,10 +65,15 @@ describe("Espace Institution — créer un projet", () => {
     await user.type(within(dialogue).getByLabelText("Début"), "2026-10-01");
     await user.click(within(dialogue).getByRole("button", { name: "Créer" }));
 
-    // Dialogue fermé, liste relue : le nouveau projet y figure, lien vers son détail.
-    const lien = await screen.findByRole("link", { name: /Mines et climat/ });
-    expect(lien).toHaveAttribute("href", `/institution/projets/${PROJET.id}`);
+    // Dialogue fermé, liste relue : le nouveau projet figure dans la table ; son tiroir mène au
+    // détail.
+    expect(await screen.findByText("Mines et climat")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("button", { name: "Voir le détail de Mines et climat" }),
+    );
+    const lien = await screen.findByRole("link", { name: "Ouvrir le projet" });
+    expect(lien).toHaveAttribute("href", `/institution/projets/${PROJET.id}`);
     const envoi = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(envoi?.[0]).toBe("/api/v1/institution/projets");
     expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({

@@ -1,36 +1,90 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type { PortefeuilleResume } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
-import { Select } from "@/shared/ui/select";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { useCreatePortfolio, useMyPortfolios } from "../api";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useCreatePortfolio, useTablePortefeuilles } from "../api";
 import { type CreerPortefeuilleForm, creerPortefeuilleSchema } from "../schemas";
 
-export function PortfoliosPage() {
-  const [recherche, setRecherche] = useState("");
-  const [archiveFiltre, setArchiveFiltre] = useState<"actifs" | "archives" | "tous">("actifs");
-  const [modaleOuverte, setModaleOuverte] = useState(false);
-  const rechercheDebattue = useDebouncedValue(recherche);
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useMyPortfolios({
-      archive: archiveFiltre === "tous" ? undefined : archiveFiltre === "archives",
-      recherche: rechercheDebattue,
-    });
+const etat = (p: PortefeuilleResume) => (p.archived ? "Archivé" : "Actif");
 
-  const portefeuilles = data?.pages.flatMap((page) => page.items) ?? [];
+/** Mes portefeuilles (table de données, tâche 5.18) : nom, encours, positions, score agrégé et
+ * couverture ; scores E/S/G, dates et accès au détail dans le tiroir. Les archivés sont masqués
+ * par défaut via le filtre « État ». */
+export function PortfoliosPage() {
+  const [modaleOuverte, setModaleOuverte] = useState(false);
+  const { data, isLoading, isError } = useTablePortefeuilles();
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
+
+  const colonnes = useMemo<ColonneTable<PortefeuilleResume>[]>(
+    () => [
+      {
+        id: "nom",
+        entete: "Portefeuille",
+        masquable: false,
+        valeurTri: (p) => p.name,
+        cellule: (p) => <span className="font-semibold text-foreground">{p.name}</span>,
+      },
+      {
+        id: "encours",
+        entete: "Encours",
+        alignement: "droite",
+        valeurTri: (p) => p.total_amount,
+        valeurExport: (p) => p.total_amount,
+        cellule: (p) => (
+          <span className="font-mono tabular-nums">
+            {p.total_amount.toLocaleString("fr-FR")} {p.reference_currency}
+          </span>
+        ),
+      },
+      {
+        id: "positions",
+        entete: "Positions",
+        alignement: "droite",
+        valeurTri: (p) => p.position_count,
+        cellule: (p) => <span className="font-mono">{p.position_count}</span>,
+      },
+      {
+        id: "score",
+        entete: "Score ESG",
+        alignement: "droite",
+        valeurTri: (p) => p.aggregated_esg_score,
+        cellule: (p) => (
+          <span className="font-mono font-semibold">{formatScore(p.aggregated_esg_score)}</span>
+        ),
+      },
+      {
+        id: "couverture",
+        entete: "Couverture",
+        alignement: "droite",
+        valeurTri: (p) => p.esg_coverage,
+        cellule: (p) => <span className="font-mono">{formatPourcentage(p.esg_coverage)}</span>,
+      },
+    ],
+    [],
+  );
+  const ouvert = data?.find((p) => p.id === ouvertId) ?? null;
 
   return (
     <div className="space-y-6">
@@ -49,75 +103,80 @@ export function PortfoliosPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Select
-          value={archiveFiltre}
-          onChange={(event) => setArchiveFiltre(event.target.value as typeof archiveFiltre)}
-          className="w-40"
-        >
-          <option value="actifs">Actifs</option>
-          <option value="archives">Archivés</option>
-          <option value="tous">Tous</option>
-        </Select>
-        <label htmlFor="portefeuilles-recherche" className="relative min-w-56 flex-1">
-          <span className="sr-only">Rechercher un portefeuille</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id="portefeuilles-recherche"
-            value={recherche}
-            onChange={(event) => setRecherche(event.target.value)}
-            placeholder="Rechercher par nom"
-            className="pl-9"
-          />
-        </label>
-      </div>
+      <DataTable
+        libelle="Portefeuilles"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(p) => p.id}
+        rechercheDans={(p) => p.name}
+        placeholderRecherche="Nom du portefeuille…"
+        filtres={[
+          { id: "etat", libelle: "État", valeur: etat },
+          { id: "devise", libelle: "Devise", valeur: (p) => p.reference_currency },
+        ]}
+        filtresInitiaux={{ etat: ["Actif"] }}
+        triInitial={{ colonne: "nom", sens: "asc" }}
+        surOuvrir={(p) => setOuvertId(p.id)}
+        libelleLigne={(p) => p.name}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun portefeuille pour ce filtre."
+        nomExport="portefeuilles"
+        memoire="investor-portefeuilles"
+      />
 
-      {isLoading ? <CardListSkeleton count={2} /> : null}
-      {isError ? (
-        <p className="text-destructive">Impossible de charger les portefeuilles.</p>
-      ) : null}
-      {!isLoading && !isError && portefeuilles.length === 0 ? (
-        <p className="text-muted-foreground">Aucun portefeuille pour ce filtre.</p>
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {portefeuilles.map((portefeuille) => (
-          <Link key={portefeuille.id} to={`/investor/portefeuilles/${portefeuille.id}`}>
-            <Card className="h-full transition hover:border-brand-green">
-              <CardHeader className="flex flex-row items-start justify-between gap-2">
-                <CardTitle className="text-base text-foreground">{portefeuille.name}</CardTitle>
-                {portefeuille.archived ? <Badge variant="secondary">archivé</Badge> : null}
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="text-2xl font-semibold tabular-nums text-foreground">
-                  {portefeuille.total_amount.toLocaleString("fr-FR")}{" "}
-                  {portefeuille.reference_currency}
-                </p>
-                <p className="text-muted-foreground">{portefeuille.position_count} position(s)</p>
-                <div className="flex items-center gap-4 pt-1">
-                  <span>
-                    Score : <strong>{formatScore(portefeuille.aggregated_esg_score)}</strong>
-                  </span>
-                  <span>
-                    Couverture : <strong>{formatPourcentage(portefeuille.esg_coverage)}</strong>
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {portefeuilles.length > 0 && hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isFetchingNextPage}
-          onClick={() => fetchNextPage()}
-        >
-          {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-        </Button>
-      ) : null}
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouvert.name}</SheetTitle>
+              <SheetDescription>
+                {ouvert.total_amount.toLocaleString("fr-FR")} {ouvert.reference_currency} ·{" "}
+                {ouvert.position_count} position(s)
+              </SheetDescription>
+              <Badge variant={ouvert.archived ? "secondary" : "success"} className="w-fit">
+                {etat(ouvert)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="ESG agrégé">
+                <SheetFields
+                  champs={[
+                    { libelle: "Score ESG", valeur: formatScore(ouvert.aggregated_esg_score) },
+                    {
+                      libelle: "Environnement",
+                      valeur: formatScore(ouvert.aggregated_environmental_score),
+                    },
+                    { libelle: "Social", valeur: formatScore(ouvert.aggregated_social_score) },
+                    {
+                      libelle: "Gouvernance",
+                      valeur: formatScore(ouvert.aggregated_governance_score),
+                    },
+                    { libelle: "Couverture", valeur: formatPourcentage(ouvert.esg_coverage) },
+                  ]}
+                />
+              </SheetSection>
+              <SheetSection titre="Portefeuille">
+                <SheetFields
+                  champs={[
+                    { libelle: "Devise de référence", valeur: ouvert.reference_currency },
+                    {
+                      libelle: "Créé le",
+                      valeur: new Date(ouvert.created_at).toLocaleDateString("fr-FR"),
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/investor/portefeuilles/${ouvert.id}`}>Ouvrir le portefeuille</Link>
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

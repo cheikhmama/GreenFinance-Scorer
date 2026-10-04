@@ -1,136 +1,151 @@
-import { Calendar, Globe, MapPin, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import type { EntreprisePublieePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libellePays } from "@/shared/format/pays";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent } from "@/shared/ui/card";
-import { Input } from "@/shared/ui/input";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { usePublishedCompanies } from "../api";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useTableEntreprisesPubliees } from "../api";
 
-/** Liste des entreprises publiées, présentées en cards volontairement sobres (logo, nom,
- * secteur, pays, quelques informations générales) — jamais le score ESG, les scores E/S/G ni le
- * montant minimum d'investissement ici : ces données détaillées restent réservées à la fiche
- * dédiée (voir CompanyDetailPage.tsx), accessible en cliquant sur la card. Le filtre secteur vit
- * dans l'URL (?secteur=...) pour rester partageable en lien direct, entre autres depuis le
- * Dashboard (voir InvestorDashboardPage.tsx::RepartitionSecteurCard). */
+function dateFr(iso: string | null): string | null {
+  return iso ? new Date(iso).toLocaleDateString("fr-FR") : null;
+}
+
+/** Entreprises publiées (table de données, tâche 5.18) : identité, secteur, pays et date de
+ * publication — jamais le score ESG, les scores E/S/G ni le montant minimum ici : ces données
+ * détaillées restent réservées à la fiche dédiée (voir CompanyDetailPage.tsx), ouverte depuis le
+ * tiroir. Le secteur passé dans l'URL (?secteur=..., depuis le Dashboard) présélectionne le
+ * filtre Secteur. */
 export function CompaniesPage() {
-  const [recherche, setRecherche] = useState("");
-  const rechercheDebattue = useDebouncedValue(recherche);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const secteur = searchParams.get("secteur");
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    usePublishedCompanies({ recherche: rechercheDebattue, secteur: secteur ?? undefined });
+  const { data, isLoading, isError } = useTableEntreprisesPubliees();
+  const [searchParams] = useSearchParams();
+  const secteurUrl = searchParams.get("secteur");
+  const [ouverteId, setOuverteId] = useState<string | null>(null);
 
-  const entreprises = data?.pages.flatMap((page) => page.items) ?? [];
+  const colonnes = useMemo<ColonneTable<EntreprisePublieePublic>[]>(
+    () => [
+      {
+        id: "nom",
+        entete: "Entreprise",
+        masquable: false,
+        valeurTri: (e) => e.name,
+        cellule: (e) => (
+          <span className="flex items-center gap-2.5 font-semibold text-foreground">
+            <CompanyAvatar nom={e.name} logo={e.logo} className="size-6 shrink-0 text-[10px]" />
+            {e.name}
+          </span>
+        ),
+      },
+      {
+        id: "secteur",
+        entete: "Secteur",
+        valeurTri: (e) => e.sector,
+        cellule: (e) => <span className="text-muted-foreground">{e.sector}</span>,
+      },
+      {
+        id: "pays",
+        entete: "Pays",
+        valeurTri: (e) => libellePays(e.country),
+        cellule: (e) => libellePays(e.country),
+      },
+      {
+        id: "publiee",
+        entete: "Publiée le",
+        alignement: "droite",
+        valeurTri: (e) => e.published_at,
+        cellule: (e) => <span className="font-mono">{dateFr(e.published_at) ?? "—"}</span>,
+      },
+    ],
+    [],
+  );
+  const ouverte = data?.find((e) => e.id === ouverteId) ?? null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Entreprises"
-        description="Parcourez les entreprises dont les données ont été validées et publiées. Cliquez sur une entreprise pour consulter sa fiche ESG complète."
+        description="Parcourez les entreprises dont les données ont été validées et publiées. Ouvrez une ligne pour accéder à sa fiche ESG complète."
       />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="entreprises-recherche" className="relative block max-w-sm flex-1">
-          <span className="sr-only">Rechercher une entreprise</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id="entreprises-recherche"
-            value={recherche}
-            onChange={(event) => setRecherche(event.target.value)}
-            placeholder="Rechercher par nom ou secteur"
-            className="pl-9"
-          />
-        </label>
-        {secteur ? (
-          <Badge variant="secondary" className="gap-1 py-1">
-            Secteur : {secteur}
-            <button
-              type="button"
-              onClick={() => setSearchParams({})}
-              aria-label="Retirer le filtre secteur"
-            >
-              <X className="size-3" />
-            </button>
-          </Badge>
+      <DataTable
+        libelle="Entreprises publiées"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(e) => e.id}
+        rechercheDans={(e) => `${e.name} ${e.sector} ${libellePays(e.country)} ${e.ticker ?? ""}`}
+        placeholderRecherche="Nom, secteur, pays…"
+        filtres={[
+          { id: "secteur", libelle: "Secteur", valeur: (e) => e.sector },
+          { id: "pays", libelle: "Pays", valeur: (e) => libellePays(e.country) },
+        ]}
+        filtresInitiaux={secteurUrl ? { secteur: [secteurUrl] } : undefined}
+        triInitial={{ colonne: "nom", sens: "asc" }}
+        surOuvrir={(e) => setOuverteId(e.id)}
+        libelleLigne={(e) => e.name}
+        ligneActive={ouverteId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucune entreprise publiée pour l’instant."
+        nomExport="entreprises-publiees"
+        memoire="investor-entreprises"
+      />
+      <Sheet open={ouverte !== null} onOpenChange={(o) => !o && setOuverteId(null)}>
+        {ouverte ? (
+          <SheetContent>
+            <SheetHeader>
+              <div className="flex items-start gap-3">
+                <CompanyAvatar
+                  nom={ouverte.name}
+                  logo={ouverte.logo}
+                  className="size-11 shrink-0"
+                />
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <SheetTitle>{ouverte.name}</SheetTitle>
+                  <SheetDescription>
+                    {ouverte.sector} · {libellePays(ouverte.country)}
+                  </SheetDescription>
+                </div>
+              </div>
+            </SheetHeader>
+            <SheetBody>
+              {ouverte.description ? (
+                <SheetSection titre="Présentation">
+                  <p className="text-sm text-muted-foreground">{ouverte.description}</p>
+                </SheetSection>
+              ) : null}
+              <SheetSection titre="Informations générales">
+                <SheetFields
+                  champs={[
+                    { libelle: "Publiée le", valeur: dateFr(ouverte.published_at) },
+                    { libelle: "Site officiel", valeur: ouverte.website },
+                    { libelle: "Ticker", valeur: ouverte.ticker },
+                    {
+                      libelle: "ISIN · LEI",
+                      valeur: [ouverte.isin, ouverte.lei].filter(Boolean).join(" · ") || null,
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/investor/entreprises/${ouverte.id}`}>Voir la fiche ESG</Link>
+              </Button>
+            </SheetFooter>
+          </SheetContent>
         ) : null}
-      </div>
-
-      {isLoading ? <CardListSkeleton count={2} /> : null}
-      {isError ? <p className="text-destructive">Impossible de charger les entreprises.</p> : null}
-      {!isLoading && !isError && entreprises.length === 0 ? (
-        <p className="text-muted-foreground">Aucune entreprise publiée pour l'instant.</p>
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {entreprises.map((entreprise) => (
-          <Link
-            key={entreprise.id}
-            to={`/investor/entreprises/${entreprise.id}`}
-            className="group block"
-          >
-            <Card className="h-full transition group-hover:border-brand-green group-hover:shadow-md">
-              <CardContent className="flex h-full flex-col gap-3">
-                <div className="flex items-start gap-3">
-                  <CompanyAvatar
-                    nom={entreprise.name}
-                    logo={entreprise.logo}
-                    className="size-14 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">{entreprise.name}</p>
-                    <Badge variant="secondary" className="mt-1">
-                      {entreprise.sector}
-                    </Badge>
-                  </div>
-                </div>
-
-                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="size-3.5 shrink-0" />
-                  {libellePays(entreprise.country)}
-                </p>
-
-                {entreprise.description ? (
-                  <p className="line-clamp-2 text-sm text-muted-foreground">
-                    {entreprise.description}
-                  </p>
-                ) : null}
-
-                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
-                  {entreprise.website ? (
-                    <span className="flex min-w-0 items-center gap-1">
-                      <Globe className="size-3.5 shrink-0" />
-                      <span className="truncate">{entreprise.website}</span>
-                    </span>
-                  ) : null}
-                  {entreprise.published_at ? (
-                    <span className="ml-auto flex shrink-0 items-center gap-1">
-                      <Calendar className="size-3.5 shrink-0" />
-                      Publiée le {new Date(entreprise.published_at).toLocaleDateString("fr-FR")}
-                    </span>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {entreprises.length > 0 && hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isFetchingNextPage}
-          onClick={() => fetchNextPage()}
-        >
-          {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-        </Button>
-      ) : null}
+      </Sheet>
     </div>
   );
 }

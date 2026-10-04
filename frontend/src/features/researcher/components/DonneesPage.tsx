@@ -1,41 +1,112 @@
-import { Building2, Scale, Search } from "lucide-react";
-import { useState } from "react";
+import { Scale } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import type { EntreprisePublieePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
+import { uneDecimale } from "@/shared/format/etatPosition";
 import { libellePays } from "@/shared/format/pays";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { Input } from "@/shared/ui/input";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { MAX_ENTREPRISES_COMPARAISON, usePublishedCompaniesForResearcher } from "../api";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { MAX_ENTREPRISES_COMPARAISON, useTableEntreprisesChercheur } from "../api";
 
-/** Liste des entreprises publiées — données de base sur lesquelles construire une analyse
- * (voir AnalysesPage). Sélection multiple pour comparaison, même principe que
- * features/investor/components/CompaniesPage.tsx. */
+/** Entreprises publiées : les données sur lesquelles construire une analyse (voir AnalysesPage).
+ * Table de données (tâche 5.18) : identité, secteur, pays et score global. Les scores E/S/G, les
+ * émissions et la fiche sont dans le tiroir. La case de la première colonne (ou le bouton du
+ * tiroir) ajoute l'entreprise à la comparaison, avec le même plafond que le serveur. */
 export function DonneesPage() {
-  const [recherche, setRecherche] = useState("");
+  const { data, isLoading, isError } = useTableEntreprisesChercheur();
   const [selection, setSelection] = useState<string[]>([]);
-  const rechercheDebattue = useDebouncedValue(recherche);
+  const [ouverteId, setOuverteId] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    usePublishedCompaniesForResearcher({ recherche: rechercheDebattue });
-
-  const entreprises = data?.pages.flatMap((page) => page.items) ?? [];
-
-  function toggleSelection(id: string) {
-    setSelection((current) => {
-      if (current.includes(id)) return current.filter((v) => v !== id);
-      // Plafond serveur (app/investor/entreprises.py::_MAX_ENTREPRISES_COMPARAISON) — refusé ici
-      // plutôt que via une erreur générique après avoir déjà cliqué sur « Comparer ».
-      if (current.length >= MAX_ENTREPRISES_COMPARAISON) return current;
-      return [...current, id];
-    });
-  }
 
   const plafondAtteint = selection.length >= MAX_ENTREPRISES_COMPARAISON;
+
+  const basculer = useCallback((id: string) => {
+    setSelection((courante) => {
+      if (courante.includes(id)) return courante.filter((v) => v !== id);
+      // Plafond serveur (app/investor/entreprises.py::_MAX_ENTREPRISES_COMPARAISON) — refusé ici
+      // plutôt que via une erreur générique après avoir déjà cliqué sur « Comparer ».
+      if (courante.length >= MAX_ENTREPRISES_COMPARAISON) return courante;
+      return [...courante, id];
+    });
+  }, []);
+
+  const colonnes = useMemo<ColonneTable<EntreprisePublieePublic>[]>(
+    () => [
+      {
+        id: "comparer",
+        entete: "Comparer",
+        masquable: false,
+        alignement: "centre",
+        cellule: (e) => {
+          const cochee = selection.includes(e.id);
+          return (
+            <input
+              type="checkbox"
+              aria-label={`Sélectionner ${e.name} pour comparaison`}
+              checked={cochee}
+              disabled={!cochee && plafondAtteint}
+              onClick={(ev) => ev.stopPropagation()}
+              onChange={() => basculer(e.id)}
+              className="size-4 accent-primary"
+            />
+          );
+        },
+      },
+      {
+        id: "nom",
+        entete: "Entreprise",
+        masquable: false,
+        valeurTri: (e) => e.name,
+        cellule: (e) => (
+          <span className="flex items-center gap-2.5 font-semibold text-foreground">
+            <CompanyAvatar nom={e.name} logo={e.logo} className="size-6 shrink-0 text-[10px]" />
+            {e.name}
+          </span>
+        ),
+      },
+      {
+        id: "secteur",
+        entete: "Secteur",
+        valeurTri: (e) => e.sector,
+        cellule: (e) => <span className="text-muted-foreground">{e.sector}</span>,
+      },
+      {
+        id: "pays",
+        entete: "Pays",
+        valeurTri: (e) => libellePays(e.country),
+        cellule: (e) => libellePays(e.country),
+      },
+      {
+        id: "score",
+        entete: "Score ESG",
+        alignement: "droite",
+        valeurTri: (e) => e.score.global_score,
+        cellule: (e) => (
+          <span className="font-mono font-semibold tabular-nums">
+            {e.score.global_score != null ? uneDecimale(e.score.global_score) : "—"}
+          </span>
+        ),
+      },
+    ],
+    [selection, plafondAtteint, basculer],
+  );
+
+  const ouverte = data?.find((e) => e.id === ouverteId) ?? null;
+  const ouverteSelectionnee = ouverte ? selection.includes(ouverte.id) : false;
 
   return (
     <div className="space-y-6">
@@ -52,23 +123,6 @@ export function DonneesPage() {
         }
       />
 
-      <label htmlFor="donnees-recherche" className="relative block max-w-sm">
-        <span className="sr-only">Rechercher une entreprise</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          id="donnees-recherche"
-          value={recherche}
-          onChange={(event) => setRecherche(event.target.value)}
-          placeholder="Rechercher par nom ou secteur"
-          className="pl-9"
-        />
-      </label>
-
-      {isLoading ? <CardListSkeleton /> : null}
-      {isError ? <p className="text-destructive">Impossible de charger les entreprises.</p> : null}
-      {!isLoading && !isError && entreprises.length === 0 ? (
-        <EmptyState icon={Building2} message="Aucune entreprise ne correspond à cette recherche." />
-      ) : null}
       {plafondAtteint ? (
         <p className="text-sm text-muted-foreground">
           Maximum {MAX_ENTREPRISES_COMPARAISON} entreprises pour une comparaison — décochez-en une
@@ -76,52 +130,84 @@ export function DonneesPage() {
         </p>
       ) : null}
 
-      <div className="space-y-4">
-        {entreprises.map((entreprise) => {
-          const selectionnee = selection.includes(entreprise.id);
-          return (
-            <Card key={entreprise.id}>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <label className="mt-1 flex items-center gap-2">
-                    <span className="sr-only">Sélectionner {entreprise.name} pour comparaison</span>
-                    <input
-                      type="checkbox"
-                      checked={selectionnee}
-                      disabled={!selectionnee && plafondAtteint}
-                      onChange={() => toggleSelection(entreprise.id)}
-                    />
-                  </label>
-                  <div>
-                    <Link
-                      to={`/researcher/entreprises/${entreprise.id}`}
-                      className="text-base font-semibold text-foreground underline-offset-2 hover:underline"
-                    >
-                      {entreprise.name}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">
-                      {entreprise.sector} — {libellePays(entreprise.country)}
-                    </p>
-                  </div>
-                </div>
-                <ScoreSummary score={entreprise.score} />
-                <CarbonSummary carbone={entreprise.carbon} />
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      <DataTable
+        libelle="Entreprises publiées"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(e) => e.id}
+        rechercheDans={(e) => `${e.name} ${e.sector} ${libellePays(e.country)}`}
+        placeholderRecherche="Nom, secteur, pays…"
+        filtres={[
+          { id: "secteur", libelle: "Secteur", valeur: (e) => e.sector },
+          { id: "pays", libelle: "Pays", valeur: (e) => libellePays(e.country) },
+        ]}
+        triInitial={{ colonne: "nom", sens: "asc" }}
+        surOuvrir={(e) => setOuverteId(e.id)}
+        libelleLigne={(e) => e.name}
+        ligneActive={ouverteId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucune entreprise publiée pour l’instant."
+        nomExport="donnees-entreprises"
+        memoire="chercheur-donnees"
+      />
 
-      {entreprises.length > 0 && hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isFetchingNextPage}
-          onClick={() => fetchNextPage()}
-        >
-          {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-        </Button>
-      ) : null}
+      <Sheet open={ouverte !== null} onOpenChange={(o) => !o && setOuverteId(null)}>
+        {ouverte ? (
+          <SheetContent>
+            <SheetHeader>
+              <div className="flex items-start gap-3">
+                <CompanyAvatar
+                  nom={ouverte.name}
+                  logo={ouverte.logo}
+                  className="size-11 shrink-0"
+                />
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <SheetTitle>{ouverte.name}</SheetTitle>
+                  <SheetDescription>
+                    {ouverte.sector} · {libellePays(ouverte.country)}
+                  </SheetDescription>
+                </div>
+              </div>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Score ESG">
+                <ScoreSummary score={ouverte.score} />
+              </SheetSection>
+              <SheetSection titre="Émissions">
+                <CarbonSummary carbone={ouverte.carbon} />
+              </SheetSection>
+              <SheetSection titre="Entreprise">
+                <SheetFields
+                  champs={[
+                    { libelle: "Description", valeur: ouverte.description },
+                    { libelle: "Site officiel", valeur: ouverte.website },
+                    {
+                      libelle: "Publiée le",
+                      valeur: ouverte.published_at
+                        ? new Date(ouverte.published_at).toLocaleDateString("fr-FR")
+                        : null,
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/researcher/entreprises/${ouverte.id}`}>Fiche complète</Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!ouverteSelectionnee && plafondAtteint}
+                onClick={() => basculer(ouverte.id)}
+              >
+                {ouverteSelectionnee ? "Retirer de la comparaison" : "Ajouter à la comparaison"}
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

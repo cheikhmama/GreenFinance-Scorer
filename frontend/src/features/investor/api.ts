@@ -6,10 +6,10 @@ import type {
   BodyImportPortfolioPositions,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
+  EntreprisePublieePublic,
   FermerPositionRequest,
   ModifierPositionRequest,
   PageEntreprisePublieePublic,
-  PagePortefeuilleResume,
   PortefeuilleDetail,
   PortefeuilleResume,
   PortfolioCarbon,
@@ -37,6 +37,7 @@ import {
   restorePortfolio,
   updatePosition,
 } from "@/shared/api/generated/investor/investor";
+import { chargerToutesLesPages, TAILLE_PAGE_TABLE } from "@/shared/api/toutesLesPages";
 
 export const TAILLE_PAGE_INVESTOR = 10;
 
@@ -79,6 +80,18 @@ export function usePublishedCompanies(filtres: {
   });
 }
 
+/** Toutes les entreprises publiÃ©es, pour la table de donnÃ©es (tÃ¢che 5.18) : recherche, filtres
+ * et tri se font ensuite dans le navigateur. */
+export function useTableEntreprisesPubliees() {
+  return useQuery<EntreprisePublieePublic[], ApiError>({
+    queryKey: [...ENTREPRISES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listPublishedCompanies({ page, page_size: TAILLE_PAGE_TABLE }),
+      ),
+  });
+}
+
 export function useCompanyDetail(entrepriseId: string) {
   return useQuery<EntrepriseDetailInvestisseur, ApiError>({
     queryKey: entrepriseKey(entrepriseId),
@@ -87,8 +100,8 @@ export function useCompanyDetail(entrepriseId: string) {
   });
 }
 
-/** GET /investor/comparaison — activée seulement à partir de 2 entreprises sélectionnées, une
- * comparaison à une seule entreprise n'a pas de sens. */
+/** GET /investor/comparaison â€” activÃ©e seulement Ã  partir de 2 entreprises sÃ©lectionnÃ©es, une
+ * comparaison Ã  une seule entreprise n'a pas de sens. */
 export function useCompareCompanies(entrepriseIds: string[]) {
   return useQuery<EntrepriseDetailInvestisseur[], ApiError>({
     queryKey: ["investor", "comparaison", entrepriseIds],
@@ -97,23 +110,13 @@ export function useCompareCompanies(entrepriseIds: string[]) {
   });
 }
 
-export function useMyPortfolios(filtres: {
-  archive?: boolean;
-  avecPosition?: boolean;
-  recherche?: string;
-}) {
-  return useInfiniteQuery<PagePortefeuilleResume, ApiError>({
-    queryKey: [...PORTEFEUILLES_KEY, filtres],
-    queryFn: ({ pageParam }) =>
-      listMyPortfolios({
-        archive: filtres.archive,
-        avec_position: filtres.avecPosition,
-        recherche: filtres.recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_INVESTOR,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
+/** Tous mes portefeuilles, actifs et archivÃ©s, pour la table de donnÃ©es (tÃ¢che 5.18). La clÃ©
+ * est rangÃ©e sous celle des portefeuilles : crÃ©ation, archivage et restauration la rafraÃ®chissent. */
+export function useTablePortefeuilles() {
+  return useQuery<PortefeuilleResume[], ApiError>({
+    queryKey: [...PORTEFEUILLES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listMyPortfolios({ page, page_size: TAILLE_PAGE_TABLE })),
   });
 }
 
@@ -125,9 +128,9 @@ export function usePortfolioDetail(portefeuilleId: string) {
   });
 }
 
-/** GET /portfolios/{id}/carbon (tâche 2.3) — empreinte PCAF, calculée à la demande. Sa clé est
- * rangée sous celle du portefeuille : toute invalidation après une mutation de position la
- * rafraîchit aussi. */
+/** GET /portfolios/{id}/carbon (tÃ¢che 2.3) â€” empreinte PCAF, calculÃ©e Ã  la demande. Sa clÃ© est
+ * rangÃ©e sous celle du portefeuille : toute invalidation aprÃ¨s une mutation de position la
+ * rafraÃ®chit aussi. */
 export function usePortfolioCarbon(portefeuilleId: string) {
   return useQuery<PortfolioCarbon, ApiError>({
     queryKey: [...portefeuilleKey(portefeuilleId), "carbon"],
@@ -136,8 +139,8 @@ export function usePortfolioCarbon(portefeuilleId: string) {
   });
 }
 
-/** POST /portfolios/{id}/positions/import (tâche 2.2) — tout ou rien : une 422 porte
- * `fields.line_<n>` / `fields.file`, et rien n'est enregistré. */
+/** POST /portfolios/{id}/positions/import (tÃ¢che 2.2) â€” tout ou rien : une 422 porte
+ * `fields.line_<n>` / `fields.file`, et rien n'est enregistrÃ©. */
 export function useImportPositions(portefeuilleId: string) {
   const queryClient = useQueryClient();
   return useMutation<PortfolioImportResult, ApiError, BodyImportPortfolioPositions>({
@@ -248,8 +251,8 @@ export function useDeletePosition(portefeuilleId: string) {
   });
 }
 
-/** GET /investor/portefeuilles/{id}/export — pas un hook TanStack Query (une action, pas une
- * donnée mise en cache) : déclenche un téléchargement navigateur réel du CSV. */
+/** GET /investor/portefeuilles/{id}/export â€” pas un hook TanStack Query (une action, pas une
+ * donnÃ©e mise en cache) : dÃ©clenche un tÃ©lÃ©chargement navigateur rÃ©el du CSV. */
 export function exportPortfolioFile(
   portefeuilleId: string,
   nomPortefeuille: string,

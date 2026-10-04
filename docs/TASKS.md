@@ -283,3 +283,11 @@ Decisions taken before starting (2026-10-01):
   - [x] `/admin/investisseurs` and `/admin/chercheurs` open Utilisateurs filtered on that role, `/admin/evaluations` opens all reports. There is no scoring or settings page in the app, so nothing to convert there.
   - [x] Backend: `GET /admin/utilisateurs` without `role` lists every role and returns `organization` and `profile_detail` (from the access request; for a researcher invited by an institution, that institution); `GET /admin/entreprises` returns `official_global_score` (latest validated report); admin lists accept up to 100 rows per page.
   - Checked on the demo: all 16 admin routes render a table, the first row's drawer opens on each, one counter per table, no page wider than a phone screen, no console error or failed call.
+- [x] 5.18 Every role's lists as data tables with a detail drawer (same `DataTable` + `Sheet` as 5.17)
+  - [x] Auditeur: assigned cases (Entreprise, Secteur, Exercice, Type, Déposé le; version, file and « Examiner le dossier » in the drawer) and opinion history (Entreprise, Exercice, Type, Avis; date, comment and case link in the drawer).
+  - [x] Entreprise: declaration history (Exercice, Type, Statut, Soumis le, Score officiel; coverage, PDF summary, version, file and SHA-256 in the drawer). The « En cours » block and the new-declaration dialog are unchanged.
+  - [x] Investisseur: published companies (Entreprise, Secteur, Pays, Publiée le — still no ESG score on this list; `?secteur=` from the dashboard presets the filter) and portfolios (Portefeuille, Encours, Positions, Score ESG, Couverture; active / archived became the « État » filter, set to Actif).
+  - [x] Chercheur: data (comparison checkbox column kept, Entreprise, Secteur, Pays, Score ESG), projects, analyses (create dialog kept) and attachments (accept / decline in the drawer).
+  - [x] Institution: companies, projects (create dialog kept), analyses (those awaiting a decision sorted first) and researchers (two tabs: my attachments, available researchers with « Inviter » in the drawer).
+  - [x] Infinite-scroll list hooks replaced by full-list table hooks where no other screen used them.
+  - Checked on the demo: the 13 converted routes render one table and one counter, the first row's drawer opens, no page wider than a phone screen, no console error or failed call; 153 frontend tests pass.

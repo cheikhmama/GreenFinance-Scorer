@@ -1,80 +1,133 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import type { DossierAuditeur } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
-import { titreDeclaration } from "@/shared/format/typeRapport";
+import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Skeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
 import { useAssignedReports } from "../api";
 
-/** Espace Auditeur réel (Phase 4 §4.5) — dossiers affectés, en attente d'avis. */
+function dateFr(iso: string | null): string | null {
+  return iso ? new Date(iso).toLocaleDateString("fr-FR") : null;
+}
+
+/** Dossiers affectés à l'Auditeur, en attente d'avis (table de données, tâche 5.18). */
 export function AuditDashboardPage() {
-  const { data: dossiers, isLoading, isError } = useAssignedReports();
+  const { data, isLoading, isError } = useAssignedReports();
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
+
+  const colonnes = useMemo<ColonneTable<DossierAuditeur>[]>(
+    () => [
+      {
+        id: "entreprise",
+        entete: "Entreprise",
+        masquable: false,
+        valeurTri: (d) => d.company_name,
+        cellule: (d) => <span className="font-semibold text-foreground">{d.company_name}</span>,
+      },
+      {
+        id: "secteur",
+        entete: "Secteur",
+        valeurTri: (d) => d.company_sector,
+        cellule: (d) => <span className="text-muted-foreground">{d.company_sector}</span>,
+      },
+      {
+        id: "exercice",
+        entete: "Exercice",
+        alignement: "droite",
+        valeurTri: (d) => d.fiscal_year,
+        cellule: (d) => <span className="font-mono">{d.fiscal_year ?? "—"}</span>,
+      },
+      {
+        id: "type",
+        entete: "Type de rapport",
+        valeurTri: (d) => libelleTypeRapport(d.type),
+        cellule: (d) => libelleTypeRapport(d.type),
+      },
+      {
+        id: "depose",
+        entete: "Déposé le",
+        alignement: "droite",
+        valeurTri: (d) => d.submitted_at,
+        cellule: (d) => <span className="font-mono">{dateFr(d.submitted_at) ?? "—"}</span>,
+      },
+    ],
+    [],
+  );
+  const ouvert = data?.find((d) => d.id === ouvertId) ?? null;
 
   return (
     <PageShell
       title="Dossiers affectés"
       description="Rapports qui vous ont été affectés, en attente de votre avis."
     >
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Dossiers en attente d'avis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? <Skeleton className="h-32 w-full" /> : null}
-          {isError ? (
-            <p className="text-sm text-destructive">Impossible de charger vos dossiers.</p>
-          ) : null}
-          {!isLoading && !isError && dossiers?.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aucun dossier en attente d'avis pour l'instant.
-            </p>
-          ) : null}
-          {dossiers && dossiers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Entreprise</TableHead>
-                  <TableHead>Déclaration</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Déposé le</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dossiers.map((dossier) => (
-                  <TableRow key={dossier.id}>
-                    <TableCell>
-                      <p className="font-medium text-foreground">{dossier.company_name}</p>
-                      <p className="text-xs text-muted-foreground">{dossier.company_sector}</p>
-                    </TableCell>
-                    <TableCell className="text-foreground">{titreDeclaration(dossier)}</TableCell>
-                    <TableCell>
-                      <Badge variant={variantStatutRapport(dossier.status)}>
-                        {libelleStatutRapport(dossier.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {dossier.submitted_at
-                        ? new Date(dossier.submitted_at).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={`/audit/rapports/${dossier.id}`}>Examiner</Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-        </CardContent>
-      </Card>
+      <DataTable
+        libelle="Dossiers en attente d’avis"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(d) => d.id}
+        rechercheDans={(d) => `${d.company_name} ${d.company_sector} ${d.fiscal_year ?? ""}`}
+        placeholderRecherche="Entreprise, secteur, exercice…"
+        filtres={[
+          { id: "secteur", libelle: "Secteur", valeur: (d) => d.company_sector },
+          { id: "type", libelle: "Type", valeur: (d) => libelleTypeRapport(d.type) },
+        ]}
+        triInitial={{ colonne: "depose", sens: "asc" }}
+        surOuvrir={(d) => setOuvertId(d.id)}
+        libelleLigne={(d) => `${d.company_name}, ${titreDeclaration(d)}`}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun dossier en attente d’avis pour l’instant."
+        nomExport="dossiers-affectes"
+        memoire="audit-dossiers"
+      />
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouvert.company_name}</SheetTitle>
+              <SheetDescription>{titreDeclaration(ouvert)}</SheetDescription>
+              <Badge variant={variantStatutRapport(ouvert.status)} className="w-fit">
+                {libelleStatutRapport(ouvert.status)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Dossier">
+                <SheetFields
+                  champs={[
+                    { libelle: "Secteur", valeur: ouvert.company_sector },
+                    { libelle: "Déposé le", valeur: dateFr(ouvert.submitted_at) },
+                    {
+                      libelle: "Version",
+                      valeur: <span className="font-mono">{ouvert.version}</span>,
+                    },
+                    { libelle: "Fichier", valeur: ouvert.original_filename },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/audit/rapports/${ouvert.id}`}>Examiner le dossier</Link>
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </PageShell>
   );
 }

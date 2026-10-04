@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { downloadFile } from "@/shared/api/download";
 import type { ApiError } from "@/shared/api/errors";
+import { chargerToutesLesPages, TAILLE_PAGE_TABLE } from "@/shared/api/toutesLesPages";
 import type {
   AffectationPublic,
   AffecterChercheurRequest,
@@ -19,6 +20,7 @@ import type {
   EntreprisePerimetrePublic,
   InstitutionProfilPublic,
   InviterChercheurRequest,
+  EntreprisePublieePublic,
   PageEntreprisePublieePublic,
   ProjetDetail,
   ProjetPublic,
@@ -185,6 +187,18 @@ export function usePublishedCompaniesForInstitution(filtres: { recherche?: strin
       }),
     initialPageParam: 1,
     getNextPageParam: pageSuivante,
+  });
+}
+
+/** Catalogue complet pour la table de données (tâche 5.18) : recherche, filtres et tri se font
+ * côté navigateur. */
+export function useTableEntreprisesInstitution() {
+  return useQuery<EntreprisePublieePublic[], ApiError>({
+    queryKey: [...ENTREPRISES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listPublishedCompaniesForInstitution({ page, page_size: TAILLE_PAGE_TABLE }),
+      ),
   });
 }
 

@@ -110,10 +110,18 @@ describe("Espace Entreprise — Mes déclarations", () => {
     expect(lignes[0]).toHaveTextContent("FY2024");
     expect(lignes[0]).toHaveTextContent("Validé");
     expect(lignes[0]).toHaveTextContent("74,5/100");
-    expect(lignes[0]).toHaveTextContent("couverture 88 %");
+
+    // Couverture, empreinte et synthèse vivent dans le tiroir de la ligne.
+    await userEvent
+      .setup()
+      .click(
+        within(lignes[0] as HTMLElement).getByRole("button", { name: /Voir le détail de FY2024/ }),
+      );
+    const tiroir = await screen.findByRole("dialog");
+    expect(tiroir).toHaveTextContent("Couverture88 %");
     // Empreinte tronquée : 8 premiers et 4 derniers caractères, complète au survol.
-    expect(within(lignes[0] as HTMLElement).getByTitle(SHA)).toHaveTextContent("ffffffff…ffff");
-    expect(within(lignes[0] as HTMLElement).getByRole("link", { name: "PDF" })).toHaveAttribute(
+    expect(within(tiroir).getByTitle(SHA)).toHaveTextContent("ffffffff…ffff");
+    expect(within(tiroir).getByRole("link", { name: "PDF" })).toHaveAttribute(
       "href",
       "/api/v1/company/rapports/valide/synthese/fichier",
     );

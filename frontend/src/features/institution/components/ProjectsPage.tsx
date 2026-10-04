@@ -1,43 +1,87 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FolderKanban } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type { ProjetPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent } from "@/shared/ui/card";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-import { EmptyState } from "@/shared/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
 import { Textarea } from "@/shared/ui/textarea";
 import { useCreateProject, useMyProjects } from "../api";
 import { type CreerProjetForm, creerProjetSchema } from "../schemas";
 
-function formatPeriode(projet: {
-  start_date: string | null;
-  planned_end_date: string | null;
-  deadline: string | null;
-}): string | null {
-  const morceaux: string[] = [];
-  if (projet.start_date)
-    morceaux.push(`Du ${new Date(projet.start_date).toLocaleDateString("fr-FR")}`);
-  if (projet.planned_end_date)
-    morceaux.push(`au ${new Date(projet.planned_end_date).toLocaleDateString("fr-FR")}`);
-  if (projet.deadline) {
-    morceaux.push(`échéance : ${new Date(projet.deadline).toLocaleDateString("fr-FR")}`);
-  }
-  return morceaux.length > 0 ? morceaux.join(" — ") : null;
-}
+const dateFr = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : null);
 
+/** Projets de l'Institution (table de données, tâche 5.18) : nom, statut et calendrier ;
+ * description et dates détaillées dans le tiroir, création dans une modale. */
 export function ProjectsPage() {
   const { data: projets, isLoading, isError } = useMyProjects();
   const [modaleOuverte, setModaleOuverte] = useState(false);
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
+  const ouvert = projets?.find((p) => p.id === ouvertId) ?? null;
+
+  const colonnes = useMemo<ColonneTable<ProjetPublic>[]>(
+    () => [
+      {
+        id: "nom",
+        entete: "Projet",
+        masquable: false,
+        valeurTri: (p) => p.name,
+        cellule: (p) => <span className="font-semibold text-foreground">{p.name}</span>,
+      },
+      {
+        id: "statut",
+        entete: "Statut",
+        alignement: "centre",
+        valeurTri: (p) => libelleStatutProjet(p.status),
+        cellule: (p) => (
+          <Badge variant={variantStatutProjet(p.status)}>{libelleStatutProjet(p.status)}</Badge>
+        ),
+      },
+      {
+        id: "debut",
+        entete: "Début",
+        alignement: "droite",
+        valeurTri: (p) => p.start_date,
+        cellule: (p) => <span className="font-mono">{dateFr(p.start_date) ?? "—"}</span>,
+      },
+      {
+        id: "echeance",
+        entete: "Date limite",
+        alignement: "droite",
+        valeurTri: (p) => p.deadline ?? p.planned_end_date,
+        cellule: (p) => (
+          <span className="font-mono">{dateFr(p.deadline ?? p.planned_end_date) ?? "—"}</span>
+        ),
+      },
+      {
+        id: "cree",
+        entete: "Créé le",
+        alignement: "droite",
+        valeurTri: (p) => p.created_at,
+        cellule: (p) => <span className="font-mono">{dateFr(p.created_at)}</span>,
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="space-y-6">
@@ -56,43 +100,62 @@ export function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      {isLoading ? <CardListSkeleton /> : null}
-      {isError ? <p className="text-destructive">Impossible de charger les projets.</p> : null}
-      {!isLoading && !isError && projets?.length === 0 ? (
-        <EmptyState
-          icon={FolderKanban}
-          message="Aucun projet pour l'instant — créez-en un pour commencer à inviter des chercheurs et définir un périmètre d'analyse."
-          action={
-            <Button size="sm" onClick={() => setModaleOuverte(true)}>
-              Créer un projet
-            </Button>
-          }
-        />
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {projets?.map((projet) => {
-          const periode = formatPeriode(projet);
-          return (
-            <Link key={projet.id} to={`/institution/projets/${projet.id}`}>
-              <Card className="h-full gap-3 transition hover:border-brand-green hover:shadow-md">
-                <CardContent className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-base font-semibold text-foreground">{projet.name}</p>
-                    <Badge variant={variantStatutProjet(projet.status)}>
-                      {libelleStatutProjet(projet.status)}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {projet.objective ?? projet.description ?? "Aucune description."}
-                  </p>
-                  {periode ? <p className="text-xs text-muted-foreground">{periode}</p> : null}
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+      <DataTable
+        libelle="Projets"
+        lignes={projets}
+        colonnes={colonnes}
+        cle={(p) => p.id}
+        rechercheDans={(p) => `${p.name} ${p.objective ?? ""} ${p.description ?? ""}`}
+        placeholderRecherche="Nom, objectif…"
+        filtres={[
+          { id: "statut", libelle: "Statut", valeur: (p) => libelleStatutProjet(p.status) },
+        ]}
+        triInitial={{ colonne: "cree", sens: "desc" }}
+        surOuvrir={(p) => setOuvertId(p.id)}
+        libelleLigne={(p) => p.name}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun projet pour l'instant — créez-en un pour commencer à inviter des chercheurs et définir un périmètre d'analyse."
+        nomExport="projets"
+        memoire="institution-projets"
+      />
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouvert.name}</SheetTitle>
+              <SheetDescription>{ouvert.objective ?? "Aucun objectif renseigné."}</SheetDescription>
+              <Badge variant={variantStatutProjet(ouvert.status)} className="w-fit">
+                {libelleStatutProjet(ouvert.status)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Calendrier">
+                <SheetFields
+                  champs={[
+                    { libelle: "Début", valeur: dateFr(ouvert.start_date) },
+                    { libelle: "Fin prévue", valeur: dateFr(ouvert.planned_end_date) },
+                    { libelle: "Date limite", valeur: dateFr(ouvert.deadline) },
+                    { libelle: "Créé le", valeur: dateFr(ouvert.created_at) },
+                    { libelle: "Clôturé le", valeur: dateFr(ouvert.closed_at) },
+                  ]}
+                />
+              </SheetSection>
+              {ouvert.description ? (
+                <SheetSection titre="Description">
+                  <p className="text-sm text-foreground">{ouvert.description}</p>
+                </SheetSection>
+              ) : null}
+            </SheetBody>
+            <SheetFooter>
+              <Button asChild size="sm">
+                <Link to={`/institution/projets/${ouvert.id}`}>Ouvrir le projet</Link>
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }
