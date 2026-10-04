@@ -1,101 +1,122 @@
-import { Search, Wallet } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { PortefeuilleAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { formatMontant } from "@/shared/format/etatPosition";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { Input } from "@/shared/ui/input";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { usePortfoliosAdmin } from "../api";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useTablePortefeuilles } from "../api";
 
-/** Tous les portefeuilles non archivés, tous Investisseurs confondus — détail derrière
- * "Portefeuilles non archivés" de l'onglet Investisseur du tableau de bord. Suivi en lecture
- * seule : la composition détaillée (positions) reste privée à son titulaire, jamais exposée ici
- * au-delà du nombre de positions et du montant total dans la devise de référence. */
+/** Tous les portefeuilles non archivés, tous Investisseurs confondus (table, tâche 5.17). */
 export function AdminPortefeuillesPage() {
-  const [recherche, setRecherche] = useState("");
-  const rechercheDebattue = useDebouncedValue(recherche);
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    usePortfoliosAdmin(rechercheDebattue);
+  const { data, isLoading, isError } = useTablePortefeuilles();
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
 
-  const portefeuilles = data?.pages.flatMap((page) => page.items) ?? [];
+  const colonnes = useMemo<ColonneTable<PortefeuilleAdmin>[]>(
+    () => [
+      {
+        id: "nom",
+        entete: "Portefeuille",
+        masquable: false,
+        valeurTri: (p) => p.name,
+        cellule: (p) => <span className="font-semibold text-foreground">{p.name}</span>,
+      },
+      {
+        id: "titulaire",
+        entete: "Titulaire",
+        valeurTri: (p) => p.investor_email,
+        cellule: (p) => <span className="font-mono text-[12.5px]">{p.investor_email}</span>,
+      },
+      {
+        id: "positions",
+        entete: "Positions",
+        alignement: "droite",
+        valeurTri: (p) => p.position_count,
+        cellule: (p) => <span className="font-mono">{p.position_count}</span>,
+      },
+      {
+        id: "montant",
+        entete: "Montant total",
+        alignement: "droite",
+        valeurTri: (p) => p.total_amount,
+        cellule: (p) => (
+          <span className="font-mono font-semibold">
+            {formatMontant(p.total_amount, p.reference_currency)}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
+  const ouvert = data?.find((p) => p.id === ouvertId) ?? null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Portefeuilles"
-        description="Tous les portefeuilles non archivés, tous Investisseurs confondus."
+        description="Tous les portefeuilles non archivés, tous investisseurs confondus."
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Portefeuilles</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <label htmlFor="portefeuilles-recherche" className="relative block max-w-sm">
-            <span className="sr-only">Rechercher par nom de portefeuille ou e-mail</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="portefeuilles-recherche"
-              value={recherche}
-              onChange={(event) => setRecherche(event.target.value)}
-              placeholder="Rechercher par nom ou e-mail"
-              className="pl-9"
-            />
-          </label>
-
-          {isLoading ? <CardListSkeleton count={3} /> : null}
-          {isError ? (
-            <p className="text-destructive">Impossible de charger les portefeuilles.</p>
-          ) : null}
-          {!isLoading && !isError && portefeuilles.length === 0 ? (
-            <EmptyState icon={Wallet} message="Aucun portefeuille pour ce filtre." />
-          ) : null}
-
-          {portefeuilles.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Portefeuille</TableHead>
-                  <TableHead>Titulaire</TableHead>
-                  <TableHead>Positions</TableHead>
-                  <TableHead>Montant total</TableHead>
-                  <TableHead>Créé le</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {portefeuilles.map((portefeuille) => (
-                  <TableRow key={portefeuille.id}>
-                    <TableCell className="font-medium text-foreground">
-                      {portefeuille.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{portefeuille.investor_email}</TableCell>
-                    <TableCell className="tabular-nums">{portefeuille.position_count}</TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatMontant(portefeuille.total_amount, portefeuille.reference_currency)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-          {portefeuilles.length > 0 && hasNextPage ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isFetchingNextPage}
-              onClick={() => fetchNextPage()}
-            >
-              {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+      <DataTable
+        libelle="Portefeuilles"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(p) => p.id}
+        rechercheDans={(p) => `${p.name} ${p.investor_email}`}
+        placeholderRecherche="Portefeuille, titulaire…"
+        filtres={[{ id: "devise", libelle: "Devise", valeur: (p) => p.reference_currency }]}
+        triInitial={{ colonne: "montant", sens: "desc" }}
+        surOuvrir={(p) => setOuvertId(p.id)}
+        libelleLigne={(p) => p.name}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun portefeuille."
+        nomExport="portefeuilles"
+        memoire="admin-portefeuilles"
+      />
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouvert.name}</SheetTitle>
+              <SheetDescription>{ouvert.investor_email}</SheetDescription>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Portefeuille">
+                <SheetFields
+                  champs={[
+                    {
+                      libelle: "Positions",
+                      valeur: <span className="font-mono">{ouvert.position_count}</span>,
+                    },
+                    {
+                      libelle: "Montant total",
+                      valeur: (
+                        <span className="font-mono font-semibold">
+                          {formatMontant(ouvert.total_amount, ouvert.reference_currency)}
+                        </span>
+                      ),
+                    },
+                    { libelle: "Devise de référence", valeur: ouvert.reference_currency },
+                    {
+                      libelle: "Créé le",
+                      valeur: new Date(ouvert.created_at).toLocaleDateString("fr-FR"),
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { RouteObject } from "react-router-dom";
+import { Navigate, type RouteObject } from "react-router-dom";
 import { AppShell } from "@/shared/layout/AppShell";
 import { RequireRole } from "@/shared/RequireRole";
 import { AdminAnalysesPage } from "./components/AdminAnalysesPage";
@@ -25,6 +25,19 @@ export const adminRoutes: RouteObject[] = [
     children: [
       { path: "/admin", element: <AdminDashboardPage /> },
       { path: "/admin/utilisateurs", element: <AdminUsersPage /> },
+      // Raccourcis (tâche 5.17) : la table Utilisateurs filtrée sur le rôle, la table Rapports.
+      {
+        path: "/admin/investisseurs",
+        element: <Navigate to="/admin/utilisateurs?role=INVESTOR" replace />,
+      },
+      {
+        path: "/admin/chercheurs",
+        element: <Navigate to="/admin/utilisateurs?role=RESEARCHER" replace />,
+      },
+      {
+        path: "/admin/evaluations",
+        element: <Navigate to="/admin/rapports?onglet=tous" replace />,
+      },
       { path: "/admin/entreprises", element: <AdminCompaniesPage /> },
       { path: "/admin/entreprises/:entrepriseId", element: <AdminCompanyDetailPage /> },
       { path: "/admin/entreprises/:entrepriseId/rapports", element: <AdminCompanyReportsPage /> },

@@ -11,7 +11,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.auth.schemas import EmailNormalise
+from app.auth.schemas import EmailNormalise, UtilisateurPublic
 from app.company.identifiers import isin_valide, lei_valide
 from app.company.schemas import EntreprisePublic
 from app.core.enums import (
@@ -114,6 +114,19 @@ class EntrepriseAdmin(EntreprisePublic):
     # Permet au frontend de lier "Voir le rapport"/"Valider" directement au rapport le plus
     # récent, sans détour par la liste des rapports — None si aucun rapport déposé.
     latest_report_id: uuid.UUID | None
+    # Score officiel du dernier rapport validé (colonne « Score officiel » de la table, tâche
+    # 5.17) — None tant qu'aucun rapport n'est validé, jamais un 0 fabriqué.
+    official_global_score: float | None = None
+
+
+class UtilisateurAdmin(UtilisateurPublic):
+    """Ligne de la table Utilisateurs (tâche 5.17) : l'organisation et la précision du rôle
+    (type d'investisseur, domaine de recherche) viennent de la demande d'accès ; pour un chercheur
+    invité par une institution, l'organisation est l'institution qui l'a rattaché. None pour un
+    compte créé par l'Administrateur sans l'une ni l'autre."""
+
+    organization: str | None = None
+    profile_detail: str | None = None
 
 
 class JournalAuditPublic(BaseModel):

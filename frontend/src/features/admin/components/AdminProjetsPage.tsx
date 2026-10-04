@@ -1,102 +1,131 @@
-import { FolderKanban } from "lucide-react";
-import type { ProjectStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import type {
+  ProjectStatus,
+  ProjetAdmin,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
-import { Select } from "@/shared/ui/select";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { useProjectsAdmin } from "../api";
-import { useOngletParametre } from "../useOngletParametre";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useTableProjets } from "../api";
 
 const STATUTS: ProjectStatus[] = ["OUVERT", "CLOTURE"];
 
-/** Tous les projets Institution, filtrable par statut — détail derrière "Projets ouverts/clôturés"
- * de l'onglet Institution du tableau de bord. Suivi en lecture seule : la composition (chercheurs
- * affectés, périmètre d'entreprises) reste gérée depuis l'espace Institution, jamais ici. */
-export function AdminProjetsPage() {
-  const [statut, setStatut] = useOngletParametre<ProjectStatus | "">("statut", "");
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useProjectsAdmin(statut || undefined);
+function dateFr(iso: string | null): string | null {
+  return iso ? new Date(iso).toLocaleDateString("fr-FR") : null;
+}
 
-  const projets = data?.pages.flatMap((page) => page.items) ?? [];
+/** Tous les projets Institution (table, tâche 5.17) ; `?statut=` présélectionne le filtre (liens
+ * « Projets ouverts / clôturés » du tableau de bord). */
+export function AdminProjetsPage() {
+  const { data, isLoading, isError } = useTableProjets();
+  const [searchParams] = useSearchParams();
+  const statutUrl = searchParams.get("statut") as ProjectStatus | null;
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
+
+  const colonnes = useMemo<ColonneTable<ProjetAdmin>[]>(
+    () => [
+      {
+        id: "projet",
+        entete: "Projet",
+        masquable: false,
+        valeurTri: (p) => p.name,
+        cellule: (p) => <span className="font-semibold text-foreground">{p.name}</span>,
+      },
+      {
+        id: "institution",
+        entete: "Institution",
+        valeurTri: (p) => p.institution_email,
+        cellule: (p) => <span className="font-mono text-[12.5px]">{p.institution_email}</span>,
+      },
+      {
+        id: "chercheurs",
+        entete: "Chercheurs",
+        alignement: "droite",
+        valeurTri: (p) => p.researcher_count,
+        cellule: (p) => <span className="font-mono">{p.researcher_count}</span>,
+      },
+      {
+        id: "echeance",
+        entete: "Échéance",
+        alignement: "droite",
+        valeurTri: (p) => p.deadline,
+        cellule: (p) => <span className="font-mono">{dateFr(p.deadline) ?? "—"}</span>,
+      },
+    ],
+    [],
+  );
+  const ouvert = data?.find((p) => p.id === ouvertId) ?? null;
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Projets"
-        description="Tous les projets Institution, filtrables par statut."
+    <div className="space-y-6">
+      <PageHeader title="Projets" description="Tous les projets des institutions." />
+      <DataTable
+        libelle="Projets"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(p) => p.id}
+        rechercheDans={(p) => `${p.name} ${p.institution_email}`}
+        placeholderRecherche="Projet, institution…"
+        filtres={[
+          { id: "statut", libelle: "Statut", valeur: (p) => libelleStatutProjet(p.status) },
+          { id: "institution", libelle: "Institution", valeur: (p) => p.institution_email },
+        ]}
+        filtresInitiaux={
+          statutUrl && STATUTS.includes(statutUrl)
+            ? { statut: [libelleStatutProjet(statutUrl)] }
+            : undefined
+        }
+        triInitial={{ colonne: "echeance", sens: "asc" }}
+        surOuvrir={(p) => setOuvertId(p.id)}
+        libelleLigne={(p) => p.name}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun projet."
+        nomExport="projets"
+        memoire="admin-projets"
       />
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle>Projets</CardTitle>
-          <Select
-            value={statut}
-            onChange={(event) => setStatut(event.target.value as ProjectStatus | "")}
-            className="w-48"
-          >
-            <option value="">Tous les statuts</option>
-            {STATUTS.map((valeur) => (
-              <option key={valeur} value={valeur}>
-                {libelleStatutProjet(valeur)}
-              </option>
-            ))}
-          </Select>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading ? <CardListSkeleton count={3} /> : null}
-          {isError ? <p className="text-destructive">Impossible de charger les projets.</p> : null}
-          {!isLoading && !isError && projets.length === 0 ? (
-            <EmptyState icon={FolderKanban} message="Aucun projet pour ce filtre." />
-          ) : null}
-
-          {projets.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Projet</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Institution</TableHead>
-                  <TableHead>Chercheurs affectés</TableHead>
-                  <TableHead>Échéance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projets.map((projet) => (
-                  <TableRow key={projet.id}>
-                    <TableCell className="font-medium text-foreground">{projet.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={variantStatutProjet(projet.status)}>
-                        {libelleStatutProjet(projet.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{projet.institution_email}</TableCell>
-                    <TableCell className="tabular-nums">{projet.researcher_count}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {projet.deadline
-                        ? new Date(projet.deadline).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-          {projets.length > 0 && hasNextPage ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isFetchingNextPage}
-              onClick={() => fetchNextPage()}
-            >
-              {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouvert.name}</SheetTitle>
+              <SheetDescription>{ouvert.institution_email}</SheetDescription>
+              <Badge variant={variantStatutProjet(ouvert.status)} className="w-fit">
+                {libelleStatutProjet(ouvert.status)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Projet">
+                <SheetFields
+                  champs={[
+                    { libelle: "Statut", valeur: libelleStatutProjet(ouvert.status) },
+                    {
+                      libelle: "Chercheurs affectés",
+                      valeur: <span className="font-mono">{ouvert.researcher_count}</span>,
+                    },
+                    { libelle: "Créé le", valeur: dateFr(ouvert.created_at) },
+                    { libelle: "Échéance", valeur: dateFr(ouvert.deadline) },
+                    { libelle: "Clôturé le", valeur: dateFr(ouvert.closed_at) },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

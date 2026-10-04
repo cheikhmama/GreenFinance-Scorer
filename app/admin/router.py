@@ -23,6 +23,7 @@ from app.admin.apercu import (
     construire_apercu_acteurs,
     entreprises_perimetre_esg,
     lister_entreprises_avec_score,
+    score_officiel_entreprise,
 )
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import avec_acteurs, lister_journal_audit
@@ -88,6 +89,7 @@ from app.admin.schemas import (
     StatistiquesInvestisseursAdmin,
     TableauDeBordAdmin,
     TrancheScorePublic,
+    UtilisateurAdmin,
     UtilisateurCree,
 )
 from app.admin.utilisateurs import (
@@ -95,6 +97,7 @@ from app.admin.utilisateurs import (
     desactiver_utilisateur,
     lister_utilisateurs_en_attente,
     lister_utilisateurs_par_role,
+    profils_utilisateurs,
     reactiver_utilisateur,
     renvoyer_lien_activation,
 )
@@ -147,22 +150,22 @@ def _vers_entreprise_admin(session: Session, entreprise: Company) -> EntrepriseA
 
 @router.get(
     "/admin/utilisateurs",
-    response_model=Page[UtilisateurPublic],
+    response_model=Page[UtilisateurAdmin],
     operation_id="listUsersByRole",
     summary="Lister les comptes actifs d'un rôle donné, avec recherche et pagination",
 )
 def lister_utilisateurs_route(
-    role: Role,
+    role: Role | None = Query(None, description="Absent : tous les rôles"),
     recherche: str | None = Query(None, description="Filtre sur l'e-mail"),
     inclure_inactifs: bool = Query(False, description="Inclure aussi les comptes désactivés"),
     en_attente_activation: bool | None = Query(
         None, description="Filtrer sur les comptes qui n'ont pas encore cliqué leur lien d'activation"
     ),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
-) -> Page[UtilisateurPublic]:
+) -> Page[UtilisateurAdmin]:
     """Page de comptes existants pour un rôle donné — la seule source à partir de laquelle une
     relation acteur-à-acteur (ex. affectation d'un auditeur) doit être construite, jamais une
     saisie libre de nom/e-mail."""
@@ -175,8 +178,16 @@ def lister_utilisateurs_route(
         page=page,
         page_size=page_size,
     )
-    return Page[UtilisateurPublic](
-        items=items,
+    profils = profils_utilisateurs(session, items)
+    return Page[UtilisateurAdmin](
+        items=[
+            UtilisateurAdmin(
+                **UtilisateurPublic.model_validate(u).model_dump(),
+                organization=profils.get(u.id, (None, None))[0],
+                profile_detail=profils.get(u.id, (None, None))[1],
+            )
+            for u in items
+        ],
         page=page,
         page_size=page_size,
         total=total,
@@ -284,7 +295,7 @@ def reactiver_utilisateur_route(
 def lister_tous_les_rapports_route(
     statut: ReportStatus | None = Query(None, description="Filtre sur le statut du rapport"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[RapportAdminListe]:
@@ -379,7 +390,7 @@ def affecter_route(
 def lister_charge_auditeurs_route(
     recherche: str | None = Query(None, description="Filtre sur l'e-mail"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[ChargeAuditeurAdmin]:
@@ -606,7 +617,7 @@ def demander_correction_route(
 def lister_toutes_les_entreprises_route(
     recherche: str | None = Query(None, description="Filtre sur le nom, le secteur ou le pays"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntrepriseAdmin]:
@@ -621,6 +632,7 @@ def lister_toutes_les_entreprises_route(
                 report_count=nombre_rapports,
                 latest_report_status=dernier_statut,
                 latest_report_id=dernier_rapport_id,
+                official_global_score=score_officiel_entreprise(session, entreprise.id),
             )
             for entreprise, nombre_rapports, dernier_statut, dernier_rapport_id in items
         ],
@@ -640,7 +652,7 @@ def lister_toutes_les_entreprises_route(
 def lister_entreprises_publiables_route(
     recherche: str | None = Query(None, description="Filtre sur le nom, le secteur ou le pays"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublic]:
@@ -664,7 +676,7 @@ def lister_entreprises_publiables_route(
 )
 def lister_entreprises_a_republier_route(
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublic]:
@@ -688,7 +700,7 @@ def lister_entreprises_avec_score_route(
     secteur: str | None = Query(None),
     pays: str | None = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntrepriseAvecScoreAdmin]:
@@ -1067,7 +1079,7 @@ def performance_esg_route(
 def lister_portefeuilles_admin_route(
     recherche: str | None = Query(None, description="Filtre sur le nom du portefeuille ou l'e-mail"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[PortefeuilleAdmin]:
@@ -1101,7 +1113,7 @@ def lister_portefeuilles_admin_route(
 def lister_analyses_admin_route(
     statut: AnalysisStatus | None = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[AnalyseAdmin]:
@@ -1137,7 +1149,7 @@ def lister_analyses_admin_route(
 def lister_projets_admin_route(
     statut: ProjectStatus | None = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(3, ge=1, le=50),
+    page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[ProjetAdmin]:

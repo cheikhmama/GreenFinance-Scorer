@@ -15,12 +15,17 @@ from sqlmodel import Session, col, func, select
 
 from app.access_requests.models import AccessRequest
 from app.auth.activation import envoyer_lien_activation
-from app.auth.models import InstitutionProfile, User
+from app.auth.models import InstitutionProfile, ResearcherAffiliation, User
 from app.auth.revocation import revoke_all_sessions
 from app.company.models import Company
 from app.core.audit import auditer
 from app.core.email import EmailDeliveryError, ensure_email_configured
-from app.core.enums import AccessRequestStatus, RegistrationStatus, Role
+from app.core.enums import (
+    AccessRequestStatus,
+    AffiliationStatus,
+    RegistrationStatus,
+    Role,
+)
 from app.core.exceptions import NotFoundError, ServiceUnavailableError, ValidationError
 from app.core.recherche import contient
 
@@ -32,7 +37,7 @@ _QUOTA_EXPORT_INITIAL = 10
 
 def lister_utilisateurs_par_role(
     session: Session,
-    role: Role,
+    role: Role | None,
     *,
     recherche: str | None = None,
     inclure_inactifs: bool = False,
@@ -49,7 +54,8 @@ def lister_utilisateurs_par_role(
 
     Pagination par offset/limit — le total ne descend jamais à la base entière : seule la page
     demandée est chargée (voir app/core/schemas.py::Page, posé pour ce cas précisément)."""
-    filtres: list[ColumnElement[bool]] = [col(User.role) == role]
+    # role=None : tous les rôles (table Utilisateurs « Tous », tâche 5.17).
+    filtres: list[ColumnElement[bool]] = [] if role is None else [col(User.role) == role]
     if not inclure_inactifs:
         filtres.append(col(User.active).is_(True))
     if en_attente_activation is not None:
@@ -258,3 +264,32 @@ def reactiver_utilisateur(session: Session, acteur_id: uuid.UUID, cible_id: uuid
     session.commit()
     session.refresh(utilisateur)
     return utilisateur
+
+
+def profils_utilisateurs(
+    session: Session, utilisateurs: list[User]
+) -> dict[uuid.UUID, tuple[str | None, str | None]]:
+    """Organisation et précision du rôle de chaque compte (tâche 5.17), en deux requêtes pour la
+    page : la demande d'accès (organisation, type d'investisseur ou domaine de recherche) ; à
+    défaut, pour un chercheur, l'institution qui l'a rattaché (rattachement accepté)."""
+    ids = [u.id for u in utilisateurs]
+    if not ids:
+        return {}
+    profils: dict[uuid.UUID, tuple[str | None, str | None]] = {}
+    for demande in session.exec(select(AccessRequest).where(col(AccessRequest.user_id).in_(ids))).all():
+        precision = demande.investor_type or demande.research_domain
+        profils[demande.user_id] = (demande.organization, precision.value if precision else None)
+    chercheurs = [u.id for u in utilisateurs if u.role == Role.RESEARCHER and u.id not in profils]
+    if chercheurs:
+        lignes = session.exec(
+            select(ResearcherAffiliation.researcher_id, User.name, User.email)
+            .join(User, col(User.id) == col(ResearcherAffiliation.institution_id))
+            .where(
+                col(ResearcherAffiliation.researcher_id).in_(chercheurs),
+                ResearcherAffiliation.status == AffiliationStatus.ACCEPTE,
+            )
+        ).all()
+        for chercheur_id, nom, email in lignes:
+            profils.setdefault(chercheur_id, (nom or email, None))
+    return profils
+

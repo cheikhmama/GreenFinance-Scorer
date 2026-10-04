@@ -1,24 +1,39 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search, Users } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import type {
+  InvestorType,
+  ResearchDomain,
+  UtilisateurAdmin,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import {
+  LIBELLES_DOMAINE_RECHERCHE,
+  LIBELLES_TYPE_INVESTISSEUR,
+} from "@/shared/format/demandeAcces";
 import { libelleRole } from "@/shared/format/role";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-import { EmptyState } from "@/shared/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { Select } from "@/shared/ui/select";
-import { Skeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { useCreateUser, useDeactivateUser, useReactivateUser, useUsersByRole } from "../api";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetFooter,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useCreateUser, useDeactivateUser, useReactivateUser, useTableUtilisateurs } from "../api";
 import {
   type CreerUtilisateurForm,
   creerUtilisateurSchema,
@@ -28,205 +43,256 @@ import {
   type RoleAttribuable,
 } from "../schemas";
 
-/** Gestion des comptes (Phase 3 §3.3) — création, désactivation/réactivation. Le rôle se fixe à
- * la création (voir FormulaireCreation) et n'est plus jamais modifiable ensuite — chaque rôle
- * porte son propre espace et ses propres permissions, les mélanger après coup n'a pas de sens
- * métier. Le mot de passe temporaire n'est jamais affiché dans cette interface (aucun compte
- * n'a de moyen de le récupérer autrement qu'à l'écran — voir plan de provisioning par e-mail).
- *
- * Recherche et pagination sont portées par l'API (GET /admin/utilisateurs?recherche=&page=&
- * page_size=) : 3 comptes chargés au départ, "Voir plus" charge 3 comptes de plus depuis la base
- * à chaque clic, jusqu'à épuisement de la liste pour la recherche/rôle en cours. */
+/** Gestion des comptes (Phase 3 §3.3, table de données tâche 5.17) — nom, organisation, e-mail
+ * et type dans la table ; état, dates, historique et actions (désactiver, réactiver) dans le
+ * tiroir. Le rôle se fixe à la création (voir FormulaireCreation) et n'est plus jamais modifiable
+ * ensuite — chaque rôle porte son propre espace et ses propres permissions. `?role=` dans l'URL
+ * présélectionne le filtre Rôle (/admin/investisseurs, /admin/chercheurs y mènent). */
 export function UsersSection() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const parametreRole = searchParams.get("role");
-  const roleAffiche: Role = ROLES_CONSULTABLES.includes(parametreRole as Role)
+  const roleUrl = ROLES_CONSULTABLES.includes(parametreRole as Role)
     ? (parametreRole as Role)
-    : Role.AUDITOR;
-  // Le formulaire de création n'accepte jamais ADMIN (voir ROLES_ATTRIBUABLES) — si on
-  // parcourt les comptes Administrateur au moment d'ouvrir la modale, retombe sur le premier rôle
-  // réellement attribuable plutôt que de présélectionner un rôle que le formulaire refuserait.
-  const roleCreationParDefaut = ROLES_ATTRIBUABLES.includes(roleAffiche as RoleAttribuable)
-    ? (roleAffiche as RoleAttribuable)
+    : null;
+  // Le formulaire n'accepte jamais ADMIN : retombe sur le premier rôle attribuable.
+  const roleCreationParDefaut = ROLES_ATTRIBUABLES.includes(roleUrl as RoleAttribuable)
+    ? (roleUrl as RoleAttribuable)
     : ROLES_ATTRIBUABLES[0];
-  const [recherche, setRecherche] = useState("");
   const [modaleOuverte, setModaleOuverte] = useState(false);
-  const rechercheDebattue = useDebouncedValue(recherche);
-  // Comptes désactivés toujours inclus (jamais de bascule dans l'UI) : sans ça, un compte
-  // désactivé disparaîtrait de cette liste et son bouton "Réactiver" deviendrait inatteignable.
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useUsersByRole(roleAffiche, rechercheDebattue, true);
-  const deactivate = useDeactivateUser(roleAffiche);
-  const reactivate = useReactivateUser(roleAffiche);
-  const confirm = useConfirm();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { data, isLoading, isError } = useTableUtilisateurs();
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
 
-  async function desactiver(utilisateurId: string, email: string) {
+  const colonnes = useMemo<ColonneTable<UtilisateurAdmin>[]>(
+    () => [
+      {
+        id: "nom",
+        entete: "Nom",
+        masquable: false,
+        valeurTri: (u) => u.name ?? u.email,
+        cellule: (u) => (
+          <span className="font-semibold text-foreground">
+            {u.name ?? <span className="font-normal text-muted-foreground">Sans nom</span>}
+          </span>
+        ),
+      },
+      {
+        id: "organisation",
+        entete: "Organisation",
+        valeurTri: (u) => u.organization ?? null,
+        cellule: (u) => u.organization ?? <span className="text-muted-foreground">—</span>,
+      },
+      {
+        id: "email",
+        entete: "E-mail",
+        valeurTri: (u) => u.email,
+        cellule: (u) => <span className="font-mono text-[12.5px]">{u.email}</span>,
+      },
+      {
+        id: "type",
+        entete: "Type / Domaine",
+        valeurTri: (u) => typeDuCompte(u),
+        cellule: (u) => <span className="text-muted-foreground">{typeDuCompte(u)}</span>,
+      },
+    ],
+    [],
+  );
+
+  const ouvert = data?.find((u) => u.id === ouvertId) ?? null;
+
+  return (
+    <section aria-labelledby="titre-utilisateurs" className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="titre-utilisateurs" className="text-lg font-semibold text-foreground">
+          Comptes
+        </h2>
+        <Button size="sm" onClick={() => setModaleOuverte(true)}>
+          Créer un utilisateur
+        </Button>
+      </div>
+      <Dialog open={modaleOuverte} onOpenChange={setModaleOuverte}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Créer un utilisateur</DialogTitle>
+          </DialogHeader>
+          <FormulaireCreation
+            roleAffiche={roleCreationParDefaut}
+            onCreated={() => setModaleOuverte(false)}
+          />
+        </DialogContent>
+      </Dialog>
+      <DataTable
+        libelle="Comptes utilisateurs"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(u) => u.id}
+        rechercheDans={(u) => `${u.name ?? ""} ${u.email} ${u.organization ?? ""}`}
+        placeholderRecherche="Nom, e-mail, organisation…"
+        filtres={[
+          { id: "role", libelle: "Rôle", valeur: (u) => libelleRole(u.role) },
+          { id: "etat", libelle: "État", valeur: (u) => (u.active ? "Actif" : "Désactivé") },
+        ]}
+        filtresInitiaux={roleUrl ? { role: [libelleRole(roleUrl)] } : undefined}
+        triInitial={{ colonne: "nom", sens: "asc" }}
+        surOuvrir={(u) => setOuvertId(u.id)}
+        libelleLigne={(u) => u.name ?? u.email}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun compte."
+        nomExport="utilisateurs"
+        memoire="admin-utilisateurs"
+      />
+      <UtilisateurTiroir utilisateur={ouvert} surFermer={() => setOuvertId(null)} />
+    </section>
+  );
+}
+
+/** « Fonds d’investissement », « Finance durable »… ; à défaut, le rôle. */
+function typeDuCompte(u: UtilisateurAdmin): string {
+  const detail = u.profile_detail ?? null;
+  if (detail && u.role === "INVESTOR") {
+    return LIBELLES_TYPE_INVESTISSEUR[detail as InvestorType] ?? detail;
+  }
+  if (detail && u.role === "RESEARCHER") {
+    return LIBELLES_DOMAINE_RECHERCHE[detail as ResearchDomain] ?? detail;
+  }
+  return libelleRole(u.role);
+}
+
+function dateFr(iso: string | null | undefined): string | null {
+  return iso ? new Date(iso).toLocaleDateString("fr-FR") : null;
+}
+
+function UtilisateurTiroir({
+  utilisateur,
+  surFermer,
+}: {
+  utilisateur: UtilisateurAdmin | null;
+  surFermer: () => void;
+}) {
+  const role = utilisateur?.role ?? Role.AUDITOR;
+  const deactivate = useDeactivateUser(role);
+  const reactivate = useReactivateUser(role);
+  const confirm = useConfirm();
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  async function desactiver(u: UtilisateurAdmin) {
     const confirme = await confirm({
       title: "Désactiver ce compte ?",
-      description: `${email} ne pourra plus se connecter et ses sessions en cours seront immédiatement révoquées. Vous pourrez le réactiver à tout moment.`,
+      description: `${u.email} ne pourra plus se connecter et ses sessions en cours seront immédiatement révoquées. Vous pourrez le réactiver à tout moment.`,
       confirmLabel: "Désactiver",
     });
     if (!confirme) return;
-    setActionError(null);
-    deactivate.mutate(utilisateurId, {
+    setErreur(null);
+    deactivate.mutate(u.id, {
       onError: (err) =>
-        setActionError(err instanceof ApiError ? err.message : "Échec de la désactivation."),
+        setErreur(err instanceof ApiError ? err.message : "Échec de la désactivation."),
     });
   }
 
-  const utilisateurs = data?.pages.flatMap((page) => page.items) ?? [];
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle>Utilisateurs</CardTitle>
-          <CardDescription>Un compte Administrateur ne peut pas être créé ici.</CardDescription>
-        </div>
-        <Button onClick={() => setModaleOuverte(true)}>Créer un utilisateur</Button>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <Dialog open={modaleOuverte} onOpenChange={setModaleOuverte}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Créer un utilisateur</DialogTitle>
-            </DialogHeader>
-            <FormulaireCreation
-              roleAffiche={roleCreationParDefaut}
-              onCreated={() => setModaleOuverte(false)}
-            />
-          </DialogContent>
-        </Dialog>
-
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="utilisateurs-recherche" className="relative min-w-56 flex-1">
-              <span className="sr-only">Rechercher un utilisateur par e-mail ou nom</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="utilisateurs-recherche"
-                value={recherche}
-                onChange={(event) => setRecherche(event.target.value)}
-                placeholder="Rechercher par e-mail ou nom"
-                className="pl-9"
-              />
-            </label>
-            <span className="text-sm text-muted-foreground">Rôle :</span>
-            <Select
-              value={roleAffiche}
-              onChange={(event) =>
-                setSearchParams(
-                  (params) => {
-                    params.set("role", event.target.value);
-                    return params;
+    <Sheet
+      open={utilisateur !== null}
+      onOpenChange={(o) => {
+        if (!o) {
+          setErreur(null);
+          surFermer();
+        }
+      }}
+    >
+      {utilisateur ? (
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{utilisateur.name ?? utilisateur.email}</SheetTitle>
+            <SheetDescription>{utilisateur.email}</SheetDescription>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="info">{libelleRole(utilisateur.role)}</Badge>
+              <Badge variant={utilisateur.active ? "success" : "secondary"}>
+                {utilisateur.active ? "Actif" : "Désactivé"}
+              </Badge>
+              {utilisateur.activated_at ? null : (
+                <Badge variant="warning">Activation en attente</Badge>
+              )}
+            </div>
+          </SheetHeader>
+          <SheetBody>
+            {erreur ? (
+              <Alert variant="destructive">
+                <AlertDescription>{erreur}</AlertDescription>
+              </Alert>
+            ) : null}
+            <SheetSection titre="Profil">
+              <SheetFields
+                champs={[
+                  { libelle: "Organisation", valeur: utilisateur.organization ?? null },
+                  { libelle: "Type / Domaine", valeur: typeDuCompte(utilisateur) },
+                  {
+                    libelle: "Rôle et droits",
+                    valeur: `Espace ${libelleRole(utilisateur.role)} uniquement`,
                   },
-                  { replace: true },
-                )
-              }
-              className="w-48"
-            >
-              {ROLES_CONSULTABLES.map((role) => (
-                <option key={role} value={role}>
-                  {libelleRole(role)}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : null}
-          {isError ? <p className="text-destructive">Impossible de charger les comptes.</p> : null}
-          {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
-          {!isLoading && !isError && utilisateurs.length === 0 ? (
-            <EmptyState icon={Users} message="Aucun compte pour ce rôle." />
-          ) : null}
-          {utilisateurs.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Compte</TableHead>
-                  <TableHead>Historique</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {utilisateurs.map((utilisateur) => (
-                  <TableRow key={utilisateur.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="min-w-0">
-                          {utilisateur.name ? (
-                            <p className="font-medium text-foreground">{utilisateur.name}</p>
-                          ) : null}
-                          <p className="truncate text-sm text-muted-foreground">{utilisateur.email}</p>
-                        </div>
-                        {!utilisateur.active ? <Badge variant="secondary">désactivé</Badge> : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button asChild size="sm" variant="outline">
-                        <Link to={`/admin/journal-audit?concerne=${utilisateur.id}`}>
-                          Historique
-                        </Link>
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      {utilisateur.active ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={deactivate.isPending}
-                          onClick={() => desactiver(utilisateur.id, utilisateur.email)}
-                        >
-                          Désactiver
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={reactivate.isPending}
-                          onClick={() => {
-                            setActionError(null);
-                            reactivate.mutate(utilisateur.id, {
-                              onError: (err) =>
-                                setActionError(
-                                  err instanceof ApiError
-                                    ? err.message
-                                    : "Échec de la réactivation.",
-                                ),
-                            });
-                          }}
-                        >
-                          Réactiver
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-          {utilisateurs.length > 0 && hasNextPage ? (
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isFetchingNextPage}
-                onClick={() => fetchNextPage()}
+                ]}
+              />
+            </SheetSection>
+            <SheetSection titre="Compte">
+              <SheetFields
+                champs={[
+                  { libelle: "Créé le", valeur: dateFr(utilisateur.created_at) },
+                  {
+                    libelle: "Activé le",
+                    valeur: dateFr(utilisateur.activated_at) ?? "Lien d’activation non utilisé",
+                  },
+                  {
+                    libelle: "Changement d’e-mail",
+                    valeur: utilisateur.pending_email ? `vers ${utilisateur.pending_email}` : null,
+                  },
+                ]}
+              />
+            </SheetSection>
+            <SheetSection titre="Historique">
+              <Link
+                to={`/admin/journal-audit?concerne=${utilisateur.id}`}
+                className="text-sm font-semibold"
               >
-                {isFetchingNextPage ? "Chargement..." : "Voir plus"}
+                Journal d’audit de ce compte
+              </Link>
+            </SheetSection>
+          </SheetBody>
+          <SheetFooter>
+            {utilisateur.role === "ADMIN" ? (
+              <p className="text-sm text-muted-foreground">
+                Un compte Administrateur ne se désactive pas ici.
+              </p>
+            ) : utilisateur.active ? (
+              <Button
+                size="sm"
+                variant="destructive-outline"
+                loading={deactivate.isPending}
+                onClick={() => desactiver(utilisateur)}
+              >
+                Désactiver
               </Button>
-            </div>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                loading={reactivate.isPending}
+                onClick={() => {
+                  setErreur(null);
+                  reactivate.mutate(utilisateur.id, {
+                    onError: (err) =>
+                      setErreur(
+                        err instanceof ApiError ? err.message : "Échec de la réactivation.",
+                      ),
+                  });
+                }}
+              >
+                Réactiver
+              </Button>
+            )}
+          </SheetFooter>
+        </SheetContent>
+      ) : null}
+    </Sheet>
   );
 }
 

@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import col, select
 
+from app.access_requests.models import AccessRequest
 from app.audit.models import AuditOpinion
 from app.auth.hashing import hash_password
 from app.auth.models import AccountActivationToken, User
@@ -20,8 +21,10 @@ from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
+    AccessRequestStatus,
     AuditDecision,
     DataMethod,
+    InvestorType,
     Pillar,
     ReportStatus,
     ReportType,
@@ -1638,3 +1641,56 @@ def test_consulter_un_rapport_ou_son_score_ne_cree_aucune_configuration(
     assert verification.status_code == 200
     assert verification.json()["computable"] is True
     assert _references_de_version(session, version_de_reference_inedite) == []
+
+
+def test_table_utilisateurs_tous_roles_avec_organisation_et_type(session) -> None:
+    """Tâche 5.17 : sans `role`, la table liste tous les rôles ; chaque ligne porte l'organisation
+    et la précision du rôle tirées de la demande d'accès (None pour un compte sans demande)."""
+    marqueur = f"tous-{uuid.uuid4()}"
+    admin = _create_utilisateur(session, Role.ADMIN)
+    investisseur = _create_utilisateur_avec_email(session, Role.INVESTOR, f"{marqueur}-inv@example.com")
+    auditeur = _create_utilisateur_avec_email(session, Role.AUDITOR, f"{marqueur}-aud@example.com")
+    session.add(
+        AccessRequest(
+            user_id=investisseur.id,
+            role=Role.INVESTOR,
+            organization="Fonds Sahel Capital",
+            investor_type=InvestorType.INVESTMENT_FUND,
+            status=AccessRequestStatus.APPROVED,
+        )
+    )
+    session.commit()
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/utilisateurs", params={"recherche": marqueur, "page_size": 100}
+    )
+
+    assert response.status_code == 200
+    lignes = {item["email"]: item for item in response.json()["items"]}
+    assert set(lignes) == {investisseur.email, auditeur.email}
+    assert lignes[investisseur.email]["organization"] == "Fonds Sahel Capital"
+    assert lignes[investisseur.email]["profile_detail"] == "INVESTMENT_FUND"
+    assert lignes[auditeur.email]["organization"] is None
+
+
+def test_table_entreprises_porte_le_score_officiel(session) -> None:
+    """Tâche 5.17 : colonne « Score officiel » = score du dernier rapport validé, None sans."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    marqueur = f"score-{uuid.uuid4()}"
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    entreprise.name = f"{marqueur} notee"
+    sans_score, _ = _create_entreprise_avec_utilisateur(session)
+    sans_score.name = f"{marqueur} sans"
+    session.add(entreprise)
+    session.add(sans_score)
+    session.commit()
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
+    _create_score(session, rapport.id)
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/entreprises", params={"recherche": marqueur, "page_size": 100}
+    )
+
+    scores = {item["name"]: item["official_global_score"] for item in response.json()["items"]}
+    assert scores == {f"{marqueur} notee": 70.0, f"{marqueur} sans": None}
+

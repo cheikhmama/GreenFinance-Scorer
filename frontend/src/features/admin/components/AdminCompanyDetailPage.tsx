@@ -309,7 +309,7 @@ export function AdminCompanyDetailPage() {
                 Publier
               </Button>
             ) : null}
-            {/* Voir AllCompaniesSection : jamais d'action de statut sur une inscription en attente. */}
+            {/* Voir EntreprisesTable : jamais d'action de statut sur une inscription en attente. */}
             {entreprise.status === "ACTIVE" ? (
               <Button size="sm" variant="outline" disabled={suspend.isPending} onClick={suspendre}>
                 Suspendre

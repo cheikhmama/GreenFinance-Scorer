@@ -145,7 +145,9 @@ export function AdminReportDetailPage() {
                   <p className="font-medium text-foreground">
                     {libelleDecisionAudit(item.decision)}
                   </p>
-                  {item.comment ? <p className="text-sm text-muted-foreground">{item.comment}</p> : null}
+                  {item.comment ? (
+                    <p className="text-sm text-muted-foreground">{item.comment}</p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -309,7 +311,9 @@ function RecalculerScoreSection({ rapportId }: { rapportId: string }) {
     return (
       <Alert>
         <AlertTitle>Score recalculé</AlertTitle>
-        <AlertDescription>Valeur globale : {formatScore(recalculer.data.global_score)}.</AlertDescription>
+        <AlertDescription>
+          Valeur globale : {formatScore(recalculer.data.global_score)}.
+        </AlertDescription>
       </Alert>
     );
   }

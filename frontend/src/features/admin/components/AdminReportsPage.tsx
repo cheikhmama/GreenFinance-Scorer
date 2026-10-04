@@ -1,11 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { AllReportsSection } from "./AllReportsSection";
-import { OverdueAuditsSection } from "./OverdueAuditsSection";
-import { ReportAnomaliesSection } from "./ReportAnomaliesSection";
-import { ReportsInValidationSection } from "./ReportsInValidationSection";
-import { ReportsToAssignSection } from "./ReportsToAssignSection";
+import { RapportsTable } from "./RapportsTable";
 
 type Onglet = "alertes" | "a-affecter" | "en-validation" | "tous";
 const ONGLET_PAR_DEFAUT: Onglet = "alertes";
@@ -47,17 +43,16 @@ export function AdminReportsPage() {
           <TabsTrigger value="tous">Tous les rapports</TabsTrigger>
         </TabsList>
         <TabsContent value="alertes">
-          <ReportAnomaliesSection />
-          <OverdueAuditsSection />
+          <RapportsTable perimetre="alertes" />
         </TabsContent>
         <TabsContent value="a-affecter">
-          <ReportsToAssignSection />
+          <RapportsTable perimetre="a-affecter" />
         </TabsContent>
         <TabsContent value="en-validation">
-          <ReportsInValidationSection />
+          <RapportsTable perimetre="en-validation" />
         </TabsContent>
         <TabsContent value="tous">
-          <AllReportsSection />
+          <RapportsTable perimetre="tous" />
         </TabsContent>
       </Tabs>
     </div>

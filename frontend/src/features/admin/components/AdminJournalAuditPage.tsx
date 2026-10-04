@@ -7,7 +7,7 @@ export function AdminJournalAuditPage() {
   const concerneId = searchParams.get("concerne") ?? undefined;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Journal d'audit"
         description={

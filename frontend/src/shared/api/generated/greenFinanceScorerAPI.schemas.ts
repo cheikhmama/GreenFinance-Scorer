@@ -1012,6 +1012,7 @@ export interface EntrepriseAdmin {
   report_count: number;
   latest_report_status: ReportStatus | null;
   latest_report_id: string | null;
+  official_global_score?: number | null;
 }
 
 /**
@@ -1664,7 +1665,13 @@ export interface PageReportResponse {
   pages: number;
 }
 
-export interface UtilisateurPublic {
+/**
+ * Ligne de la table Utilisateurs (tâche 5.17) : l'organisation et la précision du rôle
+ * (type d'investisseur, domaine de recherche) viennent de la demande d'accès ; pour un chercheur
+ * invité par une institution, l'organisation est l'institution qui l'a rattaché. None pour un
+ * compte créé par l'Administrateur sans l'une ni l'autre.
+ */
+export interface UtilisateurAdmin {
   id: string;
   email: string;
   name: string | null;
@@ -1674,10 +1681,12 @@ export interface UtilisateurPublic {
   active: boolean;
   activated_at: string | null;
   pending_email?: string | null;
+  organization?: string | null;
+  profile_detail?: string | null;
 }
 
-export interface PageUtilisateurPublic {
-  items: UtilisateurPublic[];
+export interface PageUtilisateurAdmin {
+  items: UtilisateurAdmin[];
   page: number;
   page_size: number;
   total: number;
@@ -2187,6 +2196,18 @@ export interface UtilisateurCree {
   active: boolean;
 }
 
+export interface UtilisateurPublic {
+  id: string;
+  email: string;
+  name: string | null;
+  avatar: string | null;
+  role: Role;
+  created_at: string;
+  active: boolean;
+  activated_at: string | null;
+  pending_email?: string | null;
+}
+
 /**
  * GET /company/lei-verification (tâche 5.9) : le LEI déclaré, confirmé ou non par la GLEIF.
  * `result` vaut PASSED seulement si l'enregistrement est actif ET le nom légal correspond ;
@@ -2229,7 +2250,10 @@ page_size?: number;
 };
 
 export type ListUsersByRoleParams = {
-role: Role;
+/**
+ * Absent : tous les rôles
+ */
+role?: Role | null;
 /**
  * Filtre sur l'e-mail
  */
@@ -2248,7 +2272,7 @@ en_attente_activation?: boolean | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2264,7 +2288,7 @@ statut?: ReportStatus | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2280,7 +2304,7 @@ recherche?: string | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2296,7 +2320,7 @@ recherche?: string | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2312,7 +2336,7 @@ recherche?: string | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2324,7 +2348,7 @@ export type ListCompaniesToRepublishParams = {
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2338,7 +2362,7 @@ pays?: string | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2382,7 +2406,7 @@ recherche?: string | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2395,7 +2419,7 @@ statut?: AnalysisStatus | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };
@@ -2408,7 +2432,7 @@ statut?: ProjectStatus | null;
 page?: number;
 /**
  * @minimum 1
- * @maximum 50
+ * @maximum 100
  */
 page_size?: number;
 };

@@ -1,106 +1,127 @@
-import { FlaskConical } from "lucide-react";
-import type { AnalysisStatus } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import type {
+  AnalyseAdmin,
+  AnalysisStatus,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
-import { Select } from "@/shared/ui/select";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { useAnalysesAdmin } from "../api";
-import { useOngletParametre } from "../useOngletParametre";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useTableAnalyses } from "../api";
 
-const STATUTS: AnalysisStatus[] = ["BROUILLON", "SOUMISE", "VALIDEE", "CORRECTION_DEMANDEE"];
+function dateFr(iso: string | null): string | null {
+  return iso ? new Date(iso).toLocaleDateString("fr-FR") : null;
+}
 
-/** Toutes les analyses Chercheur (toutes versions), filtrable par statut — détail derrière
- * "Analyses par statut" / "Corrections demandées" des onglets Chercheur et Institution du tableau
- * de bord. Une ligne = une version précise (Analyse.analyse_precedente_id) : jamais fusionnée
- * avec ses versions précédentes/suivantes. Suivi en lecture seule, le contenu reste privé aux
- * acteurs concernés (Chercheur/Institution). */
+/** Toutes les analyses Chercheur, toutes versions (table, tâche 5.17) ; `?statut=` présélectionne
+ * le filtre (liens « soumises / correction demandée » du tableau de bord). */
 export function AdminAnalysesPage() {
-  const [statut, setStatut] = useOngletParametre<AnalysisStatus | "">("statut", "");
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useAnalysesAdmin(statut || undefined);
+  const { data, isLoading, isError } = useTableAnalyses();
+  const [searchParams] = useSearchParams();
+  const statutUrl = searchParams.get("statut") as AnalysisStatus | null;
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
 
-  const analyses = data?.pages.flatMap((page) => page.items) ?? [];
+  const colonnes = useMemo<ColonneTable<AnalyseAdmin>[]>(
+    () => [
+      {
+        id: "analyse",
+        entete: "Analyse",
+        masquable: false,
+        valeurTri: (a) => a.title,
+        cellule: (a) => <span className="font-semibold text-foreground">{a.title}</span>,
+      },
+      {
+        id: "chercheur",
+        entete: "Chercheur",
+        valeurTri: (a) => a.researcher_email,
+        cellule: (a) => <span className="font-mono text-[12.5px]">{a.researcher_email}</span>,
+      },
+      {
+        id: "projet",
+        entete: "Projet",
+        valeurTri: (a) => a.project_name,
+        cellule: (a) => <span className="text-muted-foreground">{a.project_name}</span>,
+      },
+      {
+        id: "version",
+        entete: "Version",
+        alignement: "droite",
+        valeurTri: (a) => a.version,
+        cellule: (a) => <span className="font-mono">{a.version}</span>,
+      },
+    ],
+    [],
+  );
+  const ouvert = data?.find((a) => a.id === ouvertId) ?? null;
+  const statutInitial = statutUrl ? libelleStatutAnalyse(statutUrl) : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Analyses"
-        description="Toutes les analyses Chercheur, toutes versions, filtrables par statut."
+        description="Toutes les analyses des chercheurs, toutes versions."
       />
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle>Analyses</CardTitle>
-          <Select
-            value={statut}
-            onChange={(event) => setStatut(event.target.value as AnalysisStatus | "")}
-            className="w-56"
-          >
-            <option value="">Tous les statuts</option>
-            {STATUTS.map((valeur) => (
-              <option key={valeur} value={valeur}>
-                {libelleStatutAnalyse(valeur)}
-              </option>
-            ))}
-          </Select>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading ? <CardListSkeleton count={3} /> : null}
-          {isError ? <p className="text-destructive">Impossible de charger les analyses.</p> : null}
-          {!isLoading && !isError && analyses.length === 0 ? (
-            <EmptyState icon={FlaskConical} message="Aucune analyse pour ce filtre." />
-          ) : null}
-
-          {analyses.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Analyse</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Chercheur</TableHead>
-                  <TableHead>Projet</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Soumise le</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analyses.map((analyse) => (
-                  <TableRow key={analyse.id}>
-                    <TableCell className="font-medium text-foreground">{analyse.title}</TableCell>
-                    <TableCell>
-                      <Badge variant={variantStatutAnalyse(analyse.status)}>
-                        {libelleStatutAnalyse(analyse.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{analyse.researcher_email}</TableCell>
-                    <TableCell className="text-muted-foreground">{analyse.project_name}</TableCell>
-                    <TableCell className="tabular-nums">{analyse.version}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {analyse.submitted_at
-                        ? new Date(analyse.submitted_at).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-          {analyses.length > 0 && hasNextPage ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isFetchingNextPage}
-              onClick={() => fetchNextPage()}
-            >
-              {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+      <DataTable
+        libelle="Analyses"
+        lignes={data}
+        colonnes={colonnes}
+        cle={(a) => a.id}
+        rechercheDans={(a) => `${a.title} ${a.researcher_email} ${a.project_name}`}
+        placeholderRecherche="Titre, chercheur, projet…"
+        filtres={[
+          { id: "statut", libelle: "Statut", valeur: (a) => libelleStatutAnalyse(a.status) },
+          { id: "projet", libelle: "Projet", valeur: (a) => a.project_name },
+        ]}
+        filtresInitiaux={statutInitial ? { statut: [statutInitial] } : undefined}
+        triInitial={{ colonne: "analyse", sens: "asc" }}
+        surOuvrir={(a) => setOuvertId(a.id)}
+        libelleLigne={(a) => a.title}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucune analyse."
+        nomExport="analyses"
+        memoire="admin-analyses"
+      />
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{ouvert.title}</SheetTitle>
+              <SheetDescription>
+                {ouvert.project_name} · version {ouvert.version}
+              </SheetDescription>
+              <Badge variant={variantStatutAnalyse(ouvert.status)} className="w-fit">
+                {libelleStatutAnalyse(ouvert.status)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Workflow">
+                <SheetFields
+                  champs={[
+                    { libelle: "Statut", valeur: libelleStatutAnalyse(ouvert.status) },
+                    { libelle: "Chercheur", valeur: ouvert.researcher_email },
+                    { libelle: "Créée le", valeur: dateFr(ouvert.created_at) },
+                    { libelle: "Soumise le", valeur: dateFr(ouvert.submitted_at) },
+                    { libelle: "Décidée le", valeur: dateFr(ouvert.decided_at) },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

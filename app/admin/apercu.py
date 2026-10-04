@@ -11,6 +11,7 @@ republication de TableauDeBordAdmin couvrent déjà exactement ce que la section
 demande, les dupliquer aurait recréé la répétition déjà écartée pour le tableau de bord compact.
 """
 
+import uuid
 from dataclasses import dataclass, field
 
 from sqlalchemy import ColumnElement
@@ -212,3 +213,11 @@ def construire_apercu_acteurs(session: Session) -> ApercuActeurs:
             analyses_a_examiner=analyses_a_examiner,
         ),
     )
+
+
+def score_officiel_entreprise(session: Session, entreprise_id: uuid.UUID) -> float | None:
+    """Score global officiel du dernier rapport validé d'une entreprise (colonne « Score officiel »
+    de la table Entreprises, tâche 5.17) — None si aucun rapport validé n'a de score."""
+    rapport = dernier_rapport_valide(session, entreprise_id)
+    score = score_officiel(session, rapport.id) if rapport is not None else None
+    return score.global_score if score is not None else None

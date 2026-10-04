@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import type { TrancheScorePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { uneDecimale } from "@/shared/format/etatPosition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { usePerformanceESG } from "../api";
-import { uneDecimale } from "@/shared/format/etatPosition";
 
 const CARTES = [
   {

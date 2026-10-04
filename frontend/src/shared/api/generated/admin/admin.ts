@@ -41,7 +41,7 @@ import type {
   PagePortefeuilleAdmin,
   PageProjetAdmin,
   PageRapportAdminListe,
-  PageUtilisateurPublic,
+  PageUtilisateurAdmin,
   PendingRegistration,
   PerformanceESGAdmin,
   RapportAdminListe,
@@ -58,7 +58,7 @@ import type {
 
 import { apiFetch } from '../../client';
 
-export const getListUsersByRoleUrl = (params: ListUsersByRoleParams,) => {
+export const getListUsersByRoleUrl = (params?: ListUsersByRoleParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -79,9 +79,9 @@ export const getListUsersByRoleUrl = (params: ListUsersByRoleParams,) => {
  * saisie libre de nom/e-mail.
  * @summary Lister les comptes actifs d'un rôle donné, avec recherche et pagination
  */
-export const listUsersByRole = async (params: ListUsersByRoleParams, options?: RequestInit): Promise<PageUtilisateurPublic> => {
+export const listUsersByRole = async (params?: ListUsersByRoleParams, options?: RequestInit): Promise<PageUtilisateurAdmin> => {
 
-  return apiFetch<PageUtilisateurPublic>(getListUsersByRoleUrl(params),
+  return apiFetch<PageUtilisateurAdmin>(getListUsersByRoleUrl(params),
   {
     ...options,
     method: 'GET'

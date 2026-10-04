@@ -222,3 +222,10 @@
 @media (min-width: 40rem) {
   [data-slot="dialog-content"][data-state="open"] { animation: registre-montee 240ms var(--ease-registre); }
 }
+
+/* Tiroir de détail (tâche 5.17) : glisse depuis la droite en 240 ms, voile en fondu. */
+@keyframes registre-tiroir { from { transform: translateX(100%); } }
+[data-slot="sheet-overlay"][data-state="open"] { animation: registre-fondu 240ms var(--ease-registre); }
+[data-slot="sheet-content"][data-state="open"] { animation: registre-tiroir 240ms var(--ease-registre); }
+[data-slot="sheet-overlay"][data-state="closed"],
+[data-slot="sheet-content"][data-state="closed"] { animation: registre-sortie 170ms ease-in forwards; }
