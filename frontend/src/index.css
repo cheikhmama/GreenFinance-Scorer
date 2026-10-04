@@ -3,7 +3,7 @@
    de graisse comparables, Aptos n'étant pas distribuée en police web. Doit précéder
    @import "tailwindcss" : la spec CSS exige que les @import passent avant toute autre
    règle (au-delà de @charset/@layer, que Tailwind introduit). */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 /* Bascule du mode sombre par classe plutôt que par prefers-color-scheme (comportement par
@@ -26,12 +26,26 @@
    faire varier casserait le contraste du texte blanc qu'elle porte. */
 @theme {
   --font-sans: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  /* Chiffres (scores, montants, tonnes) : Plex Mono tabulaire — système « Registre » (tâche 5.15). */
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
 
-  --color-brand-green: #0f6b4f;
-  --color-brand-green-light: #e8f4ef;
-  --color-brand-blue: #16324f;
-  --color-brand-grey: #5b6573;
-  --color-brand-navy: #16324f;
+  /* Système « Registre » (tâche 5.15) : chaque couleur de texte atteint 7:1 (WCAG AAA) sur son
+     fond, en clair comme en sombre. L'ancien gris #5b6573 (5,9:1) et l'ancien vert #0f6b4f
+     (6,5:1) n'y arrivaient pas. */
+  --color-brand-green: #0b5e45;
+  --color-brand-green-light: #e6f3ee;
+  --color-brand-blue: #10263d;
+  --color-brand-grey: #4a5562;
+  --color-brand-navy: #0e2236;
+
+  /* Élévations : 1 carte, 2 survol, 3 flottant (menus), 4 modal. */
+  --shadow-e1: 0 1px 2px rgb(16 38 61 / 0.06);
+  --shadow-e2: 0 4px 12px rgb(16 38 61 / 0.08);
+  --shadow-e3: 0 12px 32px rgb(16 38 61 / 0.14);
+  --shadow-e4: 0 24px 64px rgb(16 38 61 / 0.22);
+
+  /* Mouvement : 120 ms appui/survol, 180 ms menus/onglets, 240 ms dialogue/panneau. */
+  --ease-registre: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* Tokens sémantiques structurels attendus par les primitives shadcn/ui de
@@ -44,7 +58,7 @@
 :root {
   --radius: 0.625rem;
 
-  --background: #ffffff;
+  --background: #f6f7f5;
   --foreground: var(--color-brand-blue);
   --card: #ffffff;
   --card-foreground: var(--color-brand-blue);
@@ -54,14 +68,37 @@
   --primary-foreground: #ffffff;
   --secondary: var(--color-brand-green-light);
   --secondary-foreground: var(--color-brand-blue);
-  --muted: #f4f5f6;
+  --muted: #eef1ee;
   --muted-foreground: var(--color-brand-grey);
   --accent: var(--color-brand-green-light);
   --accent-foreground: var(--color-brand-blue);
-  --destructive: #b3261e;
-  --border: #e2e5e8;
-  --input: #e2e5e8;
+  --destructive: #9b1c1c;
+  --destructive-foreground: #ffffff;
+  --border: #dde2e0;
+  /* Bord des champs : 3,8:1 sur blanc (WCAG 1.4.11 demande 3:1 pour un contrôle). */
+  --input: #7a8591;
   --ring: var(--color-brand-green);
+
+  /* Statuts : texte / fond / bord, chacun 7:1 au moins entre texte et fond. */
+  --success: #0a5340;
+  --success-soft: #e6f3ee;
+  --success-border: #9fcdbb;
+  --info: #183f73;
+  --info-soft: #eaf1fb;
+  --info-border: #a9c3e8;
+  --warning: #6b4100;
+  --warning-soft: #fff3dc;
+  --warning-border: #e0b562;
+  --danger: #8a1717;
+  --danger-soft: #fdecec;
+  --danger-border: #eba9a9;
+
+  /* Barre latérale : marine dans les deux thèmes. */
+  --sidebar: var(--color-brand-navy);
+  --sidebar-foreground: #c9d6e3;
+  --sidebar-active: #1b3550;
+  --sidebar-accent: #4bd1a4;
+  --sidebar-muted: #afc0d1;
 }
 
 @theme inline {
@@ -80,6 +117,24 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-border: var(--danger-border);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-muted: var(--sidebar-muted);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -105,18 +160,65 @@
    button.tsx/badge.tsx l'atténuent déjà à l'opacité (dark:bg-destructive/60) plutôt que de
    dupliquer une deuxième teinte de rouge par thème. */
 .dark {
-  --color-brand-blue: #e7edf4;
-  --color-brand-grey: #93a6ba;
-  /* #26ad80 : texte vert lisible (AA) sur les cartes et panneaux sombres ; le texte posé sur ce
-     vert devient le fond de page, le blanc n'y atteignait que 3,4:1 (tâche 5.9). */
-  --color-brand-green: #26ad80;
-  --color-brand-green-light: #123326;
-  --primary-foreground: #0b1c2c;
+  --color-brand-blue: #ecf1f6;
+  --color-brand-grey: #afc0d1;
+  /* Vert lisible sur fond sombre (8,1:1 sur les cartes) ; le texte posé dessus devient
+     #05261b (8,4:1) : le blanc n'y atteindrait que 2,3:1. */
+  --color-brand-green: #4bd1a4;
+  --color-brand-green-light: #12352a;
+  --primary-foreground: #05261b;
 
-  --background: #0b1c2c;
-  --card: #122a3d;
-  --popover: #122a3d;
-  --muted: #16324a;
-  --border: #1f3a52;
-  --input: #2a4560;
+  --background: #0a1826;
+  --card: #10263a;
+  --popover: #10263a;
+  --muted: #16314a;
+  --border: #23405a;
+  --input: #6f8ba6;
+
+  --destructive: #ff9c94;
+  --destructive-foreground: #3a0b08;
+
+  --success: #9fe3c8;
+  --success-soft: #123a2e;
+  --success-border: #2f6b55;
+  --info: #9cc3ff;
+  --info-soft: #12294a;
+  --info-border: #2f4f80;
+  --warning: #f5c46b;
+  --warning-soft: #3a2a0c;
+  --warning-border: #7a5a1c;
+  --danger: #ff9c94;
+  --danger-soft: #3d1513;
+  --danger-border: #7a2f2a;
+}
+
+/* Animations réduites : les fondus restent, les glissements et pulsations s'arrêtent
+   (système « Registre », tâche 5.15). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: la préférence « réduire les animations » doit l'emporter sur toute animation de composant. */
+    animation-duration: 1ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: la préférence « réduire les animations » doit l'emporter sur toute animation de composant. */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: la préférence « réduire les animations » doit l'emporter sur toute animation de composant. */
+    scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: la préférence « réduire les animations » doit l'emporter sur toute animation de composant. */
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Dialogues : voile en fondu, contenu qui monte de 8 px (240 ms) ; au téléphone, le panneau
+   monte du bas. Sortie plus courte (170 ms). Système « Registre », tâche 5.15. */
+@keyframes registre-fondu { from { opacity: 0; } }
+@keyframes registre-montee { from { opacity: 0; transform: translateY(8px); } }
+@keyframes registre-panneau { from { transform: translateY(100%); } }
+@keyframes registre-sortie { to { opacity: 0; } }
+[data-slot="dialog-overlay"][data-state="open"] { animation: registre-fondu 240ms var(--ease-registre); }
+[data-slot="dialog-overlay"][data-state="closed"],
+[data-slot="dialog-content"][data-state="closed"] { animation: registre-sortie 170ms ease-in forwards; }
+[data-slot="dialog-content"][data-state="open"] { animation: registre-panneau 240ms var(--ease-registre); }
+@media (min-width: 40rem) {
+  [data-slot="dialog-content"][data-state="open"] { animation: registre-montee 240ms var(--ease-registre); }
 }

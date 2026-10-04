@@ -60,7 +60,7 @@ export function AppShell() {
             <span className="block text-sm font-semibold tracking-tight text-white">
               GreenFinance
             </span>
-            <span className="block text-xs text-slate-400">ESG Scorer</span>
+            <span className="block text-xs text-sidebar-muted">ESG Scorer</span>
           </span>
         </span>
         <Button
@@ -78,13 +78,13 @@ export function AppShell() {
         className="flex-1 space-y-1 overflow-y-auto px-3 py-6"
         aria-label={`Navigation ${config.label}`}
       >
-        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted">
           Espace {config.label}
         </p>
         {config.items.map((item, i) => (
           <Fragment key={item.to}>
             {item.groupe && item.groupe !== config.items[i - 1]?.groupe ? (
-              <p className="mb-2 mt-5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="mb-2 mt-5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted">
                 {item.groupe}
               </p>
             ) : null}
@@ -96,8 +96,8 @@ export function AppShell() {
                 cn(
                   "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
                   isActive
-                    ? "bg-white/10 text-white shadow-sm"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white",
+                    ? "bg-sidebar-active font-semibold text-white shadow-[inset_3px_0_0_var(--sidebar-accent)]"
+                    : "text-sidebar-foreground hover:bg-white/5 hover:text-white",
                 )
               }
             >
@@ -117,8 +117,8 @@ export function AppShell() {
               cn(
                 "flex items-center gap-3 rounded-xl p-3 transition",
                 isActive
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white",
+                  ? "bg-sidebar-active font-semibold text-white shadow-[inset_3px_0_0_var(--sidebar-accent)]"
+                  : "text-sidebar-foreground hover:bg-white/5 hover:text-white",
               )
             }
           >
@@ -132,9 +132,9 @@ export function AppShell() {
               <span className="block truncate text-xs font-semibold text-white">
                 {user.name || user.email}
               </span>
-              <span className="block truncate text-[11px] text-slate-400">Profil</span>
+              <span className="block truncate text-[11px] text-sidebar-muted">Profil</span>
             </span>
-            <ChevronRight className="size-4 shrink-0 text-slate-500" />
+            <ChevronRight className="size-4 shrink-0 text-sidebar-muted" />
           </NavLink>
         </div>
       )}
@@ -150,7 +150,7 @@ export function AppShell() {
         Aller au contenu
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-brand-navy lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar lg:flex">
         {sidebar}
       </aside>
 
@@ -158,11 +158,11 @@ export function AppShell() {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-brand-navy/50"
+            className="absolute inset-0 bg-sidebar/50"
             aria-label="Fermer le menu"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative flex h-full w-72 flex-col bg-brand-navy shadow-2xl">
+          <aside className="relative flex h-full w-72 flex-col bg-sidebar shadow-2xl">
             {sidebar}
           </aside>
         </div>

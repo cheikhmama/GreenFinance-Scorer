@@ -34,13 +34,13 @@ export function StatCard({
       className={cn(
         "gap-4 py-5 shadow-none",
         to &&
-          "transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-brand-green/70 hover:shadow-md",
+          "transition-[border-color,box-shadow,transform] duration-[120ms] ease-(--ease-registre) hover:-translate-y-0.5 hover:border-brand-green/70 hover:shadow-(--shadow-e2)",
       )}
     >
       <CardContent className="flex items-start justify-between px-5">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-brand-blue">{value}</p>
+          <p className="mt-2 font-mono text-[28px] leading-9 font-semibold tabular-nums text-foreground">{value}</p>
           <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
         </div>
         <span className={cn("grid size-10 place-items-center rounded-xl", tones[tone])}>
