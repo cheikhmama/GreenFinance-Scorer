@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -15,7 +16,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { Textarea } from "@/shared/ui/textarea";
 import { useCreateProject, useMyProjects } from "../api";
 import { type CreerProjetForm, creerProjetSchema } from "../schemas";
 
@@ -44,7 +44,11 @@ export function ProjectsPage() {
       <PageHeader
         title="Projets"
         description="Créer un projet, définir son périmètre et ses documents, affecter des chercheurs, décider de leurs analyses."
-        action={<Button onClick={() => setModaleOuverte(true)}>Créer un projet</Button>}
+        action={
+          projets && projets.length > 0 ? (
+            <Button onClick={() => setModaleOuverte(true)}>Créer un projet</Button>
+          ) : undefined
+        }
       />
 
       <Dialog open={modaleOuverte} onOpenChange={setModaleOuverte}>
@@ -74,7 +78,7 @@ export function ProjectsPage() {
         {projets?.map((projet) => {
           const periode = formatPeriode(projet);
           return (
-            <Link key={projet.id} to={`/institution/projets/${projet.id}`}>
+            <Link key={projet.id} to={`/institution/projets/${creerSlug(projet.name, projet.id)}`}>
               <Card className="h-full gap-3 transition hover:border-brand-green hover:shadow-md">
                 <CardContent className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
@@ -104,7 +108,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
     resolver: zodResolver(creerProjetSchema),
     defaultValues: {
       name: "",
-      description: "",
       objective: "",
       start_date: "",
       planned_end_date: "",
@@ -117,7 +120,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
     createProject.mutate(
       {
         name: values.name,
-        description: values.description || null,
         objective: values.objective || null,
         start_date: values.start_date || null,
         planned_end_date: values.planned_end_date || null,
@@ -162,19 +164,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
               <FormLabel>Objectif (optionnel)</FormLabel>
               <FormControl>
                 <Input placeholder="Ex. Analyse comparative ESG du secteur minier" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description (optionnelle)</FormLabel>
-              <FormControl>
-                <Textarea rows={3} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

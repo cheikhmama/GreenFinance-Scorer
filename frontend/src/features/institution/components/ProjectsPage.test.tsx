@@ -67,13 +67,12 @@ describe("Espace Institution — créer un projet", () => {
 
     // Dialogue fermé, liste relue : le nouveau projet y figure, lien vers son détail.
     const lien = await screen.findByRole("link", { name: /Mines et climat/ });
-    expect(lien).toHaveAttribute("href", `/institution/projets/${PROJET.id}`);
+    expect(lien).toHaveAttribute("href", `/institution/projets/mines-et-climat-${PROJET.id}`);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const envoi = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(envoi?.[0]).toBe("/api/v1/institution/projets");
     expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({
       name: "Mines et climat",
-      description: null,
       objective: null,
       start_date: "2026-10-01",
       planned_end_date: "2027-03-31",

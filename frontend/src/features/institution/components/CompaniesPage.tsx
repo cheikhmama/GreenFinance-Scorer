@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -56,7 +57,7 @@ export function CompaniesPage() {
             <CardContent className="space-y-4">
               <div>
                 <Link
-                  to={`/institution/entreprises/${entreprise.id}`}
+                  to={`/institution/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
                   className="text-base font-semibold text-foreground underline-offset-2 hover:underline"
                 >
                   {entreprise.name}

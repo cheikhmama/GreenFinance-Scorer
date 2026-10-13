@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { BackLink } from "@/shared/ui/back-link";
@@ -22,7 +23,8 @@ import {
 } from "../api";
 
 export function AnalyseDetailPage() {
-  const { analyseId = "" } = useParams();
+  const { analyseId: segment = "" } = useParams();
+  const analyseId = idDepuisSlug(segment);
   const { data: analyse, isLoading, isError } = useAnalysisDetailForInstitution(analyseId);
   const valider = useApproveAnalysis(analyseId, analyse?.project_id ?? "");
   const demanderCorrection = useRequestAnalysisCorrection(analyseId, analyse?.project_id ?? "");
@@ -167,7 +169,7 @@ function EntrepriseComparee({ entrepriseId }: { entrepriseId: string }) {
 
   return (
     <Link
-      to={`/institution/entreprises/${entrepriseId}`}
+      to={`/institution/entreprises/${creerSlug(entreprise.name, entrepriseId)}`}
       className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
     >
       <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-8" />
@@ -224,7 +226,7 @@ function HistoriqueVersions({
               </Badge>
               {version.id !== analyseId ? (
                 <Link
-                  to={`/institution/analyses/${version.id}`}
+                  to={`/institution/analyses/${creerSlug(version.title, version.id)}`}
                   className="text-brand-green underline-offset-2 hover:underline"
                 >
                   Consulter

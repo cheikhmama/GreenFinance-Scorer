@@ -1,5 +1,6 @@
 import { FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -45,7 +46,7 @@ export function AnalysesPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {triees.map((analyse) => (
-          <Link key={analyse.id} to={`/institution/analyses/${analyse.id}`}>
+          <Link key={analyse.id} to={`/institution/analyses/${creerSlug(analyse.title, analyse.id)}`}>
             <Card className="h-full transition hover:border-brand-green hover:shadow-md">
               <CardContent className="space-y-2">
                 <div className="flex items-start justify-between gap-3">

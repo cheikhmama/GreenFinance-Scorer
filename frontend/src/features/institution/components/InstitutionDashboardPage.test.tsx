@@ -73,11 +73,11 @@ describe("Institution — tableau de bord", () => {
     );
 
     const decider = await screen.findByRole("link", { name: "Mines et industrie" });
-    expect(decider).toHaveAttribute("href", "/institution/analyses/a1");
+    expect(decider).toHaveAttribute("href", "/institution/analyses/mines-et-industrie-a1");
     // Seules les analyses soumises attendent une décision.
     expect(screen.queryByText("Brouillon interne")).not.toBeInTheDocument();
     const projet = screen.getAllByRole("link", { name: "Intensité carbone" })[0];
-    expect(projet).toHaveAttribute("href", "/institution/projets/p1");
+    expect(projet).toHaveAttribute("href", "/institution/projets/intensite-carbone-p1");
     expect(
       within(projet.closest("li") as HTMLElement).getByText(/Échéance le 30\/11\/2026/),
     ).toBeInTheDocument();

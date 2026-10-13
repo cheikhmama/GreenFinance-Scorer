@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UserCheck, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ApiError } from "@/shared/api/errors";
+import type { ProjetPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   libelleStatutRattachement,
   variantStatutRattachement,
@@ -15,10 +16,48 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { InitialsAvatar } from "@/shared/ui/initials-avatar";
 import { PageHeader } from "@/shared/ui/page-header";
+import { Select } from "@/shared/ui/select";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { Textarea } from "@/shared/ui/textarea";
-import { useAvailableResearchers, useInviteResearcher, useMyResearchers } from "../api";
+import { useAvailableResearchers, useInviteResearcher, useMyProjects, useMyResearchers } from "../api";
 import { type InviterChercheurForm, inviterChercheurSchema } from "../schemas";
+
+/** Durée approximative en mois entiers entre deux dates du projet, ou null si l'une des deux
+ * manque — n'importe quelle conclusion sur une durée inconnue serait inventée. */
+function dureeEnMois(debut: string | null, fin: string | null): number | null {
+  if (!debut || !fin) return null;
+  const d1 = new Date(debut);
+  const d2 = new Date(fin);
+  const mois = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+  return mois > 0 ? mois : null;
+}
+
+/** Suggestion de « conditions de collaboration » générée depuis les champs déjà saisis par
+ * l'Institution à la création du projet (tâche : pré-remplissage de l'invitation) — jamais une
+ * invention de contenu, uniquement une mise en forme de ce que le projet porte déjà. */
+function genererConditionsCollaboration(projet: ProjetPublic, resume: boolean): string {
+  const duree = dureeEnMois(projet.start_date, projet.planned_end_date);
+  const dureeTexte = duree ? `durée ${duree} mois` : null;
+  const sujet = projet.objective?.trim() || projet.description?.trim() || projet.name;
+
+  if (resume) {
+    return [sujet, dureeTexte, "résultats confidentiels réservés à l'Institution"]
+      .filter(Boolean)
+      .join(", ")
+      .replace(/^(.)/, (c) => c.toUpperCase())
+      .concat(".");
+  }
+
+  const echeance = projet.deadline
+    ? `, remise de l'analyse attendue avant le ${new Date(projet.deadline).toLocaleDateString("fr-FR")}`
+    : "";
+  return (
+    `Dans le cadre du projet « ${projet.name} »` +
+    (dureeTexte ? ` (${dureeTexte})` : "") +
+    echeance +
+    ` : ${sujet} Résultats strictement confidentiels, réservés à l'Institution.`
+  );
+}
 
 /** Chercheurs disponibles (jamais rattachés) à inviter, et suivi des rattachements déjà existants
  * — toujours une sélection parmi des comptes réels, jamais une saisie libre d'identité. */
@@ -142,10 +181,20 @@ function DialogueInvitation({
   onError: (message: string) => void;
 }) {
   const inviter = useInviteResearcher();
+  const { data: projets } = useMyProjects();
+  const projetsOuverts = projets?.filter((p) => p.status === "OUVERT") ?? [];
+  const [projetId, setProjetId] = useState("");
   const form = useForm<InviterChercheurForm>({
     resolver: zodResolver(inviterChercheurSchema),
     defaultValues: { collaboration_terms: "" },
   });
+
+  // Dialogue réutilisé d'une invitation à l'autre : repartir sans projet présélectionné.
+  useEffect(() => {
+    if (cible) setProjetId("");
+  }, [cible]);
+
+  const projetSelectionne = projetsOuverts.find((p) => p.id === projetId) ?? null;
 
   function onSubmit(values: InviterChercheurForm) {
     if (!cible) return;
@@ -154,6 +203,7 @@ function DialogueInvitation({
       {
         onSuccess: () => {
           form.reset({ collaboration_terms: "" });
+          setProjetId("");
           onClose();
         },
         onError: (error) =>
@@ -170,6 +220,57 @@ function DialogueInvitation({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            {projetsOuverts.length > 0 ? (
+              <div className="space-y-2">
+                <label htmlFor="projet-concerne" className="text-sm font-medium text-foreground">
+                  Projet concerné (optionnel)
+                </label>
+                <Select
+                  id="projet-concerne"
+                  value={projetId}
+                  onChange={(event) => setProjetId(event.target.value)}
+                >
+                  <option value="">Aucun — texte libre</option>
+                  {projetsOuverts.map((projet) => (
+                    <option key={projet.id} value={projet.id}>
+                      {projet.name}
+                    </option>
+                  ))}
+                </Select>
+                {projetSelectionne ? (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        form.setValue(
+                          "collaboration_terms",
+                          genererConditionsCollaboration(projetSelectionne, false),
+                          { shouldDirty: true },
+                        )
+                      }
+                    >
+                      Utiliser le message complet
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        form.setValue(
+                          "collaboration_terms",
+                          genererConditionsCollaboration(projetSelectionne, true),
+                          { shouldDirty: true },
+                        )
+                      }
+                    >
+                      Utiliser le résumé
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <FormField
               control={form.control}
               name="collaboration_terms"

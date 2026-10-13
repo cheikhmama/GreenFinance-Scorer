@@ -3,6 +3,7 @@ import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
 import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
 import { libellePays } from "@/shared/format/pays";
+import { idDepuisSlug } from "@/shared/format/slug";
 import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -13,7 +14,8 @@ import { useCompanyDetailForInstitution } from "../api";
  * ProjectDetailPage) — même détail (score, carbone, preuves) que côté Chercheur/Investisseur,
  * app/investor/entreprises.py restant l'unique source de vérité. */
 export function CompanyDetailPage() {
-  const { entrepriseId = "" } = useParams();
+  const { entrepriseId: segment = "" } = useParams();
+  const entrepriseId = idDepuisSlug(segment);
   const { data: entreprise, isLoading, isError } = useCompanyDetailForInstitution(entrepriseId);
 
   if (isLoading) return <PageSkeleton />;
