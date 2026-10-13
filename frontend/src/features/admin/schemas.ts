@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { Currency, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
 export { Currency, Role };
 export const DEVISES = Object.values(Currency);
@@ -17,11 +16,13 @@ export const ROLES_ATTRIBUABLES = [
 
 export type RoleAttribuable = (typeof ROLES_ATTRIBUABLES)[number];
 
-/** Rôles consultables dans la liste des comptes (UsersSection) — contrairement à
- * ROLES_ATTRIBUABLES (formulaire de création), inclut ADMIN : on ne peut pas en créer un
- * depuis ce formulaire, mais consulter/désactiver/réactiver les comptes déjà existants reste une
- * opération légitime (ex. suivre l'effectif d'administrateurs actifs). */
-export const ROLES_CONSULTABLES = Object.values(Role);
+/** Rôles consultables dans le filtre de la liste des comptes (UsersSection) — exclut ADMIN :
+ * l'effectif d'administrateurs n'a pas vocation à être filtré/parcouru comme les autres rôles
+ * depuis cet écran. Ne change rien aux droits : un compte ADMIN reste un rôle valide côté
+ * serveur, seule l'option de filtre disparaît ici. */
+export const ROLES_CONSULTABLES = Object.values(Role).filter((role) => role !== Role.ADMIN);
+
+export type RoleConsultable = (typeof ROLES_CONSULTABLES)[number];
 
 export const creerUtilisateurSchema = z
   .object({
@@ -65,37 +66,14 @@ export const decisionSchema = z.object({
 
 export type DecisionForm = z.infer<typeof decisionSchema>;
 
-/** impose_minimum est un champ purement local au formulaire (jamais envoyé au serveur) : il
- * pilote l'affichage de montant_minimum_investissement/devise_montant_minimum et la décision
- * d'envoyer ce couple ou (null, null) à la soumission — voir AdminCompanyDetailPage.tsx. Le
- * serveur applique la même règle "ensemble ou aucun" (app/admin/schemas.py::
- * ModifierEntrepriseAdminRequest), reproduite ici pour un message d'erreur immédiat. */
-export const modifierEntrepriseSchema = z
-  .object({
-    name: z.string().min(1, "Le nom est requis."),
-    sector: z.string().min(1, "Le secteur est requis."),
-    country: z.string().min(1, "Le pays est requis."),
-    description: z.string().optional(),
-    website: z.string().optional(),
-    impose_minimum: z.boolean(),
-    minimum_investment_amount: z
-      .number()
-      .refine(auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES)
-      .optional(),
-    minimum_investment_currency: z.enum(Currency).optional(),
-  })
-  .superRefine((values, ctx) => {
-    if (!values.impose_minimum) return;
-    if (
-      values.minimum_investment_amount === undefined ||
-      Number.isNaN(values.minimum_investment_amount)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["minimum_investment_amount"],
-        message: "Le montant est requis.",
-      });
-    }
-  });
+/** Identité seulement (nom, secteur, pays) : description, site officiel et montant minimum sont
+ * désormais modifiables par l'Entreprise elle-même, jamais par l'Admin (voir
+ * features/company/schemas.ts::modifierProfilEntrepriseSchema et app/admin/schemas.py::
+ * ModifierEntrepriseAdminRequest, qui ne les porte plus côté serveur non plus). */
+export const modifierEntrepriseSchema = z.object({
+  name: z.string().min(1, "Le nom est requis."),
+  sector: z.string().min(1, "Le secteur est requis."),
+  country: z.string().min(1, "Le pays est requis."),
+});
 
 export type ModifierEntrepriseForm = z.infer<typeof modifierEntrepriseSchema>;

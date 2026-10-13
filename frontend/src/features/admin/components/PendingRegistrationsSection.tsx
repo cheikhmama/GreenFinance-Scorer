@@ -2,13 +2,14 @@ import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import {
   libelleStatutInscription,
   variantStatutInscription,
 } from "@/shared/format/statutInscription";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { usePendingRegistrations } from "../api";
 import { KycDialog } from "./KycDialog";
@@ -33,9 +34,6 @@ export function PendingRegistrationsSection() {
             </Badge>
           ) : null}
         </CardTitle>
-        <CardDescription>
-          Entreprises inscrites elles-mêmes, adresse confirmée : vérifiez la demande puis décidez.
-        </CardDescription>
       </CardHeader>
       <CardContent>
         {isError ? (
@@ -52,7 +50,7 @@ export function PendingRegistrationsSection() {
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
-                      to={`/admin/entreprises/${inscription.company_id}`}
+                      to={`/admin/entreprises/${creerSlug(inscription.company_name, inscription.company_id)}`}
                       className="font-medium text-foreground underline-offset-4 hover:underline"
                     >
                       {inscription.company_name}

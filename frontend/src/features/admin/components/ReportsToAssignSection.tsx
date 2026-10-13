@@ -10,6 +10,7 @@ import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAssignReport, useReportsToAssign, useUtilisateursSelectionnables } from "../api";
 import { Role } from "../schemas";
 import { titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 
 /** File d'affectation (Phase 4 §4.4) — un rapport n'apparaît ici que l'extraction terminée
  * (app/admin/review_queue.py::lister_rapports_a_affecter). Auditeur choisi parmi les comptes
@@ -79,7 +80,7 @@ function LigneAffectation({
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <Link
-          to={`/admin/rapports/${rapportId}`}
+          to={`/admin/rapports/${creerSlug(titre, rapportId)}`}
           className="font-semibold text-foreground hover:underline"
         >
           {entreprise || titre}

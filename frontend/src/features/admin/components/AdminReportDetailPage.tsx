@@ -1,9 +1,9 @@
-import { Cloud, FileCheck2, FileText, History, MessageSquare } from "lucide-react";
+import { Cloud, FileCheck2, FileText, History } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyIdentity } from "@/shared/esg/CompanyAvatar";
-import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
 import { formatValeur, libelleIndicateur, libellePilier } from "@/shared/format/indicateurs";
 import { libellePays } from "@/shared/format/pays";
@@ -28,7 +28,6 @@ import {
   useCompanyDetail,
   useRecalculateReportScore,
   useRejectReport,
-  useReportOpinions,
   useReportScoreVerification,
   useReportVersions,
   useRequestReportCorrection,
@@ -40,14 +39,14 @@ import { ReportFinancialsCard } from "./ReportFinancialsCard";
 /** Fiche de détail Admin d'un rapport — identité de l'entreprise toujours visible en tête (on
  * arrive ici depuis plusieurs points de la plateforme : file d'affectation, file de décision,
  * fiche entreprise ; sans ce bandeau, rien ne rappelle de quelle entreprise il s'agit une fois
- * sur la page). Le reste (indicateurs, carbone, avis, versions, décision) reprend les mêmes
+ * sur la page). Le reste (indicateurs, carbone, versions, décision) reprend les mêmes
  * données qu'avant, seulement réorganisé avec des repères visuels cohérents avec le reste de la
  * plateforme (icônes de section, cartes). */
 export function AdminReportDetailPage() {
-  const { rapportId } = useParams<{ rapportId: string }>();
-  const { data: rapport, isLoading, isError } = useAdminReport(rapportId ?? "");
+  const { rapportId: segment } = useParams<{ rapportId: string }>();
+  const rapportId = idDepuisSlug(segment ?? "");
+  const { data: rapport, isLoading, isError } = useAdminReport(rapportId);
   const { data: entreprise } = useCompanyDetail(rapport?.company_id ?? "");
-  const { data: avis } = useReportOpinions(rapportId ?? "");
   const { data: versions } = useReportVersions(rapportId ?? "");
 
   if (isLoading) {
@@ -97,7 +96,6 @@ export function AdminReportDetailPage() {
 
       <PageHeader
         title={titreDeclaration(rapport)}
-        description="Indicateurs extraits, données carbone, avis d'audit et décision."
         action={
           <Button asChild variant="outline">
             <a href={urlPdf} target="_blank" rel="noreferrer">
@@ -111,7 +109,10 @@ export function AdminReportDetailPage() {
       <Card className="shadow-none">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           {entreprise ? (
-            <Link to={`/admin/entreprises/${entreprise.id}`} className="hover:opacity-80">
+            <Link
+              to={`/admin/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
+              className="hover:opacity-80"
+            >
               <CompanyIdentity
                 nom={entreprise.name}
                 logo={entreprise.logo}
@@ -125,31 +126,6 @@ export function AdminReportDetailPage() {
           <Badge variant={variantStatutRapport(rapport.status)}>
             {libelleStatutRapport(rapport.status)}
           </Badge>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-foreground">
-            <MessageSquare className="size-4" />
-            Avis d'audit
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!avis || avis.length === 0 ? (
-            <EmptyState icon={MessageSquare} message="Aucun avis rendu pour l'instant." />
-          ) : (
-            <ul className="divide-y">
-              {avis.map((item) => (
-                <li key={item.id} className="py-3">
-                  <p className="font-medium text-foreground">
-                    {libelleDecisionAudit(item.decision)}
-                  </p>
-                  {item.comment ? <p className="text-sm text-muted-foreground">{item.comment}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
         </CardContent>
       </Card>
 
@@ -281,7 +257,9 @@ export function AdminReportDetailPage() {
                   </div>
                   {version.id !== rapport.id ? (
                     <Button asChild size="sm" variant="outline">
-                      <Link to={`/admin/rapports/${version.id}`}>Ouvrir</Link>
+                      <Link to={`/admin/rapports/${creerSlug(titreDeclaration(version), version.id)}`}>
+                        Ouvrir
+                      </Link>
                     </Button>
                   ) : null}
                 </li>

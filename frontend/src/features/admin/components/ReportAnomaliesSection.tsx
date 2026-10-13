@@ -12,6 +12,7 @@ import {
   useRetryExtraction,
 } from "../api";
 import { titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 
 function BoutonRelancer({ rapportId }: { rapportId: string }) {
   const retry = useRetryExtraction();
@@ -89,7 +90,9 @@ export function ReportAnomaliesSection() {
                   <div className="flex items-center gap-2">
                     <BoutonRelancer rapportId={rapport.id} />
                     <Button asChild size="sm" variant="outline">
-                      <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>
+                      <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                        Voir
+                      </Link>
                     </Button>
                   </div>
                 </li>
@@ -110,7 +113,9 @@ export function ReportAnomaliesSection() {
 {titreDeclaration(rapport)}
                   </p>
                   <Button asChild size="sm" variant="outline">
-                    <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>
+                    <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                      Voir
+                    </Link>
                   </Button>
                 </li>
               ))}

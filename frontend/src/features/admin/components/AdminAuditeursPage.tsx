@@ -24,10 +24,7 @@ export function AdminAuditeursPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Auditeurs"
-        description="Charge de travail par Auditeur actif : dossiers affectés, en retard et avis rendus."
-      />
+      <PageHeader title="Auditeurs" />
       <Card>
         <CardHeader>
           <CardTitle>Charge par Auditeur</CardTitle>

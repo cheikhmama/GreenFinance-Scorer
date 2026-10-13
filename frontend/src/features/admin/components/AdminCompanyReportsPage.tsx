@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import {
   libelleDateRapport,
   libelleStatutRapport,
@@ -14,15 +15,13 @@ import { useCompanyReports } from "../api";
 import { titreDeclaration } from "@/shared/format/typeRapport";
 
 export function AdminCompanyReportsPage() {
-  const { entrepriseId } = useParams<{ entrepriseId: string }>();
-  const { data: rapports, isLoading, isError } = useCompanyReports(entrepriseId ?? "");
+  const { entrepriseId: segment } = useParams<{ entrepriseId: string }>();
+  const entrepriseId = idDepuisSlug(segment ?? "");
+  const { data: rapports, isLoading, isError } = useCompanyReports(entrepriseId);
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Rapports de l'entreprise"
-        description="Tous les rapports déposés, quel que soit leur statut."
-      />
+      <PageHeader title="Rapports de l'entreprise" />
       <Link
         to="/admin/entreprises"
         className="text-sm text-brand-green underline underline-offset-2"
@@ -52,7 +51,9 @@ export function AdminCompanyReportsPage() {
                   {libelleStatutRapport(rapport.status)}
                 </Badge>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/admin/rapports/${rapport.id}`}>Ouvrir</Link>
+                  <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                    Ouvrir
+                  </Link>
                 </Button>
               </div>
             </li>

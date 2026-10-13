@@ -1,6 +1,5 @@
 import { Search, Wallet } from "lucide-react";
 import { useState } from "react";
-import { formatMontant } from "@/shared/format/etatPosition";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -13,8 +12,8 @@ import { usePortfoliosAdmin } from "../api";
 
 /** Tous les portefeuilles non archivés, tous Investisseurs confondus — détail derrière
  * "Portefeuilles non archivés" de l'onglet Investisseur du tableau de bord. Suivi en lecture
- * seule : la composition détaillée (positions) reste privée à son titulaire, jamais exposée ici
- * au-delà du nombre de positions et du montant total dans la devise de référence. */
+ * seule, aux seules colonnes non sensibles : nom, titulaire, date de création — jamais la
+ * composition, le nombre de positions ni un montant, qui restent privés à son titulaire. */
 export function AdminPortefeuillesPage() {
   const [recherche, setRecherche] = useState("");
   const rechercheDebattue = useDebouncedValue(recherche);
@@ -25,10 +24,7 @@ export function AdminPortefeuillesPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Portefeuilles"
-        description="Tous les portefeuilles non archivés, tous Investisseurs confondus."
-      />
+      <PageHeader title="Portefeuilles" />
       <Card>
         <CardHeader>
           <CardTitle>Portefeuilles</CardTitle>
@@ -58,11 +54,9 @@ export function AdminPortefeuillesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Portefeuille</TableHead>
+                  <TableHead>Nom du portefeuille</TableHead>
                   <TableHead>Titulaire</TableHead>
-                  <TableHead>Positions</TableHead>
-                  <TableHead>Montant total</TableHead>
-                  <TableHead>Créé le</TableHead>
+                  <TableHead>Date de création</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -72,10 +66,6 @@ export function AdminPortefeuillesPage() {
                       {portefeuille.name}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{portefeuille.investor_email}</TableCell>
-                    <TableCell className="tabular-nums">{portefeuille.position_count}</TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatMontant(portefeuille.total_amount, portefeuille.reference_currency)}
-                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(portefeuille.created_at).toLocaleDateString("fr-FR")}
                     </TableCell>

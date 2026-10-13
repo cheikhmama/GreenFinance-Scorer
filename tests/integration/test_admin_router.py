@@ -21,6 +21,7 @@ from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
     AuditDecision,
+    Currency,
     DataMethod,
     Pillar,
     ReportStatus,
@@ -890,9 +891,38 @@ def test_consulter_entreprise_admin_inconnue_est_404(session) -> None:
     assert response.json()["error"]["code"] == "entreprise_introuvable"
 
 
-def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
+def test_modifier_entreprise_met_a_jour_l_identite(session) -> None:
     admin = _create_utilisateur(session, Role.ADMIN)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    authed_client = _login(admin.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        f"/api/v1/admin/entreprises/{entreprise.id}",
+        json={"name": "Nouveau Nom", "sector": "Énergie", "country": "Mauritanie"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Nouveau Nom"
+    assert body["sector"] == "Énergie"
+    assert body["country"] == "Mauritanie"
+    # Réponse au même format que le détail -- pas de refetch nécessaire côté frontend.
+    assert "report_count" in body
+    assert "owner_user_id" in body
+
+
+def test_modifier_entreprise_ne_touche_plus_description_site_ni_montant(session) -> None:
+    """Description, site officiel et montant minimum sont désormais du seul ressort de
+    l'Entreprise (app/company/profil.py::modifier_profil_entreprise) — un payload Admin qui les
+    porte encore (ancien client, requête manuelle) est silencieusement sans effet sur eux."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    entreprise.description = "Description existante."
+    entreprise.website = "https://existant.test"
+    entreprise.minimum_investment_amount = 500
+    entreprise.minimum_investment_currency = Currency.EUR
+    session.add(entreprise)
+    session.commit()
     authed_client = _login(admin.email, "s3cret-pass")
 
     response = authed_client.patch(
@@ -901,7 +931,7 @@ def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
             "name": "Nouveau Nom",
             "sector": "Énergie",
             "country": "Mauritanie",
-            "description": "Description mise à jour.",
+            "description": "Tentative de modification Admin.",
             "website": "https://nouveau-site.test",
             "minimum_investment_amount": 1000.0,
             "minimum_investment_currency": "USD",
@@ -911,33 +941,10 @@ def test_modifier_entreprise_met_a_jour_le_profil_complet(session) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["name"] == "Nouveau Nom"
-    assert body["sector"] == "Énergie"
-    assert body["country"] == "Mauritanie"
-    assert body["description"] == "Description mise à jour."
-    assert body["website"] == "https://nouveau-site.test"
-    assert body["minimum_investment_amount"] == 1000.0
-    assert body["minimum_investment_currency"] == "USD"
-    # Réponse au même format que le détail -- pas de refetch nécessaire côté frontend.
-    assert "report_count" in body
-    assert "owner_user_id" in body
-
-
-def test_modifier_entreprise_exige_montant_et_devise_ensemble(session) -> None:
-    admin = _create_utilisateur(session, Role.ADMIN)
-    entreprise, _ = _create_entreprise_avec_utilisateur(session)
-    authed_client = _login(admin.email, "s3cret-pass")
-
-    response = authed_client.patch(
-        f"/api/v1/admin/entreprises/{entreprise.id}",
-        json={
-            "name": entreprise.name,
-            "sector": entreprise.sector,
-            "country": entreprise.country,
-            "minimum_investment_amount": 1000.0,
-        },
-    )
-
-    assert response.status_code == 422
+    assert body["description"] == "Description existante."
+    assert body["website"] == "https://existant.test"
+    assert body["minimum_investment_amount"] == 500.0
+    assert body["minimum_investment_currency"] == "EUR"
 
 
 def test_modifier_entreprise_refuse_nom_vide(session) -> None:

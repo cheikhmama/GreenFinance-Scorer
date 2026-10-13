@@ -7,9 +7,9 @@ import { ReportAnomaliesSection } from "./ReportAnomaliesSection";
 import { ReportsInValidationSection } from "./ReportsInValidationSection";
 import { ReportsToAssignSection } from "./ReportsToAssignSection";
 
-type Onglet = "alertes" | "a-affecter" | "en-validation" | "tous";
-const ONGLET_PAR_DEFAUT: Onglet = "alertes";
-const ONGLETS_VALIDES: Onglet[] = ["alertes", "a-affecter", "en-validation", "tous"];
+type Onglet = "tous" | "alertes" | "a-affecter" | "en-validation";
+const ONGLET_PAR_DEFAUT: Onglet = "tous";
+const ONGLETS_VALIDES: Onglet[] = ["tous", "alertes", "a-affecter", "en-validation"];
 
 /** Quatre catégories de rapports répondant chacune à un critère distinct de la même entité
  * (un rapport n'appartient jamais à deux à la fois) : les empiler sur une même page mélangeait
@@ -24,10 +24,7 @@ export function AdminReportsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Rapports"
-        description="Affectation à un auditeur, puis décision (valider, rejeter ou demander une correction)."
-      />
+      <PageHeader title="Rapports" />
       <Tabs
         value={onglet}
         onValueChange={(valeur) =>
@@ -41,11 +38,14 @@ export function AdminReportsPage() {
         }
       >
         <TabsList>
+          <TabsTrigger value="tous">Tous les rapports</TabsTrigger>
           <TabsTrigger value="alertes">Alertes</TabsTrigger>
           <TabsTrigger value="a-affecter">À affecter</TabsTrigger>
           <TabsTrigger value="en-validation">En attente de décision</TabsTrigger>
-          <TabsTrigger value="tous">Tous les rapports</TabsTrigger>
         </TabsList>
+        <TabsContent value="tous">
+          <AllReportsSection />
+        </TabsContent>
         <TabsContent value="alertes">
           <ReportAnomaliesSection />
           <OverdueAuditsSection />
@@ -55,9 +55,6 @@ export function AdminReportsPage() {
         </TabsContent>
         <TabsContent value="en-validation">
           <ReportsInValidationSection />
-        </TabsContent>
-        <TabsContent value="tous">
-          <AllReportsSection />
         </TabsContent>
       </Tabs>
     </div>

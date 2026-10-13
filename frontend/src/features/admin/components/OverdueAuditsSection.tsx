@@ -6,6 +6,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useOverdueReports } from "../api";
 import { titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 
 /** Rapports affectés à un auditeur depuis plus longtemps que le délai attendu, sans décision
  * rendue — voir app/admin/review_queue.py::lister_rapports_en_retard. Affichée dans l'onglet
@@ -32,7 +33,9 @@ export function OverdueAuditsSection() {
 {titreDeclaration(rapport)}
                 </p>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>
+                  <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                    Voir
+                  </Link>
                 </Button>
               </li>
             ))}

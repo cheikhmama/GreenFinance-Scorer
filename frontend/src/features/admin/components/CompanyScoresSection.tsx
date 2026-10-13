@@ -2,6 +2,7 @@ import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -67,6 +68,7 @@ export function CompanyScoresSection() {
                 <TableHead>E</TableHead>
                 <TableHead>S</TableHead>
                 <TableHead>G</TableHead>
+                <TableHead>Preuve</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -74,7 +76,7 @@ export function CompanyScoresSection() {
                 <TableRow key={entreprise.id}>
                   <TableCell>
                     <Link
-                      to={`/admin/entreprises/${entreprise.id}`}
+                      to={`/admin/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
                       className="font-medium text-foreground hover:underline"
                     >
                       {entreprise.name}
@@ -95,6 +97,18 @@ export function CompanyScoresSection() {
                   </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {formatScore(entreprise.governance_score)}
+                  </TableCell>
+                  <TableCell>
+                    {entreprise.report_id ? (
+                      <Link
+                        to={`/admin/rapports/${creerSlug(entreprise.name, entreprise.report_id)}`}
+                        className="text-brand-green underline-offset-2 hover:underline"
+                      >
+                        Voir la preuve
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

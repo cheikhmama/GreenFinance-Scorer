@@ -8,14 +8,7 @@ export function AdminJournalAuditPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Journal d'audit"
-        description={
-          concerneId
-            ? "Historique d'activité de ce compte — actions faites ou subies."
-            : "Connexions, déconnexions, changements de rôle et désactivations de compte."
-        }
-      />
+      <PageHeader title="Journal d'audit" />
       <JournalAuditSection concerneId={concerneId} />
     </div>
   );

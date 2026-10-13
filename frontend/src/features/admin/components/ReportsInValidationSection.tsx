@@ -8,6 +8,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useReportsInValidation } from "../api";
 import { titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 
 /** File de décision (Phase 4 §4.4) — un avis d'audit a déjà été rendu ; la décision elle-même
  * (valider/rejeter/demander correction) se prend depuis le détail du rapport. */
@@ -39,7 +40,9 @@ export function ReportsInValidationSection() {
                   </span>
                 </div>
                 <Button asChild size="sm">
-                  <Link to={`/admin/rapports/${rapport.id}`}>Décider</Link>
+                  <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                    Décider
+                  </Link>
                 </Button>
               </li>
             ))}

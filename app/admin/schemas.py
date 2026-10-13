@@ -32,23 +32,18 @@ class AffecterAuditeurRequest(BaseModel):
 
 
 class ModifierEntrepriseAdminRequest(BaseModel):
-    """Remplace entièrement le profil d'une entreprise (identité, description, site officiel,
-    montant minimum) — jamais un patch partiel champ par champ, même principe que
-    CreerUtilisateurRequest pour nom_entreprise/secteur/pays. Le logo suit un circuit séparé
-    (POST/DELETE /admin/entreprises/{id}/logo, voir plus bas) : un fichier binaire validé par sa
-    signature réelle n'a pas sa place dans un payload JSON de chaîne libre. montant_minimum_
-    investissement et devise_montant_minimum se renseignent toujours ensemble ou se vident tous
-    les deux ensemble, jamais un montant minimum sans sa devise (voir app/company/models.py)."""
+    """Remplace l'identité d'une entreprise (nom, secteur, pays) — jamais un patch partiel champ
+    par champ, même principe que CreerUtilisateurRequest pour nom_entreprise/secteur/pays. La
+    description, le site officiel et le montant minimum d'investissement sont désormais du seul
+    ressort de l'Entreprise elle-même (voir app/company/schemas.py::ModifierProfilEntrepriseRequest)
+    — l'Administrateur les consulte toujours depuis cette même fiche, mais ne les modifie plus. Le
+    logo suit un circuit séparé (POST/DELETE /admin/entreprises/{id}/logo, voir plus bas) : un
+    fichier binaire validé par sa signature réelle n'a pas sa place dans un payload JSON de chaîne
+    libre."""
 
     name: str
     sector: str
     country: str
-    description: str | None = None
-    website: str | None = None
-    minimum_investment_amount: Decimal | None = Field(
-        default=None, gt=0, max_digits=20, decimal_places=2
-    )
-    minimum_investment_currency: Currency | None = None
 
     @field_validator("name", "sector", "country")
     @classmethod
@@ -57,15 +52,6 @@ class ModifierEntrepriseAdminRequest(BaseModel):
         if not valeur:
             raise ValueError("Ce champ ne peut pas être vide.")
         return valeur
-
-    @model_validator(mode="after")
-    def _verifier_paire_montant_devise(self) -> "ModifierEntrepriseAdminRequest":
-        if (self.minimum_investment_amount is None) != (self.minimum_investment_currency is None):
-            raise ValueError(
-                "montant_minimum_investissement et devise_montant_minimum doivent être fournis "
-                "ensemble ou omis ensemble."
-            )
-        return self
 
 
 class DecisionAdminRequest(BaseModel):
@@ -133,9 +119,23 @@ class JournalAuditPublic(BaseModel):
     new_value: str | None
     correlation_id: str | None
     # Qui a agi, lisible sans recouper les identifiants (absent pour une action anonyme, ex. une
-    # inscription ou une connexion échouée, ou un compte supprimé depuis).
+    # connexion échouée sur une adresse inconnue, ou un compte supprimé depuis).
     actor_name: str | None = None
     actor_email: str | None = None
+    actor_role: Role | None = None
+    # Rôle du compte visé quand resource_type == "User" (ex. Auditeur, Investisseur, Chercheur,
+    # Institution) — distinct d'actor_role : ici c'est le compte SUBI par l'action, pas celui qui
+    # l'a effectuée (ex. un Administrateur qui désactive un compte Auditeur).
+    resource_user_role: Role | None = None
+
+
+class JournalAuditActionCompte(BaseModel):
+    """Nombre d'entrées déjà enregistrées pour une action — sert à trier le filtre du Journal
+    d'audit par pertinence réelle plutôt que par un ordre alphabétique figé (voir
+    app/admin/journal.py::compter_actions)."""
+
+    action: str
+    count: int
 
 
 class TableauDeBordAdmin(BaseModel):
@@ -270,6 +270,9 @@ class EntrepriseAvecScoreAdmin(BaseModel):
     environmental_score: float | None
     social_score: float | None
     governance_score: float | None
+    # Rapport validé dont le score est issu — permet au frontend de lier vers la preuve
+    # documentaire (AdminReportDetailPage) ; None si aucun rapport validé (pas de score non plus).
+    report_id: uuid.UUID | None
 
 
 class ChargeAuditeurAdmin(BaseModel):
@@ -383,7 +386,9 @@ class CompanyIdentifiersRequest(BaseModel):
             return None
         valeur = valeur.replace(" ", "").upper()
         if not isin_valide(valeur):
-            raise ValueError("ISIN invalide (12 caractères, chiffre de contrôle incorrect).")
+            raise ValueError(
+                "ISIN invalide (12 caractères, chiffre de contrôle incorrect)."
+            )
         return valeur
 
     @field_validator("lei")
@@ -393,7 +398,9 @@ class CompanyIdentifiersRequest(BaseModel):
             return None
         valeur = valeur.replace(" ", "").upper()
         if not lei_valide(valeur):
-            raise ValueError("LEI invalide (20 caractères, chiffres de contrôle incorrects).")
+            raise ValueError(
+                "LEI invalide (20 caractères, chiffres de contrôle incorrects)."
+            )
         return valeur
 
     @field_validator("ticker")
@@ -425,7 +432,9 @@ class ReportFinancialsRequest(BaseModel):
 
     revenue: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
     revenue_currency: Currency | None = None
-    enterprise_value: Decimal | None = Field(default=None, gt=0, max_digits=20, decimal_places=2)
+    enterprise_value: Decimal | None = Field(
+        default=None, gt=0, max_digits=20, decimal_places=2
+    )
     enterprise_value_currency: Currency | None = None
     evic_date: date | None = None
 
@@ -434,7 +443,9 @@ class ReportFinancialsRequest(BaseModel):
         if (self.revenue is None) != (self.revenue_currency is None):
             raise ValueError("revenue et revenue_currency vont ensemble.")
         if (self.enterprise_value is None) != (self.enterprise_value_currency is None):
-            raise ValueError("enterprise_value et enterprise_value_currency vont ensemble.")
+            raise ValueError(
+                "enterprise_value et enterprise_value_currency vont ensemble."
+            )
         if self.enterprise_value is None and self.evic_date is not None:
             raise ValueError("evic_date n'a de sens qu'avec enterprise_value.")
         return self

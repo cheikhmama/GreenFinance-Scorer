@@ -28,10 +28,7 @@ export function AdminAnalysesPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Analyses"
-        description="Toutes les analyses Chercheur, toutes versions, filtrables par statut."
-      />
+      <PageHeader title="Analyses" />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>Analyses</CardTitle>

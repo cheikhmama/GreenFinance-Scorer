@@ -5,6 +5,7 @@ import { ApiError } from "@/shared/api/errors";
 import type { EntrepriseAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import {
   libelleStatutInscription,
@@ -122,7 +123,7 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
         <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-10 shrink-0" />
         <div className="min-w-0">
           <Link
-            to={`/admin/entreprises/${entreprise.id}`}
+            to={`/admin/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
             className="font-semibold text-foreground hover:underline"
           >
             {entreprise.name}
@@ -154,7 +155,7 @@ function EntrepriseLigne({ entreprise }: { entreprise: EntrepriseAdmin }) {
       <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
         {entreprise.latest_report_id ? (
           <Button asChild size="sm" variant="outline">
-            <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>
+            <Link to={`/admin/rapports/${creerSlug(entreprise.name, entreprise.latest_report_id)}`}>
               <FileText className="size-4" />
               Voir le rapport
             </Link>

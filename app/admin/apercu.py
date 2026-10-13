@@ -11,6 +11,7 @@ republication de TableauDeBordAdmin couvrent déjà exactement ce que la section
 demande, les dupliquer aurait recréé la répétition déjà écartée pour le tableau de bord compact.
 """
 
+import uuid
 from dataclasses import dataclass, field
 
 from sqlalchemy import ColumnElement
@@ -145,10 +146,12 @@ def lister_entreprises_avec_score(
     pays: str | None = None,
     page: int = 1,
     page_size: int = 3,
-) -> tuple[list[tuple[Company, Score | None]], int]:
+) -> tuple[list[tuple[Company, Score | None, uuid.UUID | None]], int]:
     """Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque
     entreprise publiée avec son score admissible, None si absent plutôt que 0. Même périmètre que
-    calculer_performance_esg (entreprises publiées), filtrable par secteur/pays."""
+    calculer_performance_esg (entreprises publiées), filtrable par secteur/pays. Le 3e élément du
+    tuple est l'identifiant du rapport validé derrière le score (None si aucun) — expose la preuve
+    déjà calculée ici plutôt que de la recalculer côté route (voir EntrepriseAvecScoreAdmin.report_id)."""
     filtres: list[ColumnElement[bool]] = [col(Company.published_at).is_not(None)]
     if secteur:
         filtres.append(col(Company.sector) == secteur)
@@ -166,11 +169,11 @@ def lister_entreprises_avec_score(
         ).all()
     )
 
-    resultats: list[tuple[Company, Score | None]] = []
+    resultats: list[tuple[Company, Score | None, uuid.UUID | None]] = []
     for entreprise in entreprises:
         rapport = dernier_rapport_valide(session, entreprise.id)
         score = score_officiel(session, rapport.id) if rapport is not None else None
-        resultats.append((entreprise, score))
+        resultats.append((entreprise, score, rapport.id if rapport is not None else None))
     return resultats, total
 
 

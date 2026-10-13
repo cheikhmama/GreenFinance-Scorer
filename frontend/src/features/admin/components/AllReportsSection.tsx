@@ -10,6 +10,7 @@ import { Select } from "@/shared/ui/select";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useAllReports } from "../api";
 import { titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 
 const STATUTS: ReportStatus[] = [
   "EXTRACTING",
@@ -87,7 +88,9 @@ export function AllReportsSection() {
                   </span>
                 </div>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/admin/rapports/${rapport.id}`}>Voir</Link>
+                  <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                    Voir
+                  </Link>
                 </Button>
               </li>
             ))}

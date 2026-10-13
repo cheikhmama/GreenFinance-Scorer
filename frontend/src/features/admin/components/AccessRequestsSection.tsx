@@ -9,7 +9,7 @@ import {
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
 import {
   Dialog,
@@ -53,9 +53,6 @@ export function AccessRequestsSection() {
     <Card id="demandes-acces">
       <CardHeader>
         <CardTitle className="text-base">Demandes d’accès</CardTitle>
-        <CardDescription>
-          Investisseurs et chercheurs inscrits eux-mêmes, en attente de validation.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {isError ? <p className="text-destructive">Impossible de charger les demandes.</p> : null}

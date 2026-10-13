@@ -26,10 +26,7 @@ export function AdminProjetsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Projets"
-        description="Tous les projets Institution, filtrables par statut."
-      />
+      <PageHeader title="Projets" />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>Projets</CardTitle>

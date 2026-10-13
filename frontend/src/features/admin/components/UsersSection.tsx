@@ -9,7 +9,7 @@ import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -18,7 +18,13 @@ import { Input } from "@/shared/ui/input";
 import { Select } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { useCreateUser, useDeactivateUser, useReactivateUser, useUsersByRole } from "../api";
+import {
+  useCreateUser,
+  useDeactivateUser,
+  useReactivateUser,
+  useUsersByRole,
+  useUtilisateursApercuRoles,
+} from "../api";
 import {
   type CreerUtilisateurForm,
   creerUtilisateurSchema,
@@ -26,6 +32,7 @@ import {
   ROLES_CONSULTABLES,
   Role,
   type RoleAttribuable,
+  type RoleConsultable,
 } from "../schemas";
 
 /** Gestion des comptes (Phase 3 §3.3) — création, désactivation/réactivation. Le rôle se fixe à
@@ -36,28 +43,43 @@ import {
  *
  * Recherche et pagination sont portées par l'API (GET /admin/utilisateurs?recherche=&page=&
  * page_size=) : 3 comptes chargés au départ, "Voir plus" charge 3 comptes de plus depuis la base
- * à chaque clic, jusqu'à épuisement de la liste pour la recherche/rôle en cours. */
+ * à chaque clic, jusqu'à épuisement de la liste pour la recherche/rôle en cours. Exception : tant
+ * que le filtre reste sur sa valeur par défaut ("Tous les rôles") et qu'aucune recherche n'est
+ * saisie, cette pagination est remplacée par un repère fixe (un compte par rôle, voir
+ * useUtilisateursApercuRoles) — sélectionner un rôle ou chercher un nom revient à la liste
+ * paginée habituelle. */
 export function UsersSection() {
   const [searchParams, setSearchParams] = useSearchParams();
   const parametreRole = searchParams.get("role");
-  const roleAffiche: Role = ROLES_CONSULTABLES.includes(parametreRole as Role)
-    ? (parametreRole as Role)
-    : Role.AUDITOR;
-  // Le formulaire de création n'accepte jamais ADMIN (voir ROLES_ATTRIBUABLES) — si on
-  // parcourt les comptes Administrateur au moment d'ouvrir la modale, retombe sur le premier rôle
-  // réellement attribuable plutôt que de présélectionner un rôle que le formulaire refuserait.
-  const roleCreationParDefaut = ROLES_ATTRIBUABLES.includes(roleAffiche as RoleAttribuable)
-    ? (roleAffiche as RoleAttribuable)
-    : ROLES_ATTRIBUABLES[0];
+  // Pas de paramètre, ou valeur invalide (y compris une ancienne valeur "ADMIN" encore dans
+  // l'URL/un favori — ce rôle n'est plus une option du filtre) : retombe sur "Tous les rôles".
+  const roleAffiche: RoleConsultable | undefined = ROLES_CONSULTABLES.includes(
+    parametreRole as RoleConsultable,
+  )
+    ? (parametreRole as RoleConsultable)
+    : undefined;
+  // Le formulaire de création n'accepte jamais ADMIN (voir ROLES_ATTRIBUABLES) — depuis "Tous
+  // les rôles" ou les comptes Administrateur, retombe sur le premier rôle réellement attribuable
+  // plutôt que de présélectionner un rôle que le formulaire refuserait.
+  const roleCreationParDefaut =
+    roleAffiche && ROLES_ATTRIBUABLES.includes(roleAffiche as RoleAttribuable)
+      ? (roleAffiche as RoleAttribuable)
+      : ROLES_ATTRIBUABLES[0];
   const [recherche, setRecherche] = useState("");
   const [modaleOuverte, setModaleOuverte] = useState(false);
   const rechercheDebattue = useDebouncedValue(recherche);
+  // Entrée sur l'écran, filtre encore à sa valeur par défaut ("Tous les rôles") et aucune
+  // recherche en cours : montre un repère (un compte par rôle) plutôt que la liste plate triée
+  // par e-mail, qui pourrait ne révéler qu'un seul rôle sur sa première page. Dès qu'un rôle
+  // précis est choisi ou qu'une recherche démarre, on repasse sur la liste paginée habituelle.
+  const vueParDefaut = roleAffiche === undefined && rechercheDebattue === "";
+  const apercuRoles = useUtilisateursApercuRoles(vueParDefaut);
   // Comptes désactivés toujours inclus (jamais de bascule dans l'UI) : sans ça, un compte
   // désactivé disparaîtrait de cette liste et son bouton "Réactiver" deviendrait inatteignable.
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useUsersByRole(roleAffiche, rechercheDebattue, true);
-  const deactivate = useDeactivateUser(roleAffiche);
-  const reactivate = useReactivateUser(roleAffiche);
+    useUsersByRole(roleAffiche, rechercheDebattue, true, false, !vueParDefaut);
+  const deactivate = useDeactivateUser();
+  const reactivate = useReactivateUser();
   const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -75,15 +97,17 @@ export function UsersSection() {
     });
   }
 
-  const utilisateurs = data?.pages.flatMap((page) => page.items) ?? [];
+  const utilisateurs = vueParDefaut
+    ? (apercuRoles.data ?? [])
+    : (data?.pages.flatMap((page) => page.items) ?? []);
+  const chargement = vueParDefaut ? apercuRoles.isLoading : isLoading;
+  const erreur = vueParDefaut ? apercuRoles.isError : isError;
+  const peutVoirPlus = !vueParDefaut && hasNextPage;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle>Utilisateurs</CardTitle>
-          <CardDescription>Un compte Administrateur ne peut pas être créé ici.</CardDescription>
-        </div>
+        <CardTitle>Utilisateurs</CardTitle>
         <Button onClick={() => setModaleOuverte(true)}>Créer un utilisateur</Button>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -114,11 +138,15 @@ export function UsersSection() {
             </label>
             <span className="text-sm text-muted-foreground">Rôle :</span>
             <Select
-              value={roleAffiche}
+              value={roleAffiche ?? ""}
               onChange={(event) =>
                 setSearchParams(
                   (params) => {
-                    params.set("role", event.target.value);
+                    if (event.target.value) {
+                      params.set("role", event.target.value);
+                    } else {
+                      params.delete("role");
+                    }
                     return params;
                   },
                   { replace: true },
@@ -126,6 +154,7 @@ export function UsersSection() {
               }
               className="w-48"
             >
+              <option value="">Tous les rôles</option>
               {ROLES_CONSULTABLES.map((role) => (
                 <option key={role} value={role}>
                   {libelleRole(role)}
@@ -134,23 +163,28 @@ export function UsersSection() {
             </Select>
           </div>
 
-          {isLoading ? (
+          {chargement ? (
             <div className="space-y-2">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
           ) : null}
-          {isError ? <p className="text-destructive">Impossible de charger les comptes.</p> : null}
+          {erreur ? <p className="text-destructive">Impossible de charger les comptes.</p> : null}
           {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
-          {!isLoading && !isError && utilisateurs.length === 0 ? (
-            <EmptyState icon={Users} message="Aucun compte pour ce rôle." />
+          {!chargement && !erreur && utilisateurs.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              message={roleAffiche ? "Aucun compte pour ce rôle." : "Aucun compte."}
+            />
           ) : null}
           {utilisateurs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Compte</TableHead>
+                  <TableHead>Rôle</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Historique</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
@@ -159,15 +193,22 @@ export function UsersSection() {
                 {utilisateurs.map((utilisateur) => (
                   <TableRow key={utilisateur.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="min-w-0">
-                          {utilisateur.name ? (
-                            <p className="font-medium text-foreground">{utilisateur.name}</p>
-                          ) : null}
-                          <p className="truncate text-sm text-muted-foreground">{utilisateur.email}</p>
-                        </div>
-                        {!utilisateur.active ? <Badge variant="secondary">désactivé</Badge> : null}
+                      <div className="min-w-0">
+                        {utilisateur.name ? (
+                          <p className="font-medium text-foreground">{utilisateur.name}</p>
+                        ) : null}
+                        <p className="truncate text-sm text-muted-foreground">{utilisateur.email}</p>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{libelleRole(utilisateur.role)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {utilisateur.active ? (
+                        <Badge variant="success">Actif</Badge>
+                      ) : (
+                        <Badge variant="secondary">Désactivé</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button asChild size="sm" variant="outline">
@@ -212,7 +253,7 @@ export function UsersSection() {
               </TableBody>
             </Table>
           ) : null}
-          {utilisateurs.length > 0 && hasNextPage ? (
+          {utilisateurs.length > 0 && peutVoirPlus ? (
             <div>
               <Button
                 variant="outline"
