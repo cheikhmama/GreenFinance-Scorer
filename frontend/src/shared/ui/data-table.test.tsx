@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type ColonneTable, DataTable } from "./data-table";
+import { celluleCsv, type ColonneTable, DataTable } from "./data-table";
 
 interface Ligne {
   id: string;
@@ -105,5 +105,55 @@ describe("DataTable", () => {
 
     await user.click(screen.getByRole("button", { name: "Voir le détail de Entreprise 01" }));
     expect(surOuvrir).toHaveBeenCalledWith(expect.objectContaining({ id: "e1" }));
+  });
+
+  it("signale une liste tronquée en pied de table", () => {
+    render(
+      <DataTable
+        libelle="Journal"
+        lignes={LIGNES}
+        colonnes={COLONNES}
+        cle={(l) => l.id}
+        rechercheDans={(l) => l.nom}
+        tronque
+      />,
+    );
+    expect(screen.getByText(/Liste limitée aux 5\s000 premières lignes/)).toBeInTheDocument();
+  });
+
+  it("relance la recherche quand une donnée extérieure déclarée change", async () => {
+    const user = userEvent.setup();
+    const table = (surnoms: Record<string, string>) => (
+      <DataTable
+        libelle="Entreprises"
+        lignes={LIGNES}
+        colonnes={COLONNES}
+        cle={(l) => l.id}
+        rechercheDans={(l) => surnoms[l.id] ?? l.nom}
+        dependances={[surnoms]}
+      />
+    );
+    const { rerender } = render(table({}));
+    await user.type(screen.getByRole("searchbox"), "zeta");
+    expect(screen.getByText("Aucun résultat pour ces critères.")).toBeInTheDocument();
+    rerender(table({ e3: "Zeta Corp" }));
+    expect(within(corps()).getAllByRole("row")).toHaveLength(1);
+  });
+});
+
+describe("celluleCsv", () => {
+  it("neutralise les formules saisies, pas les nombres", () => {
+    expect(celluleCsv('=HYPERLINK("http://x","y")')).toBe(`"'=HYPERLINK(""http://x"",""y"")"`);
+    expect(celluleCsv("@SUM(A1)")).toBe("'@SUM(A1)");
+    expect(celluleCsv("+33 6 00")).toBe("'+33 6 00");
+    expect(celluleCsv("-x")).toBe("'-x");
+    expect(celluleCsv(-12.5)).toBe("-12.5");
+    expect(celluleCsv(null)).toBe("");
+  });
+
+  it("met entre guillemets les séparateurs, guillemets et retours chariot", () => {
+    expect(celluleCsv("a;b")).toBe('"a;b"');
+    expect(celluleCsv("a\rb")).toBe('"a\rb"');
+    expect(celluleCsv("Ferrosahel")).toBe("Ferrosahel");
   });
 });

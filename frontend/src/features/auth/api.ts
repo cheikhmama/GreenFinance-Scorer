@@ -113,18 +113,22 @@ export function useConfirmEmailChange(token: string | null) {
   });
 }
 
-/** POST /auth/logout (204, pas de corps). Vide TOUT le cache — rien de ce que le compte quitté
- * a chargé ne doit rester en mémoire pour le compte suivant sur ce navigateur — puis celui de
- * useCurrentUser, pour que RequireRole redirige immédiatement vers /login. */
+/** POST /auth/logout (204, pas de corps). Retire TOUT le cache — rien de ce que le compte quitté
+ * a chargé ne doit rester en mémoire pour le compte suivant sur ce navigateur — sauf la session,
+ * réinitialisée plutôt que retirée : les useCurrentUser montés relisent alors /auth/me, reçoivent
+ * le 401 et RequireRole redirige vers /login (même mécanisme que gererSessionPerdue). Un
+ * clear() complet laisserait ces observateurs sur l'ancien utilisateur. */
 export function useLogout() {
   const queryClient = useQueryClient();
 
   return useMutation<void, ApiError, void>({
     mutationFn: () => logout(),
     onSuccess: () => {
-      queryClient.clear();
-      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, undefined);
-      queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+      const [domaine, ressource] = CURRENT_USER_QUERY_KEY;
+      queryClient.removeQueries({
+        predicate: ({ queryKey }) => queryKey[0] !== domaine || queryKey[1] !== ressource,
+      });
+      void queryClient.resetQueries({ queryKey: CURRENT_USER_QUERY_KEY, exact: true });
     },
   });
 }

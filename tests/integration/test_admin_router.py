@@ -1694,3 +1694,49 @@ def test_table_entreprises_porte_le_score_officiel(session) -> None:
     scores = {item["name"]: item["official_global_score"] for item in response.json()["items"]}
     assert scores == {f"{marqueur} notee": 70.0, f"{marqueur} sans": None}
 
+
+
+def test_table_entreprises_score_officiel_du_dernier_rapport_valide_sous_reference(session) -> None:
+    """Score lu en lot pour toute la page (plus deux requêtes par entreprise) : même règle que
+    dernier_rapport_valide + score_officiel — le rapport validé le plus récent, et sous la
+    configuration de référence, jamais une pondération personnalisée calculée après."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    marqueur = f"score-lot-{uuid.uuid4()}"
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    entreprise.name = marqueur
+    session.add(entreprise)
+    session.commit()
+    ancien = _create_rapport(
+        session,
+        entreprise.id,
+        status=ReportStatus.VALIDATED,
+        submitted_at=utcnow() - timedelta(days=30),
+    )
+    _create_score(session, ancien.id)
+    recent = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
+    officiel = _create_score(session, recent.id)
+    officiel.global_score = 82.0
+    personnalisee = ScoringConfig(
+        name="perso", version=1, content_yaml="perso: 1", content_hash="f" * 64, owner_user_id=admin.id
+    )
+    session.add(officiel)
+    session.add(personnalisee)
+    session.commit()
+    session.add(
+        Score(
+            report_id=recent.id,
+            config_id=personnalisee.id,
+            global_score=99.0,
+            environmental_score=99.0,
+            social_score=99.0,
+            governance_score=99.0,
+            computed_at=utcnow() + timedelta(minutes=5),
+        )
+    )
+    session.commit()
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/entreprises", params={"recherche": marqueur, "page_size": 100}
+    )
+
+    assert [item["official_global_score"] for item in response.json()["items"]] == [82.0]

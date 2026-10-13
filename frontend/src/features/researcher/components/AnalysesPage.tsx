@@ -120,6 +120,7 @@ export function AnalysesPage() {
         colonnes={colonnes}
         cle={(a) => a.id}
         rechercheDans={(a) => `${a.title} ${nomProjet(a.project_id) ?? ""}`}
+        dependances={[projets]}
         placeholderRecherche="Titre, projet…"
         filtres={[
           { id: "statut", libelle: "Statut", valeur: (a) => libelleStatutAnalyse(a.status) },

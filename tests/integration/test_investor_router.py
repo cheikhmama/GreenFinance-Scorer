@@ -644,3 +644,37 @@ def test_export_portefeuille_csv(session) -> None:
     assert export.status_code == 200
     assert export.headers["content-type"].startswith("text/csv")
     assert cible.name in export.text
+
+
+def test_mes_portefeuilles_filtre_avec_position_et_pagine(session) -> None:
+    """Filtre et pagination en SQL : seule la page demandée est résumée, totaux inchangés."""
+    cible = _entreprise_publiee(session)
+    investisseur = _create_utilisateur(session, Role.INVESTOR)
+    authed = _login(investisseur.email)
+    avec = _creer_portefeuille(authed)
+    sans = {_creer_portefeuille(authed), _creer_portefeuille(authed)}
+    ajout = authed.post(
+        f"/api/v1/investor/portefeuilles/{avec}/positions",
+        json={
+            "company_id": str(cible.id),
+            "amount": 500.0,
+            "currency": "EUR",
+            "duration_type": "OUVERTE",
+            "start_date": utcnow().isoformat(),
+        },
+    )
+    assert ajout.status_code == 201
+
+    avec_position = authed.get("/api/v1/investor/portefeuilles", params={"avec_position": True}).json()
+    assert [item["id"] for item in avec_position["items"]] == [avec]
+    assert avec_position["items"][0]["position_count"] == 1
+
+    pages = [
+        authed.get(
+            "/api/v1/investor/portefeuilles",
+            params={"avec_position": False, "page": page, "page_size": 1},
+        ).json()
+        for page in (1, 2)
+    ]
+    assert [(p["total"], p["pages"], len(p["items"])) for p in pages] == [(2, 2, 1), (2, 2, 1)]
+    assert {p["items"][0]["id"] for p in pages} == sans

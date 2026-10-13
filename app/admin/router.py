@@ -23,7 +23,7 @@ from app.admin.apercu import (
     construire_apercu_acteurs,
     entreprises_perimetre_esg,
     lister_entreprises_avec_score,
-    score_officiel_entreprise,
+    scores_officiels_entreprises,
 )
 from app.admin.dashboard import construire_tableau_de_bord
 from app.admin.journal import avec_acteurs, lister_journal_audit
@@ -624,6 +624,7 @@ def lister_toutes_les_entreprises_route(
     items, total = lister_toutes_les_entreprises(
         session, recherche=recherche, page=page, page_size=page_size
     )
+    scores = scores_officiels_entreprises(session, [entreprise.id for entreprise, *_ in items])
     return Page[EntrepriseAdmin](
         items=[
             EntrepriseAdmin(
@@ -632,7 +633,7 @@ def lister_toutes_les_entreprises_route(
                 report_count=nombre_rapports,
                 latest_report_status=dernier_statut,
                 latest_report_id=dernier_rapport_id,
-                official_global_score=score_officiel_entreprise(session, entreprise.id),
+                official_global_score=scores.get(entreprise.id),
             )
             for entreprise, nombre_rapports, dernier_statut, dernier_rapport_id in items
         ],

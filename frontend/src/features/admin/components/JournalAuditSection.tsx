@@ -77,13 +77,14 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
     ],
     [],
   );
-  const ouvert = data?.find((e) => e.id === ouvertId) ?? null;
+  const ouvert = data?.lignes.find((e) => e.id === ouvertId) ?? null;
 
   return (
     <>
       <DataTable
         libelle="Journal d’audit"
-        lignes={data}
+        lignes={data?.lignes}
+        tronque={data?.tronque}
         colonnes={colonnes}
         cle={(e) => e.id}
         rechercheDans={(e) =>

@@ -21,10 +21,10 @@ from app.audit.assignment import statistiques_charge_globale
 from app.company.models import Company
 from app.core.enums import AnalysisStatus
 from app.institution.projets import statistiques_admin as statistiques_institutions
-from app.investor.entreprises import dernier_rapport_valide
+from app.investor.entreprises import dernier_rapport_valide, derniers_rapports_valides
 from app.investor.portfolio import statistiques_admin as statistiques_investisseurs
 from app.researcher.analyses import statistiques_admin as statistiques_chercheurs
-from app.scoring.engine import score_officiel
+from app.scoring.engine import score_officiel, scores_officiels
 from app.scoring.models import Score
 
 
@@ -215,9 +215,16 @@ def construire_apercu_acteurs(session: Session) -> ApercuActeurs:
     )
 
 
-def score_officiel_entreprise(session: Session, entreprise_id: uuid.UUID) -> float | None:
-    """Score global officiel du dernier rapport validé d'une entreprise (colonne « Score officiel »
-    de la table Entreprises, tâche 5.17) — None si aucun rapport validé n'a de score."""
-    rapport = dernier_rapport_valide(session, entreprise_id)
-    score = score_officiel(session, rapport.id) if rapport is not None else None
-    return score.global_score if score is not None else None
+def scores_officiels_entreprises(
+    session: Session, entreprise_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, float]:
+    """Score global officiel du dernier rapport validé de chaque entreprise (colonne « Score
+    officiel » de la table Entreprises, tâche 5.17), en deux requêtes pour toute la page plutôt que
+    deux par entreprise. Absente du dict : aucun rapport validé n'a de score."""
+    rapports = derniers_rapports_valides(session, entreprise_ids)
+    scores = scores_officiels(session, [rapport.id for rapport in rapports.values()])
+    return {
+        entreprise_id: scores[rapport.id].global_score
+        for entreprise_id, rapport in rapports.items()
+        if rapport.id in scores
+    }

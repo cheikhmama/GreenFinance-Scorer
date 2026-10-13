@@ -370,6 +370,23 @@ def score_officiel(session: Session, rapport_id: uuid.UUID) -> Score | None:
     ).first()
 
 
+def scores_officiels(session: Session, rapport_ids: list[uuid.UUID]) -> dict[uuid.UUID, Score]:
+    """score_officiel pour plusieurs rapports en une seule requête (même règle : le plus récent
+    sous une configuration de RÉFÉRENCE). Un rapport sans score officiel est absent du dict."""
+    if not rapport_ids:
+        return {}
+    scores = session.exec(
+        select(Score)
+        .join(ScoringConfig, col(ScoringConfig.id) == col(Score.config_id))
+        .where(col(Score.report_id).in_(rapport_ids), col(ScoringConfig.owner_user_id).is_(None))
+        .order_by(col(Score.computed_at).desc())
+    ).all()
+    officiels: dict[uuid.UUID, Score] = {}
+    for score in scores:
+        officiels.setdefault(score.report_id, score)
+    return officiels
+
+
 def score_public(session: Session, rapport_id: uuid.UUID) -> ScoreESGPublic | None:
     """Forme de présentation partagée du score officiel (app/scoring/schemas.py::ScoreESGPublic)
     -- None si le rapport n'a pas encore de score officiel (avant validation), jamais un score

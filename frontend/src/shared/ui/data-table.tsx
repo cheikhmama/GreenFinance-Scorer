@@ -8,7 +8,9 @@ import {
   Rows4,
   Search,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { enregistrerBlob } from "@/shared/api/download";
+import { LIGNES_MAX } from "@/shared/api/toutesLesPages";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/cn";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
@@ -67,6 +69,13 @@ export interface DataTableProps<T> {
   memoire?: string;
   /** Valeurs de filtre présélectionnées (ex. le rôle venu de l'URL), par id de filtre. */
   filtresInitiaux?: Record<string, string[]>;
+  /** Vrai : la source a dépassé LIGNES_MAX, la table n'en a que les premières lignes. */
+  tronque?: boolean;
+  /** Données extérieures aux lignes que lisent `rechercheDans` ou `filtres` (ex. la liste des
+   * projets pour en afficher le nom) : leur changement relance recherche et filtres, qui sinon ne
+   * suivent que les lignes, la saisie et les choix — les fonctions passées en ligne changent à
+   * chaque rendu et ne servent pas de dépendance. */
+  dependances?: readonly unknown[];
 }
 
 const TAILLES = [10, 25, 50, 100];
@@ -99,12 +108,16 @@ function classeAlignement(alignement: Alignement | undefined) {
 }
 
 function telecharger(nom: string, type: string, contenu: string) {
-  const url = URL.createObjectURL(new Blob([contenu], { type }));
-  const lien = document.createElement("a");
-  lien.href = url;
-  lien.download = nom;
-  lien.click();
-  URL.revokeObjectURL(url);
+  enregistrerBlob(new Blob([contenu], { type }), nom);
+}
+
+/** Cellule CSV : une valeur saisie qui commence par = + - @ (ou tabulation, retour chariot)
+ * serait évaluée comme formule par Excel — préfixée d'une apostrophe (recommandation OWASP). Les
+ * nombres restent tels quels : un nombre négatif est une valeur, pas une formule. */
+export function celluleCsv(v: string | number | null): string {
+  const texte = v === null ? "" : String(v);
+  const neutralise = typeof v === "string" && /^[=+\-@\t\r]/.test(texte) ? `'${texte}` : texte;
+  return /[;"\r\n]/.test(neutralise) ? `"${neutralise.replaceAll('"', '""')}"` : neutralise;
 }
 
 function FiltreMultiple<T>({
@@ -112,14 +125,20 @@ function FiltreMultiple<T>({
   lignes,
   choisis,
   surChanger,
+  dependances,
 }: {
   filtre: FiltreTable<T>;
   lignes: T[];
   choisis: string[];
   surChanger: (valeurs: string[]) => void;
+  dependances: readonly unknown[];
 }) {
   const [recherche, setRecherche] = useState("");
+  const filtreCourant = useRef(filtre);
+  filtreCourant.current = filtre;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filtre relu par ref, ses options ne changent qu'avec les lignes ou les dépendances déclarées
   const options = useMemo(() => {
+    const filtre = filtreCourant.current;
     const valeurs = new Set<string>();
     for (const ligne of lignes) {
       const v = filtre.valeur(ligne);
@@ -128,7 +147,7 @@ function FiltreMultiple<T>({
     return [...valeurs]
       .map((v) => ({ valeur: v, libelle: filtre.libelleOption?.(v) ?? v }))
       .sort((a, b) => a.libelle.localeCompare(b.libelle, "fr"));
-  }, [lignes, filtre]);
+  }, [lignes, filtre.id, ...dependances]);
   const visibles = options.filter((o) => plier(o.libelle).includes(plier(recherche)));
   const actif = choisis.length > 0;
 
@@ -212,6 +231,8 @@ export function DataTable<T>({
   barre,
   memoire,
   filtresInitiaux,
+  tronque,
+  dependances = [],
 }: DataTableProps<T>) {
   const [recherche, setRecherche] = useState("");
   const [choix, setChoix] = useState<Record<string, string[]>>(filtresInitiaux ?? {});
@@ -228,8 +249,16 @@ export function DataTable<T>({
   );
   useEffect(() => ecrire(memoire, reglages), [memoire, reglages]);
 
-  const toutes = lignes ?? [];
+  const toutes = useMemo(() => lignes ?? [], [lignes]);
+  // Les appelants passent `filtres` et `rechercheDans` en ligne : relus par ref, pour que filtrer
+  // ne se refasse pas à chaque rendu (ouverture du tiroir, mutation en cours) sur des milliers de
+  // lignes. L'ensemble des filtres (ex. un filtre ajouté selon le périmètre) reste une dépendance.
+  const fonctions = useRef({ filtres, rechercheDans });
+  fonctions.current = { filtres, rechercheDans };
+  const signatureFiltres = filtres.map((f) => f.id).join("|");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fonctions relues par ref, voir plus haut
   const filtrees = useMemo(() => {
+    const { filtres, rechercheDans } = fonctions.current;
     const q = plier(recherche.trim());
     return toutes.filter(
       (ligne) =>
@@ -239,7 +268,7 @@ export function DataTable<T>({
           return valeurs.length === 0 || valeurs.includes(f.valeur(ligne) ?? "");
         }),
     );
-  }, [toutes, recherche, choix, filtres, rechercheDans]);
+  }, [toutes, recherche, choix, signatureFiltres, ...dependances]);
 
   const triees = useMemo(() => {
     const colonne = tri ? colonnes.find((c) => c.id === tri.colonne) : undefined;
@@ -290,13 +319,9 @@ export function DataTable<T>({
       return;
     }
     // « ; » et BOM UTF-8 : le fichier s'ouvre directement dans Excel en français, accents compris.
-    const cellule = (v: string | number | null) => {
-      const texte = v === null ? "" : String(v);
-      return /[;"\n]/.test(texte) ? `"${texte.replaceAll('"', '""')}"` : texte;
-    };
     const csv = [
-      colonnes.map((c) => cellule(c.entete)).join(";"),
-      ...triees.map((ligne) => colonnes.map((c) => cellule(valeur(c, ligne))).join(";")),
+      colonnes.map((c) => celluleCsv(c.entete)).join(";"),
+      ...triees.map((ligne) => colonnes.map((c) => celluleCsv(valeur(c, ligne))).join(";")),
     ].join("\r\n");
     telecharger(`${nom}.csv`, "text/csv;charset=utf-8", `﻿${csv}`);
   }
@@ -324,6 +349,7 @@ export function DataTable<T>({
             filtre={f}
             lignes={toutes}
             choisis={choix[f.id] ?? []}
+            dependances={dependances}
             surChanger={(valeurs) => {
               setChoix((c) => ({ ...c, [f.id]: valeurs }));
               setPage(1);
@@ -568,6 +594,11 @@ export function DataTable<T>({
           <span aria-live="polite" className="font-mono text-foreground">
             {chargement ? "Chargement…" : compteur}
           </span>
+          {!chargement && tronque ? (
+            <span className="text-warning">
+              Liste limitée aux {LIGNES_MAX.toLocaleString("fr-FR")} premières lignes.
+            </span>
+          ) : null}
           <label className="ml-auto inline-flex items-center gap-2">
             Par page
             <select

@@ -95,7 +95,12 @@ import type {
   UtilisateurCree,
   UtilisateurPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { chargerToutesLesPages, TAILLE_PAGE_TABLE } from "@/shared/api/toutesLesPages";
+import {
+  chargerToutesLesPages,
+  chargerToutesLesPagesAvecEtat,
+  TAILLE_PAGE_TABLE,
+  type ToutesLesPages,
+} from "@/shared/api/toutesLesPages";
 
 // Chargement initial de 10 éléments, puis +10 par clic sur "Voir plus", jusqu'à épuisement réel
 // de la liste côté serveur (voir UsersSection / PublishableCompaniesSection). 3 obligeait à
@@ -271,6 +276,10 @@ export function useValidateReport(rapportId: string) {
     onSuccess: () => {
       invalidateFileDattente(queryClient, rapportId);
       queryClient.invalidateQueries({ queryKey: PUBLIABLES_KEY });
+      // Statut, score officiel et « à republier » de la table Entreprises changent avec la validation.
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+      queryClient.invalidateQueries({ queryKey: A_REPUBLIER_KEY });
+      queryClient.invalidateQueries({ queryKey: ENTREPRISES_SCORES_KEY });
     },
   });
 }
@@ -279,7 +288,10 @@ export function useRejectReport(rapportId: string) {
   const queryClient = useQueryClient();
   return useMutation<RapportESGPublic, ApiError, DecisionAdminRequest>({
     mutationFn: (payload) => rejectReport(rapportId, payload),
-    onSuccess: () => invalidateFileDattente(queryClient, rapportId),
+    onSuccess: () => {
+      invalidateFileDattente(queryClient, rapportId);
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
   });
 }
 
@@ -287,7 +299,10 @@ export function useRequestReportCorrection(rapportId: string) {
   const queryClient = useQueryClient();
   return useMutation<RapportESGPublic, ApiError, DecisionAdminRequest>({
     mutationFn: (payload) => requestReportCorrection(rapportId, payload),
-    onSuccess: () => invalidateFileDattente(queryClient, rapportId),
+    onSuccess: () => {
+      invalidateFileDattente(queryClient, rapportId);
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
   });
 }
 
@@ -607,6 +622,7 @@ export function useDecideAccessRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: DEMANDES_ACCES_KEY });
       queryClient.invalidateQueries({ queryKey: UTILISATEURS_EN_ATTENTE_KEY });
+      queryClient.invalidateQueries({ queryKey: UTILISATEURS_TABLE_KEY });
     },
   });
 }
@@ -713,10 +729,11 @@ export function useTableAnalyses() {
 
 /** Journal complet (ou celui d'un compte / d'une entreprise : `concerneId`), plus récent d'abord. */
 export function useTableJournal(concerneId?: string) {
-  return useQuery<JournalAuditPublic[], ApiError>({
+  // Le journal ne fait que grandir : seul à signaler qu'il dépasse le plafond de chargement.
+  return useQuery<ToutesLesPages<JournalAuditPublic>, ApiError>({
     queryKey: [...JOURNAL_AUDIT_KEY, "table", concerneId ?? "tout"],
     queryFn: () =>
-      chargerToutesLesPages((page) =>
+      chargerToutesLesPagesAvecEtat((page) =>
         listAuditLog({ concerne_id: concerneId, page, page_size: TAILLE_PAGE_TABLE }),
       ),
   });
