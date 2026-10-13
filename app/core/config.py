@@ -21,10 +21,10 @@ class Settings(BaseSettings):
     # domaine réel en production) — liste séparée par des virgules, jamais "*"
     # car les routes auth posent un cookie (allow_credentials nécessite une
     # liste explicite, voir app/api/router.py).
-    cors_allowed_origins: str = "http://localhost:5173"
+    cors_allowed_origins: str = "http://localhost:5174"
     # Origine servant à construire le lien de réinitialisation de mot de passe
     # (app/auth/password_reset.py) — le frontend Vite en dev, le domaine réel en production.
-    frontend_base_url: str = "http://localhost:5173"
+    frontend_base_url: str = "http://localhost:5174"
     # Le serveur peut démarrer sans SMTP ; les formulaires publics signalent alors
     # l'indisponibilité de l'envoi, sans exposer les comptes ni les jetons.
     smtp_host: str = ""
