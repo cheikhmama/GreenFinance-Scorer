@@ -38,7 +38,14 @@ from app.ingestion.lots import Lot
 logger = structlog.get_logger(__name__)
 
 
-def options_pipeline(*, ocr: bool = True, threads: int = 4) -> PdfPipelineOptions:
+# Délai de conversion d'un lot : une page pathologique ne doit pas bloquer le job jusqu'à son délai
+# global (EXTRACTION_TIMEOUT_MINUTES) ; le lot reste alors partiel (ConversionPartielle).
+DELAI_LOT_S = 900.0
+
+
+def options_pipeline(
+    *, ocr: bool = True, threads: int = 4, delai_s: float | None = DELAI_LOT_S
+) -> PdfPipelineOptions:
     """OCR RapidOCR sur le moteur ONNX Runtime (mêmes modèles PP-OCR qu'avec Paddle) :
     paddlepaddle n'a pas de roue Linux aarch64, ce qui empêchait de construire l'image worker sur
     l'hôte ARM visé (Oracle Always Free), alors qu'onnxruntime en a une. CPU explicite et threads
@@ -51,6 +58,7 @@ def options_pipeline(*, ocr: bool = True, threads: int = 4) -> PdfPipelineOption
         accelerator_options=AcceleratorOptions(device=AcceleratorDevice.CPU, num_threads=threads),
         table_structure_options=TableStructureOptions(mode=TableFormerMode.ACCURATE),
         generate_page_images=False,
+        document_timeout=delai_s,
     )
 
 
@@ -68,9 +76,17 @@ def _get_converter(ocr: bool = True, threads: int = 4) -> DocumentConverter:
 def persist_docling_json(document: DoclingDocument, out_path: Path) -> None:
     """Sauvegarde le DoclingDocument structuré en JSON. PLACEHOLDER (pas EMBEDDED, le défaut) : seuls
     le texte et les tableaux servent à la recherche sémantique et à l'extraction, jamais les images —
-    les embarquer en base64 gonflerait le JSON pour rien (verbatim Prompt 4.2)."""
+    les embarquer en base64 gonflerait le JSON pour rien (verbatim Prompt 4.2).
+
+    Écriture atomique (fichier temporaire puis renommage) : un conteneur tué pendant la
+    sérialisation — un pic mémoire — ne laisse jamais un JSON coupé que la reprise rechargerait."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    document.save_as_json(out_path, image_mode=ImageRefMode.PLACEHOLDER)
+    temporaire = out_path.with_name(out_path.name + ".tmp")
+    try:
+        document.save_as_json(temporaire, image_mode=ImageRefMode.PLACEHOLDER)
+        os.replace(temporaire, out_path)
+    finally:
+        temporaire.unlink(missing_ok=True)
 
 
 # --- conversion par lots (rapports longs, mémoire bornée) -----------------------------------------
@@ -88,14 +104,30 @@ def chemin_lot(dossier: Path, lot: Lot) -> Path:
     return dossier / f"p{lot.debut:04d}-{lot.fin:04d}.json"
 
 
+class ConversionPartielle(Exception):
+    """Lot converti avec des erreurs ou interrompu par son délai : son document sert à l'exécution en
+    cours, mais n'est jamais sauvegardé — une reprise retentera la conversion."""
+
+    def __init__(self, document: DoclingDocument) -> None:
+        super().__init__("conversion partielle")
+        self.document = document
+
+
 def _convertir_lot(chemin_pdf: Path, lot: Lot, threads: int) -> DoclingDocument:
+    from docling.datamodel.base_models import ConversionStatus
+
     resultat = _get_converter(lot.ocr, threads).convert(
-        str(chemin_pdf), page_range=(lot.debut, lot.fin)
+        str(chemin_pdf), page_range=(lot.debut, lot.fin), raises_on_error=False
     )
-    if resultat.errors:
+    if resultat.status != ConversionStatus.SUCCESS:
         logger.warning(
-            "docling_lot_erreurs", debut=lot.debut, fin=lot.fin, erreurs=[str(e) for e in resultat.errors]
+            "docling_lot_partiel",
+            debut=lot.debut,
+            fin=lot.fin,
+            statut=str(resultat.status),
+            erreurs=[str(e) for e in resultat.errors],
         )
+        raise ConversionPartielle(resultat.document)
     return resultat.document
 
 
@@ -114,13 +146,30 @@ def convertir_par_lots(
     for lot in lots:
         chemin = chemin_lot(dossier, lot)
         t0 = time.time()
-        if chemin.exists():
-            document, repris = DoclingDocument.load_from_json(chemin), True
-        else:
-            document = (convertir or (lambda p, lt: _convertir_lot(p, lt, threads)))(chemin_pdf, lot)
-            persist_docling_json(document, chemin)
-            repris = False
+        document = _recharger(chemin)
+        repris = document is not None
+        if document is None:
+            try:
+                document = (convertir or (lambda p, lt: _convertir_lot(p, lt, threads)))(chemin_pdf, lot)
+            except ConversionPartielle as partielle:
+                document = partielle.document
+            else:
+                persist_docling_json(document, chemin)
         yield LotConverti(lot, document, repris, round(time.time() - t0, 1))
+
+
+def _recharger(chemin: Path) -> DoclingDocument | None:
+    """Lot sauvegardé par une exécution précédente, ou None. Un fichier illisible (écrit par une
+    version antérieure à l'écriture atomique, disque plein) est supprimé et le lot reconverti :
+    jamais un échec répété à chaque reprise."""
+    if not chemin.exists():
+        return None
+    try:
+        return DoclingDocument.load_from_json(chemin)
+    except Exception as exc:  # noqa: BLE001 — journalisé, le lot est reconverti
+        logger.warning("lot_json_corrompu", chemin=str(chemin), error_type=type(exc).__name__)
+        chemin.unlink(missing_ok=True)
+        return None
 
 
 class DocumentParLots:
@@ -160,12 +209,15 @@ def convertir_rapport(
     convertir: Callable[[Path, Lot], DoclingDocument] | None = None,
 ) -> RapportConverti:
     """Conversion complète d'un rapport, lot par lot : chaque lot est indexé dès qu'il est converti
-    puis relâché (voir convertir_par_lots). Lève lots.DocumentTropLong avant toute conversion
-    au-delà de `pages_max`."""
+    puis relâché (voir convertir_par_lots). Les lots sont rangés sous `dossier`, dans un
+    sous-dossier propre au contenu du PDF (dossier_lots). Lève lots.DocumentTropLong avant toute
+    conversion au-delà de `pages_max`."""
     from app.ingestion.lots import planifier_lots
 
     t0 = time.time()
     lots = planifier_lots(chemin_pdf, taille=taille, pages_max=pages_max)
+    # Sous-dossier propre à ce contenu de PDF et à cette conversion (voir dossier_lots).
+    dossier = dossier_lots(dossier, chemin_pdf)
     for lot_converti in convertir_par_lots(chemin_pdf, dossier, lots, threads=threads, convertir=convertir):
         logger.info(
             "docling_lot_converti",
@@ -182,3 +234,27 @@ def convertir_rapport(
         elapsed_s=round(time.time() - t0, 1),
         document_de_la_page=DocumentParLots(dossier, lots).document_de_la_page,
     )
+
+
+def _signature_conversion() -> str:
+    """Version de Docling et options de conversion : des lots produits par une autre version ou
+    d'autres réglages ne sont jamais repris."""
+    import hashlib
+    import importlib.metadata
+
+    options = [options_pipeline(ocr=ocr, threads=1).model_dump_json() for ocr in (False, True)]
+    contenu = importlib.metadata.version("docling") + "".join(options)
+    return hashlib.sha256(contenu.encode()).hexdigest()[:12]
+
+
+def dossier_lots(base: Path, chemin_pdf: Path) -> Path:
+    """Dossier des lots JSON d'un PDF, sous `base` : nommé par l'empreinte du contenu du PDF et la
+    signature de conversion. Un brouillon dont le PDF est remplacé garde son identifiant de rapport,
+    mais ses lots changent de dossier — ceux de l'ancien PDF ne sont jamais repris."""
+    import hashlib
+
+    sha = hashlib.sha256()
+    with chemin_pdf.open("rb") as fichier:
+        for bloc in iter(lambda: fichier.read(1 << 20), b""):
+            sha.update(bloc)
+    return base / f"{sha.hexdigest()[:16]}-{_signature_conversion()}"

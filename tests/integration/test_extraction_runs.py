@@ -271,3 +271,35 @@ def test_document_trop_long_echoue_aussitot_avec_sa_cause(session, monkeypatch) 
     assert (execution.status, execution.error) == (ExtractionRunStatus.FAILED, "document_trop_long")
     session.refresh(rapport)
     assert rapport.extraction_error == "document_trop_long"
+
+
+def test_contexte_trop_grand_pour_le_fournisseur_echoue_avec_sa_cause(session, monkeypatch) -> None:
+    """413 du fournisseur (limite de tokens) : sans reprise, cause qui dit quoi régler."""
+    from app.ingestion.llm.base import ContexteLLMTropGrand
+
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2024)
+    _simuler_pipeline_extraction(monkeypatch, _extraction_atlas())
+
+    def _trop_grand(**_k):
+        raise ContexteLLMTropGrand("413")
+
+    monkeypatch.setattr("app.ingestion.extractor._call_llm_extraction", _trop_grand)
+    monkeypatch.setattr("app.ingestion.extractor.get_settings", lambda: _reglages_reels(llm_demo=False))
+
+    extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=False)
+
+    [execution] = _executions(session, rapport.id)
+    assert (execution.status, execution.error) == (ExtractionRunStatus.FAILED, "contexte_llm_trop_grand")
+
+
+def _reglages_reels(**valeurs):
+    """Réglages de l'application avec quelques valeurs remplacées (ex. forcer un vrai appel LLM
+    alors que la clé de test est factice)."""
+    reglages = get_settings()
+
+    class _Reglages:
+        def __getattr__(self, nom):
+            return valeurs[nom] if nom in valeurs else getattr(reglages, nom)
+
+    return _Reglages()

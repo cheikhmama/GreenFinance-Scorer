@@ -43,6 +43,13 @@ services:
     restart: unless-stopped
     mem_limit: 768m
     cpus: 0.5
+    # arq écrit une clé de santé dans Redis tant que le worker tourne (health_check_interval).
+    healthcheck:
+      test: ["CMD", "arq", "--check", "app.worker.settings.WorkerSettings"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 1m
 
   worker-extraction:
     environment:
@@ -58,6 +65,22 @@ services:
     mem_limit: 12g
     memswap_limit: 14g
     cpus: 3
+    healthcheck:
+      test: ["CMD", "arq", "--check", "app.worker.settings.ExtractionWorkerSettings"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+
+  # Outil MCP lancé sur la VM (profil « mcp ») : mêmes réglages de production que les autres
+  # services — sans eux, la validation des réglages refuserait l'URL de base d'exemple de .env.
+  mcp:
+    environment:
+      <<: *environnement-prod
+      EXTRACTION_THREADS: "3"
+      OMP_NUM_THREADS: "3"
+      MKL_NUM_THREADS: "3"
+      TOKENIZERS_PARALLELISM: "false"
 
   caddy:
     build:

@@ -43,7 +43,11 @@ RUN apt-get update -qq \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/opt/venv/bin:$PATH" \
     HF_HOME=/opt/modeles/hf
-COPY app ./app
+# Seul le script de téléchargement : une modification ailleurs dans app/ ne doit pas invalider cette
+# couche, sans quoi chaque construction retéléchargerait plusieurs Go de modèles.
+COPY app/__init__.py ./app/__init__.py
+COPY app/ingestion/__init__.py ./app/ingestion/__init__.py
+COPY app/ingestion/modeles.py ./app/ingestion/modeles.py
 RUN python -m app.ingestion.modeles /opt/modeles
 
 # --- base d'exécution commune --------------------------------------------------------------------

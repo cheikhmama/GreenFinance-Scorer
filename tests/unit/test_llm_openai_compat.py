@@ -176,3 +176,67 @@ def test_cle_invalide_n_est_ni_transitoire_ni_quota() -> None:
 
     with pytest.raises(openai.AuthenticationError):
         fournisseur.extraire("PROMPT", "m")
+
+
+def test_appel_d_outil_mal_forme_par_le_modele_relance_avec_correction() -> None:
+    """Groq : 400 tool_use_failed quand Llama produit un appel d'outil invalide."""
+    requetes: list[dict[str, Any]] = []
+    echec = httpx.Response(
+        400,
+        json={
+            "error": {
+                "message": "Failed to call a function. Please adjust your prompt.",
+                "type": "invalid_request_error",
+                "code": "tool_use_failed",
+                "failed_generation": '<function=extraction_indicateurs>{"entreprise": "Atlas"',
+            }
+        },
+    )
+    fournisseur = _fournisseur([echec, _reponse_outil(EXTRACTION)], requetes)
+
+    assert fournisseur.extraire("PROMPT", "m").entreprise == "Atlas"
+    assert len(requetes) == 2
+
+
+def test_requete_trop_grande_echoue_clairement_sans_reessai() -> None:
+    from app.ingestion.llm.base import ContexteLLMTropGrand
+
+    requetes: list[dict[str, Any]] = []
+    fournisseur = _fournisseur(
+        [_erreur(413, "Request too large for model in organization on tokens per minute (TPM): Limit 12000")],
+        requetes,
+    )
+
+    with pytest.raises(ContexteLLMTropGrand):
+        fournisseur.extraire("PROMPT", "m")
+    assert len(requetes) == 1
+
+
+def test_fournisseur_sans_outils_bascule_en_mode_json() -> None:
+    """OpenRouter : certains modèles gratuits n'ont aucun point d'accès acceptant les outils."""
+    requetes: list[dict[str, Any]] = []
+    fournisseur = _fournisseur(
+        [
+            _erreur(404, "No endpoints found that support tool use."),
+            _reponse_texte(json.dumps(EXTRACTION)),
+            _reponse_texte(json.dumps(EXTRACTION)),
+        ],
+        requetes,
+    )
+
+    assert fournisseur.extraire("PROMPT", "m").indicateurs[0].valeur == 1200.5
+    json_mode = requetes[1]
+    assert "tools" not in json_mode and json_mode["response_format"] == {"type": "json_object"}
+    assert "indicateurs" in json_mode["messages"][0]["content"]  # schéma rappelé au modèle
+    # Le mode JSON est retenu pour les appels suivants : pas d'aller-retour en erreur à chaque fois.
+    fournisseur.extraire("PROMPT 2", "m")
+    assert len(requetes) == 3 and "tools" not in requetes[2]
+
+
+def test_schema_d_outil_sans_references() -> None:
+    """Les modèles ouverts suivent mal $ref/$defs : le schéma envoyé est déplié."""
+    from app.ingestion.llm.openai_compat import OUTIL
+
+    texte = json.dumps(OUTIL["function"]["parameters"])
+    assert "$ref" not in texte and "$defs" not in texte
+    assert "page_source" in texte

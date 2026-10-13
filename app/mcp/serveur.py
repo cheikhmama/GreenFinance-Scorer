@@ -62,7 +62,18 @@ def _resoudre(racine: Path, file_path: str) -> Path:
     return chemin
 
 
-def creer_serveur(racine: Path, *, extraire: Extraire = _extraire_par_defaut) -> MCPServer:
+def _demo_par_defaut() -> bool:
+    from app.core.config import get_settings
+
+    return get_settings().llm_demo
+
+
+def creer_serveur(
+    racine: Path,
+    *,
+    extraire: Extraire = _extraire_par_defaut,
+    est_demo: Callable[[], bool] = _demo_par_defaut,
+) -> MCPServer:
     serveur = MCPServer(
         name="greenfinance-esg",
         instructions=(
@@ -72,6 +83,10 @@ def creer_serveur(racine: Path, *, extraire: Extraire = _extraire_par_defaut) ->
         ),
     )
 
+    # Une extraction à la fois : deux pipelines Docling + bge-m3 simultanés dépasseraient la mémoire
+    # du conteneur, et le thread d'une extraction ne s'annule pas si le client cesse d'attendre.
+    en_cours = anyio.Lock()
+
     @serveur.tool()
     async def extract_esg_report(
         file_path: str, company_name: str | None = None, fiscal_year: int | None = None
@@ -79,10 +94,23 @@ def creer_serveur(racine: Path, *, extraire: Extraire = _extraire_par_defaut) ->
         """Extrait les indicateurs ESG d'un rapport PDF du dossier autorisé (chemin relatif à ce
         dossier, ou absolu à l'intérieur). Long : plusieurs minutes pour un rapport de 200 pages
         (conversion par lots, OCR des pages scannées, appel LLM)."""
+        if est_demo():
+            # Sans vraie clé, le pipeline produit des valeurs synthétiques (démonstration du
+            # site web) : un agent les prendrait pour une vraie extraction.
+            raise ToolError(
+                "Aucune clé LLM configurée (LLM_API_KEY, ou GEMINI_API_KEY avec LLM_PROVIDER=gemini) :"
+                " extraction refusée plutôt que de renvoyer des valeurs de démonstration."
+            )
         chemin = _resoudre(racine, file_path)
-        return await anyio.to_thread.run_sync(
-            lambda: extraire(chemin, nom_entreprise=company_name, annee=fiscal_year)
-        )
+        if en_cours.locked():
+            raise ToolError(
+                "Une extraction est déjà en cours sur ce serveur : attendre sa fin avant d'en lancer"
+                " une autre."
+            )
+        async with en_cours:
+            return await anyio.to_thread.run_sync(
+                lambda: extraire(chemin, nom_entreprise=company_name, annee=fiscal_year)
+            )
 
     @serveur.tool()
     def list_esg_indicators() -> list[IndicateurCatalogue]:

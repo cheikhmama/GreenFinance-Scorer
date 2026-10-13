@@ -17,3 +17,8 @@ class QuotaLLMEpuise(Exception):
 
 class ReponseLLMInvalide(ValueError):
     """Le modèle n'a pas appelé l'outil, ou ses arguments ne respectent pas le schéma."""
+
+
+class ContexteLLMTropGrand(Exception):
+    """Requête refusée car au-delà de la limite de tokens du fournisseur (413) : réessayer à
+    l'identique échouerait pareil — réduire LLM_CONTEXT_TOKENS."""

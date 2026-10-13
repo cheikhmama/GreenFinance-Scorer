@@ -37,10 +37,9 @@ def test_extraire_document_renvoie_le_json_du_rapport(tmp_path: Path, monkeypatc
 
     sortie = coeur.extraire_document(pdf, nom_entreprise=None, annee=2025, dossier_travail=tmp_path / "travail")
 
-    # Nom d'entreprise par défaut : celui du fichier ; lots de travail rangés par empreinte du PDF
-    # (une seconde extraction du même fichier reprend les lots déjà convertis).
+    # Nom d'entreprise par défaut : celui du fichier.
     empreinte = hashlib.sha256(pdf.read_bytes()).hexdigest()
-    assert recus == {"source": pdf, "dossier": tmp_path / "travail" / empreinte, "nom": "helios-2025"}
+    assert recus == {"source": pdf, "dossier": tmp_path / "travail", "nom": "helios-2025"}
     assert (sortie.document.nom, sortie.document.pages, sortie.document.sha256) == ("helios-2025.pdf", 250, empreinte)
     assert sortie.execution.modele == "llama-3.3-70b-versatile"
     assert sortie.execution.pages_ocr == 20

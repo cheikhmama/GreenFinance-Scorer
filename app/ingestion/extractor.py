@@ -56,7 +56,11 @@ from app.ingestion.etat_extraction import (
     marquer_echec,
     notifier_pret_a_affecter,
 )
-from app.ingestion.llm.base import ErreurLLMTransitoire, QuotaLLMEpuise
+from app.ingestion.llm.base import (
+    ContexteLLMTropGrand,
+    ErreurLLMTransitoire,
+    QuotaLLMEpuise,
+)
 from app.ingestion.llm.openai_compat import FournisseurOpenAICompat
 from app.ingestion.lots import DocumentTropLong
 from app.ingestion.memoire import pic_memoire_mo
@@ -1286,6 +1290,9 @@ def run_extraction_pipeline(
             if quota_journalier_epuise(exc):
                 # Cause dédiée : « réseau ou fournisseur indisponible » égarait (tâche 5.11).
                 etape = "quota_llm_epuise"
+            elif isinstance(exc, ContexteLLMTropGrand):
+                # Réglage à corriger (LLM_CONTEXT_TOKENS), pas une panne du fournisseur.
+                etape = "contexte_llm_trop_grand"
             marquer_echec(session, rapport, etape)
             session.commit()
             logger.error(

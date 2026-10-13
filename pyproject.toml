@@ -108,3 +108,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+# Tests « slow » : Docling, OCR et modèles réels (plusieurs minutes, modèles téléchargés au premier
+# lancement). Exclus par défaut ; à lancer avant un déploiement : uv run pytest -m slow
+markers = ["slow: conversion Docling réelle (modèles réels, plusieurs minutes)"]
+addopts = "-m 'not slow'"

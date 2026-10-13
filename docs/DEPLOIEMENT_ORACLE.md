@@ -130,11 +130,18 @@ de données :
 
 ```bash
 mkdir -p rapports && cp mon-rapport.pdf rapports/
-docker compose --profile mcp build mcp
-docker compose --profile mcp run --rm -i --no-deps -v "$PWD/rapports:/data:ro" mcp
+PROD="-f docker-compose.yml -f docker-compose.prod.yml"
+docker compose $PROD --profile mcp build mcp
+docker compose $PROD --profile mcp run --rm -i --no-deps -v "$PWD/rapports:/data:ro" mcp
 ```
 
-Pour Claude Code, copier `.mcp.json.example` en `.mcp.json`. Deux outils :
+Sur la VM, garder les deux fichiers compose : le service reçoit alors les réglages de production
+(sinon l'URL de base d'exemple de `.env` est refusée au premier appel). Il exige une vraie clé LLM :
+sans elle, l'outil refuse plutôt que de renvoyer des valeurs de démonstration. Une seule extraction
+à la fois ; un second appel pendant une extraction est refusé.
+
+En local (développement), `.mcp.json.example` lance le même service avec le seul
+`docker-compose.yml` ; le copier en `.mcp.json` pour Claude Code. Deux outils :
 
 - `extract_esg_report(file_path, company_name?, fiscal_year?)` : chemin relatif au dossier monté.
   Renvoie le JSON `RapportExtraitJSON` (`app/ingestion/sortie.py`) :

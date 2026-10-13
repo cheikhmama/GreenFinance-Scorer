@@ -40,13 +40,14 @@ def extraire_document(
     annee: int | None,
     dossier_travail: Path = DOSSIER_TRAVAIL,
 ) -> RapportExtraitJSON:
-    """Les lots Docling sont rangés par empreinte du PDF : une extraction interrompue, ou relancée
-    sur le même fichier, reprend les lots déjà convertis au lieu de tout reconvertir."""
+    """Les lots Docling sont rangés sous `dossier_travail` par empreinte du PDF
+    (docling_pipeline.dossier_lots) : une extraction interrompue, ou relancée sur le même fichier,
+    reprend les lots déjà convertis au lieu de tout reconvertir."""
     empreinte = _empreinte(chemin_pdf)
     nom = nom_entreprise or chemin_pdf.stem
     identifiant = uuid.uuid4()  # journalisation uniquement : aucun rapport en base
     analyse = extractor.analyser_document(
-        chemin_pdf, dossier_travail / empreinte, nom_entreprise=nom, rapport_id=identifiant
+        chemin_pdf, dossier_travail, nom_entreprise=nom, rapport_id=identifiant
     )
     return construire_sortie(
         analyse.extraction,

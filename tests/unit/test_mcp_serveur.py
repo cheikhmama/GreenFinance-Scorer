@@ -67,7 +67,7 @@ def test_extrait_un_pdf_de_la_racine(racine: Path) -> None:
         return _sortie(chemin.name)
 
     resultat = _appeler(
-        creer_serveur(racine, extraire=extraire),
+        creer_serveur(racine, est_demo=lambda: False, extraire=extraire),
         "extract_esg_report",
         {"file_path": "helios.pdf", "company_name": "Helios", "fiscal_year": 2025},
     )
@@ -92,7 +92,7 @@ def test_chemins_refuses_sans_extraction(racine: Path, chemin: str, attendu: str
     def extraire(*_a, **_k):
         raise AssertionError("aucune extraction ne doit être lancée")
 
-    resultat = _appeler(creer_serveur(racine, extraire=extraire), "extract_esg_report", {"file_path": chemin})
+    resultat = _appeler(creer_serveur(racine, est_demo=lambda: False, extraire=extraire), "extract_esg_report", {"file_path": chemin})
 
     assert resultat.is_error
     assert attendu in resultat.content[0].text
@@ -102,7 +102,7 @@ def test_chemin_absolu_dans_la_racine_accepte(racine: Path) -> None:
     pdf = _pdf(racine / "absolu.pdf")
 
     resultat = _appeler(
-        creer_serveur(racine, extraire=lambda c, **_k: _sortie(c.name)),
+        creer_serveur(racine, est_demo=lambda: False, extraire=lambda c, **_k: _sortie(c.name)),
         "extract_esg_report",
         {"file_path": str(pdf)},
     )
@@ -117,3 +117,52 @@ def test_catalogue_des_indicateurs_avec_referentiels(racine: Path) -> None:
     assert len(indicateurs) == len(INDICATEURS_CIBLES)
     scope_1 = next(i for i in indicateurs if i["code"] == "scope_1")
     assert scope_1["famille"] == "CARBONE" and scope_1["referentiels"]["gri"] == "GRI 305-1"
+
+
+def test_une_seule_extraction_a_la_fois(racine: Path) -> None:
+    """Deux extractions simultanées dépasseraient la mémoire du conteneur : la seconde est refusée
+    clairement (typiquement la relance d'un client qui a cessé d'attendre)."""
+    import threading
+
+    _pdf(racine / "a.pdf")
+    _pdf(racine / "b.pdf")
+    demarree, liberer = threading.Event(), threading.Event()
+
+    def extraire(chemin, **_k):
+        demarree.set()
+        liberer.wait(10)
+        return _sortie(chemin.name)
+
+    serveur = creer_serveur(racine, extraire=extraire, est_demo=lambda: False)
+    resultats: dict[str, Any] = {}
+
+    async def principal():
+        async with Client(serveur) as client:
+            async def appeler(nom: str) -> None:
+                resultats[nom] = await client.call_tool("extract_esg_report", {"file_path": f"{nom}.pdf"})
+
+            async with anyio.create_task_group() as groupe:
+                groupe.start_soon(appeler, "a")
+                await anyio.to_thread.run_sync(demarree.wait, 10)
+                await appeler("b")
+                liberer.set()
+
+    anyio.run(principal)
+
+    assert not resultats["a"].is_error
+    assert resultats["b"].is_error and "déjà en cours" in resultats["b"].content[0].text
+
+
+def test_refuse_de_rendre_des_valeurs_de_demonstration(racine: Path) -> None:
+    """Sans vraie clé LLM, le pipeline produit des valeurs synthétiques : un agent les prendrait
+    pour une vraie extraction."""
+    _pdf(racine / "a.pdf")
+
+    def extraire(*_a, **_k):
+        raise AssertionError("aucune extraction en mode démonstration")
+
+    resultat = _appeler(
+        creer_serveur(racine, extraire=extraire, est_demo=lambda: True), "extract_esg_report", {"file_path": "a.pdf"}
+    )
+
+    assert resultat.is_error and "LLM_API_KEY" in resultat.content[0].text
