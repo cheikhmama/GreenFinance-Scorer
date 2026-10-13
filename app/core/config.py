@@ -6,7 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Marqueurs des valeurs d'exemple de .env.example — jamais acceptables une fois
 # ENVIRONMENT=production (voir Settings._rejeter_placeholders_en_production).
-_MARQUEURS_PLACEHOLDER = ("changeme", "gemini-api-key-example-replace-me")
+_MARQUEURS_PLACEHOLDER = (
+    "changeme",
+    "gemini-api-key-example-replace-me",
+    "llm-api-key-example-replace-me",
+)
 
 
 class Settings(BaseSettings):
@@ -50,6 +54,29 @@ class Settings(BaseSettings):
     # erreur ni un blocage de la décision.
     gleif_api_url: str = "https://api.gleif.org/api/v1"
     gleif_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    # Fournisseur du LLM d'extraction (app/ingestion/llm/). « openai_compat » : tout serveur
+    # /chat/completions — paliers gratuits de modèles ouverts (Groq, OpenRouter : Llama 3.3 70B,
+    # DeepSeek-V3) ou serveur local (vLLM, Ollama). « gemini » : chemin historique, GEMINI_API_KEY.
+    llm_provider: Literal["gemini", "openai_compat"] = "gemini"
+    llm_base_url: str = "https://api.groq.com/openai/v1"
+    llm_api_key: str = ""
+    llm_model: str = "llama-3.3-70b-versatile"
+    # Rejoué quand le quota JOURNALIER du modèle principal est épuisé ; vide : pas de secours.
+    llm_model_secours: str = ""
+    # Budget de contexte par appel (tokens estimés). En dessous de 24 000 (défaut historique), le
+    # pipeline fait un appel par famille d'indicateurs, chacun plafonné strictement — à régler
+    # sous la limite de tokens par minute du palier (ex. 6 000 pour 12 000 TPM, prompt et réponse
+    # compris). Voir app/ingestion/extractor.py::groupes_d_appel.
+    llm_context_tokens: int = Field(default=24_000, ge=2_000)
+    gemini_api_key: str = ""
+
+    @property
+    def llm_demo(self) -> bool:
+        """Extraction synthétique de démonstration tant qu'aucune vraie clé n'est configurée pour
+        le fournisseur choisi — jamais en production (_rejeter_placeholders_en_production)."""
+        if self.llm_provider == "gemini":
+            return self.gemini_api_key_is_placeholder
+        return not self.llm_api_key or "llm-api-key-example-replace-me" in self.llm_api_key
 
     @property
     def gemini_api_key_is_placeholder(self) -> bool:
@@ -78,7 +105,6 @@ class Settings(BaseSettings):
     # Pas de valeur par défaut : une variable manquante doit lever une erreur explicite.
     secret_key: str
     mfa_issuer_name: str
-    gemini_api_key: str
     storage_backend: str
     storage_path: str
     default_scoring_config: str
@@ -91,6 +117,8 @@ class Settings(BaseSettings):
         """Un déploiement production avec une valeur encore recopiée de
         .env.example (ex. SECRET_KEY=changeme-...) n'est pas une erreur de
         config à découvrir en incident — elle doit bloquer le démarrage."""
+        if self.llm_provider == "gemini" and not self.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY est requis quand LLM_PROVIDER=gemini.")
         if self.environment != "production":
             return self
 
@@ -100,8 +128,11 @@ class Settings(BaseSettings):
         valeurs_sensibles = {
             "SECRET_KEY": self.secret_key,
             "DATABASE_URL": self.database_url,
-            "GEMINI_API_KEY": self.gemini_api_key,
         }
+        if self.llm_provider == "gemini":
+            valeurs_sensibles["GEMINI_API_KEY"] = self.gemini_api_key
+        else:
+            valeurs_sensibles["LLM_API_KEY"] = self.llm_api_key or "llm-api-key-example-replace-me"
         for nom, valeur in valeurs_sensibles.items():
             if any(marqueur in valeur for marqueur in _MARQUEURS_PLACEHOLDER):
                 raise ValueError(

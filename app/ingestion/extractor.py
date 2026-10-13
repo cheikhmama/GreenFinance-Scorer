@@ -44,7 +44,7 @@ from app.carbon.pcaf import qualite_donnee_pcaf
 from app.core import storage
 from app.core.config import get_settings
 from app.core.database import engine, utcnow
-from app.core.enums import DataMethod, ExtractionRunStatus, ReportStatus
+from app.core.enums import DataMethod, ExtractionRunStatus, Pillar, ReportStatus
 from app.core.notifications import notifier
 from app.ingestion import docling_pipeline, localisation, proof_generator
 from app.ingestion.cibles import INDICATEURS_CIBLES
@@ -55,6 +55,8 @@ from app.ingestion.etat_extraction import (
     marquer_echec,
     notifier_pret_a_affecter,
 )
+from app.ingestion.llm.base import ErreurLLMTransitoire, QuotaLLMEpuise
+from app.ingestion.llm.openai_compat import FournisseurOpenAICompat
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
@@ -74,13 +76,15 @@ def quota_journalier_epuise(exc: BaseException) -> bool:
     par modèle), distinct d'un dépassement par minute : il ne se lève qu'au lendemain. Reprendre le
     job (3 tentatives, 1 puis 2 min d'attente, Docling et l'indexation refaits à chaque fois)
     faisait patienter une dizaine de minutes pour un échec certain."""
+    if isinstance(exc, QuotaLLMEpuise):
+        return True
     if not isinstance(exc, genai_errors.ClientError) or getattr(exc, "code", None) != 429:
         return False
     return "PerDay" in str(getattr(exc, "details", None) or exc)
 
 
 def _est_transitoire(exc: BaseException) -> bool:
-    if isinstance(exc, genai_errors.ServerError):
+    if isinstance(exc, genai_errors.ServerError | ErreurLLMTransitoire):
         return True
     if isinstance(exc, genai_errors.ClientError) and getattr(exc, "code", None) == 429:
         return not quota_journalier_epuise(exc)
@@ -199,6 +203,30 @@ def _get_embed_model() -> BGEM3FlagModel:
 @lru_cache
 def _get_gemini_client() -> genai.Client:
     return genai.Client(api_key=get_settings().gemini_api_key)
+
+
+@lru_cache
+def _get_fournisseur_openai() -> FournisseurOpenAICompat:
+    import openai
+
+    settings = get_settings()
+    # Retentatives gérées par le fournisseur (Retry-After, quota journalier), pas par le SDK.
+    client = openai.OpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url, max_retries=0)
+    return FournisseurOpenAICompat(client)
+
+
+def _openai_compat() -> bool:
+    return get_settings().llm_provider == "openai_compat"
+
+
+def modele_principal() -> str:
+    """Modèle enregistré sur l'exécution (ExtractionRun.llm_model) et appelé en premier."""
+    return get_settings().llm_model if _openai_compat() else EXTRACTION_MODEL
+
+
+def modele_secours() -> str | None:
+    """Rejoué sur quota journalier épuisé ; None : pas de secours configuré."""
+    return (get_settings().llm_model_secours or None) if _openai_compat() else MODELE_SECOURS
 
 
 def _iter_page_chunks(doc: DoclingDocument, max_chars: int = 1200) -> list[dict]:
@@ -372,8 +400,52 @@ def _elargir_aux_voisins(pages: list[int], pages_disponibles: set[int], radius: 
     return sorted(elargi)
 
 
+def _elargir_dans_le_plafond(
+    pages_coeur: list[int], texte_par_page: dict[int, str], *, radius: int, plafond_tokens: int
+) -> list[int]:
+    """_elargir_aux_voisins sous un plafond strict de tokens : les pages cœur restent toutes, leurs
+    voisines ne s'ajoutent (dans l'ordre de pertinence des pages cœur) que tant que le total tient.
+    Sert quand le fournisseur refuse une requête au-delà de sa limite de tokens par minute — un
+    élargissement hors budget y ferait échouer l'appel entier."""
+    retenues = set(pages_coeur)
+    total = sum(_estimer_tokens(texte_par_page.get(p, "")) for p in pages_coeur)
+    for p in pages_coeur:
+        for voisine in (p + d for d in range(-radius, radius + 1) if d):
+            if voisine in retenues or voisine not in texte_par_page:
+                continue
+            cout = _estimer_tokens(texte_par_page[voisine])
+            if total + cout <= plafond_tokens:
+                retenues.add(voisine)
+                total += cout
+    return sorted(retenues)
+
+
+def groupes_d_appel(codes: list[str], budget_tokens: int) -> list[list[str]]:
+    """Un seul appel tant que le budget de contexte n'est pas réduit (comportement historique). Sous
+    un budget réduit, un appel par famille — carbone, environnement, social, gouvernance (avec le
+    score global déclaré) — chacun avec son propre contexte : un budget partagé entre 23 codes ne
+    laisserait que quelques pages à chacun."""
+    if budget_tokens >= CONTEXT_TOKEN_BUDGET:
+        return [list(codes)]
+    famille: dict[str, str] = {}
+    for cible in INDICATEURS_CIBLES:
+        if cible.cible == "donnee_carbone":
+            famille[cible.code] = "carbone"
+        elif cible.pilier in (Pillar.ENVIRONNEMENT, Pillar.SOCIAL):
+            famille[cible.code] = cible.pilier.value
+        else:
+            famille[cible.code] = Pillar.GOUVERNANCE.value
+    ordre = ["carbone", Pillar.ENVIRONNEMENT.value, Pillar.SOCIAL.value, Pillar.GOUVERNANCE.value]
+    groupes = [[c for c in codes if famille[c] == f] for f in ordre]
+    return [g for g in groupes if g]
+
+
 def _build_context(
-    search_index: dict, embed_model: BGEM3FlagModel, codes: list[str], budget_tokens: int
+    search_index: dict,
+    embed_model: BGEM3FlagModel,
+    codes: list[str],
+    budget_tokens: int,
+    plafond_tokens: int | None = None,
 ) -> tuple[str, list[int], dict[str, list[PageCandidat]]]:
     """Remplace l'ancienne fonction à 2 arguments (REQUETES_FIXES/CONTEXT_TOP_PAGES implicites) :
     codes et budget_tokens explicites pour être appelable identiquement au 1er passage (tous les
@@ -390,7 +462,12 @@ def _build_context(
     texte_par_page_str = {page: "\n".join(parts) for page, parts in texte_par_page.items()}
 
     pages_coeur = _selectionner_pages_adaptatif(classement_global, texte_par_page_str, budget_tokens)
-    pages_finales = _elargir_aux_voisins(pages_coeur, set(texte_par_page_str), NEIGHBOR_RADIUS)
+    if plafond_tokens is None:
+        pages_finales = _elargir_aux_voisins(pages_coeur, set(texte_par_page_str), NEIGHBOR_RADIUS)
+    else:
+        pages_finales = _elargir_dans_le_plafond(
+            pages_coeur, texte_par_page_str, radius=NEIGHBOR_RADIUS, plafond_tokens=plafond_tokens
+        )
 
     context = "\n\n".join(
         f"--- Page {p} ---\n{texte_par_page_str[p]}" for p in pages_finales if p in texte_par_page_str
@@ -460,7 +537,7 @@ _TENTATIVES_APPEL_LLM = 3
 
 
 def _call_llm_extraction(
-    *, nom_entreprise: str, context: str, codes: list[str], modele: str = EXTRACTION_MODEL
+    *, nom_entreprise: str, context: str, codes: list[str], modele: str | None = None
 ) -> ExtractionEntreprise:
     """Tool-calling forcé (mode ANY, un seul outil déclaré), verbatim du protocole validé au
     Prompt 4.4 (initialement avec Claude, voir Phase 5 — bascule vers Gemini). Laisse remonter
@@ -469,6 +546,9 @@ def _call_llm_extraction(
     c'est ce qui permet d'appeler cette fonction une seconde fois pour la relance groupée sans la
     modifier (voir run_extraction_pipeline)."""
     prompt = construire_prompt(nom_entreprise=nom_entreprise, context=context, codes=codes)
+    if _openai_compat():
+        return _get_fournisseur_openai().extraire(prompt, modele or modele_principal())
+    modele = modele or EXTRACTION_MODEL
     config = genai_types.GenerateContentConfig(
         tools=[genai_types.Tool(function_declarations=[EXTRACTION_TOOL])],
         tool_config=genai_types.ToolConfig(
@@ -502,21 +582,20 @@ def _appeler_avec_secours(
     modele: str, *, nom_entreprise: str, context: str, codes: list[str]
 ) -> tuple[ExtractionEntreprise, str]:
     """Appelle `modele` ; si c'est le modèle principal et que son quota journalier est épuisé,
-    rejoue l'appel avec MODELE_SECOURS. Renvoie l'extraction et le modèle qui l'a produite."""
-    if modele == EXTRACTION_MODEL:
+    rejoue l'appel avec le modèle de secours. Renvoie l'extraction et le modèle qui l'a produite."""
+    if modele == modele_principal():
         try:
             # Sans `modele=` : les doubles de test de _call_llm_extraction gardent leur signature.
             extraction = _call_llm_extraction(nom_entreprise=nom_entreprise, context=context, codes=codes)
             return extraction, modele
-        except genai_errors.ClientError as exc:
-            if not quota_journalier_epuise(exc):
+        except Exception as exc:
+            secours = modele_secours()
+            if not quota_journalier_epuise(exc) or secours is None:
                 raise
             logger.warning(
-                "quota_journalier_modele_principal_epuise",
-                modele=EXTRACTION_MODEL,
-                modele_secours=MODELE_SECOURS,
+                "quota_journalier_modele_principal_epuise", modele=modele, modele_secours=secours
             )
-            modele = MODELE_SECOURS
+            modele = secours
     extraction = _call_llm_extraction(
         nom_entreprise=nom_entreprise, context=context, codes=codes, modele=modele
     )
@@ -593,9 +672,102 @@ def _fusionner_extractions(
     return ExtractionEntreprise(entreprise=premiere.entreprise, indicateurs=list(fusion.values()))
 
 
+@dataclass
+class ResultatLLM:
+    extraction: ExtractionEntreprise
+    modele: str
+    pages_vues_par_code: dict[str, set[int]]
+    pages_par_code: dict[str, list[PageCandidat]]
+
+
+def _marquer_etape(exc: BaseException, etape: str) -> None:
+    """Étape d'échec portée par l'exception jusqu'au classement de run_extraction_pipeline
+    (ExtractionRun.error, ESGReport.extraction_error), quel que soit l'appel qui l'a levée."""
+    if not hasattr(exc, "etape_extraction"):
+        exc.etape_extraction = etape  # type: ignore[attr-defined]
+
+
+def _contexte(
+    search_index: dict, embed_model: BGEM3FlagModel, codes: list[str], budget: int, plafond: int | None
+) -> tuple[str, list[int], dict[str, list[PageCandidat]]]:
+    # Sans plafond, appel à 4 arguments inchangé (doubles de test de _build_context compris).
+    if plafond is None:
+        return _build_context(search_index, embed_model, codes, budget)
+    return _build_context(search_index, embed_model, codes, budget, plafond_tokens=plafond)
+
+
+def _extraire_par_llm(
+    search_index: dict,
+    embed_model: BGEM3FlagModel,
+    codes: list[str],
+    *,
+    nom_entreprise: str,
+    budget_tokens: int,
+    modele: str,
+) -> ResultatLLM:
+    """1er passage (un appel, ou un par famille sous budget réduit — groupes_d_appel), puis UNE
+    relance groupée pour les codes encore manquants. Sous budget réduit, chaque contexte est
+    plafonné strictement : le fournisseur refuserait une requête au-delà de sa limite par minute."""
+    contraint = budget_tokens < CONTEXT_TOKEN_BUDGET
+    plafond = budget_tokens if contraint else None
+    extraction: ExtractionEntreprise | None = None
+    pages_vues_par_code: dict[str, set[int]] = {}
+    pages_par_code: dict[str, list[PageCandidat]] = {}
+
+    for groupe in groupes_d_appel(codes, budget_tokens):
+        try:
+            context, pages_used, pages_groupe = _contexte(
+                search_index, embed_model, groupe, min(budget_tokens, CONTEXT_TOKEN_BUDGET), plafond
+            )
+        except Exception as exc:
+            _marquer_etape(exc, "indexation_semantique_echouee")
+            raise
+        logger.info("contexte_assemble", n_pages=len(pages_used), n_codes=len(groupe))
+        pages_par_code.update(pages_groupe)
+        for code in groupe:
+            pages_vues_par_code[code] = set(pages_used)
+        try:
+            resultat, modele = _appeler_avec_secours(
+                modele, nom_entreprise=nom_entreprise, context=context, codes=groupe
+            )
+        except Exception as exc:
+            _marquer_etape(exc, "appel_llm_echoue")
+            raise
+        extraction = (
+            resultat if extraction is None else _fusionner_extractions(extraction, resultat, groupe)
+        )
+    assert extraction is not None
+
+    # Relance groupee (Phase 6) : UN SEUL appel supplementaire couvrant tous les codes encore
+    # manquants apres le 1er passage, jamais un appel par code — borner le nombre d'appels par
+    # rapport est la protection qui ne depend pas de connaitre le quota exact du palier gratuit.
+    codes_manquants = [code for code in codes if not _indicateur_trouve(extraction, code)]
+    if codes_manquants:
+        try:
+            contexte_retry, pages_retry, pages_par_code_retry = _contexte(
+                search_index,
+                embed_model,
+                codes_manquants,
+                min(CONTEXT_TOKEN_BUDGET_RETRY, budget_tokens),
+                plafond,
+            )
+            if pages_retry:
+                extraction_retry, modele = _appeler_avec_secours(
+                    modele, nom_entreprise=nom_entreprise, context=contexte_retry, codes=codes_manquants
+                )
+                extraction = _fusionner_extractions(extraction, extraction_retry, codes_manquants)
+                for code in codes_manquants:
+                    pages_vues_par_code[code] |= set(pages_retry)
+                pages_par_code.update(pages_par_code_retry)
+        except Exception as exc:
+            _marquer_etape(exc, "relance_llm_echouee")
+            raise
+    return ResultatLLM(extraction, modele, pages_vues_par_code, pages_par_code)
+
+
 def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> ExtractionEntreprise:
-    """Résultat synthétique utilisé uniquement quand GEMINI_API_KEY est encore le placeholder
-    de .env.example (Settings.gemini_api_key_is_placeholder) — jamais en production, où
+    """Résultat synthétique utilisé uniquement tant qu'aucune vraie clé LLM n'est configurée
+    (Settings.llm_demo) — jamais en production, où
     _rejeter_placeholders_en_production bloque le démarrage dans ce cas. Valeurs rondes et
     strictement croissantes par construction, pour ne jamais être prises pour une vraie
     extraction ; la preuve documentaire associée porte aussi un préfixe "[DEMO]" visible à
@@ -681,12 +853,12 @@ def run_extraction_pipeline(
         session.add(rapport)
         # Une ligne par exécution (tâche 5.5) : ce qui produit les valeurs, enregistré avant de
         # commencer pour qu'une exécution interrompue laisse aussi sa trace.
-        demo = get_settings().gemini_api_key_is_placeholder
+        demo = get_settings().llm_demo
         execution = ExtractionRun(
             report_id=rapport_id,
             started_at=rapport.extraction_started_at,
             docling_version=version_docling(),
-            llm_model=MODELE_DEMO if demo else EXTRACTION_MODEL,
+            llm_model=MODELE_DEMO if demo else modele_principal(),
             prompt_version=PROMPT_VERSION,
         )
         session.add(execution)
@@ -733,49 +905,33 @@ def run_extraction_pipeline(
             search_index = _build_search_index(conversion.document)
             embed_model = _get_embed_model()
             codes = [cible.code for cible in INDICATEURS_CIBLES]
-            context, pages_used, pages_par_code = _build_context(
-                search_index, embed_model, codes, CONTEXT_TOKEN_BUDGET
-            )
-            logger.info("contexte_assemble", rapport_id=str(rapport_id), n_pages=len(pages_used))
-            pages_vues_par_code: dict[str, set[int]] = {code: set(pages_used) for code in codes}
 
             etape = "appel_llm_echoue"
             if demo:
+                _context, pages_used, pages_par_code = _build_context(
+                    search_index, embed_model, codes, CONTEXT_TOKEN_BUDGET
+                )
+                pages_vues_par_code: dict[str, set[int]] = {code: set(pages_used) for code in codes}
                 logger.warning(
                     "extraction_demo_synthetique_utilisee",
                     rapport_id=str(rapport_id),
-                    raison="GEMINI_API_KEY est un placeholder (.env) — extraction simulee",
+                    raison="aucune vraie cle LLM configuree (.env) — extraction simulee",
                 )
                 extraction = _extraction_demo_synthetique(nom_entreprise=nom_entreprise, codes=codes)
             else:
-                extraction, modele = _appeler_avec_secours(
-                    EXTRACTION_MODEL, nom_entreprise=nom_entreprise, context=context, codes=codes
+                resultat_llm = _extraire_par_llm(
+                    search_index,
+                    embed_model,
+                    codes,
+                    nom_entreprise=nom_entreprise,
+                    budget_tokens=get_settings().llm_context_tokens,
+                    modele=modele_principal(),
                 )
-
-                # Relance groupee (Phase 6) : UN SEUL appel supplementaire couvrant tous les codes
-                # encore manquants apres le 1er passage, jamais un appel par code — le pipeline
-                # tourne sur le palier gratuit Gemini, sans infrastructure de rate-limiting ;
-                # borner a 2 appels/rapport au maximum est la protection qui ne depend pas de
-                # connaitre le quota exact de ce palier.
-                codes_manquants = [code for code in codes if not _indicateur_trouve(extraction, code)]
-                if codes_manquants:
-                    etape = "relance_llm_echouee"
-                    contexte_retry, pages_retry, pages_par_code_retry = _build_context(
-                        search_index, embed_model, codes_manquants, CONTEXT_TOKEN_BUDGET_RETRY
-                    )
-                    if pages_retry:
-                        extraction_retry, modele = _appeler_avec_secours(
-                            modele,
-                            nom_entreprise=nom_entreprise,
-                            context=contexte_retry,
-                            codes=codes_manquants,
-                        )
-                        extraction = _fusionner_extractions(extraction, extraction_retry, codes_manquants)
-                        for code in codes_manquants:
-                            pages_vues_par_code[code] |= set(pages_retry)
-                        pages_par_code.update(pages_par_code_retry)
-                    etape = "appel_llm_echoue"
-                if modele != EXTRACTION_MODEL:
+                extraction = resultat_llm.extraction
+                modele = resultat_llm.modele
+                pages_vues_par_code = resultat_llm.pages_vues_par_code
+                pages_par_code = resultat_llm.pages_par_code
+                if modele != modele_principal():
                     execution_en_cours = session.get(ExtractionRun, execution_id)
                     if execution_en_cours is not None:
                         execution_en_cours.llm_model = modele
@@ -993,6 +1149,7 @@ def run_extraction_pipeline(
             # erreur (Docling, réseau, Anthropic, DB) doit être classée et journalisée, jamais
             # remonter silencieusement dans une BackgroundTask sans observateur.
             session.rollback()
+            etape = getattr(exc, "etape_extraction", etape)
             if not derniere_tentative and _est_transitoire(exc):
                 # Retour en file : un début nul est ce qui distingue un job en attente d'un job en
                 # cours (app/ingestion/supervision.py).

@@ -44,6 +44,7 @@ extraction = [
     "FlagEmbedding",
     "google-genai",
     "onnxruntime>=1.31.0",
+    "openai>=3.29.0",
     "torch",
     "torchvision",
 ]
