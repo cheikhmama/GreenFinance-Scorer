@@ -1,0 +1,110 @@
+# Correspondance des codes extraits (app/ingestion/cibles.py) avec les référentiels publics, pour la
+# sortie JSON de l'extraction (app/ingestion/sortie.py, outil MCP extract_esg_report).
+#
+# Sources :
+#   - GHG Protocol Corporate Standard (WRI/WBCSD, 2004) et Scope 2 Guidance (2015) ;
+#   - GRI Standards : GRI 2 (2021), 302 (2016), 305 (2016), 306 (2020), 403 (2018), 404 (2016),
+#     405 (2016) — numéro de la publication (« disclosure ») ;
+#   - ESRS, premier jeu (règlement délégué (UE) 2023/2772) — exigence de publication (ex. E1-6),
+#     volontairement sans numéro de paragraphe : la correspondance se fait au niveau de l'exigence.
+# Un score que l'entreprise s'attribue elle-même ne relève d'aucun référentiel : null partout.
+
+scope_1:
+  ghg_protocol: "Scope 1"
+  gri: "GRI 305-1"
+  esrs: "ESRS E1-6"
+  unite: "tCO2e"
+scope_2:
+  ghg_protocol: "Scope 2"
+  gri: "GRI 305-2"
+  esrs: "ESRS E1-6"
+  unite: "tCO2e"
+scope_2_location_based:
+  ghg_protocol: "Scope 2 (location-based)"
+  gri: "GRI 305-2-a"
+  esrs: "ESRS E1-6"
+  unite: "tCO2e"
+scope_2_market_based:
+  ghg_protocol: "Scope 2 (market-based)"
+  gri: "GRI 305-2-b"
+  esrs: "ESRS E1-6"
+  unite: "tCO2e"
+scope_3:
+  ghg_protocol: "Scope 3"
+  gri: "GRI 305-3"
+  esrs: "ESRS E1-6"
+  unite: "tCO2e"
+intensite_scope_1_2_marketbased:
+  ghg_protocol: "Scope 1 + Scope 2 (market-based), intensité"
+  gri: "GRI 305-4"
+  esrs: "ESRS E1-6"
+  unite: "selon le rapport (ex. tCO2e/M€)"
+intensite_scope_1_2_3_hors_cat11:
+  ghg_protocol: "Scope 1 + 2 + 3 hors catégorie 11, intensité"
+  gri: "GRI 305-4"
+  esrs: "ESRS E1-6"
+  unite: "selon le rapport (ex. tCO2e/M€)"
+intensite_scope_1_2_3_total:
+  ghg_protocol: "Scope 1 + 2 + 3, intensité"
+  gri: "GRI 305-4"
+  esrs: "ESRS E1-6"
+  unite: "selon le rapport (ex. tCO2e/M€)"
+part_renouvelable_pourcentage:
+  ghg_protocol: null
+  gri: "GRI 302-1"
+  esrs: "ESRS E1-5"
+  unite: "%"
+dechets_valorises_pourcentage:
+  ghg_protocol: null
+  gri: "GRI 306-4"
+  esrs: "ESRS E5-5"
+  unite: "%"
+femmes_management_pourcentage:
+  ghg_protocol: null
+  gri: "GRI 405-1"
+  esrs: "ESRS S1-9"
+  unite: "%"
+deces_professionnels:
+  ghg_protocol: null
+  gri: "GRI 403-9-a-i"
+  esrs: "ESRS S1-14"
+  unite: "nombre"
+effectif_total:
+  ghg_protocol: null
+  gri: "GRI 2-7"
+  esrs: "ESRS S1-6"
+  unite: "salariés"
+femmes_effectif_pourcentage:
+  ghg_protocol: null
+  gri: "GRI 2-7"
+  esrs: "ESRS S1-6"
+  unite: "%"
+heures_formation_par_employe:
+  ghg_protocol: null
+  gri: "GRI 404-1"
+  esrs: "ESRS S1-13"
+  unite: "heures/salarié"
+taux_frequence_accidents:
+  ghg_protocol: null
+  gri: "GRI 403-9-a-iii"
+  esrs: "ESRS S1-14"
+  unite: "taux (selon la base du rapport)"
+femmes_conseil_pourcentage:
+  ghg_protocol: null
+  gri: "GRI 405-1-a"
+  esrs: "ESRS 2 GOV-1"
+  unite: "%"
+taille_conseil:
+  ghg_protocol: null
+  gri: "GRI 2-9"
+  esrs: "ESRS 2 GOV-1"
+  unite: "membres"
+administrateurs_independants_pourcentage:
+  ghg_protocol: null
+  gri: "GRI 2-9-c"
+  esrs: "ESRS 2 GOV-1"
+  unite: "%"
+score_environnement_declare: {ghg_protocol: null, gri: null, esrs: null, unite: "score déclaré"}
+score_social_declare: {ghg_protocol: null, gri: null, esrs: null, unite: "score déclaré"}
+score_gouvernance_declare: {ghg_protocol: null, gri: null, esrs: null, unite: "score déclaré"}
+score_global_declare: {ghg_protocol: null, gri: null, esrs: null, unite: "score déclaré"}
