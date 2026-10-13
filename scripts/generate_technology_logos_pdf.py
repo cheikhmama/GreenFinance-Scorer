@@ -16,7 +16,6 @@ PREVIEW.mkdir(exist_ok=True)
 
 
 def load_logo(item, index, rendered):
-    path = ASSETS / item["file"]
     pdf = pymupdf.open()
     pdf.insert_pdf(rendered, from_page=index, to_page=index)
     page = pdf[0]

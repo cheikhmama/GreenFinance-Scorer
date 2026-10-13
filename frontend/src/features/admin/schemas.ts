@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Currency, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
-export { Currency, Role };
+export { Role };
 export const DEVISES = Object.values(Currency);
 
 /** Jamais ADMIN — même règle déjà validée côté prototype (docs/PROTOTYPE_FRONTEND.md) et
@@ -52,18 +52,6 @@ export const creerUtilisateurSchema = z
   });
 
 export type CreerUtilisateurForm = z.infer<typeof creerUtilisateurSchema>;
-
-export const changerRoleSchema = z.object({
-  role: z.enum(ROLES_ATTRIBUABLES),
-});
-
-export type ChangerRoleForm = z.infer<typeof changerRoleSchema>;
-
-export const decisionSchema = z.object({
-  comment: z.string().optional(),
-});
-
-export type DecisionForm = z.infer<typeof decisionSchema>;
 
 /** impose_minimum est un champ purement local au formulaire (jamais envoyé au serveur) : il
  * pilote l'affichage de montant_minimum_investissement/devise_montant_minimum et la décision

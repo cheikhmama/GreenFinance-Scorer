@@ -1,4 +1,4 @@
-import { Check, ChevronRight, FileSearch, Info, X } from "lucide-react";
+import { ChevronRight, FileSearch, Info, X } from "lucide-react";
 import { cloneElement, isValidElement, type ReactNode, useId } from "react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -272,20 +272,5 @@ export function EvidencePreview({ company, page }: { company: string; page: numb
         </div>
       </div>
     </div>
-  );
-}
-
-export function CheckList({ items }: { items: string[] }) {
-  return (
-    <ul className="space-y-3">
-      {items.map((item) => (
-        <li key={item} className="flex gap-3 text-sm text-slate-700">
-          <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-green-light text-brand-green">
-            <Check className="size-3" />
-          </span>
-          {item}
-        </li>
-      ))}
-    </ul>
   );
 }

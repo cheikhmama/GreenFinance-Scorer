@@ -45,16 +45,6 @@ const VALEURS: Record<string, string> = {
   inactive: "inactif",
 };
 
-/** Choix des filtres du journal : le serveur filtre sur le code exact, jamais sur le libellé. */
-export const OPTIONS_ACTIONS_JOURNAL = Object.entries(ACTIONS)
-  .map(([value, label]) => ({ value, label }))
-  .sort((a, b) => a.label.localeCompare(b.label, "fr"));
-
-export const OPTIONS_TYPES_RESSOURCE = Object.entries(TYPES_RESSOURCE).map(([value, label]) => ({
-  value,
-  label,
-}));
-
 export function libelleActionJournal(action: string): string {
   return ACTIONS[action] ?? action;
 }

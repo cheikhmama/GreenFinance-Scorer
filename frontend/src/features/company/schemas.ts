@@ -5,7 +5,6 @@ import {
 } from "@/features/registration/referentiels";
 import { Currency, ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-export { Currency, ReportType };
 export const DEVISES = Object.values(Currency);
 export const TYPES_RAPPORT = Object.values(ReportType);
 

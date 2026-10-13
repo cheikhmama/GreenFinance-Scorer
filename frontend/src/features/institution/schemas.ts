@@ -34,12 +34,3 @@ export const inviterChercheurSchema = z.object({
 });
 
 export type InviterChercheurForm = z.infer<typeof inviterChercheurSchema>;
-
-/** Un commentaire est requis pour demander une correction (voir
- * app/institution/analyses.py::demander_correction) ; optionnel pour valider. La validation zod
- * elle-même reste permissive, la contrainte réelle est appliquée côté formulaire/serveur. */
-export const decisionAnalyseSchema = z.object({
-  comment: z.string().optional(),
-});
-
-export type DecisionAnalyseForm = z.infer<typeof decisionAnalyseSchema>;

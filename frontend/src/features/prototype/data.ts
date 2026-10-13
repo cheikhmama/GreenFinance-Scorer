@@ -1,6 +1,6 @@
 import type { PrototypeState, RoleSlug } from "./types";
 
-export const roleBySlug = {
+const roleBySlug = {
   admin: "ADMIN",
   company: "ENTERPRISE",
   audit: "AUDITOR",
@@ -17,15 +17,6 @@ export const slugByRole = {
   RESEARCHER: "researcher",
   INSTITUTION: "institution",
 } as const satisfies Record<(typeof roleBySlug)[RoleSlug], RoleSlug>;
-
-export const roleLabels = {
-  ADMIN: "Administrateur",
-  ENTERPRISE: "Entreprise",
-  AUDITOR: "Auditeur",
-  INVESTOR: "Investisseur",
-  RESEARCHER: "Chercheur",
-  INSTITUTION: "Institution",
-} as const;
 
 export function createInitialPrototypeState(): PrototypeState {
   return {

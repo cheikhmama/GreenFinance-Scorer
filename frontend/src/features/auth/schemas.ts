@@ -30,21 +30,6 @@ export const forgotPasswordFormSchema = z.object({
 
 export type ForgotPasswordForm = z.infer<typeof forgotPasswordFormSchema>;
 
-/** Formulaire de POST /auth/changer-mot-de-passe — la confirmation n'existe que côté
- * client (le backend ne reçoit que mot_de_passe_actuel/nouveau_mot_de_passe). */
-export const changerMotDePasseFormSchema = z
-  .object({
-    motDePasseActuel: z.string().min(1, "Le mot de passe actuel est requis"),
-    nouveauMotDePasse: z.string().min(MOT_DE_PASSE_LONGUEUR_MIN, MESSAGE_LONGUEUR_MIN),
-    confirmation: z.string().min(1, "La confirmation est requise"),
-  })
-  .refine((values) => values.nouveauMotDePasse === values.confirmation, {
-    message: "Les deux mots de passe ne correspondent pas.",
-    path: ["confirmation"],
-  });
-
-export type ChangerMotDePasseForm = z.infer<typeof changerMotDePasseFormSchema>;
-
 /** Formulaire de PATCH /auth/me — nom et email, jamais le rôle. Changer d'e-mail exige le mot
  * de passe actuel et ne prend effet qu'après confirmation du lien envoyé à la nouvelle adresse
  * (app/auth/email_change.py) : le composant n'exige motDePasseActuel que dans ce cas. */
