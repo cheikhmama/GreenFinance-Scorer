@@ -1,0 +1,44 @@
+@startuml uc-01-global
+!include _style.iuml
+title Diagramme de cas d'utilisation global — GreenFinance-Scorer
+left to right direction
+
+actor "Visiteur" as V
+actor "Entreprise" as E
+actor "Administrateur" as A
+actor "Auditeur" as AU
+actor "Investisseur" as I
+actor "Chercheur" as C
+actor "Institution" as IN
+
+actor "Gemini (LLM)" as LLM <<système>>
+actor "GLEIF" as GL <<système>>
+
+rectangle "Plateforme GreenFinance-Scorer" {
+  usecase "Inscrire son entreprise /\ndemander un accès" as UC_REG
+  usecase "Déposer et suivre\nses rapports ESG" as UC_DEP
+  usecase "Extraire les indicateurs\nESG et carbone" as UC_EXT
+  usecase "Gérer les inscriptions\net les utilisateurs" as UC_ONB
+  usecase "Piloter le circuit\nde validation des rapports" as UC_PUB
+  usecase "Auditer un rapport" as UC_REV
+  usecase "Gérer ses portefeuilles\net leur empreinte carbone" as UC_PF
+  usecase "Consulter les entreprises\nnotées et leurs scores" as UC_CAT
+  usecase "Rédiger et valider\ndes analyses" as UC_ANA
+  usecase "Piloter des projets\nde recherche" as UC_PROJ
+}
+
+V --> UC_REG
+E --> UC_DEP
+UC_DEP ..> UC_EXT : <<include>>
+UC_EXT --> LLM
+A --> UC_ONB
+A --> UC_PUB
+UC_ONB --> GL
+AU --> UC_REV
+I --> UC_PF
+I --> UC_CAT
+C --> UC_CAT
+C --> UC_ANA
+IN --> UC_ANA
+IN --> UC_PROJ
+@enduml

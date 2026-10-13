@@ -1,0 +1,58 @@
+@startuml uc-02-entreprise
+!include _style.iuml
+title Cas d'utilisation — Entreprise (inscription et déclaration ESG)
+left to right direction
+
+actor "Visiteur" as V
+actor "Entreprise" as E
+actor "Worker d'extraction" as W <<système>>
+actor "Gemini (LLM)" as LLM <<système>>
+
+rectangle "Inscription (espace public)" {
+  usecase "S'inscrire\n(identité, identifiant fiscal,\nlettre de mandat)" as R1
+  usecase "Vérifier son e-mail\n(code à 6 chiffres)" as R2
+  usecase "Suivre sa demande\n(lien de suivi)" as R3
+  usecase "Compléter sa demande\n(informations demandées)" as R4
+  usecase "Activer son compte\n(lien 72 h)" as R5
+}
+
+rectangle "Espace Entreprise" {
+  usecase "Ouvrir une session\nde déclaration\n(exercice, données financières)" as D1
+  usecase "Joindre le rapport PDF" as D2
+  usecase "Importer un rapport\npar URL" as D3
+  usecase "Consulter la checklist\nde complétude" as D4
+  usecase "Soumettre le rapport" as D5
+  usecase "Abandonner un brouillon" as D6
+  usecase "Déposer une nouvelle version\n(correction demandée)" as D7
+  usecase "Suivre ses rapports\net son score officiel" as D8
+  usecase "Télécharger le rapport\nde synthèse PDF" as D9
+  usecase "Vérifier son LEI (GLEIF)" as D10
+  usecase "Analyser le document" as X1
+}
+
+V --> R1
+R1 ..> R2 : <<include>>
+V --> R3
+R4 .up.> R3 : <<extend>>\n[INFO_REQUESTED]
+E --> R5
+
+E --> D1
+E --> D2
+E --> D3
+E --> D4
+E --> D5
+E --> D6
+E --> D7
+E --> D8
+E --> D9
+E --> D10
+D2 ..> X1 : <<include>>
+D3 ..> X1 : <<include>>
+D7 ..> X1 : <<include>>
+note right of D5
+  Précondition : l'analyse du fichier
+  a réussi ; le rapport est ensuite verrouillé.
+end note
+X1 --> W
+W --> LLM
+@enduml

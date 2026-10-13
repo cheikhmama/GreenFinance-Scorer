@@ -1,0 +1,97 @@
+---
+title: Schéma BD (1/5) — Comptes, accès et traçabilité
+---
+erDiagram
+  users {
+    uuid id PK
+    string email UK
+    string name
+    string avatar_path
+    string password_hash "null avant activation"
+    string role "ADMIN ENTERPRISE AUDITOR INVESTOR RESEARCHER INSTITUTION"
+    datetime created_at
+    bool active
+    datetime activated_at
+  }
+  account_activation_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token_hash
+    datetime expires_at "72 h"
+    datetime used_at
+  }
+  password_reset_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token_hash
+    datetime expires_at
+    datetime used_at
+  }
+  email_change_requests {
+    uuid id PK
+    uuid user_id FK
+    string new_email
+    string token_hash
+    datetime expires_at
+    datetime used_at
+  }
+  access_requests {
+    uuid id PK
+    uuid user_id FK
+    uuid decided_by_id FK
+    string role "INVESTOR ou RESEARCHER"
+    string organization
+    string investor_type
+    string research_domain
+    string status "PENDING_APPROVAL APPROVED REJECTED"
+    datetime requested_at
+    datetime decided_at
+    string rejection_reason
+  }
+  institution_profiles {
+    uuid id PK
+    uuid user_id FK
+    int export_quota
+  }
+  researcher_affiliations {
+    uuid id PK
+    uuid researcher_id FK
+    uuid institution_id FK
+    string status
+    datetime invited_at
+    datetime responded_at
+    string collaboration_terms
+  }
+  notifications {
+    uuid id PK
+    uuid user_id FK
+    string message
+    string type
+    uuid resource_id
+    datetime sent_at
+    bool read
+  }
+  audit_log {
+    uuid id PK
+    uuid actor_id FK
+    string action
+    string resource_type
+    uuid resource_id
+    datetime occurred_at
+    string result
+    string old_value
+    string new_value
+    string correlation_id
+    string ip
+  }
+
+  users ||--o{ account_activation_tokens : "active son compte"
+  users ||--o{ password_reset_tokens : "réinitialise"
+  users ||--o{ email_change_requests : "change d'e-mail"
+  users ||--o{ access_requests : "demande l'accès"
+  users |o--o{ access_requests : "décide (ADMIN)"
+  users |o--o| institution_profiles : "profil institution"
+  users ||--o{ researcher_affiliations : "chercheur"
+  users ||--o{ researcher_affiliations : "institution"
+  users ||--o{ notifications : "reçoit"
+  users |o--o{ audit_log : "acteur"

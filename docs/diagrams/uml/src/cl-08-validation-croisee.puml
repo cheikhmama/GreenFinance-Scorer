@@ -1,0 +1,94 @@
+@startuml cl-08-validation-croisee
+!include _style.iuml
+title Diagramme de classes — Recherche : validation croisée sur jeux de référence
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 65
+hide empty methods
+
+class "User\n(Chercheur)" as Res {
+  - role : Role = RESEARCHER
+}
+class Company {
+  - isin : str [0..1]
+  - lei : str [0..1]
+}
+class Score {
+  - global_score : float
+  - environmental_score : float [0..1]
+  - social_score : float [0..1]
+  - governance_score : float [0..1]
+}
+hide Res methods
+hide Company methods
+hide Score methods
+
+class ReferenceDataset {
+  - name : str
+  - source_url : str
+  - licence : str
+  - scale_min : float
+  - scale_max : float
+  - higher_is_better : bool
+  - created_at : datetime
+  .. researcher/cross_validation.py ..
+  + {static} importer(chercheur : User, requete : ReferenceDatasetRequest, contenu : bytes) : ReferenceDatasetImportResult
+  + {static} lister(chercheur : User) : list<ReferenceDatasetSummary>
+  + resume() : ReferenceDatasetSummary
+  + rapport(chercheur : User) : CrossValidationReport
+  + supprimer(chercheur : User) : void
+}
+
+class ReferenceDatasetRow {
+  - line_number : int
+  - isin : str [0..1]
+  - lei : str [0..1]
+  - company_name : str [0..1]
+  - environmental_score : float [0..1]
+  - social_score : float [0..1]
+  - governance_score : float [0..1]
+  - total_score : float [0..1]
+}
+
+class "cross_validation" as CV <<utility>> {
+  .. researcher/cross_validation.py ..
+  + {static} spearman(x : list<float>, y : list<float>) : float [0..1]
+  + {static} rangs_moyens(valeurs : list<float>) : list<float>
+  + {static} sur_cent(valeur : float, min : float, max : float, plus_haut_est_meilleur : bool) : float
+}
+hide CV fields
+
+enum ComparedScore <<enumeration>> {
+  ENVIRONMENTAL
+  SOCIAL
+  GOVERNANCE
+  GLOBAL
+}
+enum UnmatchedReason <<enumeration>> {
+  UNKNOWN
+  DUPLICATE
+  NO_PLATFORM_SCORE
+}
+
+Res "1" *-- "0..*" ReferenceDataset : importe >
+ReferenceDataset "1" *-- "1..*" ReferenceDatasetRow : lignes >
+ReferenceDatasetRow "0..*" ..> "0..1" Company : rapprochée par ISIN / LEI
+Company "1" .. "0..*" Score : /score officiel\n(via ESGReport validé) >
+ReferenceDataset ..> CV : <<use>>\nrapport()
+ReferenceDataset ..> ComparedScore
+ReferenceDataset ..> UnmatchedReason
+
+note bottom of CV
+  rapport() : rapprochement par ISIN puis LEI avec les entreprises
+  publiées du périmètre des projets du chercheur ; par pilier,
+  corrélation de rang de Spearman et écart absolu moyen
+  (valeurs ramenées sur 0-100 par sur_cent) avec le score
+  officiel du dernier rapport validé. Aucune écriture
+  dans les données de la plateforme.
+end note
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (« .. module .. »).
+  L'objet courant et la session sont omis. Souligné = opération de classe.
+endlegend
+@enduml

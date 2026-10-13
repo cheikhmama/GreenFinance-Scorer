@@ -1,0 +1,67 @@
+@startuml seq-03-depot-extraction
+!include _style.iuml
+title Diagramme de séquence — Dépôt d'un rapport ESG et extraction automatique
+autonumber "<b>0."
+
+actor "Entreprise" as E
+participant "API\n/reports" as API
+database "Stockage\n(volume)" as ST
+queue "Redis\n(file extraction)" as Q
+participant "Worker\nd'extraction" as W
+participant "Pipeline\n(app/ingestion)" as P
+participant "Gemini" as LLM
+database "PostgreSQL" as DB
+
+E -> API : POST /reports (exercice, données financières)
+API -> DB : ESGReport DRAFT
+API --> E : 201 (rapport brouillon)
+
+E -> API : POST /reports/{id}/file (PDF)
+activate API
+API -> API : octets magiques, taille,\nSHA-256 non déjà utilisé
+API -> ST : enregistre rapport.pdf
+API -> DB : status = EXTRACTING
+API -> Q : enfiler_extraction(rapport_id, exercice)
+API --> E : 202
+deactivate API
+
+Q -> W : extract_report
+activate W
+W -> P : run_extraction_pipeline()
+activate P
+P -> DB : ExtractionRun RUNNING\n(versions Docling, LLM, prompt)
+P -> ST : lit rapport.pdf
+P -> P : Docling : PDF → DoclingDocument
+P -> P : découpage par page, embeddings bge-m3,\nindex FAISS, sélection adaptative des pages
+loop pour chaque lot d'indicateurs
+  P -> LLM : prompt + contexte (tool-calling forcé)
+  LLM --> P : valeurs + citation de page
+end
+P -> P : localisation des valeurs citées (boîtes),\nextraits PDF de preuve, couverture
+P -> ST : extraits de preuve
+P -> DB : remplace indicateurs, émissions,\npreuves et couverture ; run SUCCEEDED
+P -> DB : pré-score (configuration de référence)
+alt rapport déjà soumis
+  P -> DB : status = AWAITING_ASSIGNMENT,\nnotification aux administrateurs
+else analyse d'un brouillon
+  P -> DB : status = DRAFT (checklist disponible)
+end
+deactivate P
+deactivate W
+
+group En cas d'échec
+  alt échec passager (quota, réseau), tentatives restantes
+    P -> DB : run RETRY_SCHEDULED
+    P --> W : ExtractionTransitoire
+    W -> Q : Retry(defer = délai × tentative)
+  else échec définitif ou dernière tentative
+    P -> DB : run FAILED ; status = EXTRACTION_FAILED\n(ou DRAFT avec la cause pour un brouillon)
+  end
+end
+
+E -> API : GET /reports/{id}/checklist
+API --> E : indicateurs trouvés / attendus par groupe
+E -> API : POST /reports/{id}/submit
+API -> DB : submitted_at (verrouillage),\nstatus = AWAITING_ASSIGNMENT
+API -> Q : job generate_synthesis_pdf
+@enduml

@@ -1,0 +1,95 @@
+@startuml cl-03-entreprise
+!include _style.iuml
+title Diagramme de classes — Entreprise (inscription, KYC, onboarding)
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 60
+hide empty methods
+
+class "User\n(Entreprise)" as Owner {
+  - role : Role = ENTERPRISE
+}
+class "User\n(Administrateur)" as Admin {
+  - role : Role = ADMIN
+}
+hide Owner methods
+hide Admin methods
+class ESGReport
+hide ESGReport members
+
+class Company {
+  - name : str
+  - sector : str
+  - country : str
+  - logo : str [0..1]
+  - description : str [0..1]
+  - website : str [0..1]
+  - status : RegistrationStatus
+  - tax_id : str [0..1]
+  - tax_id_type : TaxIdType [0..1]
+  - isin : str [0..1]
+  - lei : str [0..1]
+  - ticker : str [0..1]
+  - minimum_investment_amount : Decimal [0..1]
+  - mandate_letter_path : str [0..1]
+  - email_verified_at : datetime [0..1]
+  - registered_at : datetime [0..1]
+  - onboarded_at : datetime [0..1]
+  - published_at : datetime [0..1]
+  - info_request_message : str [0..1]
+  - rejection_reason : str [0..1]
+  .. company/registration.py ..
+  + {static} enregistrer_demande(demande : CompanyRegistrationRequest, lettre : bytes) : void
+  + {static} confirmer_adresse(email : str, code : str) : void
+  + {static} consulter_suivi(jeton : str) : RegistrationStatusView
+  + {static} repondre_demande_infos(jeton : str, lettre : bytes, message : str) : RegistrationStatusView
+  + nouveau_jeton_de_suivi() : str
+  .. admin/kyc.py ..
+  + rapport_kyc() : KycReport
+  + controles_gleif() : list<KycCheck>
+  .. admin/onboarding.py ..
+  + decider_inscription(decision : OnboardingDecision, motif : str, message : str) : CompanyOnboardingResult
+  .. admin/review_queue.py ..
+  + publier_entreprise() : Company
+  + suspendre_entreprise() : Company
+  + reactiver_entreprise() : Company
+  + modifier_identifiants(valeurs : dict) : Company
+  + modifier_entreprise_admin(nom : str, secteur : str, pays : str, ...) : Company
+  + televerser_logo_entreprise(contenu : bytes) : Company
+  .. company/rapports.py ..
+  + {static} verifier_entreprise_active(entreprise : Company) : void
+}
+
+enum RegistrationStatus <<enumeration>> {
+  EMAIL_VERIFICATION_PENDING
+  PENDING_ONBOARDING
+  INFO_REQUESTED
+  ACTIVE
+  REJECTED
+  SUSPENDED
+}
+enum TaxIdType <<enumeration>> {
+  NIF
+  SIREN
+  EIN
+  TAX_ID
+}
+enum KycCheckResult <<enumeration>> {
+  PASSED
+  FAILED
+  NOT_VERIFIABLE
+  NOT_APPLICABLE
+}
+
+Owner "0..1" -- "0..1" Company : propriétaire >
+Admin "0..1" -- "0..*" Company : onboarde >
+Company "1" *-- "0..*" ESGReport : dépose >
+Company ..> RegistrationStatus
+Company ..> TaxIdType
+Company ..> KycCheckResult : rapport_kyc()
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (« .. module .. »).
+  L'objet courant et les paramètres techniques sont omis. Souligné = opération de classe.
+endlegend
+@enduml

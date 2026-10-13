@@ -1,0 +1,44 @@
+@startuml seq-04-audit
+!include _style.iuml
+title Diagramme de séquence — Affectation et audit d'un rapport
+autonumber "<b>0."
+
+actor "Administrateur" as A
+participant "API Admin" as ADM
+actor "Auditeur" as AU
+participant "API Audit\n/audit/rapports" as API
+database "PostgreSQL" as DB
+
+A -> ADM : POST /admin/rapports/{id}/affecter (auditeur)
+ADM -> DB : auditor_id, assigned_at,\nstatus = IN_AUDIT
+ADM -> DB : notification à l'auditeur
+
+AU -> API : GET /audit/rapports/{id}
+API -> DB : vérifie l'affectation
+API --> AU : indicateurs, émissions, preuves
+
+loop pour chaque valeur extraite
+  AU -> API : GET .../preuves/{preuve_id}/fichier
+  API --> AU : page PDF + zone de la valeur citée
+  AU -> API : POST /audit/rapports/{id}/reviews\n(ACCEPTED | OVERRIDDEN + nouvelle valeur | NOT_FOUND, motif)
+  activate API
+  API -> DB : INSERT metric_reviews (append-only)
+  API -> DB : MAJ review_status / audited_value
+  API --> AU : 201
+  deactivate API
+end
+
+AU -> API : POST /audit/rapports/{id}/avis (décision, commentaire)
+activate API
+alt une valeur n'est pas encore revue
+  API --> AU : 422 revue_incomplete
+else revue complète
+  API -> DB : INSERT audit_opinions
+  API -> DB : status = PENDING_DECISION
+  API --> AU : 201 (revue close)
+end
+deactivate API
+
+AU -> API : GET /audit/rapports/{id}/pre-score
+API --> AU : score de référence avec les valeurs revues\n(accessible seulement après l'avis)
+@enduml

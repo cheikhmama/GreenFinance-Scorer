@@ -1,0 +1,46 @@
+---
+title: GreenFinance-Scorer — Architecture système (vue d'exécution)
+---
+flowchart LR
+  subgraph Clients["Navigateur"]
+    SPA["SPA React 19 + Vite<br/>TanStack Query · React Router<br/>client Orval (OpenAPI)"]
+  end
+
+  subgraph Compose["docker compose"]
+    direction LR
+    subgraph API["service api (uvicorn :8000)"]
+      ROOT["App racine FastAPI<br/>/health · SecurityHeaders · CorrelationId"]
+      V1["Sous-app /api/v1<br/>CORS · CSRF · CorrelationId<br/>12 routers métier"]
+      ROOT -->|mount /api/v1| V1
+    end
+    MIG["migrate<br/>alembic upgrade head"]
+    W["worker (arq)<br/>e-mails · PDF de synthèse<br/>cron reprendre_extractions /5 min"]
+    WX["worker-extraction (arq)<br/>Docling · bge-m3 · FAISS<br/>1 extraction à la fois"]
+    DB[("PostgreSQL 16<br/>+ pgvector")]
+    R[("Redis 7<br/>files arq · révocation sessions<br/>limitation de débit")]
+    VS[["volume storage<br/>rapports PDF · preuves · synthèses"]]
+    VM[["volume modeles<br/>cache bge-m3 / Docling"]]
+  end
+
+  subgraph Ext["Services externes"]
+    GEM["Google Gemini<br/>(tool-calling forcé)"]
+    SMTP["Serveur SMTP"]
+    GLEIF["API GLEIF<br/>(vérification LEI / KYC)"]
+  end
+
+  SPA -- "HTTPS · cookies __Host- httpOnly<br/>+ en-tête X-CSRF-Token" --> V1
+  MIG --> DB
+  V1 --> DB
+  V1 --> R
+  V1 -- enfiler jobs --> R
+  V1 --> VS
+  V1 --> GLEIF
+  R -- file par défaut --> W
+  R -- file extraction --> WX
+  W --> DB
+  W --> VS
+  W --> SMTP
+  WX --> DB
+  WX --> VS
+  WX --> VM
+  WX --> GEM

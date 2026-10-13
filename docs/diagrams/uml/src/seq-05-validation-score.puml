@@ -1,0 +1,49 @@
+@startuml seq-05-validation-score
+!include _style.iuml
+title Diagramme de séquence — Validation du rapport et publication atomique du score
+autonumber "<b>0."
+
+actor "Administrateur" as A
+participant "API Admin\n/admin/rapports" as ADM
+participant "Moteur de scoring\n(scoring.engine)" as ENG
+database "PostgreSQL" as DB
+queue "Redis\n(file par défaut)" as Q
+participant "Worker" as W
+
+A -> ADM : GET /admin/rapports/{id}/score-verification
+ADM -> ENG : aperçu du score
+ENG --> ADM : couverture et seuil minimal
+ADM --> A : vérification affichée
+
+A -> ADM : POST /admin/rapports/{id}/valider
+activate ADM
+group Transaction unique (tout ou rien)
+  ADM -> DB : SELECT ... FOR UPDATE (rapport)
+  ADM -> ADM : vérifie status = PENDING_DECISION
+  ADM -> ENG : calculer_score(rapport_id)
+  activate ENG
+  ENG -> DB : configuration de référence par hash du contenu\n(get-or-create, flush sans commit)
+  ENG -> DB : valeurs effectives :\nauditée (OVERRIDDEN), exclue (NOT_FOUND), sinon extraite
+  ENG -> ENG : score par pilier E / S / G,\nscore global, couverture
+  alt couverture < min_coverage
+    ENG --> ADM : couverture_insuffisante
+    ADM -> DB : ROLLBACK (reste PENDING_DECISION)
+    ADM --> A : 422
+  else score calculable
+    ENG -> DB : INSERT scores
+    ENG --> ADM : score
+    deactivate ENG
+    ADM -> DB : official_score, coverage_rate, config_hash
+    ADM -> DB : status = VALIDATED
+    ADM -> DB : journal d'audit + notification
+    ADM -> DB : COMMIT
+  end
+end
+ADM -> Q : enfiler generate_synthesis_pdf\n+ e-mail de notification (après commit)
+ADM --> A : 200
+deactivate ADM
+
+Q -> W : generate_synthesis_pdf
+W -> DB : lit score, indicateurs, carbone
+W -> W : génère le PDF de synthèse
+@enduml

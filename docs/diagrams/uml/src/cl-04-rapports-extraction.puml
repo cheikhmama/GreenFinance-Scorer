@@ -1,0 +1,167 @@
+@startuml cl-04-rapports-extraction
+!include _style.iuml
+title Diagramme de classes — Rapports ESG et extraction
+skinparam linetype ortho
+skinparam nodesep 45
+skinparam ranksep 60
+hide empty methods
+
+class Company
+hide Company members
+
+class ESGReport {
+  - type : ReportType
+  - channel : SubmissionChannel
+  - status : ReportStatus
+  - fiscal_year : int
+  - version : int
+  - source_file : str [0..1]
+  - checksum_sha256 : str [0..1]
+  - submitted_at : datetime [0..1]
+  - assigned_at : datetime [0..1]
+  - extraction_attempts : int
+  - extraction_error : str [0..1]
+  - declared_global_score : float [0..1]
+  - official_score : float [0..1]
+  - coverage_rate : float [0..1]
+  - config_hash : str [0..1]
+  - revenue : Decimal [0..1]
+  - enterprise_value : Decimal [0..1]
+  - evic_date : date [0..1]
+  .. reporting/sessions.py ..
+  + {static} ouvrir(user : User, demande : ReportCreateRequest) : ESGReport
+  + joindre_fichier(user : User, contenu : bytes, nom : str) : ESGReport
+  + liste_de_completude(user : User) : list<GroupeCompletude>
+  + soumettre(user : User) : ESGReport
+  + abandonner(user : User) : void
+  .. company/rapports.py ..
+  + {static} deposer_rapport(entreprise_id : UUID, contenu : bytes, ...) : ESGReport
+  + {static} importer_rapport_par_url(entreprise_id : UUID, url : str, ...) : ESGReport
+  + creer_correction(entreprise_id : UUID, contenu : bytes, annee : int) : ESGReport
+  .. audit/assignment.py, admin/review_queue.py ..
+  + affecter_auditeur(auditeur_id : UUID) : ESGReport
+  + relancer_extraction() : ESGReport
+  + valider_rapport(commentaire : str) : ESGReport
+  + rejeter_rapport(commentaire : str) : ESGReport
+  + demander_correction(commentaire : str) : ESGReport
+  + recalculer_score() : Score
+  + modifier_donnees_financieres(valeurs : dict) : ESGReport
+  .. ingestion/synthesis_report.py ..
+  + generer_rapport_synthese() : bytes
+  + regenerer_synthese() : void
+}
+
+class ExtractionRun {
+  - status : ExtractionRunStatus
+  - started_at : datetime
+  - finished_at : datetime [0..1]
+  - docling_version : str
+  - llm_model : str
+  - prompt_version : str
+  - error : str [0..1]
+  .. ingestion/extractor.py ..
+  + {static} run_extraction_pipeline(rapport_id : UUID, annee : int, derniere_tentative : bool) : void
+  .. ingestion/etat_extraction.py ..
+  + {static} cloturer_executions(rapport_id : UUID, statut : ExtractionRunStatus, cause : str) : void
+  + {static} marquer_echec(rapport : ESGReport, cause : str) : void
+}
+
+class Evidence {
+  - document_name : str
+  - year : int
+  - total_pages : int
+  - page_start : int
+  - page_end : int
+  - excerpt_pdf_path : str
+  .. ingestion/proof_generator.py ..
+  + {static} generate_page_proof(source_pdf : Path, page : int, ...) : Evidence
+}
+
+abstract class "Valeur extraite" as ExtractedValue <<abstraction>> {
+  - method : DataMethod
+  - raw_value : str [0..1]
+  - proof_text : str [0..1]
+  - confidence : ConfidenceLevel [0..1]
+  - proof_boxes : list
+  - review_status : MetricReviewStatus
+  - audited_value : float [0..1]
+  .. scoring/engine.py ..
+  + {static} valeur_effective(statut : MetricReviewStatus, valeur : float, valeur_auditee : float) : float [0..1]
+  .. ingestion/localisation.py ..
+  + {static} localiser(document : DoclingDocument, page : int, citation : str, ...) : list<Boite>
+}
+
+class ESGMetric {
+  - pillar : Pillar
+  - metric_code : str
+  - value : float
+  - unit : str
+}
+
+class CarbonEmission {
+  - scope : int {1, 2, 3}
+  - ghg_category : str [0..1]
+  - tonnes_co2e : float
+  - year : int
+  - pcaf_data_quality : int [0..1] {1..5}
+  .. carbon/pcaf.py ..
+  + {static} qualite_donnee_pcaf(methode : DataMethod) : int
+}
+
+class MetricCoverage {
+  - metric_code : str
+  - status : MetricCoverageStatus
+  - pages_examined : int
+  .. ingestion/completeness.py ..
+  + {static} calculer_couverture(rapport_id : UUID, extraction : ExtractionEntreprise, ...) : list<MetricCoverage>
+}
+
+class DiscrepancyFlag {
+  - nature : str
+  - status : str
+  - flagged_at : datetime
+}
+
+enum ReportStatus <<enumeration>> {
+  DRAFT
+  EXTRACTING
+  EXTRACTION_FAILED
+  AWAITING_ASSIGNMENT
+  IN_AUDIT
+  PENDING_DECISION
+  REVISION_REQUESTED
+  VALIDATED
+  REJECTED
+}
+enum ExtractionRunStatus <<enumeration>> {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  RETRY_SCHEDULED
+}
+
+Company "1" *-- "0..*" ESGReport : dépose >
+ESGReport "0..1" -- "0..1" ESGReport : version précédente >
+ESGReport "1" *-- "0..*" ExtractionRun
+ESGReport "1" *-- "0..*" ESGMetric
+ESGReport "1" *-- "0..*" CarbonEmission
+ESGReport "1" *-- "0..*" MetricCoverage
+ExtractedValue <|-- ESGMetric
+ExtractedValue <|-- CarbonEmission
+ExtractionRun "0..1" -- "0..*" ExtractedValue : produit >
+Evidence "1" -- "0..*" ExtractedValue : prouve >
+ESGMetric "1" -- "0..*" DiscrepancyFlag
+ESGReport ..> ReportStatus
+ExtractionRun ..> ExtractionRunStatus
+
+note bottom of ExtractedValue
+  Abstraction de présentation : en base,
+  esg_metrics et carbon_emissions sont deux
+  tables qui partagent ces colonnes.
+end note
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (« .. module .. »).
+  L'objet courant et les paramètres techniques sont omis. Souligné = opération de classe.
+endlegend
+@enduml

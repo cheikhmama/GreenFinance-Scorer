@@ -1,0 +1,33 @@
+@startuml st-01-rapport
+!include _style.iuml
+title Diagramme d'états-transitions — Rapport ESG (ReportStatus)
+hide empty description
+
+[*] --> DRAFT : créer une session de déclaration\n[entreprise ACTIVE, exercice non validé]
+
+state DRAFT : brouillon modifiable
+state EXTRACTING : analyse du PDF\n(job extract_report)
+state EXTRACTION_FAILED
+state AWAITING_ASSIGNMENT : soumis et verrouillé
+state IN_AUDIT : revue des valeurs\npar l'auditeur affecté
+state PENDING_DECISION : avis rendu,\ndécision de l'administrateur
+state REVISION_REQUESTED
+state VALIDATED : score officiel publié
+state REJECTED
+
+DRAFT --> EXTRACTING : joindre le PDF\n/ enfiler l'extraction
+EXTRACTING --> DRAFT : [brouillon] analyse terminée\nou échouée (cause)
+DRAFT --> AWAITING_ASSIGNMENT : soumettre [analyse réussie]\n/ submitted_at, synthèse PDF
+DRAFT --> [*] : abandonner
+EXTRACTING --> AWAITING_ASSIGNMENT : [soumis] extraction réussie\n/ pré-score, notification
+EXTRACTING --> EXTRACTION_FAILED : [soumis] échec définitif\nou délai dépassé
+EXTRACTION_FAILED --> EXTRACTING : relancer (administrateur)
+AWAITING_ASSIGNMENT --> IN_AUDIT : affecter un auditeur\n/ notification
+IN_AUDIT --> PENDING_DECISION : avis d'audit\n[toutes les valeurs revues]
+PENDING_DECISION --> VALIDATED : valider [couverture suffisante]\n/ publication atomique du score
+PENDING_DECISION --> REJECTED : rejeter (motif)
+PENDING_DECISION --> REVISION_REQUESTED : demander une correction (motif)
+REVISION_REQUESTED --> EXTRACTING : nouvelle version déposée\n(nouvelle ligne, version + 1)
+VALIDATED --> [*]
+REJECTED --> [*]
+@enduml

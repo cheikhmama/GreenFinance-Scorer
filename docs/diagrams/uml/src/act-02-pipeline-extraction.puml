@@ -1,0 +1,46 @@
+@startuml act-02-pipeline-extraction
+!include _style.iuml
+title Diagramme d'activité — Pipeline d'extraction (worker d'extraction)
+
+start
+:Recevoir le job extract_report;
+if (Rapport toujours en EXTRACTING ?) then (non)
+  :Ignorer (job rejoué);
+  stop
+else (oui)
+endif
+:Ouvrir une exécution (ExtractionRun RUNNING)\navec les versions Docling, LLM et prompt;
+:Convertir le PDF avec Docling;
+:Découper le document par page;
+:Calculer les embeddings bge-m3\net construire l'index FAISS;
+:Rechercher les pages candidates\npour chaque code d'indicateur;
+:Sélectionner les pages selon le budget de tokens\n(+ pages voisines);
+repeat
+  :Construire le prompt (contexte + codes attendus);
+  :Appeler Gemini (tool-calling forcé);
+  if (Erreur passagère (quota, réseau) ?) then (oui)
+    if (Dernière tentative ?) then (non)
+      :Marquer l'exécution RETRY_SCHEDULED;
+      :Remettre le job en file avec délai;
+      stop
+    else (oui)
+      :Marquer l'échec (EXTRACTION_FAILED\nou DRAFT avec la cause);
+      stop
+    endif
+  else (non)
+  endif
+  :Fusionner les valeurs extraites;
+repeat while (Indicateurs manquants\net pages non examinées ?) is (oui) not (non)
+:Localiser chaque valeur citée (boîtes englobantes);
+:Générer les extraits PDF de preuve;
+:Calculer la couverture par indicateur;
+:Remplacer indicateurs, émissions, preuves\net couverture (une transaction);
+:Clore l'exécution (SUCCEEDED);
+:Calculer le pré-score (configuration de référence);
+if (Rapport soumis ?) then (oui)
+  :Statut AWAITING_ASSIGNMENT\n+ notification aux administrateurs;
+else (non, brouillon)
+  :Statut DRAFT\n(checklist disponible);
+endif
+stop
+@enduml

@@ -1,0 +1,29 @@
+@startuml st-02-entreprise
+!include _style.iuml
+title Diagramme d'états-transitions — Entreprise (RegistrationStatus)
+hide empty description
+
+state "En cours d'examen" as EXAMEN {
+  state PENDING_ONBOARDING
+  state INFO_REQUESTED
+  PENDING_ONBOARDING --> INFO_REQUESTED : demander des informations\n/ nouveau lien de suivi
+  INFO_REQUESTED --> PENDING_ONBOARDING : réponse du demandeur\n(nouvelle lettre de mandat)
+}
+
+[*] --> EMAIL_VERIFICATION_PENDING : inscription publique\n/ e-mail avec code à 6 chiffres
+EMAIL_VERIFICATION_PENDING --> PENDING_ONBOARDING : code valide\n[30 min, 5 essais]
+EXAMEN --> ACTIVE : approuver\n/ lien d'activation 72 h
+EXAMEN --> REJECTED : rejeter (motif)\n/ compte désactivé
+REJECTED --> PENDING_ONBOARDING : nouvelle inscription\navec les mêmes identifiants
+ACTIVE --> SUSPENDED : suspendre\n/ sessions révoquées
+SUSPENDED --> ACTIVE : réactiver
+
+state ACTIVE : dépose des rapports,\nreçoit des investissements
+state SUSPENDED : visible des investisseurs existants,\naucune nouvelle position
+
+note right of EXAMEN
+  Entreprise invisible pour tous les rôles
+  sauf l'administrateur ; le demandeur suit
+  sa demande par un lien à jeton.
+end note
+@enduml

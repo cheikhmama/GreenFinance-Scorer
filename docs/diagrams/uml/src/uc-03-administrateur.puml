@@ -1,0 +1,60 @@
+@startuml uc-03-administrateur
+!include _style.iuml
+title Cas d'utilisation — Administrateur
+left to right direction
+
+actor "Administrateur" as A
+actor "GLEIF" as GL <<système>>
+actor "Serveur SMTP" as SMTP <<système>>
+
+rectangle "Espace Administrateur" {
+  usecase "Examiner une inscription\nd'entreprise" as O1
+  usecase "Consulter la revue KYC\n(LEI, domaine e-mail,\nlettre de mandat)" as O2
+  usecase "Approuver l'inscription" as O3
+  usecase "Demander des informations" as O4
+  usecase "Rejeter avec motif" as O5
+  usecase "Traiter une demande d'accès\n(investisseur / chercheur)" as O6
+  usecase "Envoyer un lien d'activation" as O7
+
+  usecase "Suspendre / réactiver\nune entreprise" as G1
+  usecase "Gérer les utilisateurs\n(désactiver, réactiver)" as G2
+  usecase "Compléter identifiants\net données financières\n(ISIN, ticker, EVIC, CA)" as G3
+
+  usecase "Relancer une extraction\néchouée" as V0
+  usecase "Affecter un auditeur" as V1
+  usecase "Consulter l'avis et le\njournal de revue" as V2
+  usecase "Vérifier le score\n(couverture minimale)" as V3
+  usecase "Valider le rapport\n(publication atomique du score)" as V4
+  usecase "Rejeter le rapport" as V5
+  usecase "Demander une correction" as V6
+  usecase "Publier l'entreprise\nau catalogue" as V7
+
+  usecase "Consulter le tableau de bord\net le journal d'audit" as S1
+}
+
+A --> O1
+O1 ..> O2 : <<include>>
+O2 --> GL
+O3 .up.> O1 : <<extend>>
+O4 .up.> O1 : <<extend>>
+O5 .up.> O1 : <<extend>>
+A --> O6
+O3 ..> O7 : <<include>>
+O6 ..> O7 : <<include>>
+O7 --> SMTP
+
+A --> G1
+A --> G2
+A --> G3
+
+A --> V0
+A --> V1
+A --> V2
+V4 ..> V3 : <<include>>
+A --> V4
+A --> V5
+A --> V6
+A --> V7
+
+A --> S1
+@enduml

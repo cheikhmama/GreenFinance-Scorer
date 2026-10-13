@@ -1,0 +1,108 @@
+@startuml cl-06-investissement
+!include _style.iuml
+title Diagramme de classes — Investissement (portefeuilles et carbone PCAF)
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 60
+hide empty methods
+
+class User {
+  - role : Role = INVESTOR
+}
+class Company {
+  - isin : str [0..1]
+  - ticker : str [0..1]
+  - status : RegistrationStatus
+  - published_at : datetime [0..1]
+  - minimum_investment_amount : Decimal [0..1]
+}
+hide User methods
+hide Company methods
+
+class Portfolio {
+  - name : str
+  - reference_currency : Currency
+  - archived : bool
+  - created_at : datetime
+  - total_esg_score : float [0..1]
+  - waci : float [0..1]
+  - financed_emissions_tco2e : float [0..1]
+  - computed_at : datetime [0..1]
+  - config_hash : str [0..1]
+  .. investor/portfolio.py ..
+  + {static} creer_portefeuille(investisseur_id : UUID, nom : str) : Portfolio
+  + renommer_portefeuille(investisseur_id : UUID, nom : str) : Portfolio
+  + archiver_portefeuille(investisseur_id : UUID) : Portfolio
+  + restaurer_portefeuille(investisseur_id : UUID) : Portfolio
+  + supprimer_portefeuille(investisseur_id : UUID) : void
+  + resume_portefeuille() : PortefeuilleResume
+  + detail_portefeuille() : PortefeuilleDetail
+  + exporter_positions_csv() : str
+  .. investor/importation.py ..
+  + importer_positions(investisseur_id : UUID, contenu : bytes, nom_fichier : str, total_value : Decimal) : list<PortfolioPosition>
+  .. investor/carbon.py ..
+  + empreinte_carbone() : PortfolioCarbon
+}
+
+class PortfolioPosition {
+  - identifier_type : IdentifierType [0..1]
+  - identifier_raw : str [0..1]
+  - match_status : MatchStatus
+  - outstanding_amount : Decimal
+  - currency : Currency
+  - fx_rate_used : Decimal [0..1]
+  - converted_amount : Decimal
+  - weight : Decimal [0..1]
+  - duration_type : DurationType
+  - start_date : datetime
+  - end_date : datetime [0..1]
+  .. investor/models.py (validateurs) ..
+  - _valider_regles_duree() : PortfolioPosition
+  - _valider_montant_minimum(info : ValidationInfo) : PortfolioPosition
+  .. investor/portfolio.py ..
+  + {static} ajouter_position(investisseur_id : UUID, portefeuille_id : UUID, payload : AjouterPositionRequest) : PortfolioPosition
+  + modifier_position(investisseur_id : UUID, payload : ModifierPositionRequest) : PortfolioPosition
+  + fermer_position(investisseur_id : UUID, date_fin : datetime) : PortfolioPosition
+  + supprimer_position(investisseur_id : UUID) : void
+  + etat_position(entreprise_actif : bool) : EtatPosition
+  + etat_temporel() : EtatPosition
+}
+
+class "pcaf" as PCAF <<utility>> {
+  .. carbon/pcaf.py ..
+  + {static} calculer_ligne(ligne : LignePCAF) : ResultatLigne
+  + {static} calculer_portefeuille(lignes : list<LignePCAF>) : ResultatPortefeuille
+  + {static} choisir_scope_2(par_categorie : dict) : tuple<Emission, str>
+  + {static} qualite_donnee_pcaf(methode : DataMethod) : int
+}
+hide PCAF fields
+
+enum MatchStatus <<enumeration>> {
+  MATCHED
+  UNMATCHED
+  AMBIGUOUS
+}
+enum Currency <<enumeration>> {
+  MRU
+  USD
+  EUR
+}
+enum DurationType <<enumeration>> {
+  OUVERTE
+  FIXE
+}
+
+User "1" *-- "0..*" Portfolio : détient >
+Portfolio "1" *-- "0..*" PortfolioPosition : contient >
+Company "0..1" -- "0..*" PortfolioPosition : investie <
+Portfolio ..> PCAF : <<use>>\nempreinte_carbone()
+PortfolioPosition ..> MatchStatus
+PortfolioPosition ..> DurationType
+Portfolio ..> Currency
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (séparateur « .. module .. »).
+  L'objet courant et la session sont omis. Souligné = opération de classe.
+  Les deux validateurs privés sont de vraies méthodes du modèle SQLModel.
+endlegend
+@enduml

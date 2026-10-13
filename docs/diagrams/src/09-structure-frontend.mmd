@@ -1,0 +1,50 @@
+---
+title: Structure des composants du frontend (React 19 · Vite · TanStack Query)
+---
+flowchart TB
+  MAIN["main.tsx<br/>QueryClientProvider · thème"] --> APP["App.tsx<br/>createBrowserRouter"]
+
+  subgraph F["src/features — une feature par espace (routes.tsx · api.ts · components/)"]
+    direction LR
+    FA["auth<br/>connexion · activation · profil · 403"]
+    FR["registration<br/>inscription entreprise · suivi"]
+    FC["contact"]
+    FAD["admin<br/>tableaux de bord · KYC · onboarding<br/>rapports · journal · utilisateurs"]
+    FCO["company<br/>rapports · session de déclaration"]
+    FAU["audit<br/>file d'audit · revue des valeurs"]
+    FI["investor<br/>portefeuilles · import · carbone"]
+    FRE["researcher<br/>projets · analyses · jeux de référence"]
+    FIN["institution<br/>projets · chercheurs"]
+    FP["prototype"]
+  end
+
+  subgraph S["src/shared — système « Registre »"]
+    direction LR
+    LAY["layout<br/>AppShell · PageShell · AuthLayout · roleNav"]
+    UIK["ui<br/>data-table · sheet (tiroir) · dialog<br/>stat-card · badge · form · tabs"]
+    ESG["esg<br/>affichage score / piliers"]
+    FMT["format<br/>dates · montants · statuts"]
+    NOT["notifications"]
+    PRO["profile"]
+    THM["theme"]
+    HK["hooks"]
+  end
+
+  subgraph API["src/shared/api"]
+    direction LR
+    GEN["generated/* (Orval)<br/>hooks React Query typés<br/>12 domaines OpenAPI"]
+    CLI["client.ts<br/>fetch credentials include<br/>+ X-CSRF-Token"]
+    ERR["errors.ts · download.ts"]
+    GEN --> CLI
+  end
+
+  APP --> F
+  F --> LAY
+  F --> UIK
+  F --> ESG
+  F --> FMT
+  F --> GEN
+  LAY --> NOT
+  LAY --> PRO
+  CLI -->|"HTTP /api/v1"| BE[("Backend FastAPI<br/>openapi.json → orval.config.ts")]
+  BE -. "génération du client" .-> GEN

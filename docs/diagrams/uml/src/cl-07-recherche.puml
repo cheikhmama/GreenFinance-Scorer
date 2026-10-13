@@ -1,0 +1,106 @@
+@startuml cl-07-recherche
+!include _style.iuml
+title Diagramme de classes — Recherche : projets et analyses
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 65
+hide empty methods
+
+class "User\n(Institution)" as Inst {
+  - role : Role = INSTITUTION
+}
+class "User\n(Chercheur)" as Res {
+  - role : Role = RESEARCHER
+}
+class Company
+class ESGReport
+class Score
+hide Inst methods
+hide Res methods
+hide Company members
+hide ESGReport members
+hide Score members
+
+class Project {
+  - name : str
+  - description : str [0..1]
+  - objective : str [0..1]
+  - start_date : datetime [0..1]
+  - planned_end_date : datetime [0..1]
+  - deadline : datetime [0..1]
+  - status : ProjectStatus
+  - closed_at : datetime [0..1]
+  .. institution/projets.py ..
+  + {static} creer_projet(institution_id : UUID, nom : str, description : str, objectif : str, ...) : Project
+  + consulter_projet(institution_id : UUID) : Project
+  + affecter_chercheur(institution_id : UUID, chercheur_id : UUID) : ProjectAssignment
+  + ajouter_entreprise_perimetre(institution_id : UUID, entreprise_id : UUID) : ProjectCompany
+  + ajouter_document(institution_id : UUID, rapport_id : UUID) : ProjectDocument
+  + cloturer_projet(institution_id : UUID) : Project
+}
+class ProjectAssignment {
+  - assigned_at : datetime
+}
+class ProjectCompany {
+  - added_at : datetime
+}
+class ProjectDocument {
+  - added_at : datetime
+}
+class Analysis {
+  - title : str
+  - content : str
+  - status : AnalysisStatus
+  - version : int
+  - institution_comment : str [0..1]
+  - created_at : datetime
+  - submitted_at : datetime [0..1]
+  - decided_at : datetime [0..1]
+  .. researcher/analyses.py ..
+  + {static} creer_analyse(chercheur_id : UUID, projet_id : UUID, titre : str, contenu : str, entreprise_ids : list<UUID>) : Analysis
+  + modifier_analyse(chercheur_id : UUID, titre : str, contenu : str, entreprise_ids : list<UUID>) : Analysis
+  + soumettre_analyse(chercheur_id : UUID) : Analysis
+  + corriger_analyse(chercheur_id : UUID, titre : str, contenu : str, entreprise_ids : list<UUID>) : Analysis
+  .. institution/analyses.py ..
+  + valider_analyse(institution_id : UUID, commentaire : str) : Analysis
+  + demander_correction(institution_id : UUID, commentaire : str) : Analysis
+  + historique_analyse(institution_id : UUID) : list<Analysis>
+  + exporter_analyse_csv(institution_id : UUID) : str
+}
+class AnalysisCompany
+hide AnalysisCompany members
+
+enum AnalysisStatus <<enumeration>> {
+  BROUILLON
+  SOUMISE
+  VALIDEE
+  CORRECTION_DEMANDEE
+}
+enum ProjectStatus <<enumeration>> {
+  OUVERT
+  CLOTURE
+}
+
+Inst "1" -- "0..*" Project : pilote >
+Project "1" *-- "0..*" ProjectAssignment
+Res "1" -- "0..*" ProjectAssignment
+Project "1" *-- "0..*" ProjectCompany : périmètre >
+Company "1" -- "0..*" ProjectCompany
+Project "1" *-- "0..*" ProjectDocument
+ESGReport "1" -- "0..*" ProjectDocument
+Project "1" *-- "0..*" Analysis
+Res "1" -- "0..*" Analysis : rédige >
+Analysis "0..1" -- "0..1" Analysis : version précédente >
+Analysis "1" *-- "0..*" AnalysisCompany
+Company "1" -- "0..*" AnalysisCompany
+ESGReport "0..1" -- "0..*" AnalysisCompany : figé >
+Score "0..1" -- "0..*" AnalysisCompany : figé >
+Analysis ..> AnalysisStatus
+Project ..> ProjectStatus
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (séparateur « .. module .. »).
+  L'objet courant et la session sont omis. Souligné = opération de classe.
+  Une correction ne réécrit jamais l'analyse : corriger_analyse() crée une nouvelle version.
+endlegend
+@enduml

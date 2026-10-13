@@ -1,0 +1,29 @@
+---
+title: Inscription et cycle de vie d'une entreprise (RegistrationStatus, KYC)
+---
+stateDiagram-v2
+  direction LR
+  [*] --> EMAIL_VERIFICATION_PENDING: inscription publique (lettre de mandat, identifiants vérifiés)
+  EMAIL_VERIFICATION_PENDING --> PENDING_ONBOARDING: code e-mail à 6 chiffres (30 min, 5 essais)
+  PENDING_ONBOARDING --> INFO_REQUESTED: demander des informations (ADMIN)
+  INFO_REQUESTED --> PENDING_ONBOARDING: réponse via lien de suivi (nouvelle lettre)
+  PENDING_ONBOARDING --> ACTIVE: approuver (ADMIN) — lien d'activation 72 h
+  INFO_REQUESTED --> ACTIVE: approuver (ADMIN)
+  PENDING_ONBOARDING --> REJECTED: rejeter avec motif
+  INFO_REQUESTED --> REJECTED: rejeter avec motif
+  REJECTED --> PENDING_ONBOARDING: nouvelle inscription, mêmes identifiants
+  ACTIVE --> SUSPENDED: suspendre (sessions révoquées)
+  SUSPENDED --> ACTIVE: réactiver
+
+  note right of PENDING_ONBOARDING
+    Revue KYC (lecture seule) :
+    GLEIF (LEI, raison sociale),
+    domaine e-mail vs site web,
+    lettre de mandat présente
+  end note
+  note right of ACTIVE
+    Seule une entreprise ACTIVE dépose des
+    rapports et reçoit de nouveaux investissements.
+    published_at : visible aux investisseurs
+    et chercheurs
+  end note

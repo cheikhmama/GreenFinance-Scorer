@@ -1,0 +1,33 @@
+@startuml uc-04-auditeur
+!include _style.iuml
+title Cas d'utilisation — Auditeur
+left to right direction
+
+actor "Auditeur" as AU
+
+rectangle "Espace Auditeur" {
+  usecase "Consulter les rapports\nqui lui sont affectés" as A1
+  usecase "Examiner un rapport\n(indicateurs, carbone)" as A2
+  usecase "Visualiser la preuve\n(page PDF, zone citée)" as A3
+  usecase "Réviser une valeur" as A4
+  usecase "Accepter la valeur" as A5
+  usecase "Corriger la valeur\n(nouvelle valeur + motif)" as A6
+  usecase "Déclarer la valeur\nintrouvable (motif)" as A7
+  usecase "Rendre l'avis d'audit" as A8
+  usecase "Consulter le pré-score" as A9
+  usecase "Consulter son historique" as A10
+}
+
+AU --> A1
+AU --> A2
+A2 ..> A3 : <<include>>
+AU --> A4
+A5 -up-|> A4
+A6 -up-|> A4
+A7 -up-|> A4
+AU --> A8
+A8 ..> A4 : <<include>>\n(toutes les valeurs revues)
+AU --> A9
+AU --> A10
+
+@enduml

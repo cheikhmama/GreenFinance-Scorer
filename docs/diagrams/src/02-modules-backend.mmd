@@ -1,0 +1,55 @@
+---
+title: Backend FastAPI — modules et dépendances
+---
+flowchart TB
+  MAIN["app/main.py<br/>App racine"] --> APIR["app/api/router.py<br/>api_app (/api/v1)"]
+
+  subgraph Espaces["Modules « espace » (exposent un router.py)"]
+    direction LR
+    AUTH["auth<br/>login · activation · profil · avatar"]
+    ACC["access_requests<br/>demandes d'accès"]
+    CONT["contact"]
+    ADM["admin<br/>52 routes · KYC · onboarding · journal"]
+    AUD["audit<br/>revue des valeurs · avis"]
+    COMP["company<br/>inscription · rapports · dépôt"]
+    REP["reporting<br/>sessions de déclaration"]
+    INV["investor<br/>portefeuilles · import · carbone"]
+    RES["researcher<br/>projets · analyses · validation croisée"]
+    INST["institution<br/>projets · chercheurs"]
+    EXPLR["explainability (router)"]
+  end
+
+  subgraph Moteurs["Modules moteurs (sans router)"]
+    direction LR
+    ING["ingestion<br/>Docling · recherche sémantique<br/>extraction LLM · complétude · preuves"]
+    SCO["scoring<br/>engine · normalisation · config YAML"]
+    CAR["carbon<br/>PCAF · facteurs d'émission"]
+    EXP["explainability<br/>décomposition du score"]
+  end
+
+  subgraph Core["app/core (transverse)"]
+    direction LR
+    CFG["config"] --- DBM["database"] --- DEP["dependencies<br/>get_current_user"] --- EXC["exceptions"]
+    LOG["logging structlog"] --- RED["redis"] --- STO["storage"] --- MAIL["email"]
+    NOTIF["notifications (router)"] --- AUDLOG["audit (journal)"]
+  end
+
+  WRK["app/worker<br/>queue · jobs · settings arq"]
+
+  APIR --> Espaces
+  APIR --> NOTIF
+  COMP --> ING
+  COMP --> WRK
+  ADM --> SCO
+  ADM --> WRK
+  AUD --> SCO
+  INV --> SCO
+  INV --> CAR
+  RES --> SCO
+  EXPLR --> EXP
+  EXP --> SCO
+  WRK --> ING
+  ING --> SCO
+  Espaces --> Core
+  Moteurs --> Core
+  WRK --> Core

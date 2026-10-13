@@ -1,0 +1,132 @@
+@startuml cl-00-essentiel
+!include _style.iuml
+title Diagramme de classes — GreenFinance-Scorer
+hide empty methods
+skinparam nodesep 50
+skinparam ranksep 65
+
+class User {
+  - email : str
+  - role : Role
+  - active : bool
+  + activer_compte()
+  + verify_password()
+  + revoke_all_sessions()
+}
+
+class Company {
+  - name : str
+  - sector : str
+  - isin : str
+  - status : RegistrationStatus
+  + enregistrer_demande()
+  + decider_inscription()
+  + publier_entreprise()
+}
+
+class ESGReport {
+  - fiscal_year : int
+  - status : ReportStatus
+  - version : int
+  - official_score : float
+  + soumettre()
+  + affecter_auditeur()
+  + valider_rapport()
+  + demander_correction()
+}
+
+class ESGMetric {
+  - pillar : Pillar
+  - metric_code : str
+  - value : float
+  - review_status : MetricReviewStatus
+}
+
+class CarbonEmission {
+  - scope : int
+  - tonnes_co2e : float
+  - pcaf_data_quality : int
+}
+
+class Evidence {
+  - page_start : int
+  - excerpt_pdf_path : str
+  + generate_page_proof()
+}
+
+class MetricReview {
+  - decision : MetricReviewStatus
+  - original_value : float
+  - new_value : float
+  + enregistrer_revue()
+}
+
+class AuditOpinion {
+  - decision : AuditDecision
+  - comment : str
+  + soumettre_avis()
+}
+
+class ScoringConfig {
+  - version : int
+  - content_hash : str
+  + obtenir_configuration_reference()
+}
+
+class Score {
+  - global_score : float
+  - environmental_score : float
+  - social_score : float
+  - governance_score : float
+  + calculer_score()
+  + expliquer_score()
+}
+
+class Portfolio {
+  - name : str
+  - reference_currency : Currency
+  - waci : float
+  + importer_positions()
+  + empreinte_carbone()
+}
+
+class PortfolioPosition {
+  - outstanding_amount : Decimal
+  - weight : Decimal
+  - match_status : MatchStatus
+}
+
+class Project {
+  - name : str
+  - status : ProjectStatus
+  + affecter_chercheur()
+  + cloturer_projet()
+}
+
+class Analysis {
+  - title : str
+  - status : AnalysisStatus
+  - version : int
+  + soumettre_analyse()
+  + valider_analyse()
+}
+
+User "1" -- "0..1" Company : possède >
+Company "1" *-- "0..*" ESGReport : dépose >
+User "0..1" -- "0..*" ESGReport : audite >
+ESGReport "1" *-- "0..*" ESGMetric
+ESGReport "1" *-- "0..*" CarbonEmission
+Evidence "1" -- "0..*" ESGMetric : prouve >
+Evidence "1" -- "0..*" CarbonEmission : prouve >
+ESGReport "1" *-- "0..*" MetricReview
+ESGMetric "1" -- "0..*" MetricReview : révisée par >
+ESGReport "1" *-- "0..*" AuditOpinion
+ESGReport "1" *-- "0..*" Score
+ScoringConfig "1" -- "0..*" Score : méthode >
+User "1" *-- "0..*" Portfolio : détient >
+Portfolio "1" *-- "0..*" PortfolioPosition
+Company "0..1" -- "0..*" PortfolioPosition : investie >
+User "1" -- "0..*" Project : pilote >
+Project "1" *-- "0..*" Analysis
+Analysis "0..*" -- "0..*" Company : compare >
+@enduml

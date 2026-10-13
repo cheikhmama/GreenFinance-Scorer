@@ -1,0 +1,58 @@
+@startuml uc-06-recherche
+!include _style.iuml
+title Cas d'utilisation — Institution et Chercheur
+left to right direction
+
+actor "Institution" as IN
+actor "Chercheur" as C
+
+rectangle "Espace Recherche" {
+  usecase "Inviter un chercheur" as I1
+  usecase "Créer un projet" as I2
+  usecase "Définir le périmètre\n(entreprises)" as I3
+  usecase "Joindre des documents\n(rapports ESG)" as I4
+  usecase "Affecter des chercheurs" as I5
+  usecase "Clôturer un projet" as I6
+  usecase "Valider une analyse" as I7
+  usecase "Demander une correction" as I8
+  usecase "Exporter une analyse" as I9
+
+  usecase "Consulter le catalogue\net les fiches ESG" as S1
+
+  usecase "Accepter / refuser\nun rattachement" as C1
+  usecase "Consulter ses projets\n(périmètre, documents)" as C2
+  usecase "Rédiger une analyse" as C3
+  usecase "Soumettre une analyse" as C4
+  usecase "Corriger une analyse\n(nouvelle version)" as C5
+  usecase "Importer un jeu de données\nde référence" as C6
+  usecase "Lancer une validation croisée" as C7
+}
+
+IN --> I1
+IN --> I2
+IN --> I3
+IN --> I4
+IN --> I5
+IN --> I6
+IN --> I7
+IN --> I8
+IN --> I9
+IN --> S1
+
+C --> S1
+C --> C1
+C --> C2
+C --> C3
+C --> C4
+C --> C5
+C --> C6
+C --> C7
+note right of C1
+  Répond à une invitation
+  envoyée par l'Institution.
+end note
+note right of C7
+  Précondition : un jeu de données
+  de référence a été importé.
+end note
+@enduml

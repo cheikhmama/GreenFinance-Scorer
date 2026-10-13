@@ -1,0 +1,79 @@
+---
+title: Schéma BD (3/5) — Audit et scoring
+---
+erDiagram
+  users {
+    uuid id PK
+  }
+  esg_reports {
+    uuid id PK
+    string status
+    float official_score
+    float coverage_rate
+    string config_hash
+  }
+  esg_metrics {
+    uuid id PK
+    string metric_code
+    float value
+    string review_status "PENDING ACCEPTED OVERRIDDEN NOT_FOUND"
+    float audited_value
+  }
+  carbon_emissions {
+    uuid id PK
+    int scope
+    float tonnes_co2e
+    string review_status
+    float audited_value
+  }
+  metric_reviews {
+    uuid id PK
+    uuid report_id FK
+    uuid metric_id FK "ou emission_id"
+    uuid emission_id FK
+    uuid auditor_id FK
+    string decision
+    float original_value
+    float new_value
+    string reason
+    string comment
+    datetime created_at "append-only"
+  }
+  audit_opinions {
+    uuid id PK
+    uuid report_id FK
+    uuid auditor_id FK
+    string decision "FAVORABLE · AVEC_RESERVES · CORRECTION · UNFAVORABLE"
+    string comment
+    datetime submitted_at
+  }
+  scoring_configs {
+    uuid id PK
+    uuid owner_user_id FK "null = référence"
+    string name
+    int version
+    string content_yaml
+    string content_hash
+    datetime created_at
+  }
+  scores {
+    uuid id PK
+    uuid report_id FK
+    uuid config_id FK
+    float global_score
+    float environmental_score
+    float social_score
+    float governance_score
+    float coverage_rate
+    datetime computed_at
+  }
+
+  esg_reports ||--o{ metric_reviews : "journal de revue"
+  esg_metrics |o--o{ metric_reviews : "revue"
+  carbon_emissions |o--o{ metric_reviews : "revue"
+  users ||--o{ metric_reviews : "auditeur"
+  esg_reports ||--o{ audit_opinions : "avis"
+  users ||--o{ audit_opinions : "auditeur"
+  esg_reports ||--o{ scores : "scores"
+  scoring_configs ||--o{ scores : "méthode"
+  users |o--o{ scoring_configs : "pondérations perso"

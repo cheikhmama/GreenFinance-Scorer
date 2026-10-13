@@ -1,0 +1,48 @@
+@startuml uc-05-investisseur
+!include _style.iuml
+title Cas d'utilisation — Investisseur
+left to right direction
+
+actor "Investisseur" as I
+
+rectangle "Espace Investisseur" {
+  usecase "Consulter le catalogue\ndes entreprises publiées" as C1
+  usecase "Consulter la fiche ESG\nd'une entreprise" as C2
+  usecase "Consulter les preuves\nd'un indicateur" as C3
+  usecase "Comparer des entreprises" as C4
+  usecase "Expliquer un score\n(décomposition par pilier)" as C5
+
+  usecase "Créer / renommer\nun portefeuille" as P1
+  usecase "Ajouter une position" as P2
+  usecase "Importer des positions\n(CSV / JSON, ISIN / ticker)" as P3
+  usecase "Fermer / supprimer\nune position" as P4
+  usecase "Archiver / restaurer\nun portefeuille" as P5
+  usecase "Consulter le score ESG\nagrégé du portefeuille" as P6
+  usecase "Analyser l'empreinte carbone\n(PCAF : émissions financées,\nWACI, qualité)" as P7
+  usecase "Exporter un portefeuille" as P8
+  usecase "Consulter son tableau de bord" as P9
+}
+
+I --> C1
+I --> C2
+C3 .up.> C2 : <<extend>>
+C5 .up.> C2 : <<extend>>
+I --> C4
+
+I --> P1
+I --> P2
+I --> P3
+I --> P4
+I --> P5
+I --> P6
+I --> P7
+I --> P8
+I --> P9
+note right of P3
+  Rapprochement ISIN / ticker avec
+  les entreprises publiées ; montants
+  convertis au taux figé à l'import.
+  Fichier rejeté en entier si une ligne
+  est invalide.
+end note
+@enduml
