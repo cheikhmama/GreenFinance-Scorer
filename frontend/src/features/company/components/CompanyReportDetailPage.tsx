@@ -9,6 +9,7 @@ import type {
   ScoreESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
+import { idDepuisSlug } from "@/shared/format/slug";
 import {
   formatValeur,
   libelleCategorieGes,
@@ -57,8 +58,9 @@ function RetourListe() {
  * du brouillon, bandeau de verrouillage, score officiel une fois validée, correction demandée,
  * valeurs extraites (lecture seule). */
 export function CompanyReportDetailPage() {
-  const { rapportId } = useParams<{ rapportId: string }>();
-  const { data: rapport, isLoading, isError } = useCompanyReport(rapportId ?? "");
+  const { rapportId: segment } = useParams<{ rapportId: string }>();
+  const rapportId = idDepuisSlug(segment ?? "");
+  const { data: rapport, isLoading, isError } = useCompanyReport(rapportId);
   const [soumissionOuverte, setSoumissionOuverte] = useState(false);
   const etat = rapport ? etatBrouillon(rapport) : null;
   const liste = useReportChecklist(
@@ -113,9 +115,11 @@ export function CompanyReportDetailPage() {
         }
         actions={
           <>
-            <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
-              {libelleStatutRapportEntreprise(rapport.status)}
-            </Badge>
+            {rapport.status !== "DRAFT" ? (
+              <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
+                {libelleStatutRapportEntreprise(rapport.status)}
+              </Badge>
+            ) : null}
             {rapport.synthesis_available ? (
               <Button asChild variant="outline" size="sm">
                 <a href={`/api/v1/company/rapports/${rapport.id}/synthese/fichier`}>

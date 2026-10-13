@@ -107,7 +107,9 @@ def demander_acces(
     _verifier_envoi_possible()
 
     role = _role(demande.role)
-    utilisateur = session.exec(select(User).where(col(User.email) == demande.email)).first()
+    utilisateur = session.exec(
+        select(User).where(col(User.email) == demande.email)
+    ).first()
     if utilisateur is None:
         utilisateur = User(
             email=demande.email,
@@ -118,7 +120,9 @@ def demander_acces(
         )
         session.add(utilisateur)
         session.flush()
-        acces = AccessRequest(user_id=utilisateur.id, role=role, organization=demande.organization)
+        acces = AccessRequest(
+            user_id=utilisateur.id, role=role, organization=demande.organization
+        )
         action = "access_requested"
     else:
         existante = session.exec(
@@ -147,7 +151,10 @@ def demander_acces(
     session.add(acces)
     session.flush()
 
-    auditer(session, None, action, "User", utilisateur.id, "success")
+    # Geste libre-service : personne n'est encore connecté, mais l'acteur reste identifiable —
+    # c'est le titulaire de la demande lui-même (même principe que app/auth/password_reset.py::
+    # reinitialiser_mot_de_passe, identifié par jeton plutôt que par session).
+    auditer(session, utilisateur.id, action, "User", utilisateur.id, "success")
     for admin in session.exec(
         select(User).where(col(User.role) == Role.ADMIN, col(User.active).is_(True))
     ).all():
@@ -166,7 +173,9 @@ def demander_acces(
         session.rollback()
         background_tasks.add_task(_demande_non_aboutie, demande.email)
         return
-    logger.info("access_request_received", access_request_id=str(acces.id), action=action)
+    logger.info(
+        "access_request_received", access_request_id=str(acces.id), action=action
+    )
     background_tasks.add_task(_accuse_de_reception, demande.email, role)
 
 
@@ -190,10 +199,14 @@ def _vue(acces: AccessRequest, utilisateur: User) -> AccessRequestView:
 def lister_demandes(
     session: Session, statut: AccessRequestStatus | None
 ) -> list[AccessRequestView]:
-    requete = select(AccessRequest, User).where(col(AccessRequest.user_id) == col(User.id))
+    requete = select(AccessRequest, User).where(
+        col(AccessRequest.user_id) == col(User.id)
+    )
     if statut is not None:
         requete = requete.where(col(AccessRequest.status) == statut)
-    lignes = session.exec(requete.order_by(col(AccessRequest.requested_at).desc())).all()
+    lignes = session.exec(
+        requete.order_by(col(AccessRequest.requested_at).desc())
+    ).all()
     return [_vue(acces, utilisateur) for acces, utilisateur in lignes]
 
 
@@ -209,7 +222,9 @@ def decider_demande(
     if acces is None:
         raise NotFoundError("Demande introuvable.", code="demande_introuvable")
     if acces.status != AccessRequestStatus.PENDING_APPROVAL:
-        raise ValidationError("Cette demande a déjà été traitée.", code="transition_invalide")
+        raise ValidationError(
+            "Cette demande a déjà été traitée.", code="transition_invalide"
+        )
     utilisateur = session.get(User, acces.user_id)
     assert utilisateur is not None  # FK NOT NULL, CASCADE
     try:
@@ -225,16 +240,34 @@ def decider_demande(
         acces.status = AccessRequestStatus.APPROVED
         session.add(acces)
         envoyer_lien_activation(session, utilisateur, background_tasks)
-        auditer(session, acteur_id, "access_request_approved", "User", utilisateur.id, "success")
+        auditer(
+            session,
+            acteur_id,
+            "access_request_approved",
+            "User",
+            utilisateur.id,
+            "success",
+        )
     else:
         assert motif is not None  # garanti par AccessDecisionRequest
         acces.status = AccessRequestStatus.REJECTED
         acces.rejection_reason = motif
         utilisateur.active = False
         session.add_all([acces, utilisateur])
-        auditer(session, acteur_id, "access_request_rejected", "User", utilisateur.id, "success")
+        auditer(
+            session,
+            acteur_id,
+            "access_request_rejected",
+            "User",
+            utilisateur.id,
+            "success",
+        )
         background_tasks.add_task(_prevenir_refus, utilisateur.email, motif)
     session.commit()
     session.refresh(acces)
-    logger.info("access_request_decided", access_request_id=str(acces.id), decision=decision.value)
+    logger.info(
+        "access_request_decided",
+        access_request_id=str(acces.id),
+        decision=decision.value,
+    )
     return _vue(acces, utilisateur)

@@ -65,10 +65,16 @@ logger = structlog.get_logger(__name__)
 MAX_DEMANDES_PAR_IP = 3
 FENETRE_SECONDES = 60 * 60
 # Demande qui attend une décision de l'Administrateur.
-STATUTS_EN_EXAMEN = (RegistrationStatus.PENDING_ONBOARDING, RegistrationStatus.INFO_REQUESTED)
+STATUTS_EN_EXAMEN = (
+    RegistrationStatus.PENDING_ONBOARDING,
+    RegistrationStatus.INFO_REQUESTED,
+)
 # Demandes qu'une nouvelle inscription avec les mêmes identifiants reprend : refusée, ou jamais
 # confirmée par son code (tâche 5.11).
-STATUTS_REOUVRABLES = (RegistrationStatus.REJECTED, RegistrationStatus.EMAIL_VERIFICATION_PENDING)
+STATUTS_REOUVRABLES = (
+    RegistrationStatus.REJECTED,
+    RegistrationStatus.EMAIL_VERIFICATION_PENDING,
+)
 
 
 def _limiter_par_ip(adresse_ip: str, prefixe: str = "company_registrations") -> None:
@@ -76,12 +82,16 @@ def _limiter_par_ip(adresse_ip: str, prefixe: str = "company_registrations") -> 
     try:
         demandes = incrementer_fenetre(get_redis_client(), cle, FENETRE_SECONDES)
     except redis.RedisError as exc:
-        logger.error("company_registration_rate_limit_unavailable", error_type=type(exc).__name__)
+        logger.error(
+            "company_registration_rate_limit_unavailable", error_type=type(exc).__name__
+        )
         raise ServiceUnavailableError(
             "Le service d'inscription est temporairement indisponible. Réessayez plus tard."
         ) from exc
     if demandes > MAX_DEMANDES_PAR_IP:
-        raise TooManyRequestsError("Trop de demandes d'inscription. Réessayez dans une heure.")
+        raise TooManyRequestsError(
+            "Trop de demandes d'inscription. Réessayez dans une heure."
+        )
 
 
 def _verifier_envoi_possible() -> None:
@@ -162,7 +172,9 @@ def _demande_existante(
     _CONFLIT : un identifiant est déjà pris ailleurs (compte d'un autre rôle, autre entreprise,
     demande en cours ou entreprise validée)."""
     entreprises: dict[uuid.UUID, Company] = {}
-    utilisateur = session.exec(select(User).where(col(User.email) == demande.contact_email)).first()
+    utilisateur = session.exec(
+        select(User).where(col(User.email) == demande.contact_email)
+    ).first()
     if utilisateur is not None:
         possedee = session.exec(
             select(Company).where(col(Company.owner_user_id) == utilisateur.id)
@@ -176,7 +188,10 @@ def _demande_existante(
             col(Company.isin) == demande.isin if demande.isin else None,
             col(Company.lei) == demande.lei if demande.lei else None,
             # Identifiant fiscal (tâche 5.10) : unique dans son pays.
-            and_(col(Company.country) == demande.country, col(Company.tax_id) == demande.tax_id),
+            and_(
+                col(Company.country) == demande.country,
+                col(Company.tax_id) == demande.tax_id,
+            ),
         )
         if condition is not None
     ]
@@ -204,12 +219,16 @@ def _enregistrer_mandat(entreprise_id: uuid.UUID, contenu: bytes) -> str:
     return chemin
 
 
-def _notifier_admins(session: Session, type_notification: str, message: str, entreprise: Company) -> None:
+def _notifier_admins(
+    session: Session, type_notification: str, message: str, entreprise: Company
+) -> None:
     admins = session.exec(
         select(User).where(col(User.role) == Role.ADMIN, col(User.active).is_(True))
     ).all()
     for admin in admins:
-        notifier(session, admin.id, type_notification, message, id_ressource=entreprise.id)
+        notifier(
+            session, admin.id, type_notification, message, id_ressource=entreprise.id
+        )
 
 
 def _titulaire_de_la_demande_rouverte(
@@ -217,9 +236,15 @@ def _titulaire_de_la_demande_rouverte(
 ) -> User:
     """Titulaire d'une demande refusée : jamais activé (pas de mot de passe), il reprend l'adresse
     et le nom de la nouvelle demande. Recréé s'il n'existe plus."""
-    titulaire = session.get(User, entreprise.owner_user_id) if entreprise.owner_user_id else None
+    titulaire = (
+        session.get(User, entreprise.owner_user_id)
+        if entreprise.owner_user_id
+        else None
+    )
     if titulaire is None:
-        titulaire = User(email=demande.contact_email, role=Role.ENTERPRISE, password_hash=None)
+        titulaire = User(
+            email=demande.contact_email, role=Role.ENTERPRISE, password_hash=None
+        )
         session.add(titulaire)
         session.flush()
         entreprise.owner_user_id = titulaire.id
@@ -296,11 +321,18 @@ def enregistrer_demande(
     session.add(entreprise)
     session.flush()
     code = emettre_code(entreprise)
-    entreprise.mandate_letter_path = _enregistrer_mandat(entreprise.id, lettre_de_mandat)
+    entreprise.mandate_letter_path = _enregistrer_mandat(
+        entreprise.id, lettre_de_mandat
+    )
     entreprise.mandate_letter_uploaded_at = utcnow()
     session.add(entreprise)
 
-    auditer(session, None, action, "Company", entreprise.id, "success")
+    # Geste libre-service : personne n'est encore connecté, mais l'acteur reste identifiable —
+    # c'est le titulaire de l'entreprise lui-même (même principe que app/access_requests/
+    # service.py::demander_acces).
+    auditer(
+        session, entreprise.owner_user_id, action, "Company", entreprise.id, "success"
+    )
 
     try:
         session.commit()
@@ -311,8 +343,12 @@ def enregistrer_demande(
         background_tasks.add_task(_demande_non_aboutie, demande.contact_email)
         return
 
-    logger.info("company_registration_received", company_id=str(entreprise.id), action=action)
-    background_tasks.add_task(envoyer_code, demande.contact_email, demande.company_name, code)
+    logger.info(
+        "company_registration_received", company_id=str(entreprise.id), action=action
+    )
+    background_tasks.add_task(
+        envoyer_code, demande.contact_email, demande.company_name, code
+    )
 
 
 def confirmer_adresse(
@@ -328,7 +364,14 @@ def confirmer_adresse(
     entreprise.status = RegistrationStatus.PENDING_ONBOARDING
     jeton = nouveau_jeton_de_suivi(entreprise)
     session.add(entreprise)
-    auditer(session, None, "registration_email_verified", "Company", entreprise.id, "success")
+    auditer(
+        session,
+        entreprise.owner_user_id,
+        "registration_email_verified",
+        "Company",
+        entreprise.id,
+        "success",
+    )
     _notifier_admins(
         session,
         "ENTREPRISE_INSCRITE",
@@ -340,14 +383,18 @@ def confirmer_adresse(
     background_tasks.add_task(_accuse_de_reception, email, entreprise.name, jeton)
 
 
-def _entreprise_du_jeton(session: Session, jeton: str, *, verrouiller: bool = False) -> Company:
+def _entreprise_du_jeton(
+    session: Session, jeton: str, *, verrouiller: bool = False
+) -> Company:
     requete = select(Company).where(col(Company.status_token_hash) == _empreinte(jeton))
     if verrouiller:
         requete = requete.with_for_update()
     entreprise = session.exec(requete).first()
     if entreprise is None:
         # Jeton inconnu ou remplacé par un plus récent : même réponse.
-        raise NotFoundError("Lien de suivi invalide ou expiré.", code="suivi_introuvable")
+        raise NotFoundError(
+            "Lien de suivi invalide ou expiré.", code="suivi_introuvable"
+        )
     return entreprise
 
 
@@ -382,15 +429,25 @@ def repondre_demande_infos(
     entreprise = _entreprise_du_jeton(session, jeton, verrouiller=True)
     if entreprise.status != RegistrationStatus.INFO_REQUESTED:
         raise ValidationError(
-            "Aucune information n'est demandée pour cette inscription.", code="transition_invalide"
+            "Aucune information n'est demandée pour cette inscription.",
+            code="transition_invalide",
         )
     valider_pdf(lettre_de_mandat, taille_max=TAILLE_MAX_MANDAT_OCTETS)
-    entreprise.mandate_letter_path = _enregistrer_mandat(entreprise.id, lettre_de_mandat)
+    entreprise.mandate_letter_path = _enregistrer_mandat(
+        entreprise.id, lettre_de_mandat
+    )
     entreprise.mandate_letter_uploaded_at = utcnow()
     entreprise.info_response_message = message
     entreprise.status = RegistrationStatus.PENDING_ONBOARDING
     session.add(entreprise)
-    auditer(session, None, "registration_info_provided", "Company", entreprise.id, "success")
+    auditer(
+        session,
+        entreprise.owner_user_id,
+        "registration_info_provided",
+        "Company",
+        entreprise.id,
+        "success",
+    )
     _notifier_admins(
         session,
         "ENTREPRISE_INFOS_COMPLETEES",

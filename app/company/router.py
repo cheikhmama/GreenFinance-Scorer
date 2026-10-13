@@ -21,6 +21,7 @@ from app.auth.models import User
 from app.auth.permissions import require_role
 from app.company.import_rate_limit import enforce_url_import_rate_limit
 from app.company.models import Company
+from app.company.profil import modifier_profil_entreprise
 from app.company.rapports import (
     creer_correction,
     deposer_rapport,
@@ -38,6 +39,7 @@ from app.company.schemas import (
     CompanyRegistrationRequest,
     EntreprisePublic,
     ImporterRapportParURLRequest,
+    ModifierProfilEntrepriseRequest,
     RegistrationEmailResend,
     RegistrationEmailVerification,
     RegistrationStatusRequest,
@@ -221,6 +223,27 @@ def consulter_mon_profil_route(
     _entreprise_id(current_user)  # lève si aucune entreprise n'est rattachée
     assert current_user.company is not None
     return current_user.company
+
+
+@router.patch(
+    "/company/profil",
+    response_model=EntreprisePublic,
+    operation_id="updateMyCompanyProfile",
+    summary="Modifier la description, le site officiel et le montant minimum de ma fiche entreprise",
+)
+def modifier_mon_profil_route(
+    payload: ModifierProfilEntrepriseRequest,
+    current_user: User = Depends(require_role(Role.ENTERPRISE)),
+    session: Session = Depends(get_session),
+) -> Company:
+    return modifier_profil_entreprise(
+        session,
+        _entreprise_id(current_user),
+        description=payload.description,
+        website=payload.website,
+        minimum_investment_amount=payload.minimum_investment_amount,
+        minimum_investment_currency=payload.minimum_investment_currency,
+    )
 
 
 @router.get(

@@ -1,6 +1,5 @@
-import { FileUp, Loader2, Send, Trash2 } from "lucide-react";
+import { FileUp, Loader2, Send } from "lucide-react";
 import { type SyntheticEvent, useId, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type {
   GroupeCompletude,
@@ -10,17 +9,16 @@ import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { FileDrop } from "@/shared/ui/file-drop";
 import { Label } from "@/shared/ui/label";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useAttachDraftFile, useDiscardDraft } from "../api";
+import { useAttachDraftFile } from "../api";
 import { fichierBrouillonSchema } from "../schemas";
 import { CompletenessChecklist } from "./CompletenessChecklist";
 import type { EtatBrouillon } from "./etat";
 
 /** Préparation d'une déclaration (tâche 5.8) : joindre le PDF, suivre son analyse, lire la liste
- * de complétude, puis soumettre — ou abandonner le brouillon. */
+ * de complétude, puis soumettre. */
 export function DraftPanel({
   rapport,
   etat,
@@ -34,21 +32,6 @@ export function DraftPanel({
   chargementListe: boolean;
   onSoumettre: () => void;
 }) {
-  const navigate = useNavigate();
-  const confirm = useConfirm();
-  const abandonner = useDiscardDraft(rapport.id);
-
-  async function abandonnerBrouillon() {
-    const confirme = await confirm({
-      title: "Abandonner ce brouillon ?",
-      description: "Le brouillon et son fichier sont supprimés ; rien n’a été transmis.",
-      confirmLabel: "Abandonner",
-      destructive: true,
-    });
-    if (confirme)
-      abandonner.mutate(undefined, { onSuccess: () => navigate("/company/declarations") });
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -103,12 +86,6 @@ export function DraftPanel({
             <Button onClick={onSoumettre}>
               <Send className="size-4" aria-hidden="true" />
               Soumettre
-            </Button>
-          ) : null}
-          {etat !== "ANALYSE" ? (
-            <Button variant="outline" onClick={abandonnerBrouillon} disabled={abandonner.isPending}>
-              <Trash2 className="size-4" aria-hidden="true" />
-              Abandonner le brouillon
             </Button>
           ) : null}
         </div>

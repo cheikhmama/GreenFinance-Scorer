@@ -8,6 +8,7 @@ noms des attributs de Company ; CompanyContractMixin n'ajoute que le booléen ca
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import (
@@ -98,6 +99,32 @@ class EntreprisePublic(CompanyContractMixin):
     isin: str | None = None
     lei: str | None = None
     ticker: str | None = None
+
+
+class ModifierProfilEntrepriseRequest(BaseModel):
+    """Corps de PATCH /company/profil : la description, le site officiel et le montant minimum
+    d'investissement de SA PROPRE entreprise — nom, secteur et pays restent du seul ressort de
+    l'Administrateur (voir app/admin/schemas.py::ModifierEntrepriseAdminRequest, qui ne porte plus
+    ces trois champs depuis leur bascule ici). Même règle montant/devise que l'ancien schéma Admin :
+    toujours ensemble, jamais l'un sans l'autre (voir app/company/models.py)."""
+
+    description: str | None = None
+    website: str | None = None
+    minimum_investment_amount: Decimal | None = Field(
+        default=None, gt=0, max_digits=20, decimal_places=2
+    )
+    minimum_investment_currency: Currency | None = None
+
+    @model_validator(mode="after")
+    def _verifier_paire_montant_devise(self) -> "ModifierProfilEntrepriseRequest":
+        if (self.minimum_investment_amount is None) != (
+            self.minimum_investment_currency is None
+        ):
+            raise ValueError(
+                "minimum_investment_amount et minimum_investment_currency doivent être fournis "
+                "ensemble ou omis ensemble."
+            )
+        return self
 
 
 class VerificationLei(BaseModel):

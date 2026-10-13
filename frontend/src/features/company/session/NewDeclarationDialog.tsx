@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
-import { libelleTypeRapport } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
+import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import {
@@ -60,7 +61,12 @@ export function NewDeclarationDialog({
     ouvrir.mutate(values, {
       onSuccess: (brouillon) => {
         onOpenChange(false);
-        navigate(`/company/declarations/${brouillon.id}`);
+        const titre = titreDeclaration({
+          type: brouillon.report_type,
+          fiscal_year: brouillon.fiscal_year,
+          version: brouillon.version,
+        });
+        navigate(`/company/declarations/${creerSlug(titre, brouillon.id)}`);
       },
       onError: (error) =>
         setErreur(

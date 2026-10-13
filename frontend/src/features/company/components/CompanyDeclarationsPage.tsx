@@ -6,6 +6,7 @@ import {
   libelleStatutRapportEntreprise,
   variantStatutRapportEntreprise,
 } from "@/shared/format/statut";
+import { creerSlug } from "@/shared/format/slug";
 import { titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -110,7 +111,9 @@ export function CompanyDeclarationsPage() {
                           <StatutEntreprise rapport={rapport} />
                         </div>
                         <Button asChild variant="outline" size="sm">
-                          <Link to={`/company/declarations/${rapport.id}`}>Ouvrir</Link>
+                          <Link to={`/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                            Ouvrir
+                          </Link>
                         </Button>
                       </div>
                       <SessionStepper rapport={rapport} />
@@ -208,7 +211,9 @@ export function CompanyDeclarationsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="ghost" size="sm">
-                          <Link to={`/company/declarations/${rapport.id}`}>Détail</Link>
+                          <Link to={`/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                            Détail
+                          </Link>
                         </Button>
                       </TableCell>
                     </TableRow>
