@@ -71,6 +71,7 @@ _ = torch.zeros(1).sum().item()
 import argparse
 import json
 import sys
+import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -90,8 +91,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.ingestion import completeness, extractor
 from app.ingestion.extractor import (
     INDICATEURS_CIBLES,
+    IndexIncremental,
     _build_context,
-    _build_search_index,
     _call_llm_extraction,
     _get_embed_model,
 )
@@ -160,36 +161,39 @@ def _valeurs_proches(a: float, b: float) -> bool:
     return abs(a - b) / abs(b) <= TOLERANCE_RELATIVE
 
 
-def _charger_conversion(document: Path, cache_dir: Path | None):
-    """Charge le DoclingDocument déjà converti depuis data_test/docling_json/<nom>.json si
-    disponible (voir DOCLING_CACHE_DIR ci-dessus), sinon reconvertit le PDF normalement."""
+def _indexer_document(document: Path, cache_dir: Path | None, embed_model) -> tuple[dict, int]:
+    """Index sémantique du rapport et son nombre de pages. Depuis le DoclingDocument déjà converti
+    de data_test/docling_json/<nom>.json si disponible (voir DOCLING_CACHE_DIR ci-dessus), sinon
+    par la conversion par lots du worker (docling_pipeline.convertir_rapport)."""
+    index = IndexIncremental(embed_model)
     if cache_dir is not None:
         cache_path = cache_dir / f"{document.stem}.json"
         if cache_path.exists():
             t0 = time.time()
             doc = DoclingDocument.load_from_json(cache_path)
-            elapsed = round(time.time() - t0, 2)
+            index.ajouter(doc)
             print(
                 f"  Docling (JSON en cache, {cache_path.name}) : {doc.num_pages()} pages, "
-                f"chargé en {elapsed}s",
+                f"chargé en {round(time.time() - t0, 2)}s",
                 flush=True,
             )
-            return docling_pipeline.ConversionResult(
-                document=doc,
-                status="cache_json",
-                errors=[],
-                pages_docling=doc.num_pages(),
-                pages_pymupdf=doc.num_pages(),
-                pages_correspondent=True,
-                elapsed_s=elapsed,
-            )
-    conversion = docling_pipeline.convert_pdf(document)
+            return index.en_dictionnaire(), doc.num_pages()
+    settings = extractor.get_settings()
+    with tempfile.TemporaryDirectory() as dossier:
+        conversion = docling_pipeline.convertir_rapport(
+            document,
+            Path(dossier),
+            taille=settings.extraction_pages_par_lot,
+            pages_max=settings.extraction_pages_max,
+            threads=settings.extraction_threads,
+            indexer=index.ajouter,
+        )
     print(
-        f"  Docling: {conversion.pages_docling} pages, {conversion.elapsed_s}s, "
-        f"status={conversion.status}",
+        f"  Docling: {conversion.pages_total} pages ({conversion.pages_ocr} en OCR), "
+        f"{conversion.elapsed_s}s",
         flush=True,
     )
-    return conversion
+    return index.en_dictionnaire(), conversion.pages_total
 
 
 def evaluer_entreprise(entree: dict, *, cache_docling_dir: Path | None) -> dict:
@@ -208,9 +212,7 @@ def evaluer_entreprise(entree: dict, *, cache_docling_dir: Path | None) -> dict:
     embed_model = _get_embed_model()
     embed_model.encode(["initialisation"])
 
-    conversion = _charger_conversion(document, cache_docling_dir)
-
-    search_index = _build_search_index(conversion.document)
+    search_index, pages_docling = _indexer_document(document, cache_docling_dir, embed_model)
     codes = [cible.code for cible in INDICATEURS_CIBLES]
 
     # 1er passage — identique à run_extraction_pipeline.
@@ -359,7 +361,7 @@ def evaluer_entreprise(entree: dict, *, cache_docling_dir: Path | None) -> dict:
     return {
         "nom": nom,
         "document": str(document),
-        "pages_docling": conversion.pages_docling,
+        "pages_docling": pages_docling,
         "pages_retenues_1er_passage": pages_used,
         "pages_voisines_ajoutees": pages_voisines_ajoutees,
         "pages_boost_table_decisives": pages_boost_table_decisives,

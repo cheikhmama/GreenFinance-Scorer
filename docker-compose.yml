@@ -73,6 +73,25 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Serveur MCP de l'extraction (app/mcp/serveur.py), lancé par l'agent et jamais en tâche de fond :
+  #   docker compose --profile mcp run --rm -i -v "$PWD/rapports:/data:ro" mcp
+  # Sans base de données. Partage le budget mémoire du worker d'extraction : sur la VM, à lancer
+  # quand celui-ci est inactif.
+  mcp:
+    profiles: ["mcp"]
+    build:
+      context: .
+      target: mcp
+    env_file:
+      - .env
+    environment:
+      EXTRACTION_THREADS: "3"
+      OMP_NUM_THREADS: "3"
+      TOKENIZERS_PARALLELISM: "false"
+    stdin_open: true
+    mem_limit: 12g
+    cpus: 3
+
   db:
     image: pgvector/pgvector:pg16
     environment:

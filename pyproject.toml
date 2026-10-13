@@ -43,6 +43,7 @@ extraction = [
     "faiss-cpu",
     "FlagEmbedding",
     "google-genai",
+    "mcp>=2.3.0",
     "onnxruntime>=1.31.0",
     "openai>=3.29.0",
     "torch",

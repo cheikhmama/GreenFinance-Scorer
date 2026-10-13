@@ -563,7 +563,7 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
         raise RuntimeError("docling indisponible pour ce test")
 
     monkeypatch.setattr("app.ingestion.extractor.docling_pipeline.convertir_rapport", _echec)
-    # _get_embed_model().encode(...) s'exécute désormais AVANT convert_pdf (Phase 5 §9,
+    # _get_embed_model().encode(...) s'exécute désormais AVANT la conversion Docling (Phase 5 §9,
     # contournement d'un conflit d'initialisation natif Docling/PaddleOCR + PyTorch) -- sans ce
     # mock, ce test censé échouer vite au niveau Docling chargeait pour de vrai le modèle bge-m3
     # avant même d'atteindre le point qu'il teste. Même stub minimal que le test voisin

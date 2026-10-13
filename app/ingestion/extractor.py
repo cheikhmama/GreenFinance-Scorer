@@ -839,6 +839,152 @@ def _boites_de_la_valeur(
         return []
 
 
+@dataclass
+class Analyse:
+    """Résultat de analyser_document : tout ce que l'extraction a produit, avant toute écriture en
+    base — le worker le persiste (run_extraction_pipeline), l'outil MCP le renvoie en JSON."""
+
+    conversion: docling_pipeline.RapportConverti
+    codes: list[str]
+    extraction: ExtractionEntreprise
+    modele: str
+    pages_vues_par_code: dict[str, set[int]]
+    pages_par_code: dict[str, list[PageCandidat]]
+    duree_llm_s: float
+    demo: bool
+
+
+def analyser_document(
+    source_path: Path, dossier_json: Path, *, nom_entreprise: str, rapport_id: uuid.UUID
+) -> Analyse:
+    """Conversion par lots, index sémantique, LLM et déduction des pages omises — sans base de
+    données. Une exception porte son étape d'échec (`etape_extraction`), lue par
+    run_extraction_pipeline pour classer l'échec."""
+    demo = get_settings().llm_demo
+
+    # Doit s'exécuter AVANT la conversion Docling (Phase 5 §9, trouvaille empirique) : bge-m3
+    # (PyTorch) initialisé APRÈS le backend OCR de Docling faisait planter le process (segfault,
+    # puis faux « manque de mémoire » de l'allocateur CPU PyTorch au chargement de TableFormer),
+    # constaté avec le moteur OCR Paddle ; PyTorch doit avoir réellement exécuté une passe
+    # d'inférence (encode()) avant. Conservé avec ONNX Runtime tant qu'une exécution réelle
+    # complète n'a pas montré qu'il est devenu inutile. _get_embed_model est mis en cache : cet
+    # appel ne recharge rien au rapport suivant, encode() d'une courte chaîne est immédiat.
+    try:
+        embed_model = _get_embed_model()
+        embed_model.encode(["initialisation"])
+    except Exception as exc:
+        _marquer_etape(exc, "chargement_modele_embedding_echoue")
+        raise
+
+    logger.info("docling_conversion_demarree", rapport_id=str(rapport_id))
+    index = IndexIncremental(embed_model)
+
+    def indexer(document: DoclingDocument) -> None:
+        try:
+            index.ajouter(document)
+        except Exception as exc:
+            _marquer_etape(exc, "indexation_semantique_echouee")
+            raise
+
+    # Lot par lot (app/ingestion/lots.py) : un lot converti est indexé puis relâché, un lot déjà
+    # converti par une exécution interrompue est repris depuis son JSON.
+    settings = get_settings()
+    try:
+        conversion = docling_pipeline.convertir_rapport(
+            source_path,
+            dossier_json,
+            taille=settings.extraction_pages_par_lot,
+            pages_max=settings.extraction_pages_max,
+            threads=settings.extraction_threads,
+            indexer=indexer,
+        )
+    except DocumentTropLong as exc:
+        _marquer_etape(exc, "document_trop_long")
+        raise
+    except Exception as exc:
+        _marquer_etape(exc, "docling_conversion_echouee")
+        raise
+    logger.info(
+        "docling_conversion_terminee",
+        rapport_id=str(rapport_id),
+        elapsed_s=conversion.elapsed_s,
+        pages=conversion.pages_total,
+        pages_ocr=conversion.pages_ocr,
+    )
+
+    try:
+        search_index = index.en_dictionnaire()
+    except Exception as exc:
+        _marquer_etape(exc, "indexation_semantique_echouee")
+        raise
+    codes = [cible.code for cible in INDICATEURS_CIBLES]
+
+    debut_llm = time.monotonic()
+    if demo:
+        _context, pages_used, pages_par_code = _build_context(
+            search_index, embed_model, codes, CONTEXT_TOKEN_BUDGET
+        )
+        pages_vues_par_code: dict[str, set[int]] = {code: set(pages_used) for code in codes}
+        logger.warning(
+            "extraction_demo_synthetique_utilisee",
+            rapport_id=str(rapport_id),
+            raison="aucune vraie cle LLM configuree (.env) — extraction simulee",
+        )
+        extraction = _extraction_demo_synthetique(nom_entreprise=nom_entreprise, codes=codes)
+        modele = MODELE_DEMO
+    else:
+        resultat_llm = _extraire_par_llm(
+            search_index,
+            embed_model,
+            codes,
+            nom_entreprise=nom_entreprise,
+            budget_tokens=settings.llm_context_tokens,
+            modele=modele_principal(),
+        )
+        extraction = resultat_llm.extraction
+        modele = resultat_llm.modele
+        pages_vues_par_code = resultat_llm.pages_vues_par_code
+        pages_par_code = resultat_llm.pages_par_code
+    duree_llm_s = round(time.monotonic() - debut_llm, 1)
+    logger.info("extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo, duree_s=duree_llm_s)
+
+    extraction = _deduire_pages_manquantes(
+        extraction, conversion.document_de_la_page, pages_vues_par_code, rapport_id
+    )
+    return Analyse(
+        conversion=conversion,
+        codes=codes,
+        extraction=extraction,
+        modele=modele,
+        pages_vues_par_code=pages_vues_par_code,
+        pages_par_code=pages_par_code,
+        duree_llm_s=duree_llm_s,
+        demo=demo,
+    )
+
+
+def couvertures(analyse: Analyse, rapport_id: uuid.UUID) -> list[MetricCoverage]:
+    """Statut de couverture de chaque code cible (completeness.calculer_couverture) : un code est
+    "recherché exhaustivement" si TOUTES ses pages candidates au-dessus de son propre plancher de
+    pertinence ont effectivement été montrées au LLM (1er passage + relance) — jamais déduit du
+    budget global, qui peut avoir écarté des pages pertinentes pour CE code au profit d'autres
+    codes dans le classement fusionné."""
+    pages_vues, pages_par_code = analyse.pages_vues_par_code, analyse.pages_par_code
+    pages_examinees_par_code = {code: len(pages_vues[code]) for code in analyse.codes}
+    recherche_exhaustive_par_code = {
+        code: {
+            candidat.page
+            for candidat in pages_par_code[code]
+            if candidat.score >= pages_par_code[code][0].score * RELEVANCE_FLOOR_RATIO
+        }.issubset(pages_vues[code])
+        for code in analyse.codes
+        if pages_par_code.get(code)
+    }
+    return calculer_couverture(
+        rapport_id, analyse.extraction, analyse.codes, pages_examinees_par_code, recherche_exhaustive_par_code
+    )
+
+
 def run_extraction_pipeline(
     rapport_id: uuid.UUID, annee_reporting: int, *, derniere_tentative: bool = True
 ) -> None:
@@ -905,96 +1051,20 @@ def run_extraction_pipeline(
             if demo:
                 nom_document = f"[DEMO] {nom_document}"
 
-            # Doit s'exécuter AVANT tout appel à docling_pipeline.convert_pdf (Phase 5 §9,
-            # trouvaille empirique) : bge-m3 (PyTorch) initialisé APRÈS que Docling ait chargé son
-            # backend PaddleOCR (RapidOcrOptions(backend="paddle")) fait planter le process —
-            # d'abord un segmentation fault natif pur (reproduit deux fois à l'identique),
-            # puis, une fois la seule construction du modèle déplacée ici, un allocateur CPU
-            # PyTorch corrompu signalant un "manque de mémoire" fantaisiste sur une allocation de
-            # quelques Mo lors du chargement des modèles Docling (TableFormer, qui utilise aussi
-            # PyTorch) — la construction seule ne suffit pas, PyTorch doit avoir réellement exécuté
-            # une passe d'inférence (encode()) pour que son runtime CPU soit stabilisé avant que
-            # PaddleOCR ne s'initialise. Les deux runtimes coexistent sans problème si PyTorch a
-            # réellement tourné en premier, jamais dans l'ordre inverse. _get_embed_model est mis
-            # en cache (@lru_cache) : cet appel ne recharge rien la deuxième fois qu'un process a
-            # déjà traité un rapport, mais encode() retourne vite (une seule courte chaîne).
-            etape = "chargement_modele_embedding_echoue"
-            _get_embed_model().encode(["initialisation"])
-
-            etape = "docling_conversion_echouee"
-            logger.info("docling_conversion_demarree", rapport_id=str(rapport_id))
-            embed_model = _get_embed_model()
-            index = IndexIncremental(embed_model)
-
-            def indexer(document: DoclingDocument) -> None:
-                try:
-                    index.ajouter(document)
-                except Exception as exc:
-                    _marquer_etape(exc, "indexation_semantique_echouee")
-                    raise
-
-            # Lot par lot (app/ingestion/lots.py) : un lot converti est indexé puis relâché, un lot
-            # déjà converti par une exécution interrompue est repris depuis son JSON.
-            settings = get_settings()
-            try:
-                conversion = docling_pipeline.convertir_rapport(
-                    source_path,
-                    storage.resolve_path(f"docling_json/{rapport_id}"),
-                    taille=settings.extraction_pages_par_lot,
-                    pages_max=settings.extraction_pages_max,
-                    threads=settings.extraction_threads,
-                    indexer=indexer,
-                )
-            except DocumentTropLong as exc:
-                _marquer_etape(exc, "document_trop_long")
-                raise
-            logger.info(
-                "docling_conversion_terminee",
-                rapport_id=str(rapport_id),
-                elapsed_s=conversion.elapsed_s,
-                pages=conversion.pages_total,
-                pages_ocr=conversion.pages_ocr,
+            # Conversion, recherche sémantique, LLM : analyser_document (sans base de données).
+            analyse = analyser_document(
+                source_path,
+                storage.resolve_path(f"docling_json/{rapport_id}"),
+                nom_entreprise=nom_entreprise,
+                rapport_id=rapport_id,
             )
-
-            etape = "indexation_semantique_echouee"
-            search_index = index.en_dictionnaire()
-            codes = [cible.code for cible in INDICATEURS_CIBLES]
-
-            etape = "appel_llm_echoue"
-            debut_llm = time.monotonic()
-            if demo:
-                _context, pages_used, pages_par_code = _build_context(
-                    search_index, embed_model, codes, CONTEXT_TOKEN_BUDGET
-                )
-                pages_vues_par_code: dict[str, set[int]] = {code: set(pages_used) for code in codes}
-                logger.warning(
-                    "extraction_demo_synthetique_utilisee",
-                    rapport_id=str(rapport_id),
-                    raison="aucune vraie cle LLM configuree (.env) — extraction simulee",
-                )
-                extraction = _extraction_demo_synthetique(nom_entreprise=nom_entreprise, codes=codes)
-            else:
-                resultat_llm = _extraire_par_llm(
-                    search_index,
-                    embed_model,
-                    codes,
-                    nom_entreprise=nom_entreprise,
-                    budget_tokens=get_settings().llm_context_tokens,
-                    modele=modele_principal(),
-                )
-                extraction = resultat_llm.extraction
-                modele = resultat_llm.modele
-                pages_vues_par_code = resultat_llm.pages_vues_par_code
-                pages_par_code = resultat_llm.pages_par_code
-                if modele != modele_principal():
-                    execution_en_cours = session.get(ExtractionRun, execution_id)
-                    if execution_en_cours is not None:
-                        execution_en_cours.llm_model = modele
-                        session.add(execution_en_cours)
-            duree_llm_s = round(time.monotonic() - debut_llm, 1)
-            logger.info(
-                "extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo, duree_s=duree_llm_s
-            )
+            conversion = analyse.conversion
+            duree_llm_s = analyse.duree_llm_s
+            if not analyse.demo and analyse.modele != modele_principal():
+                execution_en_cours = session.get(ExtractionRun, execution_id)
+                if execution_en_cours is not None:
+                    execution_en_cours.llm_model = analyse.modele
+                    session.add(execution_en_cours)
 
             etape = "persistance_echouee"
             # Purge des données dérivées d'une extraction précédente sur ce même rapport, pour que
@@ -1035,9 +1105,7 @@ def run_extraction_pipeline(
                     session.delete(ancienne_preuve)
             session.flush()
 
-            extraction = _deduire_pages_manquantes(
-                extraction, conversion.document_de_la_page, pages_vues_par_code, rapport_id
-            )
+            extraction = analyse.extraction
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}
             preuves_par_page: dict[int, Evidence] = {}
             # Le LLM peut renvoyer deux fois le même code : la première occurrence exploitable
@@ -1135,23 +1203,7 @@ def run_extraction_pipeline(
                     session.add(rapport)
 
             # Exhaustivité par code (statut ABSENT_CONFIRME, voir completeness._absence_confirmee) :
-            # un code est "recherché exhaustivement" si TOUTES ses pages candidates au-dessus de son
-            # propre plancher de pertinence ont effectivement été montrées au LLM (1er passage +
-            # relance) — jamais déduit du budget global, qui peut avoir écarté des pages pertinentes
-            # pour CE code au profit d'autres codes dans le classement fusionné.
-            pages_examinees_par_code = {code: len(pages_vues_par_code[code]) for code in codes}
-            recherche_exhaustive_par_code = {
-                code: {
-                    candidat.page
-                    for candidat in pages_par_code[code]
-                    if candidat.score >= pages_par_code[code][0].score * RELEVANCE_FLOOR_RATIO
-                }.issubset(pages_vues_par_code[code])
-                for code in codes
-                if pages_par_code.get(code)
-            }
-            for couverture in calculer_couverture(
-                rapport_id, extraction, codes, pages_examinees_par_code, recherche_exhaustive_par_code
-            ):
+            for couverture in couvertures(analyse, rapport_id):
                 session.add(couverture)
 
             rapport.extraction_finished_at = utcnow()

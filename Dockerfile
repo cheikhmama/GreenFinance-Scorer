@@ -93,3 +93,10 @@ ENV TORCHDYNAMO_DISABLE=1 \
 
 USER greenfinance
 CMD ["arq", "app.worker.settings.ExtractionWorkerSettings"]
+
+# --- serveur MCP (stdio) de l'extraction -----------------------------------------------------------
+# Même pile et mêmes modèles que le worker ; lancé à la demande par un agent, jamais exposé sur le
+# réseau (voir app/mcp/serveur.py et le profil « mcp » de docker-compose.yml).
+FROM worker AS mcp
+ENV MCP_RACINE_FICHIERS=/data
+CMD ["python", "-m", "app.mcp.serveur"]

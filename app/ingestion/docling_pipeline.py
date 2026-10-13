@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-import pymupdf
 import structlog
 from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 from docling.datamodel.base_models import InputFormat
@@ -37,17 +36,6 @@ from docling_core.types.doc.document import DoclingDocument
 from app.ingestion.lots import Lot
 
 logger = structlog.get_logger(__name__)
-
-
-@dataclass(frozen=True)
-class ConversionResult:
-    document: DoclingDocument
-    status: str
-    errors: list[str]
-    pages_docling: int
-    pages_pymupdf: int
-    pages_correspondent: bool
-    elapsed_s: float
 
 
 def options_pipeline(*, ocr: bool = True, threads: int = 4) -> PdfPipelineOptions:
@@ -74,38 +62,6 @@ def _get_converter(ocr: bool = True, threads: int = 4) -> DocumentConverter:
     options = options_pipeline(ocr=ocr, threads=threads)
     return DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
-    )
-
-
-def convert_pdf(path: Path) -> ConversionResult:
-    """Convertit un PDF en DoclingDocument structuré. Le nombre de pages est recompté
-    indépendamment via pymupdf ; un désaccord est journalisé (jamais observé sur le corpus pilote
-    validé) mais ne bloque pas la conversion — c'est un signal diagnostique, pas une erreur fatale."""
-    t0 = time.time()
-    conv = _get_converter().convert(str(path))
-    elapsed = time.time() - t0
-    doc = conv.document
-
-    pages_docling = doc.num_pages()
-    with pymupdf.open(path) as pm:
-        pages_pymupdf = pm.page_count
-    pages_correspondent = pages_docling == pages_pymupdf
-    if not pages_correspondent:
-        logger.warning(
-            "docling_pages_desaccord",
-            path=str(path),
-            pages_docling=pages_docling,
-            pages_pymupdf=pages_pymupdf,
-        )
-
-    return ConversionResult(
-        document=doc,
-        status=str(conv.status),
-        errors=[str(e) for e in conv.errors],
-        pages_docling=pages_docling,
-        pages_pymupdf=pages_pymupdf,
-        pages_correspondent=pages_correspondent,
-        elapsed_s=round(elapsed, 1),
     )
 
 

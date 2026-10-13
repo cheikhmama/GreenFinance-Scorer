@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "greenfinance-esg": {
+      "command": "docker",
+      "args": [
+        "compose", "--profile", "mcp", "run", "--rm", "-i", "--no-deps",
+        "-v", "./rapports:/data:ro",
+        "mcp"
+      ]
+    }
+  }
+}
