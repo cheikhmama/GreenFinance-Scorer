@@ -11,6 +11,7 @@ import type {
   BodySubmitCompanyReportCorrection,
   EntreprisePublic,
   ImporterRapportParURLRequest,
+  ModifierProfilEntrepriseRequest,
   RapportESGDetail,
   RapportESGPublic,
   RegistrationEmailResend,
@@ -200,6 +201,35 @@ export const getMyCompanyProfile = async ( options?: RequestInit): Promise<Entre
     method: 'GET'
 
 
+  }
+);}
+
+
+export const getUpdateMyCompanyProfileUrl = () => {
+
+
+
+
+  return `/company/profil`
+}
+
+/**
+ * @summary Modifier la description, le site officiel et le montant minimum de ma fiche entreprise
+ */
+export const updateMyCompanyProfile = async (modifierProfilEntrepriseRequest: ModifierProfilEntrepriseRequest, options?: RequestInit): Promise<EntreprisePublic> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return apiFetch<EntreprisePublic>(getUpdateMyCompanyProfileUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(modifierProfilEntrepriseRequest)
   }
 );}
 

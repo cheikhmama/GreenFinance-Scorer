@@ -18,6 +18,7 @@ import type {
   EntrepriseAdmin,
   EntreprisePublic,
   ExtractionRunPublic,
+  JournalAuditActionCompte,
   KycReport,
   ListAllCompaniesParams,
   ListAllReportsParams,
@@ -58,7 +59,7 @@ import type {
 
 import { apiFetch } from '../../client';
 
-export const getListUsersByRoleUrl = (params: ListUsersByRoleParams,) => {
+export const getListUsersByRoleUrl = (params?: ListUsersByRoleParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -77,9 +78,9 @@ export const getListUsersByRoleUrl = (params: ListUsersByRoleParams,) => {
  * Page de comptes existants pour un rôle donné — la seule source à partir de laquelle une
  * relation acteur-à-acteur (ex. affectation d'un auditeur) doit être construite, jamais une
  * saisie libre de nom/e-mail.
- * @summary Lister les comptes actifs d'un rôle donné, avec recherche et pagination
+ * @summary Lister les comptes actifs d'un rôle donné (ou tous rôles confondus), avec recherche et pagination
  */
-export const listUsersByRole = async (params: ListUsersByRoleParams, options?: RequestInit): Promise<PageUtilisateurPublic> => {
+export const listUsersByRole = async (params?: ListUsersByRoleParams, options?: RequestInit): Promise<PageUtilisateurPublic> => {
 
   return apiFetch<PageUtilisateurPublic>(getListUsersByRoleUrl(params),
   {
@@ -134,6 +135,29 @@ export const getListUsersAwaitingActivationUrl = () => {
 export const listUsersAwaitingActivation = async ( options?: RequestInit): Promise<UtilisateurPublic[]> => {
 
   return apiFetch<UtilisateurPublic[]>(getListUsersAwaitingActivationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListUsersRoleOverviewUrl = () => {
+
+
+
+
+  return `/admin/utilisateurs/apercu-roles`
+}
+
+/**
+ * @summary Un compte actif par rôle (hors Administrateur) — repère rapide des acteurs de la plateforme
+ */
+export const listUsersRoleOverview = async ( options?: RequestInit): Promise<UtilisateurPublic[]> => {
+
+  return apiFetch<UtilisateurPublic[]>(getListUsersRoleOverviewUrl(),
   {
     ...options,
     method: 'GET'
@@ -1041,7 +1065,7 @@ export const getUpdateCompanyProfileUrl = (entrepriseId: string,) => {
 }
 
 /**
- * @summary Mettre à jour le profil d'une entreprise (identité, description, site officiel, montant minimum)
+ * @summary Mettre à jour l'identité d'une entreprise (nom, secteur, pays)
  */
 export const updateCompanyProfile = async (entrepriseId: string,
     modifierEntrepriseAdminRequest: ModifierEntrepriseAdminRequest, options?: RequestInit): Promise<EntrepriseAdmin> => {
@@ -1155,6 +1179,29 @@ export const getListAuditLogUrl = (params?: ListAuditLogParams,) => {
 export const listAuditLog = async (params?: ListAuditLogParams, options?: RequestInit): Promise<PageJournalAuditPublic> => {
 
   return apiFetch<PageJournalAuditPublic>(getListAuditLogUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+export const getListAuditLogActionCountsUrl = () => {
+
+
+
+
+  return `/admin/journal-audit/compteurs-actions`
+}
+
+/**
+ * @summary Nombre d'entrées existantes par action du journal d'audit
+ */
+export const listAuditLogActionCounts = async ( options?: RequestInit): Promise<JournalAuditActionCompte[]> => {
+
+  return apiFetch<JournalAuditActionCompte[]>(getListAuditLogActionCountsUrl(),
   {
     ...options,
     method: 'GET'
