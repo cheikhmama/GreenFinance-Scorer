@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
+import { creerSlug } from "@/shared/format/slug";
 import { titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Badge } from "@/shared/ui/badge";
@@ -65,7 +66,9 @@ export function AuditDashboardPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button asChild variant="outline" size="sm">
-                        <Link to={`/audit/rapports/${dossier.id}`}>Examiner</Link>
+                        <Link to={`/audit/rapports/${creerSlug(dossier.company_name, dossier.id)}`}>
+                          Examiner
+                        </Link>
                       </Button>
                     </TableCell>
                   </TableRow>

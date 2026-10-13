@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { formatValeur, listeIndicateurs } from "@/shared/format/indicateurs";
+import { idDepuisSlug } from "@/shared/format/slug";
 import { libelleStatutRevue, variantStatutRevue } from "@/shared/format/revue";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { titreDeclaration } from "@/shared/format/typeRapport";
@@ -25,7 +26,8 @@ function urlPreuve(rapportId: string, preuveId: string) {
  * valeurs (25 %), la page-preuve avec la valeur surlignée (45 %), le détail et les décisions (30 %).
  * Clavier : A accepter, E corriger, N non trouvée, J / K valeur suivante / précédente. */
 export function AuditReviewPage() {
-  const { rapportId = "" } = useParams<{ rapportId: string }>();
+  const { rapportId: segment = "" } = useParams<{ rapportId: string }>();
+  const rapportId = idDepuisSlug(segment);
   const dossier = useAssignedReport(rapportId);
   const revues = useAuditReviews(rapportId);
   const revoir = useReviewValue(rapportId);

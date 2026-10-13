@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
+import { creerSlug } from "@/shared/format/slug";
 import { titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Button } from "@/shared/ui/button";
@@ -53,7 +54,9 @@ export function AuditHistoryPage() {
                   <div className="flex shrink-0 flex-col items-end gap-1 text-sm text-muted-foreground">
                     <span>{new Date(item.submitted_at).toLocaleDateString("fr-FR")}</span>
                     <Button asChild variant="ghost" size="sm">
-                      <Link to={`/audit/rapports/${item.report_id}`}>Voir le dossier</Link>
+                      <Link to={`/audit/rapports/${creerSlug(item.company_name, item.report_id)}`}>
+                        Voir le dossier
+                      </Link>
                     </Button>
                   </div>
                 </li>
