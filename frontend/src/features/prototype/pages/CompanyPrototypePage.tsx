@@ -455,13 +455,6 @@ function CompanyProfile({
                 <option value="custom">Exercice décalé</option>
               </select>
             </Field>
-            <Field label="Description">
-              <textarea
-                className={`${fieldClassName} min-h-28`}
-                name="description"
-                defaultValue={`${company.name} opère dans le secteur ${company.sector.toLocaleLowerCase("fr")} et publie ses informations ESG sur le périmètre déclaré.`}
-              />
-            </Field>
             <div className="flex items-end justify-end sm:col-span-2">
               <Button type="submit">
                 <CheckCircle2 />

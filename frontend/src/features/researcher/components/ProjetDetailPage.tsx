@@ -1,6 +1,7 @@
 import { Building2, FileText } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { BackLink } from "@/shared/ui/back-link";
 import { Badge } from "@/shared/ui/badge";
@@ -20,7 +21,8 @@ function formatDate(iso: string): string {
  * automatiquement). Aucun endpoint de détail dédié côté backend : le projet est retrouvé dans la
  * liste déjà chargée par useMyAssignedProjects, périmètre et documents ont chacun leur route. */
 export function ProjetDetailPage() {
-  const { projetId = "" } = useParams();
+  const { projetId: segment = "" } = useParams();
+  const projetId = idDepuisSlug(segment);
   const { data: projets, isLoading: chargementProjets } = useMyAssignedProjects();
   const { data: perimetre, isLoading: chargementPerimetre } = useProjectScope(projetId);
   const { data: documents, isLoading: chargementDocuments } = useProjectDocuments(projetId);
@@ -77,7 +79,7 @@ export function ProjetDetailPage() {
           {perimetre?.map((entreprise) => (
             <Link
               key={entreprise.id}
-              to={`/researcher/entreprises/${entreprise.company_id}`}
+              to={`/researcher/entreprises/${creerSlug(entreprise.company_name, entreprise.company_id)}`}
               className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
             >
               <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
@@ -105,7 +107,7 @@ export function ProjetDetailPage() {
           {documents?.map((document) => (
             <Link
               key={document.id}
-              to={`/researcher/entreprises/${document.company_id}`}
+              to={`/researcher/entreprises/${creerSlug(document.company_name, document.company_id)}`}
               className="flex items-center gap-3 rounded-md border p-2 text-sm transition hover:border-brand-green"
             >
               <CompanyAvatar nom={document.company_name} logo={null} className="size-8" />

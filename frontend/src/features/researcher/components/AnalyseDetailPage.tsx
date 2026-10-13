@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { BackLink } from "@/shared/ui/back-link";
@@ -24,7 +25,8 @@ import {
 import { type AnalyseForm, analyseFormSchema } from "../schemas";
 
 export function AnalyseDetailPage() {
-  const { analyseId = "" } = useParams();
+  const { analyseId: segment = "" } = useParams();
+  const analyseId = idDepuisSlug(segment);
   const { data: analyse, isLoading, isError } = useAnalysisDetail(analyseId);
   const soumettre = useSubmitAnalysis(analyseId);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -133,7 +135,7 @@ function HistoriqueVersions({
               </Badge>
               {version.id !== analyseId ? (
                 <Link
-                  to={`/researcher/analyses/${version.id}`}
+                  to={`/researcher/analyses/${creerSlug(version.title, version.id)}`}
                   className="text-brand-green underline-offset-2 hover:underline"
                 >
                   Consulter

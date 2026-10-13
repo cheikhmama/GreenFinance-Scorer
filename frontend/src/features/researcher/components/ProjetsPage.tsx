@@ -1,5 +1,6 @@
 import { FolderKanban } from "lucide-react";
 import { Link } from "react-router-dom";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -49,7 +50,7 @@ export function ProjetsPage() {
         {projets?.map((projet) => {
           const periode = formatPeriode(projet);
           return (
-            <Link key={projet.id} to={`/researcher/projets/${projet.id}`}>
+            <Link key={projet.id} to={`/researcher/projets/${creerSlug(projet.name, projet.id)}`}>
               <Card className="h-full transition hover:border-brand-green hover:shadow-md">
                 <CardContent className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-3">

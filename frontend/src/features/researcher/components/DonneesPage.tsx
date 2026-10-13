@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -94,7 +95,7 @@ export function DonneesPage() {
                   </label>
                   <div>
                     <Link
-                      to={`/researcher/entreprises/${entreprise.id}`}
+                      to={`/researcher/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
                       className="text-base font-semibold text-foreground underline-offset-2 hover:underline"
                     >
                       {entreprise.name}
