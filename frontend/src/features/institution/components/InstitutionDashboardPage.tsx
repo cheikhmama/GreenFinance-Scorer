@@ -1,5 +1,6 @@
 import { ArrowRight, FlaskConical, FolderKanban, UserCheck, Users } from "lucide-react";
 import { Link } from "react-router-dom";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Badge } from "@/shared/ui/badge";
@@ -129,7 +130,7 @@ export function InstitutionDashboardPage() {
                   <li key={analyse.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <Link
-                        to={`/institution/analyses/${analyse.id}`}
+                        to={`/institution/analyses/${creerSlug(analyse.title, analyse.id)}`}
                         className="block truncate font-medium text-foreground hover:underline"
                       >
                         {analyse.title}
@@ -142,7 +143,9 @@ export function InstitutionDashboardPage() {
                       </p>
                     </div>
                     <Button asChild size="sm" variant="outline" className="shrink-0">
-                      <Link to={`/institution/analyses/${analyse.id}`}>Décider</Link>
+                      <Link to={`/institution/analyses/${creerSlug(analyse.title, analyse.id)}`}>
+                        Décider
+                      </Link>
                     </Button>
                   </li>
                 ))}
@@ -167,7 +170,7 @@ export function InstitutionDashboardPage() {
                   <li key={projet.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <Link
-                        to={`/institution/projets/${projet.id}`}
+                        to={`/institution/projets/${creerSlug(projet.name, projet.id)}`}
                         className="block truncate font-medium text-foreground hover:underline"
                       >
                         {projet.name}

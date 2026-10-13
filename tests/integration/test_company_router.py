@@ -101,6 +101,53 @@ def test_consulter_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(se
     assert response.json()["error"]["code"] == "entreprise_non_rattachee"
 
 
+def test_modifier_mon_profil_met_a_jour_description_site_et_montant(session) -> None:
+    user = _create_entreprise_utilisateur(session, password="s3cret-pass")
+    authed_client = _login(user.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        "/api/v1/company/profil",
+        json={
+            "description": "Nouvelle description.",
+            "website": "https://nouveau-site.test",
+            "minimum_investment_amount": 1000.0,
+            "minimum_investment_currency": "USD",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["description"] == "Nouvelle description."
+    assert body["website"] == "https://nouveau-site.test"
+    assert body["minimum_investment_amount"] == 1000.0
+    assert body["minimum_investment_currency"] == "USD"
+    # Jamais touchés par cette route -- identité réservée à l'Administrateur.
+    assert body["sector"] == "Technologies"
+    assert body["country"] == "France"
+
+
+def test_modifier_mon_profil_exige_montant_et_devise_ensemble(session) -> None:
+    user = _create_entreprise_utilisateur(session, password="s3cret-pass")
+    authed_client = _login(user.email, "s3cret-pass")
+
+    response = authed_client.patch(
+        "/api/v1/company/profil",
+        json={"minimum_investment_amount": 1000.0},
+    )
+
+    assert response.status_code == 422
+
+
+def test_modifier_mon_profil_sans_entreprise_rattachee_est_refuse_proprement(session) -> None:
+    user = _create_entreprise_utilisateur(session, password="s3cret-pass", avec_entreprise=False)
+    authed_client = _login(user.email, "s3cret-pass")
+
+    response = authed_client.patch("/api/v1/company/profil", json={"description": "X"})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "entreprise_non_rattachee"
+
+
 def test_deposer_rapport_avec_pdf_valide_retourne_201_statut_envoye(session, monkeypatch) -> None:
     user = _create_entreprise_utilisateur(session, password="s3cret-pass")
     authed_client = _login(user.email, "s3cret-pass")

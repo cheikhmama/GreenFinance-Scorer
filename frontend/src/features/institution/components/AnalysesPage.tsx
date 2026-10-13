@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AnalyseInstitutionPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
+import { creerSlug } from "@/shared/format/slug";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
@@ -124,12 +125,12 @@ export function AnalysesPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/institution/analyses/${ouverte.id}`}>
+                <Link to={`/institution/analyses/${creerSlug(ouverte.title, ouverte.id)}`}>
                   {ouverte.status === "SOUMISE" ? "Rendre la décision" : "Ouvrir l’analyse"}
                 </Link>
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link to={`/institution/projets/${ouverte.project_id}`}>Voir le projet</Link>
+                <Link to={`/institution/projets/${creerSlug(ouverte.project_name, ouverte.project_id)}`}>Voir le projet</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

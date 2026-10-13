@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { DossierAuditeur } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -122,7 +123,7 @@ export function AuditDashboardPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/audit/rapports/${ouvert.id}`}>Examiner le dossier</Link>
+                <Link to={`/audit/rapports/${creerSlug(ouvert.company_name, ouvert.id)}`}>Examiner le dossier</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

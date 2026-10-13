@@ -7,7 +7,10 @@ const STORAGE_KEY = "gfs-theme";
 function lireThemeInitial(): Theme {
   const stocke = localStorage.getItem(STORAGE_KEY);
   if (stocke === "light" || stocke === "dark") return stocke;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  // Pas de préférence enregistrée : mode nuit par défaut pour l'espace connecté (choix produit) —
+  // jamais pour les pages publiques (connexion, inscription...), forcées en clair indépendamment
+  // de ce réglage (voir shared/layout/AuthLayout.tsx).
+  return "dark";
 }
 
 const ThemeContext = createContext<{ theme: Theme; toggleTheme: () => void } | null>(null);

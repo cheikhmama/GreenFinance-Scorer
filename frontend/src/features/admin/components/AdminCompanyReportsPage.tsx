@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { uneDecimale } from "@/shared/format/etatPosition";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { libelleTypeRapport } from "@/shared/format/typeRapport";
 import { BackLink } from "@/shared/ui/back-link";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
@@ -11,9 +12,10 @@ import { type Ligne, RapportTiroir } from "./RapportsTable";
 /** Tous les rapports d'une entreprise (table, tâche 5.17) : exercice, type, version et score ;
  * statut, dates et actions dans le tiroir partagé avec la page Rapports. */
 export function AdminCompanyReportsPage() {
-  const { entrepriseId } = useParams<{ entrepriseId: string }>();
-  const { data: entreprise } = useCompanyDetail(entrepriseId ?? "");
-  const { data: rapports, isLoading, isError } = useCompanyReports(entrepriseId ?? "");
+  const { entrepriseId: segment } = useParams<{ entrepriseId: string }>();
+  const entrepriseId = idDepuisSlug(segment ?? "");
+  const { data: entreprise } = useCompanyDetail(entrepriseId);
+  const { data: rapports, isLoading, isError } = useCompanyReports(entrepriseId);
   const [ouvertId, setOuvertId] = useState<string | null>(null);
 
   const lignes = useMemo<Ligne[] | undefined>(
@@ -61,13 +63,12 @@ export function AdminCompanyReportsPage() {
 
   return (
     <div className="space-y-6">
-      <BackLink to={entrepriseId ? `/admin/entreprises/${entrepriseId}` : "/admin/entreprises"}>
+      <BackLink
+        to={entrepriseId ? `/admin/entreprises/${creerSlug(entreprise?.name, entrepriseId)}` : "/admin/entreprises"}
+      >
         {entreprise?.name ?? "Entreprise"}
       </BackLink>
-      <PageHeader
-        title="Rapports de l'entreprise"
-        description="Tous les rapports déposés, quel que soit leur statut."
-      />
+      <PageHeader title="Rapports de l'entreprise" />
       <DataTable
         libelle={`Rapports de ${entreprise?.name ?? "l’entreprise"}`}
         lignes={lignes}

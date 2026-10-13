@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ProjetAffecte } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
+import { creerSlug } from "@/shared/format/slug";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
@@ -126,7 +127,7 @@ export function ProjetsPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/researcher/projets/${ouvert.id}`}>Ouvrir le projet</Link>
+                <Link to={`/researcher/projets/${creerSlug(ouvert.name, ouvert.id)}`}>Ouvrir le projet</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

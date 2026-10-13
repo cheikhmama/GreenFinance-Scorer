@@ -24,9 +24,17 @@ export default defineConfig({
   },
   server: {
     headers: ENTETES_SECURITE,
+    // Port fixe plutôt que le comportement par défaut de Vite (essayer un autre port si celui-ci
+    // est occupé) : le backend n'autorise que cette origine en CORS (app/core/config.py,
+    // CORS_ALLOWED_ORIGINS) et vérifie l'Origin sur toute requête mutante (app/auth/csrf.py). Un
+    // repli silencieux sur un autre port casse alors toute action POST/PUT/PATCH/DELETE après
+    // connexion (ex. déconnexion) sans erreur visible — mieux vaut échouer au démarrage que de
+    // laisser ce symptôme réapparaître.
+    strictPort: true,
+    port: 5174,
     proxy: {
       // Le backend FastAPI pose un cookie httpOnly `access_token`. En développement,
-      // le proxy Vite fait apparaître l'API comme same-origin (localhost:5173) plutôt
+      // le proxy Vite fait apparaître l'API comme same-origin (localhost:5174) plutôt
       // que cross-origin (localhost:8000) : le navigateur envoie/accepte alors le
       // cookie sans configuration CORS ni SameSite particulière côté backend.
       "/api/v1": {

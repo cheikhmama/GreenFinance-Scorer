@@ -9,7 +9,7 @@ l'authentification réelle, utilise uniquement des données de démonstration et
 En développement, le point d'entrée est :
 
 ```text
-http://localhost:5173/prototype
+http://localhost:5174/prototype
 ```
 
 Dans un build de démonstration, il faut définir :

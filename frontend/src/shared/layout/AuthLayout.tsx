@@ -1,5 +1,5 @@
 import { ArrowUpRight, Leaf, MessageCircle, ShieldCheck } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import "./AuthLayout.css";
 
@@ -22,6 +22,20 @@ export function AuthLayout({
   layout = "split",
 }: AuthLayoutProps) {
   const headingId = useId();
+
+  // Pages publiques (connexion, inscription, mot de passe oublié...) toujours en mode clair,
+  // indépendamment du thème choisi pour l'espace connecté (qui, lui, démarre en mode nuit par
+  // défaut — voir shared/theme/ThemeProvider.tsx). useLayoutEffect : la classe est retirée avant
+  // le premier affichage à l'écran, pas de flash sombre visible. Restaurée à la sortie pour ne
+  // jamais affecter le thème réel de l'espace connecté qu'on rejoint ensuite.
+  useLayoutEffect(() => {
+    const racine = document.documentElement;
+    const etaitSombre = racine.classList.contains("dark");
+    racine.classList.remove("dark");
+    return () => {
+      if (etaitSombre) racine.classList.add("dark");
+    };
+  }, []);
 
   return (
     <div className="auth-page">

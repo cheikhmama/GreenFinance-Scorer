@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { EntrepriseAvecScoreAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { uneDecimale } from "@/shared/format/etatPosition";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import {
@@ -123,8 +124,18 @@ export function ScoresTable() {
               </SheetSection>
             </SheetBody>
             <SheetFooter>
+              {/* Le rapport validé dont vient le score : la preuve derrière le chiffre. */}
+              {ouverte.report_id ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link to={`/admin/rapports/${creerSlug(ouverte.name, ouverte.report_id)}`}>
+                    Voir la preuve
+                  </Link>
+                </Button>
+              ) : null}
               <Button asChild size="sm">
-                <Link to={`/admin/entreprises/${ouverte.id}`}>Ouvrir la fiche</Link>
+                <Link to={`/admin/entreprises/${creerSlug(ouverte.name, ouverte.id)}`}>
+                  Ouvrir la fiche
+                </Link>
               </Button>
             </SheetFooter>
           </SheetContent>

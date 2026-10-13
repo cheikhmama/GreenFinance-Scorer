@@ -21,6 +21,7 @@ import {
   listAllReports,
   listAnalysesAdmin,
   listAuditLog,
+  listAuditLogActionCounts,
   listAuditorWorkload,
   listCompaniesToRepublish,
   listCompaniesWithScore,
@@ -32,12 +33,12 @@ import {
   listProjectsAdmin,
   listPublishableCompanies,
   listReportExtractionRuns,
-  listReportOpinions,
   listReportsInValidation,
   listReportsToAssign,
   listReportVersions,
   listUsersAwaitingActivation,
   listUsersByRole,
+  listUsersRoleOverview,
   onboardCompany,
   publishCompany,
   reactivateCompany,
@@ -47,7 +48,6 @@ import {
   requestReportCorrection,
   retryExtraction,
   suspendCompany,
-  updateCompanyIdentifiers,
   updateCompanyProfile,
   updateReportFinancials,
   uploadCompanyLogo,
@@ -61,10 +61,7 @@ import type {
   AffecterAuditeurRequest,
   AnalyseAdmin,
   ApercuActeursAdmin,
-  AvisAuditAdmin,
   ChargeAuditeurAdmin,
-  CompanyIdentifiers,
-  CompanyIdentifiersRequest,
   CompanyOnboardingRequest,
   CompanyOnboardingResult,
   CreerUtilisateurRequest,
@@ -74,6 +71,7 @@ import type {
   EntreprisePublic,
   ExtractionRunPublic,
   JournalAuditPublic,
+  JournalAuditActionCompte,
   KycReport,
   ListAuditLogParams,
   ModifierEntrepriseAdminRequest,
@@ -115,14 +113,14 @@ const ORPHELINS_KEY = ["admin", "rapports", "orphelins"] as const;
 const rapportKey = (rapportId: string) => ["admin", "rapports", rapportId] as const;
 const scoreVerificationKey = (rapportId: string) =>
   ["admin", "rapports", rapportId, "score-verification"] as const;
-const avisKey = (rapportId: string) => ["admin", "rapports", rapportId, "avis"] as const;
 const EN_RETARD_KEY = ["admin", "rapports", "en-retard"] as const;
 const TOUS_RAPPORTS_KEY = ["admin", "rapports", "tous"] as const;
 const PUBLIABLES_KEY = ["admin", "entreprises", "publiables"] as const;
 const TOUTES_ENTREPRISES_KEY = ["admin", "entreprises", "toutes"] as const;
 const A_REPUBLIER_KEY = ["admin", "entreprises", "a-republier"] as const;
 const UTILISATEURS_EN_ATTENTE_KEY = ["admin", "utilisateurs", "en-attente"] as const;
-const utilisateursKey = (role: Role) => ["admin", "utilisateurs", role] as const;
+const UTILISATEURS_KEY = ["admin", "utilisateurs"] as const;
+const utilisateursKey = (role?: Role) => [...UTILISATEURS_KEY, role ?? "tous"] as const;
 const versionsKey = (rapportId: string) => ["admin", "rapports", rapportId, "versions"] as const;
 const JOURNAL_AUDIT_KEY = ["admin", "journal-audit"] as const;
 const UTILISATEURS_TABLE_KEY = ["admin", "utilisateurs", "table"] as const;
@@ -242,14 +240,6 @@ export function useRecalculateReportScore(rapportId: string) {
       queryClient.invalidateQueries({ queryKey: rapportKey(rapportId) });
       queryClient.invalidateQueries({ queryKey: PUBLIABLES_KEY });
     },
-  });
-}
-
-export function useReportOpinions(rapportId: string) {
-  return useQuery<AvisAuditAdmin[], ApiError>({
-    queryKey: avisKey(rapportId),
-    queryFn: () => listReportOpinions(rapportId),
-    enabled: rapportId.length > 0,
   });
 }
 
@@ -412,19 +402,6 @@ export function useUpdateCompanyProfile(entrepriseId: string) {
   });
 }
 
-/** PATCH /admin/companies/{id}/identifiers (tâche 2.2) — patch partiel : seuls les champs
- * envoyés changent, `null` efface. Relit la fiche (qui expose isin/lei/ticker) au succès. */
-export function useUpdateCompanyIdentifiers(entrepriseId: string) {
-  const queryClient = useQueryClient();
-  return useMutation<CompanyIdentifiers, ApiError, CompanyIdentifiersRequest>({
-    mutationFn: (payload) => updateCompanyIdentifiers(entrepriseId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: companyDetailKey(entrepriseId) });
-      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
-    },
-  });
-}
-
 /** GET /admin/reports/{id}/extraction-runs (tâche 5.5) — exécutions du pipeline, plus récente
  * d'abord. */
 export function useReportExtractionRuns(rapportId: string) {
@@ -517,36 +494,48 @@ export function useUsersAwaitingActivation() {
   });
 }
 
+/** Un compte actif par rôle (hors ADMIN) — vue de repère affichée par UsersSection.tsx quand le
+ * filtre "Rôle" est à sa valeur par défaut ("Tous les rôles") et qu'aucune recherche n'est en
+ * cours, pour montrer d'un coup d'œil les différents acteurs de la plateforme plutôt qu'une
+ * liste de comptes triés par e-mail qui pourrait ne montrer qu'un seul rôle sur sa première
+ * page. Voir app/admin/utilisateurs.py::lister_utilisateurs_apercu_roles. */
+export function useUtilisateursApercuRoles(actif: boolean) {
+  return useQuery<UtilisateurPublic[], ApiError>({
+    queryKey: [...UTILISATEURS_KEY, "apercu-roles"],
+    queryFn: () => listUsersRoleOverview(),
+    enabled: actif,
+  });
+}
+
 export function useCreateUser() {
   const queryClient = useQueryClient();
   return useMutation<UtilisateurCree, ApiError, CreerUtilisateurRequest>({
     mutationFn: (payload) => createUser(payload),
-    onSuccess: (utilisateur) => {
-      queryClient.invalidateQueries({ queryKey: utilisateursKey(utilisateur.role) });
-      queryClient.invalidateQueries({ queryKey: UTILISATEURS_TABLE_KEY });
+    onSuccess: () => {
+      // Préfixe sans segment de rôle : invalide toutes les vues (un rôle précis et "Tous les
+      // rôles"), pas seulement celle du rôle créé.
+      queryClient.invalidateQueries({ queryKey: UTILISATEURS_KEY });
     },
   });
 }
 
-export function useDeactivateUser(role: Role) {
+export function useDeactivateUser() {
   const queryClient = useQueryClient();
   return useMutation<UtilisateurPublic, ApiError, string>({
     mutationFn: (utilisateurId) => deactivateUser(utilisateurId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: utilisateursKey(role) });
-      queryClient.invalidateQueries({ queryKey: UTILISATEURS_TABLE_KEY });
+      queryClient.invalidateQueries({ queryKey: UTILISATEURS_KEY });
       queryClient.invalidateQueries({ queryKey: UTILISATEURS_EN_ATTENTE_KEY });
     },
   });
 }
 
-export function useReactivateUser(role: Role) {
+export function useReactivateUser() {
   const queryClient = useQueryClient();
   return useMutation<UtilisateurPublic, ApiError, string>({
     mutationFn: (utilisateurId) => reactivateUser(utilisateurId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: utilisateursKey(role) });
-      queryClient.invalidateQueries({ queryKey: UTILISATEURS_TABLE_KEY });
+      queryClient.invalidateQueries({ queryKey: UTILISATEURS_KEY });
       queryClient.invalidateQueries({ queryKey: UTILISATEURS_EN_ATTENTE_KEY });
     },
   });
@@ -571,6 +560,16 @@ export function useJournalAudit(filtres: FiltresJournalAudit = {}) {
       } satisfies ListAuditLogParams),
     initialPageParam: 1,
     getNextPageParam: pageSuivante,
+  });
+}
+
+/** Nombre d'entrées déjà enregistrées par action — sert à trier le filtre Action par pertinence
+ * réelle (voir app/admin/journal.py::compter_actions), jamais par un ordre alphabétique figé qui
+ * mettrait une action encore jamais survenue en tête de liste. */
+export function useActionCountsJournalAudit() {
+  return useQuery<JournalAuditActionCompte[], ApiError>({
+    queryKey: [...JOURNAL_AUDIT_KEY, "compteurs-actions"],
+    queryFn: () => listAuditLogActionCounts(),
   });
 }
 

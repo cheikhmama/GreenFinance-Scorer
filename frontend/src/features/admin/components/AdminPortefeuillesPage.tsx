@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import type { PortefeuilleAdmin } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { formatMontant } from "@/shared/format/etatPosition";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
 import {
@@ -15,7 +14,14 @@ import {
 } from "@/shared/ui/sheet";
 import { useTablePortefeuilles } from "../api";
 
-/** Tous les portefeuilles non archivés, tous Investisseurs confondus (table, tâche 5.17). */
+/** Tous les portefeuilles non archivés, tous Investisseurs confondus — détail derrière
+ * "Portefeuilles non archivés" de l'onglet Investisseur du tableau de bord. Suivi en lecture
+ * seule, aux seules colonnes non sensibles : nom, titulaire, date de création — jamais la
+ * composition, le nombre de positions ni un montant, qui restent privés à son titulaire. */
+function dateFr(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR");
+}
+
 export function AdminPortefeuillesPage() {
   const { data, isLoading, isError } = useTablePortefeuilles();
   const [ouvertId, setOuvertId] = useState<string | null>(null);
@@ -24,7 +30,7 @@ export function AdminPortefeuillesPage() {
     () => [
       {
         id: "nom",
-        entete: "Portefeuille",
+        entete: "Nom du portefeuille",
         masquable: false,
         valeurTri: (p) => p.name,
         cellule: (p) => <span className="font-semibold text-foreground">{p.name}</span>,
@@ -36,22 +42,11 @@ export function AdminPortefeuillesPage() {
         cellule: (p) => <span className="font-mono text-[12.5px]">{p.investor_email}</span>,
       },
       {
-        id: "positions",
-        entete: "Positions",
-        alignement: "droite",
-        valeurTri: (p) => p.position_count,
-        cellule: (p) => <span className="font-mono">{p.position_count}</span>,
-      },
-      {
-        id: "montant",
-        entete: "Montant total",
-        alignement: "droite",
-        valeurTri: (p) => p.total_amount,
-        cellule: (p) => (
-          <span className="font-mono font-semibold">
-            {formatMontant(p.total_amount, p.reference_currency)}
-          </span>
-        ),
+        id: "creation",
+        entete: "Date de création",
+        valeurTri: (p) => p.created_at,
+        valeurExport: (p) => dateFr(p.created_at),
+        cellule: (p) => <span className="font-mono">{dateFr(p.created_at)}</span>,
       },
     ],
     [],
@@ -60,10 +55,7 @@ export function AdminPortefeuillesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Portefeuilles"
-        description="Tous les portefeuilles non archivés, tous investisseurs confondus."
-      />
+      <PageHeader title="Portefeuilles" />
       <DataTable
         libelle="Portefeuilles"
         lignes={data}
@@ -71,8 +63,7 @@ export function AdminPortefeuillesPage() {
         cle={(p) => p.id}
         rechercheDans={(p) => `${p.name} ${p.investor_email}`}
         placeholderRecherche="Portefeuille, titulaire…"
-        filtres={[{ id: "devise", libelle: "Devise", valeur: (p) => p.reference_currency }]}
-        triInitial={{ colonne: "montant", sens: "desc" }}
+        triInitial={{ colonne: "creation", sens: "desc" }}
         surOuvrir={(p) => setOuvertId(p.id)}
         libelleLigne={(p) => p.name}
         ligneActive={ouvertId}
@@ -93,23 +84,8 @@ export function AdminPortefeuillesPage() {
               <SheetSection titre="Portefeuille">
                 <SheetFields
                   champs={[
-                    {
-                      libelle: "Positions",
-                      valeur: <span className="font-mono">{ouvert.position_count}</span>,
-                    },
-                    {
-                      libelle: "Montant total",
-                      valeur: (
-                        <span className="font-mono font-semibold">
-                          {formatMontant(ouvert.total_amount, ouvert.reference_currency)}
-                        </span>
-                      ),
-                    },
-                    { libelle: "Devise de référence", valeur: ouvert.reference_currency },
-                    {
-                      libelle: "Créé le",
-                      valeur: new Date(ouvert.created_at).toLocaleDateString("fr-FR"),
-                    },
+                    { libelle: "Titulaire", valeur: ouvert.investor_email },
+                    { libelle: "Date de création", valeur: dateFr(ouvert.created_at) },
                   ]}
                 />
               </SheetSection>

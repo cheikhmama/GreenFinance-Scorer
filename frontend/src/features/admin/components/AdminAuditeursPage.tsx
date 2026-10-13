@@ -61,10 +61,7 @@ export function AdminAuditeursPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Auditeurs"
-        description="Charge de travail par auditeur actif : dossiers affectés, en retard et avis rendus."
-      />
+      <PageHeader title="Auditeurs" />
       <DataTable
         libelle="Auditeurs"
         lignes={data}

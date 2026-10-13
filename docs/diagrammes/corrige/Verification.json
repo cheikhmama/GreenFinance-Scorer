@@ -1,0 +1,21 @@
+{
+  "classes": 22,
+  "enumerations": 1,
+  "associations": 43,
+  "attributes_and_fk_verified": true,
+  "ownership": "Utilisateur 0..1 -- 0..* Entreprise",
+  "svg_xml_valid": true,
+  "removed_class_absent": true,
+  "no_entity_overlap": true,
+  "review_scope": "static source, no runtime DB",
+  "files": [
+    "Diagramme_classes_corrige.pdf",
+    "Diagramme_classes_corrige.png",
+    "Diagramme_classes_corrige.puml",
+    "Diagramme_classes_corrige.svg",
+    "Diagramme_classes_corrige_apercu.png",
+    "Diagramme_classes_par_domaine.pdf",
+    "Modele_diagramme.json",
+    "Tracabilite.md"
+  ]
+}

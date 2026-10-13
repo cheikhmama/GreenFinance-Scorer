@@ -26,7 +26,7 @@ from app.admin.apercu import (
     scores_officiels_entreprises,
 )
 from app.admin.dashboard import construire_tableau_de_bord
-from app.admin.journal import avec_acteurs, lister_journal_audit
+from app.admin.journal import avec_acteurs, compter_actions, lister_journal_audit
 from app.admin.kyc import rapport_kyc
 from app.admin.onboarding import decider_inscription, lister_inscriptions_a_examiner
 from app.admin.review_queue import (
@@ -71,6 +71,7 @@ from app.admin.schemas import (
     DecisionAdminRequest,
     EntrepriseAdmin,
     EntrepriseAvecScoreAdmin,
+    JournalAuditActionCompte,
     JournalAuditPublic,
     KycReport,
     ModifierEntrepriseAdminRequest,
@@ -95,6 +96,7 @@ from app.admin.schemas import (
 from app.admin.utilisateurs import (
     creer_utilisateur,
     desactiver_utilisateur,
+    lister_utilisateurs_apercu_roles,
     lister_utilisateurs_en_attente,
     lister_utilisateurs_par_role,
     profils_utilisateurs,
@@ -152,14 +154,17 @@ def _vers_entreprise_admin(session: Session, entreprise: Company) -> EntrepriseA
     "/admin/utilisateurs",
     response_model=Page[UtilisateurAdmin],
     operation_id="listUsersByRole",
-    summary="Lister les comptes actifs d'un rôle donné, avec recherche et pagination",
+    summary="Lister les comptes actifs d'un rôle donné (ou tous rôles confondus), avec recherche et pagination",
 )
 def lister_utilisateurs_route(
     role: Role | None = Query(None, description="Absent : tous les rôles"),
     recherche: str | None = Query(None, description="Filtre sur l'e-mail"),
-    inclure_inactifs: bool = Query(False, description="Inclure aussi les comptes désactivés"),
+    inclure_inactifs: bool = Query(
+        False, description="Inclure aussi les comptes désactivés"
+    ),
     en_attente_activation: bool | None = Query(
-        None, description="Filtrer sur les comptes qui n'ont pas encore cliqué leur lien d'activation"
+        None,
+        description="Filtrer sur les comptes qui n'ont pas encore cliqué leur lien d'activation",
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=100),
@@ -206,6 +211,19 @@ def lister_utilisateurs_en_attente_route(
     session: Session = Depends(get_session),
 ) -> list[User]:
     return lister_utilisateurs_en_attente(session)
+
+
+@router.get(
+    "/admin/utilisateurs/apercu-roles",
+    response_model=list[UtilisateurPublic],
+    operation_id="listUsersRoleOverview",
+    summary="Un compte actif par rôle (hors Administrateur) — repère rapide des acteurs de la plateforme",
+)
+def lister_utilisateurs_apercu_roles_route(
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> list[User]:
+    return lister_utilisateurs_apercu_roles(session)
 
 
 @router.post(
@@ -293,13 +311,17 @@ def reactiver_utilisateur_route(
     summary="Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut",
 )
 def lister_tous_les_rapports_route(
-    statut: ReportStatus | None = Query(None, description="Filtre sur le statut du rapport"),
+    statut: ReportStatus | None = Query(
+        None, description="Filtre sur le statut du rapport"
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[RapportAdminListe]:
-    items, total = lister_tous_les_rapports(session, statut=statut, page=page, page_size=page_size)
+    items, total = lister_tous_les_rapports(
+        session, statut=statut, page=page, page_size=page_size
+    )
     return Page[RapportAdminListe](
         items=avec_entreprises(session, items),
         page=page,
@@ -394,7 +416,9 @@ def lister_charge_auditeurs_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[ChargeAuditeurAdmin]:
-    items, total = lister_charge_auditeurs(session, recherche=recherche, page=page, page_size=page_size)
+    items, total = lister_charge_auditeurs(
+        session, recherche=recherche, page=page, page_size=page_size
+    )
     return Page[ChargeAuditeurAdmin](
         items=[
             ChargeAuditeurAdmin(
@@ -498,7 +522,9 @@ def consulter_rapport_route(
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
-    return detail.model_copy(update={"official_score": score_public(session, rapport_id)})
+    return detail.model_copy(
+        update={"official_score": score_public(session, rapport_id)}
+    )
 
 
 @router.get(
@@ -515,7 +541,9 @@ def consulter_fichier_route(
     if rapport is None:
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     if rapport.source_file is None:
-        raise NotFoundError("Ce rapport n'a pas encore de fichier.", code="fichier_absent")
+        raise NotFoundError(
+            "Ce rapport n'a pas encore de fichier.", code="fichier_absent"
+        )
     return FileResponse(storage.resolve_path(rapport.source_file))
 
 
@@ -615,7 +643,9 @@ def demander_correction_route(
     summary="Lister toutes les entreprises avec un résumé de statut (dépôts, dernier statut, compte lié)",
 )
 def lister_toutes_les_entreprises_route(
-    recherche: str | None = Query(None, description="Filtre sur le nom, le secteur ou le pays"),
+    recherche: str | None = Query(
+        None, description="Filtre sur le nom, le secteur ou le pays"
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
@@ -651,7 +681,9 @@ def lister_toutes_les_entreprises_route(
     summary="Lister les entreprises ayant au moins un rapport validé, pas encore publiées",
 )
 def lister_entreprises_publiables_route(
-    recherche: str | None = Query(None, description="Filtre sur le nom, le secteur ou le pays"),
+    recherche: str | None = Query(
+        None, description="Filtre sur le nom, le secteur ou le pays"
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
@@ -681,7 +713,9 @@ def lister_entreprises_a_republier_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[EntreprisePublic]:
-    items, total = lister_entreprises_a_republier(session, page=page, page_size=page_size)
+    items, total = lister_entreprises_a_republier(
+        session, page=page, page_size=page_size
+    )
     return Page[EntreprisePublic](
         items=items,
         page=page,
@@ -719,8 +753,9 @@ def lister_entreprises_avec_score_route(
                 environmental_score=score.environmental_score if score else None,
                 social_score=score.social_score if score else None,
                 governance_score=score.governance_score if score else None,
+                report_id=report_id,
             )
-            for entreprise, score in items
+            for entreprise, score, report_id in items
         ],
         page=page,
         page_size=page_size,
@@ -745,7 +780,10 @@ def update_company_identifiers(
         session, company_id, payload.model_dump(include=payload.model_fields_set)
     )
     return CompanyIdentifiers(
-        company_id=entreprise.id, isin=entreprise.isin, lei=entreprise.lei, ticker=entreprise.ticker
+        company_id=entreprise.id,
+        isin=entreprise.isin,
+        lei=entreprise.lei,
+        ticker=entreprise.ticker,
     )
 
 
@@ -818,7 +856,9 @@ def get_company_mandate_letter(
     chemin = storage.resolve_path(entreprise.mandate_letter_path)
     if not chemin.is_file():
         raise NotFoundError("Lettre de mandat introuvable.", code="mandat_introuvable")
-    return FileResponse(chemin, media_type="application/pdf", filename="lettre-de-mandat.pdf")
+    return FileResponse(
+        chemin, media_type="application/pdf", filename="lettre-de-mandat.pdf"
+    )
 
 
 @router.post(
@@ -882,7 +922,7 @@ def consulter_entreprise_route(
     "/admin/entreprises/{entreprise_id}",
     response_model=EntrepriseAdmin,
     operation_id="updateCompanyProfile",
-    summary="Mettre à jour le profil d'une entreprise (identité, description, site officiel, montant minimum)",
+    summary="Mettre à jour l'identité d'une entreprise (nom, secteur, pays)",
 )
 def modifier_entreprise_route(
     entreprise_id: uuid.UUID,
@@ -896,10 +936,6 @@ def modifier_entreprise_route(
         nom=payload.name,
         secteur=payload.sector,
         pays=payload.country,
-        description=payload.description,
-        site_officiel=payload.website,
-        montant_minimum_investissement=payload.minimum_investment_amount,
-        devise_montant_minimum=payload.minimum_investment_currency,
     )
     return _vers_entreprise_admin(session, entreprise)
 
@@ -993,6 +1029,22 @@ def lister_journal_audit_route(
 
 
 @router.get(
+    "/admin/journal-audit/compteurs-actions",
+    response_model=list[JournalAuditActionCompte],
+    operation_id="listAuditLogActionCounts",
+    summary="Nombre d'entrées existantes par action du journal d'audit",
+)
+def lister_compteurs_actions_route(
+    _current_user: User = Depends(require_role(Role.ADMIN)),
+    session: Session = Depends(get_session),
+) -> list[JournalAuditActionCompte]:
+    return [
+        JournalAuditActionCompte(action=action, count=total)
+        for action, total in compter_actions(session)
+    ]
+
+
+@router.get(
     "/admin/dashboard",
     response_model=TableauDeBordAdmin,
     operation_id="getAdminDashboard",
@@ -1078,13 +1130,17 @@ def performance_esg_route(
     summary="Lister tous les portefeuilles non archivés, tous Investisseurs confondus",
 )
 def lister_portefeuilles_admin_route(
-    recherche: str | None = Query(None, description="Filtre sur le nom du portefeuille ou l'e-mail"),
+    recherche: str | None = Query(
+        None, description="Filtre sur le nom du portefeuille ou l'e-mail"
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(3, ge=1, le=100),
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[PortefeuilleAdmin]:
-    items, total = lister_portefeuilles_admin(session, recherche=recherche, page=page, page_size=page_size)
+    items, total = lister_portefeuilles_admin(
+        session, recherche=recherche, page=page, page_size=page_size
+    )
     return Page[PortefeuilleAdmin](
         items=[
             PortefeuilleAdmin(
@@ -1118,7 +1174,9 @@ def lister_analyses_admin_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[AnalyseAdmin]:
-    items, total = lister_analyses_admin(session, statut=statut, page=page, page_size=page_size)
+    items, total = lister_analyses_admin(
+        session, statut=statut, page=page, page_size=page_size
+    )
     return Page[AnalyseAdmin](
         items=[
             AnalyseAdmin(
@@ -1154,7 +1212,9 @@ def lister_projets_admin_route(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> Page[ProjetAdmin]:
-    items, total = lister_projets_admin(session, statut=statut, page=page, page_size=page_size)
+    items, total = lister_projets_admin(
+        session, statut=statut, page=page, page_size=page_size
+    )
     return Page[ProjetAdmin](
         items=[
             ProjetAdmin(
@@ -1184,7 +1244,9 @@ def _donnees_financieres(rapport: ESGReport) -> ReportFinancials:
         status=rapport.status,
         revenue=float(rapport.revenue) if rapport.revenue is not None else None,
         revenue_currency=rapport.revenue_currency,
-        enterprise_value=float(rapport.enterprise_value) if rapport.enterprise_value is not None else None,
+        enterprise_value=float(rapport.enterprise_value)
+        if rapport.enterprise_value is not None
+        else None,
         enterprise_value_currency=rapport.enterprise_value_currency,
         evic_date=rapport.evic_date,
     )
@@ -1241,5 +1303,6 @@ def update_report_financials(
     _current_user: User = Depends(require_role(Role.ADMIN)),
     session: Session = Depends(get_session),
 ) -> ReportFinancials:
-    return _donnees_financieres(modifier_donnees_financieres(session, report_id, payload.model_dump()))
-
+    return _donnees_financieres(
+        modifier_donnees_financieres(session, report_id, payload.model_dump())
+    )

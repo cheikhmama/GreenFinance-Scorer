@@ -4,8 +4,44 @@ import {
   erreurIdentifiantFiscal,
 } from "@/features/registration/referentiels";
 import { Currency, ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
 export const DEVISES = Object.values(Currency);
+
+/** Description, site officiel et montant minimum de sa propre fiche entreprise (tâche
+ * post-Phase-0 : bascule de cette modification de l'Administrateur vers l'Entreprise). Même
+ * principe que l'ancien formulaire Admin : impose_minimum est purement local (jamais envoyé),
+ * il pilote l'affichage du couple montant/devise et la décision d'envoyer (null, null) sinon —
+ * voir ProfilePage.tsx. Le serveur applique la même règle "ensemble ou aucun"
+ * (app/company/schemas.py::ModifierProfilEntrepriseRequest), reproduite ici pour un message
+ * d'erreur immédiat. */
+export const modifierProfilEntrepriseSchema = z
+  .object({
+    description: z.string().optional(),
+    website: z.string().optional(),
+    impose_minimum: z.boolean(),
+    minimum_investment_amount: z
+      .number()
+      .refine(auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES)
+      .optional(),
+    minimum_investment_currency: z.enum(Currency).optional(),
+  })
+  .superRefine((values, ctx) => {
+    if (!values.impose_minimum) return;
+    if (
+      values.minimum_investment_amount === undefined ||
+      Number.isNaN(values.minimum_investment_amount)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["minimum_investment_amount"],
+        message: "Le montant est requis.",
+      });
+    }
+  });
+
+export type ModifierProfilEntrepriseForm = z.infer<typeof modifierProfilEntrepriseSchema>;
+
 export const TYPES_RAPPORT = Object.values(ReportType);
 
 // z.number(), pas z.coerce.number() : coerce sépare le type d'entrée (unknown) du type de

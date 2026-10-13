@@ -9,6 +9,7 @@ import {
   registerCompany,
   replyToRegistrationInfoRequest,
   submitCompanyReportCorrection,
+  updateMyCompanyProfile,
 } from "@/shared/api/generated/company/company";
 import type {
   BodyRegisterCompany,
@@ -16,6 +17,7 @@ import type {
   BodySubmitCompanyReportCorrection,
   EntreprisePublic,
   GroupeCompletude,
+  ModifierProfilEntrepriseRequest,
   RapportESGDetail,
   RapportESGPublic,
   RegistrationStatusView,
@@ -116,12 +118,25 @@ export function useDiscardDraft(rapportId: string) {
   });
 }
 
-/** GET /company/profil — la fiche entreprise telle que vue par les investisseurs, en lecture
- * seule (l'édition reste réservée à l'Admin, voir ARCHITECTURE.md gouvernance Phase 0). */
+/** GET /company/profil — la fiche entreprise telle que vue par les investisseurs. Nom, secteur
+ * et pays restent réservés à l'Admin ; description, site officiel et montant minimum sont
+ * modifiables par l'Entreprise elle-même (voir useUpdateMyCompanyProfile ci-dessous). */
 export function useMyCompanyProfile() {
   return useQuery<EntreprisePublic, ApiError>({
     queryKey: ["company", "profil"],
     queryFn: () => getMyCompanyProfile(),
+  });
+}
+
+/** PATCH /company/profil — description, site officiel et montant minimum de sa propre
+ * entreprise. */
+export function useUpdateMyCompanyProfile() {
+  const queryClient = useQueryClient();
+  return useMutation<EntreprisePublic, ApiError, ModifierProfilEntrepriseRequest>({
+    mutationFn: (payload) => updateMyCompanyProfile(payload),
+    onSuccess: (entreprise) => {
+      queryClient.setQueryData(["company", "profil"], entreprise);
+    },
   });
 }
 

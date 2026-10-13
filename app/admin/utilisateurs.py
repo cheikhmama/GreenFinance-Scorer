@@ -45,12 +45,13 @@ def lister_utilisateurs_par_role(
     page: int = 1,
     page_size: int = 3,
 ) -> tuple[list[User], int]:
-    """Page de comptes d'un rôle donné, filtrée par e-mail OU nom si `recherche` est fourni —
-    seuls les comptes actifs par défaut, tous si `inclure_inactifs` (nécessaire pour retrouver un
-    compte à réactiver, sinon invisible dès qu'il est désactivé). `en_attente_activation`
-    retrouve les comptes provisionnés qui n'ont pas encore cliqué leur lien d'activation (tuile
-    "en attente" du tableau de bord, app/admin/dashboard.py, qui calcule son compteur tous rôles
-    confondus — ce filtre reste scopé à un rôle, comme le reste de cette liste).
+    """Page de comptes, filtrée par e-mail OU nom si `recherche` est fourni — seuls les comptes
+    actifs par défaut, tous si `inclure_inactifs` (nécessaire pour retrouver un compte à
+    réactiver, sinon invisible dès qu'il est désactivé). `en_attente_activation` retrouve les
+    comptes provisionnés qui n'ont pas encore cliqué leur lien d'activation (tuile "en attente"
+    du tableau de bord, app/admin/dashboard.py, qui calcule son compteur tous rôles confondus —
+    ce filtre reste disponible qu'un rôle soit choisi ou non). `role` est optionnel : omis, la
+    page porte sur tous les rôles confondus (vue "Tous les rôles" de UsersSection.tsx).
 
     Pagination par offset/limit — le total ne descend jamais à la base entière : seule la page
     demandée est chargée (voir app/core/schemas.py::Page, posé pour ce cas précisément)."""
@@ -99,6 +100,28 @@ def lister_utilisateurs_en_attente(session: Session) -> list[User]:
             )
         ).all()
     )
+
+
+def lister_utilisateurs_apercu_roles(session: Session) -> list[User]:
+    """Un compte actif par rôle, hors ADMIN — vue de repère affichée par défaut dans
+    UsersSection.tsx quand le filtre vaut "Tous les rôles", pour montrer d'un coup d'œil les
+    différents acteurs qui collaborent sur la plateforme. Un simple tri par e-mail sur l'ensemble
+    des comptes pourrait n'exposer qu'un seul rôle sur la première page si plusieurs comptes du
+    même rôle se suivent alphabétiquement ; cette vue garantit un représentant par rôle. Un rôle
+    sans aucun compte actif est simplement absent du résultat (jamais une entrée vide)."""
+    resultats: list[User] = []
+    for role in Role:
+        if role == Role.ADMIN:
+            continue
+        utilisateur = session.exec(
+            select(User)
+            .where(col(User.role) == role, col(User.active).is_(True))
+            .order_by(col(User.email))
+            .limit(1)
+        ).first()
+        if utilisateur is not None:
+            resultats.append(utilisateur)
+    return resultats
 
 
 def creer_utilisateur(

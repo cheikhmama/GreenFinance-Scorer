@@ -8,7 +8,6 @@ ARCHITECTURE.md §1).
 
 import uuid
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Any
 
 import structlog
@@ -22,7 +21,7 @@ from app.auth.avatar import construire_avatar_data_uri
 from app.company.models import Company
 from app.core.config import get_settings
 from app.core.database import utcnow
-from app.core.enums import Currency, RegistrationStatus, ReportStatus
+from app.core.enums import RegistrationStatus, ReportStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
@@ -623,24 +622,17 @@ def modifier_entreprise_admin(
     nom: str,
     secteur: str,
     pays: str,
-    description: str | None,
-    site_officiel: str | None,
-    montant_minimum_investissement: Decimal | None,
-    devise_montant_minimum: Currency | None,
 ) -> Company:
-    """Remplace le profil complet d'une entreprise — jamais de logique métier dérivée ici,
-    seulement l'affectation des champs fournis (voir ModifierEntrepriseAdminRequest pour la
-    contrainte "ensemble ou aucun" sur le couple montant/devise). Le logo n'est délibérément pas
-    de la partie, voir televerser_logo_entreprise/supprimer_logo_entreprise ci-dessous."""
+    """Remplace l'identité d'une entreprise — jamais de logique métier dérivée ici, seulement
+    l'affectation des champs fournis. Description, site officiel et montant minimum ne sont plus
+    modifiables depuis l'espace Admin (voir app/company/profil.py::modifier_profil_entreprise, côté
+    Entreprise). Le logo n'est délibérément pas de la partie, voir
+    televerser_logo_entreprise/supprimer_logo_entreprise ci-dessous."""
     entreprise = consulter_entreprise_admin(session, entreprise_id)
 
     entreprise.name = nom
     entreprise.sector = secteur
     entreprise.country = pays
-    entreprise.description = description
-    entreprise.website = site_officiel
-    entreprise.minimum_investment_amount = montant_minimum_investissement
-    entreprise.minimum_investment_currency = devise_montant_minimum
     session.add(entreprise)
     session.commit()
     session.refresh(entreprise)

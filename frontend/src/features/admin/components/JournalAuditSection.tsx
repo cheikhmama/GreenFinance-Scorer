@@ -6,6 +6,7 @@ import {
   libelleTypeRessource,
   libelleValeurJournal,
 } from "@/shared/format/journal";
+import { libelleRole } from "@/shared/format/role";
 import { Badge } from "@/shared/ui/badge";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import {
@@ -28,24 +29,42 @@ function acteur(e: JournalAuditPublic): string {
   return e.actor_name ?? e.actor_email ?? "Anonyme";
 }
 
-/** Journal d'audit (table de données, tâche 5.17) : date, action, acteur, ressource et résultat ;
+/** Un compte est désigné par son rôle (« Investisseur »), toute autre ressource par son type. */
+function ressource(e: JournalAuditPublic): string {
+  if (e.resource_type !== "User") return libelleTypeRessource(e.resource_type);
+  return e.resource_user_role ? libelleRole(e.resource_user_role) : "Compte supprimé";
+}
+
+/** Deux catégories masquées à l'écran, jamais supprimées ni modifiées en base (le journal reste
+ * immuable) : une ressource de type compte dont le rôle est introuvable (compte supprimé depuis),
+ * et toute entrée sans acteur identifié — aucune action du code actuel n'en écrit plus (voir
+ * app/core/audit.py), une telle ligne ne peut venir que d'un compte de test supprimé après coup.
+ * Une entrée AVEC acteur connu reste affichée même en échec : c'est le signal le plus utile pour
+ * repérer une activité suspecte sur un vrai compte. */
+function affichable(e: JournalAuditPublic): boolean {
+  return (
+    (e.resource_type !== "User" || Boolean(e.resource_user_role)) &&
+    Boolean(e.actor_name || e.actor_email)
+  );
+}
+
+/** Journal d'audit (table de données, tâche 5.17) : ressource, action, acteur, résultat et date ;
  * avant / après, identifiants et corrélation dans le tiroir. `concerneId` restreint à l'historique
  * d'un compte ou d'une entreprise (actions faites ou subies). */
 export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
   const { data, isLoading, isError } = useTableJournal(concerneId);
   const [ouvertId, setOuvertId] = useState<string | null>(null);
 
+  const lignes = useMemo(() => data?.lignes.filter(affichable), [data]);
+
   const colonnes = useMemo<ColonneTable<JournalAuditPublic>[]>(
     () => [
       {
-        id: "date",
-        entete: "Date",
+        id: "ressource",
+        entete: "Ressource",
         masquable: false,
-        valeurTri: (e) => e.occurred_at,
-        valeurExport: (e) => dateHeure(e.occurred_at),
-        cellule: (e) => (
-          <span className="font-mono whitespace-nowrap">{dateHeure(e.occurred_at)}</span>
-        ),
+        valeurTri: (e) => ressource(e),
+        cellule: (e) => <span className="text-muted-foreground">{ressource(e)}</span>,
       },
       {
         id: "action",
@@ -59,36 +78,51 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
         id: "acteur",
         entete: "Par",
         valeurTri: (e) => acteur(e),
-        cellule: (e) =>
-          e.actor_name || e.actor_email ? (
-            acteur(e)
-          ) : (
-            <span className="text-muted-foreground">Anonyme</span>
-          ),
+        cellule: (e) => (
+          <span className="flex flex-col">
+            <span title={e.actor_email ?? undefined}>{acteur(e)}</span>
+            {/* Pas de doublon avec Ressource quand l'acteur agit sur lui-même (ex. connexion) :
+             * Ressource montre déjà ce même rôle. */}
+            {e.actor_role && e.actor_id !== e.resource_id ? (
+              <span className="text-xs text-muted-foreground">{libelleRole(e.actor_role)}</span>
+            ) : null}
+          </span>
+        ),
       },
       {
-        id: "ressource",
-        entete: "Ressource",
-        valeurTri: (e) => libelleTypeRessource(e.resource_type),
+        id: "resultat",
+        entete: "Résultat",
+        valeurTri: (e) => libelleResultatJournal(e.result),
         cellule: (e) => (
-          <span className="text-muted-foreground">{libelleTypeRessource(e.resource_type)}</span>
+          <Badge variant={e.result === "success" ? "success" : "destructive"}>
+            {libelleResultatJournal(e.result)}
+          </Badge>
+        ),
+      },
+      {
+        id: "date",
+        entete: "Date",
+        valeurTri: (e) => e.occurred_at,
+        valeurExport: (e) => dateHeure(e.occurred_at),
+        cellule: (e) => (
+          <span className="font-mono whitespace-nowrap">{dateHeure(e.occurred_at)}</span>
         ),
       },
     ],
     [],
   );
-  const ouvert = data?.lignes.find((e) => e.id === ouvertId) ?? null;
+  const ouvert = lignes?.find((e) => e.id === ouvertId) ?? null;
 
   return (
     <>
       <DataTable
         libelle="Journal d’audit"
-        lignes={data?.lignes}
+        lignes={lignes}
         tronque={data?.tronque}
         colonnes={colonnes}
         cle={(e) => e.id}
         rechercheDans={(e) =>
-          `${libelleActionJournal(e.action)} ${acteur(e)} ${e.actor_email ?? ""} ${libelleTypeRessource(e.resource_type)}`
+          `${libelleActionJournal(e.action)} ${acteur(e)} ${e.actor_email ?? ""} ${ressource(e)}`
         }
         placeholderRecherche="Action, personne, ressource…"
         filtres={[
@@ -96,7 +130,7 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
           {
             id: "ressource",
             libelle: "Ressource",
-            valeur: (e) => libelleTypeRessource(e.resource_type),
+            valeur: (e) => ressource(e),
           },
           { id: "resultat", libelle: "Résultat", valeur: (e) => libelleResultatJournal(e.result) },
         ]}
@@ -129,7 +163,7 @@ export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
                   champs={[
                     { libelle: "Par", valeur: acteur(ouvert) },
                     { libelle: "E-mail", valeur: ouvert.actor_email ?? null },
-                    { libelle: "Ressource", valeur: libelleTypeRessource(ouvert.resource_type) },
+                    { libelle: "Ressource", valeur: ressource(ouvert) },
                     {
                       libelle: "Code de l’action",
                       valeur: <code className="font-mono text-xs">{ouvert.action}</code>,

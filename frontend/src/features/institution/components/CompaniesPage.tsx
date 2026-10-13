@@ -6,6 +6,7 @@ import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { formatScore } from "@/shared/format/etatPosition";
 import { formatValeur } from "@/shared/format/indicateurs";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -152,7 +153,7 @@ export function CompaniesPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/institution/entreprises/${ouverte.id}`}>Ouvrir la fiche</Link>
+                <Link to={`/institution/entreprises/${creerSlug(ouverte.name, ouverte.id)}`}>Ouvrir la fiche</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

@@ -50,12 +50,12 @@ export const roleNavConfig: Record<Role, RoleNavConfig> = {
       { to: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
       { to: "/admin/entreprises", label: "Entreprises", icon: Building2 },
       { to: "/admin/rapports", label: "Rapports", icon: FileText },
-      { to: "/admin/journal-audit", label: "Journal d'audit", icon: History },
       // Pages de suivi déjà atteignables depuis le tableau de bord, jusqu'ici absentes du menu.
-      { to: "/admin/auditeurs", label: "Auditeurs", icon: ClipboardCheck, groupe: "Supervision" },
-      { to: "/admin/portefeuilles", label: "Portefeuilles", icon: Wallet, groupe: "Supervision" },
-      { to: "/admin/projets", label: "Projets", icon: FolderKanban, groupe: "Supervision" },
-      { to: "/admin/analyses", label: "Analyses", icon: FlaskConical, groupe: "Supervision" },
+      // Auditeurs : déjà filtrables depuis « Utilisateurs », pas de section dédiée ici.
+      { to: "/admin/portefeuilles", label: "Portefeuilles", icon: Wallet },
+      { to: "/admin/projets", label: "Projets", icon: FolderKanban },
+      { to: "/admin/analyses", label: "Analyses", icon: FlaskConical },
+      { to: "/admin/journal-audit", label: "Journal d'audit", icon: History },
     ],
   },
   [Role.ENTERPRISE]: {

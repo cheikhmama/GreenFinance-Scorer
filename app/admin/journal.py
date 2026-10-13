@@ -15,23 +15,51 @@ from app.auth.models import User
 from app.core.models import AuditLogEntry
 
 
-def avec_acteurs(session: Session, entrees: list[AuditLogEntry]) -> list[JournalAuditPublic]:
-    """Joint le nom et l'e-mail de l'acteur à chaque entrée, en une seule requête par page."""
-    ids = {e.actor_id for e in entrees if e.actor_id is not None}
-    acteurs = (
+def avec_acteurs(
+    session: Session, entrees: list[AuditLogEntry]
+) -> list[JournalAuditPublic]:
+    """Joint à chaque entrée le nom/e-mail/rôle de l'acteur, et — quand la ressource visée est un
+    compte (resource_type == "User", ex. une désactivation) — le rôle de ce compte, en une seule
+    requête par page plutôt qu'un aller-retour par ligne."""
+    ids_acteurs = {e.actor_id for e in entrees if e.actor_id is not None}
+    ids_ressources_compte = {
+        e.resource_id
+        for e in entrees
+        if e.resource_id is not None and e.resource_type == "User"
+    }
+    ids = ids_acteurs | ids_ressources_compte
+    comptes = (
         {u.id: u for u in session.exec(select(User).where(col(User.id).in_(ids))).all()}
         if ids
         else {}
     )
     lignes = []
     for entree in entrees:
-        acteur = acteurs.get(entree.actor_id) if entree.actor_id is not None else None
+        acteur = comptes.get(entree.actor_id) if entree.actor_id is not None else None
         ligne = JournalAuditPublic.model_validate(entree)
         if acteur is not None:
             ligne.actor_name = acteur.name
             ligne.actor_email = acteur.email
+            ligne.actor_role = acteur.role
+        if entree.resource_type == "User" and entree.resource_id is not None:
+            compte_vise = comptes.get(entree.resource_id)
+            if compte_vise is not None:
+                ligne.resource_user_role = compte_vise.role
         lignes.append(ligne)
     return lignes
+
+
+def compter_actions(session: Session) -> list[tuple[str, int]]:
+    """Nombre d'entrées par action, décroissant — sert à trier le filtre d'actions de la page
+    Journal d'audit par pertinence réelle : une action jamais survenue passe en bas plutôt qu'en
+    tête d'un ordre alphabétique qui ne dit rien de ce que la base contient vraiment."""
+    return list(
+        session.exec(
+            select(AuditLogEntry.action, func.count())
+            .group_by(col(AuditLogEntry.action))
+            .order_by(func.count().desc())
+        ).all()
+    )
 
 
 def lister_journal_audit(
@@ -55,7 +83,10 @@ def lister_journal_audit(
     filtres: list[ColumnElement[bool]] = []
     if concerne_id is not None:
         filtres.append(
-            or_(col(AuditLogEntry.actor_id) == concerne_id, col(AuditLogEntry.resource_id) == concerne_id)
+            or_(
+                col(AuditLogEntry.actor_id) == concerne_id,
+                col(AuditLogEntry.resource_id) == concerne_id,
+            )
         )
     elif acteur_id is not None:
         filtres.append(col(AuditLogEntry.actor_id) == acteur_id)
@@ -70,7 +101,9 @@ def lister_journal_audit(
     if jusqu_a is not None:
         filtres.append(col(AuditLogEntry.occurred_at) <= jusqu_a)
 
-    total = session.exec(select(func.count()).select_from(AuditLogEntry).where(*filtres)).one()
+    total = session.exec(
+        select(func.count()).select_from(AuditLogEntry).where(*filtres)
+    ).one()
     items = list(
         session.exec(
             select(AuditLogEntry)

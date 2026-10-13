@@ -10,6 +10,7 @@ import {
   libelleStatutInscription,
   variantStatutInscription,
 } from "@/shared/format/statutInscription";
+import { creerSlug } from "@/shared/format/slug";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -303,11 +304,11 @@ function EntrepriseTiroir({
           </SheetBody>
           <SheetFooter>
             <Button asChild size="sm">
-              <Link to={`/admin/entreprises/${entreprise.id}`}>Ouvrir la fiche</Link>
+              <Link to={`/admin/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}>Ouvrir la fiche</Link>
             </Button>
             {entreprise.latest_report_id ? (
               <Button asChild size="sm" variant="outline">
-                <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>Dernier rapport</Link>
+                <Link to={`/admin/rapports/${creerSlug(entreprise.name, entreprise.latest_report_id)}`}>Dernier rapport</Link>
               </Button>
             ) : null}
             {publiable || aRepublier ? (

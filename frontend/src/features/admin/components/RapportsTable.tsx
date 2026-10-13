@@ -6,6 +6,7 @@ import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { uneDecimale } from "@/shared/format/etatPosition";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -245,12 +246,12 @@ export function RapportTiroir({
           </SheetBody>
           <SheetFooter>
             <Button asChild size="sm">
-              <Link to={`/admin/rapports/${rapport.id}`}>
+              <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
                 {rapport.status === "PENDING_DECISION" ? "Rendre la décision" : "Ouvrir le rapport"}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link to={`/admin/entreprises/${rapport.company_id}`}>Fiche de l’entreprise</Link>
+              <Link to={`/admin/entreprises/${creerSlug(rapport.company_name, rapport.company_id)}`}>Fiche de l’entreprise</Link>
             </Button>
           </SheetFooter>
         </SheetContent>

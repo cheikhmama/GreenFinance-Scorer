@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
@@ -33,7 +34,8 @@ function formatDate(iso: string): string {
 }
 
 export function ProjectDetailPage() {
-  const { projetId = "" } = useParams();
+  const { projetId: segment = "" } = useParams();
+  const projetId = idDepuisSlug(segment);
   const { data: projet, isLoading, isError } = useProjectDetail(projetId);
   const { data: chercheursAcceptes } = useMyResearchers("ACCEPTE");
   const assigner = useAssignResearcher(projetId);
@@ -49,6 +51,16 @@ export function ProjectDetailPage() {
   const dejaAffectes = new Set(projet.assignments.map((a) => a.researcher_id));
   const candidats = (chercheursAcceptes ?? []).filter((r) => !dejaAffectes.has(r.researcher_id));
   const documentesIds = new Set(projet.documents.map((d) => d.company_id));
+
+  // Révélation progressive (tâche post-5.17bis) : un projet tout juste créé n'affiche que
+  // « Chercheurs affectés », seule étape toujours pertinente à ce stade. Le périmètre ne prend
+  // sens qu'une fois un chercheur affecté (ou déjà construit) ; documents et analyses n'ont aucun
+  // point d'entrée propre (le dépôt d'un document se fait depuis une ligne du périmètre, une
+  // analyse n'est jamais créée par l'Institution) — les montrer vides avant toute donnée réelle
+  // n'offrirait donc aucune action possible, seulement du bruit visuel.
+  const perimetrePertinent = projet.assignments.length > 0 || projet.companies.length > 0;
+  const documentsPertinents = projet.documents.length > 0;
+  const analysesPertinentes = projet.analyses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -164,66 +176,63 @@ export function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base text-foreground">
-            <Building2 className="size-4" />
-            Périmètre autorisé ({projet.companies.length})
-          </CardTitle>
-          {projet.status === "OUVERT" ? (
-            <Button size="sm" variant="outline" onClick={() => setPerimetreOuvert(true)}>
-              Ajouter une entreprise
-            </Button>
-          ) : null}
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Seules ces entreprises pourront être comparées dans une analyse de ce projet.
-          </p>
-          {projet.companies.length === 0 ? (
-            <EmptyState
-              icon={Building2}
-              message="Aucune entreprise n'est encore autorisée — les chercheurs affectés ne pourront créer aucune analyse tant que le périmètre est vide."
-            />
-          ) : (
-            projet.companies.map((entreprise) => (
-              <div
-                key={entreprise.id}
-                className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
-              >
-                <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
-                <Link
-                  to={`/institution/entreprises/${entreprise.company_id}`}
-                  className="flex-1 font-medium text-foreground underline-offset-2 hover:underline"
+      {perimetrePertinent ? (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
+              <Building2 className="size-4" />
+              Périmètre autorisé ({projet.companies.length})
+            </CardTitle>
+            {projet.status === "OUVERT" ? (
+              <Button size="sm" variant="outline" onClick={() => setPerimetreOuvert(true)}>
+                Ajouter une entreprise
+              </Button>
+            ) : null}
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Seules ces entreprises pourront être comparées dans une analyse de ce projet.
+            </p>
+            {projet.companies.length === 0 ? (
+              <EmptyState
+                icon={Building2}
+                message="Aucune entreprise n'est encore autorisée — les chercheurs affectés ne pourront créer aucune analyse tant que le périmètre est vide."
+              />
+            ) : (
+              projet.companies.map((entreprise) => (
+                <div
+                  key={entreprise.id}
+                  className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
                 >
-                  {entreprise.company_name}
-                </Link>
-                {documentesIds.has(entreprise.company_id) ? (
-                  <Badge variant="success">Document mis à disposition</Badge>
-                ) : (
-                  <BoutonMettreADisposition projetId={projet.id} entreprise={entreprise} />
-                )}
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+                  <CompanyAvatar nom={entreprise.company_name} logo={null} className="size-8" />
+                  <Link
+                    to={`/institution/entreprises/${creerSlug(entreprise.company_name, entreprise.company_id)}`}
+                    className="flex-1 font-medium text-foreground underline-offset-2 hover:underline"
+                  >
+                    {entreprise.company_name}
+                  </Link>
+                  {documentesIds.has(entreprise.company_id) ? (
+                    <Badge variant="success">Document mis à disposition</Badge>
+                  ) : (
+                    <BoutonMettreADisposition projetId={projet.id} entreprise={entreprise} />
+                  )}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-foreground">
-            <FileText className="size-4" />
-            Documents mis à disposition ({projet.documents.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {projet.documents.length === 0 ? (
-            <EmptyState
-              icon={FileText}
-              message="Aucun document mis à disposition — utilisez le bouton sur une entreprise du périmètre ci-dessus."
-            />
-          ) : (
-            projet.documents.map((document) => (
+      {documentsPertinents ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
+              <FileText className="size-4" />
+              Documents mis à disposition ({projet.documents.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {projet.documents.map((document) => (
               <div
                 key={document.id}
                 className="flex items-center gap-3 border-b py-2 text-sm last:border-0"
@@ -237,23 +246,21 @@ export function ProjectDetailPage() {
                   ajouté le {formatDate(document.added_at)}
                 </span>
               </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base text-foreground">Analyses reçues</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {projet.analyses.length === 0 ? (
-            <EmptyState icon={FileText} message="Aucune analyse soumise pour l'instant." />
-          ) : (
-            projet.analyses.map((analyse) => (
+      {analysesPertinentes ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base text-foreground">Analyses reçues</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {projet.analyses.map((analyse) => (
               <Link
                 key={analyse.id}
-                to={`/institution/analyses/${analyse.id}`}
+                to={`/institution/analyses/${creerSlug(analyse.title, analyse.id)}`}
                 className="flex items-center justify-between border-b py-2 text-sm last:border-0 hover:bg-muted"
               >
                 <span className="font-medium text-foreground">
@@ -263,10 +270,10 @@ export function ProjectDetailPage() {
                   {libelleStatutAnalyse(analyse.status)}
                 </Badge>
               </Link>
-            ))
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <SelectionEntrepriseDialog
         projetId={projet.id}

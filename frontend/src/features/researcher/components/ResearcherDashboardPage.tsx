@@ -1,5 +1,6 @@
 import { FlaskConical, FolderKanban, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { PageShell } from "@/shared/layout/PageShell";
@@ -78,7 +79,7 @@ export function ResearcherDashboardPage() {
           <AlertDescription>
             L’institution a demandé des modifications avant de décider.{" "}
             <Link
-              to={`/researcher/analyses/${aCorriger[0].id}`}
+              to={`/researcher/analyses/${creerSlug(aCorriger[0].title, aCorriger[0].id)}`}
               className="font-medium underline underline-offset-2"
             >
               Ouvrir « {aCorriger[0].title} »
@@ -107,7 +108,7 @@ export function ResearcherDashboardPage() {
                   <li key={analyse.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <Link
-                        to={`/researcher/analyses/${analyse.id}`}
+                        to={`/researcher/analyses/${creerSlug(analyse.title, analyse.id)}`}
                         className="block truncate font-medium text-foreground hover:underline"
                       >
                         {analyse.title}
@@ -148,7 +149,7 @@ export function ResearcherDashboardPage() {
                   <li key={projet.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <Link
-                        to={`/researcher/projets/${projet.id}`}
+                        to={`/researcher/projets/${creerSlug(projet.name, projet.id)}`}
                         className="block truncate font-medium text-foreground hover:underline"
                       >
                         {projet.name}

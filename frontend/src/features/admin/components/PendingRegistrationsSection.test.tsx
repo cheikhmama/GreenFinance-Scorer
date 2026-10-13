@@ -52,7 +52,7 @@ describe("Administration — inscriptions à valider", () => {
     const liste = await screen.findByRole("list", { name: "Inscriptions à valider" });
     expect(within(liste).getByRole("link", { name: "TEST" })).toHaveAttribute(
       "href",
-      "/admin/entreprises/c1",
+      "/admin/entreprises/test-c1",
     );
     expect(liste).toHaveTextContent("Énergie · Mauritanie · NIF 12345678");
     expect(liste).toHaveTextContent("Mohamed · mohamed@exemple.mr");

@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type { ProjetPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutProjet, variantStatutProjet } from "@/shared/format/statutProjet";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -24,7 +25,6 @@ import {
   SheetSection,
   SheetTitle,
 } from "@/shared/ui/sheet";
-import { Textarea } from "@/shared/ui/textarea";
 import { useCreateProject, useMyProjects } from "../api";
 import { type CreerProjetForm, creerProjetSchema } from "../schemas";
 
@@ -150,7 +150,7 @@ export function ProjectsPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/institution/projets/${ouvert.id}`}>Ouvrir le projet</Link>
+                <Link to={`/institution/projets/${creerSlug(ouvert.name, ouvert.id)}`}>Ouvrir le projet</Link>
               </Button>
             </SheetFooter>
           </SheetContent>
@@ -167,7 +167,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
     resolver: zodResolver(creerProjetSchema),
     defaultValues: {
       name: "",
-      description: "",
       objective: "",
       start_date: "",
       planned_end_date: "",
@@ -180,7 +179,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
     createProject.mutate(
       {
         name: values.name,
-        description: values.description || null,
         objective: values.objective || null,
         start_date: values.start_date || null,
         planned_end_date: values.planned_end_date || null,
@@ -225,19 +223,6 @@ function FormulaireCreation({ onCreated }: { onCreated: () => void }) {
               <FormLabel>Objectif (optionnel)</FormLabel>
               <FormControl>
                 <Input placeholder="Ex. Analyse comparative ESG du secteur minier" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description (optionnelle)</FormLabel>
-              <FormControl>
-                <Textarea rows={3} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

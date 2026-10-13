@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfilePage } from "./ProfilePage";
@@ -85,5 +86,52 @@ describe("Espace Entreprise — profil", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/lei-verification"))).toBe(
       false,
     );
+  });
+
+  it("modifie et enregistre description, site officiel et montant minimum (pas secteur ni pays)", async () => {
+    fetchMock.mockImplementation(async (url, init) => {
+      const chemin = String(url);
+      if (chemin.endsWith("/lei-verification")) {
+        return Response.json({ lei: LEI, result: "NOT_VERIFIABLE", detail: "" });
+      }
+      if (chemin.endsWith("/company/profil") && init?.method === "PATCH") {
+        return Response.json(
+          profil({
+            description: "Nouvelle description.",
+            website: "https://nouveau-site.test",
+            minimum_investment_amount: 1000,
+            minimum_investment_currency: "USD",
+          }),
+        );
+      }
+      if (chemin.endsWith("/company/profil")) return Response.json(profil());
+      return Response.json({ detail: "non authentifié" }, { status: 401 });
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const fiche = await screen.findByRole("region", { name: "Fiche entreprise" });
+    await user.type(within(fiche).getByLabelText("Description"), "Nouvelle description.");
+    await user.type(within(fiche).getByLabelText("Site officiel"), "https://nouveau-site.test");
+    await user.click(within(fiche).getByLabelText("Imposer un montant minimum d'investissement"));
+    await user.type(within(fiche).getByLabelText("Montant minimum"), "1000");
+    await user.click(within(fiche).getByRole("button", { name: "Enregistrer" }));
+
+    const envoi = await vi.waitFor(() =>
+      fetchMock.mock.calls.find(
+        ([callUrl, callInit]) =>
+          String(callUrl).endsWith("/company/profil") && callInit?.method === "PATCH",
+      ),
+    );
+    expect(envoi).toBeDefined();
+    const corps = JSON.parse(envoi?.[1]?.body as string);
+    expect(corps).toEqual({
+      description: "Nouvelle description.",
+      website: "https://nouveau-site.test",
+      minimum_investment_amount: 1000,
+      // Devise non choisie explicitement : repli sur la première de l'énumération (comportement
+      // du formulaire, pas une valeur à deviner côté test).
+      minimum_investment_currency: expect.any(String),
+    });
   });
 });

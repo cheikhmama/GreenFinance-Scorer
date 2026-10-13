@@ -6,7 +6,6 @@ import { z } from "zod";
 export const creerProjetSchema = z
   .object({
     name: z.string().min(1, "Le nom est requis."),
-    description: z.string().optional(),
     objective: z.string().optional(),
     start_date: z.string().optional(),
     planned_end_date: z.string().optional(),

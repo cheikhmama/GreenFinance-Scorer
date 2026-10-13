@@ -97,7 +97,7 @@ export function AppShell() {
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 cn(
-                  "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
+                  "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-l-2 border-transparent px-3 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-sidebar-active font-semibold text-white shadow-[inset_3px_0_0_var(--sidebar-accent)]"
                     : "text-sidebar-foreground hover:bg-white/5 hover:text-white",
@@ -118,7 +118,7 @@ export function AppShell() {
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-xl p-3 transition",
+                "flex cursor-pointer items-center gap-3 rounded-xl border-l-2 border-transparent p-3 transition-colors",
                 isActive
                   ? "bg-sidebar-active font-semibold text-white shadow-[inset_3px_0_0_var(--sidebar-accent)]"
                   : "text-sidebar-foreground hover:bg-white/5 hover:text-white",

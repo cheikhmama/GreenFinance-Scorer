@@ -6,6 +6,7 @@ import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { uneDecimale } from "@/shared/format/etatPosition";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -194,7 +195,7 @@ export function DonneesPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/researcher/entreprises/${ouverte.id}`}>Fiche complète</Link>
+                <Link to={`/researcher/entreprises/${creerSlug(ouverte.name, ouverte.id)}`}>Fiche complète</Link>
               </Button>
               <Button
                 size="sm"

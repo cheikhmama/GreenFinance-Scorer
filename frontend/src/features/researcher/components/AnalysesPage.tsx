@@ -4,6 +4,8 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type { AnalysePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { ProjetAffecte } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleStatutAnalyse, variantStatutAnalyse } from "@/shared/format/statutAnalyse";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
@@ -166,7 +168,7 @@ export function AnalysesPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/researcher/analyses/${ouverte.id}`}>Ouvrir l’analyse</Link>
+                <Link to={`/researcher/analyses/${creerSlug(ouverte.title, ouverte.id)}`}>Ouvrir l’analyse</Link>
               </Button>
             </SheetFooter>
           </SheetContent>
@@ -233,11 +235,23 @@ function CompaniesPicker({
   );
 }
 
+/** Suggestion de titre/contenu depuis ce que l'Institution a déjà renseigné sur le projet
+ * (objectif, description) — jamais une invention, juste une amorce que le Chercheur affine
+ * ensuite ; voir la même logique pour les conditions de collaboration côté Institution
+ * (ResearchersPage.tsx::genererConditionsCollaboration). */
+function suggestionTitre(projet: Pick<ProjetAffecte, "name" | "objective">): string {
+  return projet.objective?.trim() || projet.name;
+}
+
+function suggestionContenu(projet: Pick<ProjetAffecte, "objective" | "description">): string {
+  return projet.description?.trim() || projet.objective?.trim() || "";
+}
+
 function FormulaireAnalyse({
   projets,
   onDone,
 }: {
-  projets: { id: string; name: string }[];
+  projets: ProjetAffecte[];
   onDone: () => void;
 }) {
   const [projetId, setProjetId] = useState(projets[0]?.id ?? "");
@@ -245,7 +259,11 @@ function FormulaireAnalyse({
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<AnalyseForm>({
     resolver: zodResolver(analyseFormSchema),
-    defaultValues: { title: "", content: "", company_ids: [] },
+    defaultValues: {
+      title: projets[0] ? suggestionTitre(projets[0]) : "",
+      content: projets[0] ? suggestionContenu(projets[0]) : "",
+      company_ids: [],
+    },
   });
 
   function onSubmit(values: AnalyseForm) {
@@ -277,9 +295,15 @@ function FormulaireAnalyse({
             value={projetId}
             onChange={(event) => {
               // Le périmètre autorisé diffère par projet — on vide la sélection plutôt que de
-              // laisser une entreprise hors périmètre s'y attarder après le changement.
+              // laisser une entreprise hors périmètre s'y attarder après le changement. Titre et
+              // contenu repartent eux aussi de l'objectif/description du nouveau projet.
+              const nouveauProjet = projets.find((p) => p.id === event.target.value);
               setProjetId(event.target.value);
               form.setValue("company_ids", []);
+              if (nouveauProjet) {
+                form.setValue("title", suggestionTitre(nouveauProjet));
+                form.setValue("content", suggestionContenu(nouveauProjet));
+              }
             }}
           >
             {projets.map((projet) => (
@@ -333,7 +357,7 @@ function FormulaireAnalyse({
         />
 
         <Button type="submit" className="w-full" disabled={createAnalysis.isPending || !projetId}>
-          {createAnalysis.isPending ? "Création..." : "Créer (brouillon)"}
+          {createAnalysis.isPending ? "Création..." : "Créer l'analyse"}
         </Button>
       </form>
     </Form>

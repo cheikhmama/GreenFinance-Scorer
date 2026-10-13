@@ -1,9 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, FlaskConical, LoaderCircle, LockKeyhole } from "lucide-react";
+import { ArrowRight, LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { isPrototypeEnabled } from "@/features/prototype/routes";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
 import { cheminAutorisePour } from "@/shared/roleHome";
@@ -90,7 +89,7 @@ export function LoginPage() {
                     placeholder="vous@organisation.fr"
                     spellCheck={false}
                     autoCapitalize="none"
-                    readOnly={login.isPending}
+                    disabled={login.isPending}
                     {...field}
                   />
                 </FormControl>
@@ -109,7 +108,7 @@ export function LoginPage() {
                   <PasswordInput
                     autoComplete="current-password"
                     placeholder="Votre mot de passe"
-                    readOnly={login.isPending}
+                    disabled={login.isPending}
                     {...field}
                   />
                 </FormControl>
@@ -148,19 +147,6 @@ export function LoginPage() {
         </Link>
       </p>
 
-      {isPrototypeEnabled ? (
-        <div className="mt-6 border-t pt-5">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto min-h-11 w-full whitespace-normal py-2"
-            onClick={() => navigate("/prototype")}
-          >
-            <FlaskConical aria-hidden="true" />
-            Explorer la démonstration
-          </Button>
-        </div>
-      ) : null}
     </AuthLayout>
   );
 }

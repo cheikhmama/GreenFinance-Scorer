@@ -41,6 +41,7 @@ import {
   ROLES_CONSULTABLES,
   Role,
   type RoleAttribuable,
+  type RoleConsultable,
 } from "../schemas";
 
 /** Gestion des comptes (Phase 3 §3.3, table de données tâche 5.17) — nom, organisation, e-mail
@@ -51,8 +52,8 @@ import {
 export function UsersSection() {
   const [searchParams] = useSearchParams();
   const parametreRole = searchParams.get("role");
-  const roleUrl = ROLES_CONSULTABLES.includes(parametreRole as Role)
-    ? (parametreRole as Role)
+  const roleUrl = ROLES_CONSULTABLES.includes(parametreRole as RoleConsultable)
+    ? (parametreRole as RoleConsultable)
     : null;
   // Le formulaire n'accepte jamais ADMIN : retombe sur le premier rôle attribuable.
   const roleCreationParDefaut = ROLES_ATTRIBUABLES.includes(roleUrl as RoleAttribuable)
@@ -170,9 +171,8 @@ function UtilisateurTiroir({
   utilisateur: UtilisateurAdmin | null;
   surFermer: () => void;
 }) {
-  const role = utilisateur?.role ?? Role.AUDITOR;
-  const deactivate = useDeactivateUser(role);
-  const reactivate = useReactivateUser(role);
+  const deactivate = useDeactivateUser();
+  const reactivate = useReactivateUser();
   const confirm = useConfirm();
   const [erreur, setErreur] = useState<string | null>(null);
 

@@ -68,10 +68,7 @@ export function AdminAnalysesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Analyses"
-        description="Toutes les analyses des chercheurs, toutes versions."
-      />
+      <PageHeader title="Analyses" />
       <DataTable
         libelle="Analyses"
         lignes={data}

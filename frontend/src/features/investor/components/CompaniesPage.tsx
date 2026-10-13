@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { EntreprisePublieePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -140,7 +141,7 @@ export function CompaniesPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/investor/entreprises/${ouverte.id}`}>Voir la fiche ESG</Link>
+                <Link to={`/investor/entreprises/${creerSlug(ouverte.name, ouverte.id)}`}>Voir la fiche ESG</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

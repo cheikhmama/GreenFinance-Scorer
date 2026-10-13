@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { AvisHistorique } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleDecisionAudit } from "@/shared/format/decisionAudit";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
+import { creerSlug } from "@/shared/format/slug";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Button } from "@/shared/ui/button";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
@@ -114,7 +115,7 @@ export function AuditHistoryPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm" variant="outline">
-                <Link to={`/audit/rapports/${ouvert.report_id}`}>Voir le dossier</Link>
+                <Link to={`/audit/rapports/${creerSlug(ouvert.company_name, ouvert.report_id)}`}>Voir le dossier</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

@@ -70,7 +70,7 @@ export function AdminProjetsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Projets" description="Tous les projets des institutions." />
+      <PageHeader title="Projets" />
       <DataTable
         libelle="Projets"
         lignes={data}

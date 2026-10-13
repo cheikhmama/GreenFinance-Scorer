@@ -73,12 +73,11 @@ describe("Espace Institution — créer un projet", () => {
       await screen.findByRole("button", { name: "Voir le détail de Mines et climat" }),
     );
     const lien = await screen.findByRole("link", { name: "Ouvrir le projet" });
-    expect(lien).toHaveAttribute("href", `/institution/projets/${PROJET.id}`);
+    expect(lien).toHaveAttribute("href", `/institution/projets/mines-et-climat-${PROJET.id}`);
     const envoi = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(envoi?.[0]).toBe("/api/v1/institution/projets");
     expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({
       name: "Mines et climat",
-      description: null,
       objective: null,
       start_date: "2026-10-01",
       planned_end_date: "2027-03-31",

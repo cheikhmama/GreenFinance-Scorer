@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, CheckCircle2, FileText, X } from "lucide-react";
+import { Camera, CheckCircle2, FileText, Globe, Info, Wallet, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
+import { formatMontant } from "@/shared/format/etatPosition";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import { libelleStatutRapport, variantStatutRapport } from "@/shared/format/statut";
 import {
   inscriptionEnExamen,
@@ -19,9 +22,7 @@ import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
-import { Select } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { Textarea } from "@/shared/ui/textarea";
 import {
   useCompanyDetail,
   useDeleteCompanyLogo,
@@ -32,8 +33,7 @@ import {
   useUploadCompanyLogo,
   useValidateReport,
 } from "../api";
-import { DEVISES, type ModifierEntrepriseForm, modifierEntrepriseSchema } from "../schemas";
-import { CompanyIdentifiersCard } from "./CompanyIdentifiersCard";
+import { type ModifierEntrepriseForm, modifierEntrepriseSchema } from "../schemas";
 import { OnboardingPanel } from "./OnboardingPanel";
 
 function LogoEditor({
@@ -116,11 +116,13 @@ function LogoEditor({
 }
 
 /** Fiche de détail Admin d'une entreprise — centralise ce que l'Investisseur voit sur sa fiche
- * publiée (logo, nom, secteur, pays, description, site officiel, montant minimum) pour que ces
- * données soient consultées ET modifiées depuis un seul endroit, plutôt que dispersées entre le
- * profil auto-déclaré de l'Entreprise et les seuls logo/montant jusqu'ici gérables ici. */
+ * publiée (logo, nom, secteur, pays, description, site officiel, montant minimum). L'Admin modifie
+ * l'identité (nom, secteur, pays) et le logo ; description, site officiel et montant minimum sont
+ * en lecture seule ici, modifiables par l'Entreprise elle-même depuis son propre profil (tâche
+ * post-Phase-0, voir frontend/src/features/company/components/ProfilePage.tsx). */
 export function AdminCompanyDetailPage() {
-  const { entrepriseId = "" } = useParams<{ entrepriseId: string }>();
+  const { entrepriseId: segment = "" } = useParams<{ entrepriseId: string }>();
+  const entrepriseId = idDepuisSlug(segment);
   const { data: entreprise, isLoading, isError } = useCompanyDetail(entrepriseId);
   const updateProfile = useUpdateCompanyProfile(entrepriseId);
   const suspend = useSuspendCompany();
@@ -135,29 +137,11 @@ export function AdminCompanyDetailPage() {
     resolver: zodResolver(modifierEntrepriseSchema),
     // `values` n'arrive qu'après le premier rendu : sans valeurs de départ, chaque champ passait
     // de non contrôlé à contrôlé (avertissement React).
-    defaultValues: {
-      name: "",
-      sector: "",
-      country: "",
-      description: "",
-      website: "",
-      impose_minimum: false,
-      minimum_investment_currency: DEVISES[0],
-    },
+    defaultValues: { name: "", sector: "", country: "" },
     values: entreprise
-      ? {
-          name: entreprise.name,
-          sector: entreprise.sector,
-          country: entreprise.country,
-          description: entreprise.description ?? "",
-          website: entreprise.website ?? "",
-          impose_minimum: entreprise.minimum_investment_amount != null,
-          minimum_investment_amount: entreprise.minimum_investment_amount ?? undefined,
-          minimum_investment_currency: entreprise.minimum_investment_currency ?? DEVISES[0],
-        }
+      ? { name: entreprise.name, sector: entreprise.sector, country: entreprise.country }
       : undefined,
   });
-  const imposeMinimum = form.watch("impose_minimum");
 
   if (isLoading) {
     return (
@@ -189,19 +173,7 @@ export function AdminCompanyDetailPage() {
   function onSubmit(values: ModifierEntrepriseForm) {
     setServerError(null);
     updateProfile.mutate(
-      {
-        name: values.name,
-        sector: values.sector,
-        country: values.country,
-        description: values.description || null,
-        website: values.website || null,
-        minimum_investment_amount: values.impose_minimum
-          ? (values.minimum_investment_amount ?? null)
-          : null,
-        minimum_investment_currency: values.impose_minimum
-          ? (values.minimum_investment_currency ?? null)
-          : null,
-      },
+      { name: values.name, sector: values.sector, country: values.country },
       {
         onError: (error) => {
           setServerError(error instanceof ApiError ? error.message : "Échec de l'enregistrement.");
@@ -212,10 +184,7 @@ export function AdminCompanyDetailPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title={entreprise.name}
-        description="Profil complet de l'entreprise, tel que présenté à l'Investisseur une fois publiée."
-      />
+      <PageHeader title={entreprise.name} />
       <Link
         to="/admin/entreprises"
         className="text-sm text-brand-green underline underline-offset-2"
@@ -254,7 +223,7 @@ export function AdminCompanyDetailPage() {
                 )}
               </div>
               <Button asChild size="sm" variant="link" className="h-auto p-0">
-                <Link to={`/admin/entreprises/${entrepriseId}/rapports`}>
+                <Link to={`/admin/entreprises/${creerSlug(entreprise.name, entrepriseId)}/rapports`}>
                   {entreprise.report_count} rapport{entreprise.report_count > 1 ? "s" : ""} déposé
                   {entreprise.report_count > 1 ? "s" : ""}
                 </Link>
@@ -264,7 +233,7 @@ export function AdminCompanyDetailPage() {
           <div className="flex flex-wrap items-center justify-center gap-2 sm:shrink-0 sm:justify-end">
             {entreprise.latest_report_id ? (
               <Button asChild size="sm" variant="outline">
-                <Link to={`/admin/rapports/${entreprise.latest_report_id}`}>
+                <Link to={`/admin/rapports/${creerSlug(entreprise.name, entreprise.latest_report_id)}`}>
                   <FileText className="size-4" />
                   Voir le rapport
                 </Link>
@@ -394,96 +363,6 @@ export function AdminCompanyDetailPage() {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea rows={3} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="website"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Site officiel</FormLabel>
-                    <FormControl>
-                      <Input type="url" placeholder="https://..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-3 border-t pt-4">
-                <FormField
-                  control={form.control}
-                  name="impose_minimum"
-                  render={({ field }) => (
-                    <FormItem>
-                      <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={field.value}
-                          onChange={(event) => field.onChange(event.target.checked)}
-                        />
-                        Cette entreprise impose un montant minimum d'investissement
-                      </label>
-                    </FormItem>
-                  )}
-                />
-                {imposeMinimum ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="minimum_investment_amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Montant minimum</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min={0}
-                              name={field.name}
-                              value={field.value ?? ""}
-                              onChange={(event) => field.onChange(event.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="minimum_investment_currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Devise</FormLabel>
-                          <FormControl>
-                            <Select {...field}>
-                              {DEVISES.map((devise) => (
-                                <option key={devise} value={devise}>
-                                  {devise}
-                                </option>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ) : null}
-              </div>
-
               <Button type="submit" disabled={updateProfile.isPending}>
                 {updateProfile.isPending ? "Enregistrement..." : "Enregistrer"}
               </Button>
@@ -492,7 +371,53 @@ export function AdminCompanyDetailPage() {
         </CardContent>
       </Card>
 
-      <CompanyIdentifiersCard key={entreprise.id} entreprise={entreprise} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Fiche publique</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-3">
+          <ChampLectureSeule icone={<FileText />} libelle="Description">
+            {entreprise.description ?? "Non renseignée"}
+          </ChampLectureSeule>
+          <ChampLectureSeule icone={<Globe />} libelle="Site officiel">
+            <span className="block truncate">{entreprise.website ?? "Non renseigné"}</span>
+          </ChampLectureSeule>
+          <ChampLectureSeule icone={<Wallet />} libelle="Montant minimum">
+            {entreprise.minimum_investment_amount !== null && entreprise.minimum_investment_currency
+              ? formatMontant(
+                  entreprise.minimum_investment_amount,
+                  entreprise.minimum_investment_currency,
+                )
+              : "Aucun minimum imposé"}
+          </ChampLectureSeule>
+          <p className="col-span-full flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Info className="size-3.5 shrink-0" aria-hidden="true" />
+            Gérée par l'Entreprise elle-même, depuis son propre profil.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ChampLectureSeule({
+  icone,
+  libelle,
+  children,
+}: {
+  icone: ReactNode;
+  libelle: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border bg-muted/50 p-3">
+      <span className="mt-0.5 shrink-0 text-muted-foreground [&>svg]:size-4" aria-hidden="true">
+        {icone}
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{libelle}</p>
+        <p className="text-sm font-medium text-foreground">{children}</p>
+      </div>
     </div>
   );
 }

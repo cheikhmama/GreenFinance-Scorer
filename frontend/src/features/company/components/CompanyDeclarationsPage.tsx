@@ -6,6 +6,7 @@ import {
   libelleStatutRapportEntreprise,
   variantStatutRapportEntreprise,
 } from "@/shared/format/statut";
+import { creerSlug } from "@/shared/format/slug";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -128,7 +129,9 @@ export function CompanyDeclarationsPage() {
                           <StatutEntreprise rapport={rapport} />
                         </div>
                         <Button asChild variant="outline" size="sm">
-                          <Link to={`/company/declarations/${rapport.id}`}>Ouvrir</Link>
+                          <Link to={`/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                            Ouvrir
+                          </Link>
                         </Button>
                       </div>
                       <SessionStepper rapport={rapport} />
@@ -287,7 +290,7 @@ function Historique({ rapports }: { rapports: RapportESGPublic[] }) {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/company/declarations/${ouvert.id}`}>Voir la déclaration</Link>
+                <Link to={`/company/declarations/${creerSlug(titreDeclaration(ouvert), ouvert.id)}`}>Voir la déclaration</Link>
               </Button>
             </SheetFooter>
           </SheetContent>

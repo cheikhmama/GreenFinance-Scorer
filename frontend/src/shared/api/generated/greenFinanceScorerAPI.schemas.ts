@@ -1028,6 +1028,7 @@ export interface EntrepriseAvecScoreAdmin {
   environmental_score: number | null;
   social_score: number | null;
   governance_score: number | null;
+  report_id: string | null;
 }
 
 /**
@@ -1245,6 +1246,16 @@ export interface InviterChercheurRequest {
 }
 
 /**
+ * Nombre d'entrées déjà enregistrées pour une action — sert à trier le filtre du Journal
+ * d'audit par pertinence réelle plutôt que par un ordre alphabétique figé (voir
+ * app/admin/journal.py::compter_actions).
+ */
+export interface JournalAuditActionCompte {
+  action: string;
+  count: number;
+}
+
+/**
  * Vue Administrateur d'une entrée du journal d'audit — aucun champ sensible à masquer, la
  * table elle-même ne contient jamais de secret (voir app/core/audit.py).
  */
@@ -1261,6 +1272,8 @@ export interface JournalAuditPublic {
   correlation_id: string | null;
   actor_name?: string | null;
   actor_email?: string | null;
+  actor_role?: Role | null;
+  resource_user_role?: Role | null;
 }
 
 /**
@@ -1407,22 +1420,19 @@ export interface ModifierAnalyseRequest {
 }
 
 /**
- * Remplace entièrement le profil d'une entreprise (identité, description, site officiel,
- * montant minimum) — jamais un patch partiel champ par champ, même principe que
- * CreerUtilisateurRequest pour nom_entreprise/secteur/pays. Le logo suit un circuit séparé
- * (POST/DELETE /admin/entreprises/{id}/logo, voir plus bas) : un fichier binaire validé par sa
- * signature réelle n'a pas sa place dans un payload JSON de chaîne libre. montant_minimum_
- * investissement et devise_montant_minimum se renseignent toujours ensemble ou se vident tous
- * les deux ensemble, jamais un montant minimum sans sa devise (voir app/company/models.py).
+ * Remplace l'identité d'une entreprise (nom, secteur, pays) — jamais un patch partiel champ
+ * par champ, même principe que CreerUtilisateurRequest pour nom_entreprise/secteur/pays. La
+ * description, le site officiel et le montant minimum d'investissement sont désormais du seul
+ * ressort de l'Entreprise elle-même (voir app/company/schemas.py::ModifierProfilEntrepriseRequest)
+ * — l'Administrateur les consulte toujours depuis cette même fiche, mais ne les modifie plus. Le
+ * logo suit un circuit séparé (POST/DELETE /admin/entreprises/{id}/logo, voir plus bas) : un
+ * fichier binaire validé par sa signature réelle n'a pas sa place dans un payload JSON de chaîne
+ * libre.
  */
 export interface ModifierEntrepriseAdminRequest {
   name: string;
   sector: string;
   country: string;
-  description?: string | null;
-  website?: string | null;
-  minimum_investment_amount?: number | string | null;
-  minimum_investment_currency?: Currency | null;
 }
 
 /**
@@ -1436,6 +1446,20 @@ export interface ModifierPositionRequest {
   duration_type: DurationType;
   start_date: string;
   end_date?: string | null;
+}
+
+/**
+ * Corps de PATCH /company/profil : la description, le site officiel et le montant minimum
+ * d'investissement de SA PROPRE entreprise — nom, secteur et pays restent du seul ressort de
+ * l'Administrateur (voir app/admin/schemas.py::ModifierEntrepriseAdminRequest, qui ne porte plus
+ * ces trois champs depuis leur bascule ici). Même règle montant/devise que l'ancien schéma Admin :
+ * toujours ensemble, jamais l'un sans l'autre (voir app/company/models.py).
+ */
+export interface ModifierProfilEntrepriseRequest {
+  description?: string | null;
+  website?: string | null;
+  minimum_investment_amount?: number | string | null;
+  minimum_investment_currency?: Currency | null;
 }
 
 /**

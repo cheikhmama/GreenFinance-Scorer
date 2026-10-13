@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type { PortefeuilleResume } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
+import { creerSlug } from "@/shared/format/slug";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -140,6 +141,16 @@ export function PortfoliosPage() {
               </Badge>
             </SheetHeader>
             <SheetBody>
+              {/* Tout juste créé, sans position : un état dédié plutôt qu'un score et une
+               * couverture vides, qui se liraient comme un mauvais résultat. */}
+              {ouvert.position_count === 0 ? (
+                <div className="rounded-lg border border-dashed px-4 py-6 text-center">
+                  <p className="text-sm font-medium text-foreground">Portefeuille vide</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ajoutez une première position pour démarrer le suivi ESG et carbone.
+                  </p>
+                </div>
+              ) : (
               <SheetSection titre="ESG agrégé">
                 <SheetFields
                   champs={[
@@ -157,6 +168,7 @@ export function PortfoliosPage() {
                   ]}
                 />
               </SheetSection>
+              )}
               <SheetSection titre="Portefeuille">
                 <SheetFields
                   champs={[
@@ -171,7 +183,7 @@ export function PortfoliosPage() {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/investor/portefeuilles/${ouvert.id}`}>Ouvrir le portefeuille</Link>
+                <Link to={`/investor/portefeuilles/${creerSlug(ouvert.name, ouvert.id)}`}>Ouvrir le portefeuille</Link>
               </Button>
             </SheetFooter>
           </SheetContent>
