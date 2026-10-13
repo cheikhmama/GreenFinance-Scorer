@@ -1,6 +1,6 @@
 import { ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { Fragment, useState } from "react";
-import { Link, NavLink, Outlet, useMatches } from "react-router-dom";
+import { Link, NavLink, Outlet, useMatches, useNavigate } from "react-router-dom";
 import { useCurrentUser, useLogout } from "@/features/auth/api";
 import { NotificationBell } from "@/shared/notifications/NotificationBell";
 import { UserAvatar } from "@/shared/profile/UserAvatar";
@@ -23,6 +23,7 @@ export function AppShell() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   // Une route peut demander toute la largeur via `handle: { pleineLargeur: true }` (tâche 5.7).
@@ -48,7 +49,13 @@ export function AppShell() {
       cancelLabel: "Annuler",
     });
     if (!confirme) return;
-    logout.mutate();
+    // Navigation explicite, sans state : laisser RequireRole réagir au cache vidé renverrait vers
+    // /login avec `depuis` figé sur CETTE route protégée — une prochaine connexion (potentiellement
+    // un autre compte, un autre rôle) y serait alors renvoyée de force au lieu de son propre
+    // tableau de bord. `depuis` doit rester réservé à une session perdue en cours de navigation
+    // (voir RequireRole.tsx), jamais à une déconnexion volontaire.
+    await logout.mutateAsync();
+    navigate("/login", { replace: true });
   }
 
   const sidebar = (
@@ -94,10 +101,10 @@ export function AppShell() {
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 cn(
-                  "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
+                  "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-l-2 border-transparent px-3 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-white/10 text-white shadow-sm"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white",
+                    ? "border-emerald-400 bg-white/10 font-semibold text-white shadow-sm"
+                    : "text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white",
                 )
               }
             >
@@ -115,10 +122,10 @@ export function AppShell() {
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-xl p-3 transition",
+                "flex cursor-pointer items-center gap-3 rounded-xl border-l-2 border-transparent p-3 transition-colors",
                 isActive
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white",
+                  ? "border-emerald-400 bg-white/10 text-white shadow-sm"
+                  : "text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white",
               )
             }
           >

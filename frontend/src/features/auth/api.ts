@@ -113,8 +113,11 @@ export function useConfirmEmailChange(token: string | null) {
   });
 }
 
-/** POST /auth/logout (204, pas de corps). Vide le cache de useCurrentUser pour que
- * RequireRole redirige immédiatement vers /login sans attendre un refetch. */
+/** POST /auth/logout (204, pas de corps). Vide le cache de useCurrentUser : toute vue encore
+ * montée (ex. le temps d'une redirection) reflète aussitôt l'état déconnecté, sans attendre un
+ * refetch. La navigation vers /login elle-même est explicite, portée par l'appelant (ex.
+ * AppShell::seDeconnecter) — jamais laissée au redirect réactif de RequireRole, réservé à une
+ * session perdue en cours de navigation (voir session.ts::pageDeRetour). */
 export function useLogout() {
   const queryClient = useQueryClient();
 
