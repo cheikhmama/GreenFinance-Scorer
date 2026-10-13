@@ -1,0 +1,269 @@
+@startuml
+' Vue corrigée : noms français et classes de code entre parenthèses.
+hide empty methods
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+title GreenFinance-Scorer — Diagramme de classes corrigé
+package "01  Identité, rapports et notation" {
+class "Utilisateur\n(User)" as User <<entity>> {
+  id : UUID
+  email : str
+  name : str?
+  password_hash : str?
+  role : Role
+  active : bool
+  created_at : datetime
+}
+note bottom of User : Un seul rôle par compte ; pas de sous-classes métier
+class "Entreprise\n(Company)" as Company <<entity>> {
+  id : UUID
+  name : str
+  sector : str
+  country : str
+  status : RegistrationStatus
+  tax_id : str?
+  isin : str?
+  lei : str?
+  published_at : datetime?
+}
+note bottom of Company : Propriétaire facultatif ; publication distincte du statut
+class "RapportESG\n(ESGReport)" as ESGReport <<entity>> {
+  id : UUID
+  type : ReportType
+  fiscal_year : int?
+  status : ReportStatus
+  version : int
+  source_file : str?
+  submitted_at : datetime?
+  assigned_at : datetime?
+  revenue : Decimal?
+  revenue_currency : Currency?
+  enterprise_value : Decimal?
+  enterprise_value_currency : Currency?
+}
+note bottom of ESGReport : Brouillon possible ; correction = nouvelle version
+class "ConfigurationScore\n(ScoringConfig)" as ScoringConfig <<entity>> {
+  id : UUID
+  name : str
+  version : int
+  content_yaml : str?
+  content_hash : str?
+}
+note bottom of ScoringConfig : owner nul = configuration de référence
+class "ScoreESG\n(Score)" as Score <<entity>> {
+  id : UUID
+  global_score : float
+  environmental_score : float?
+  social_score : float?
+  governance_score : float?
+  coverage_rate : float?
+  computed_at : datetime
+}
+note bottom of Score : {unique(report_id, config_id)}
+}
+package "02  Extraction et preuves" {
+class "ExecutionExtraction\n(ExtractionRun)" as ExtractionRun <<entity>> {
+  id : UUID
+  status : ExtractionRunStatus
+  started_at : datetime
+  finished_at : datetime?
+  llm_model : str
+  prompt_version : str
+}
+class "CouvertureIndicateur\n(MetricCoverage)" as MetricCoverage <<entity>> {
+  id : UUID
+  metric_code : str
+  status : MetricCoverageStatus
+  pages_examined : int
+}
+note bottom of MetricCoverage : {unique(report_id, metric_code)}
+class "MesureESG\n(ESGMetric)" as ESGMetric <<entity>> {
+  id : UUID
+  pillar : Pillar
+  metric_code : str
+  value : float
+  unit : str
+  method : DataMethod
+  review_status : MetricReviewStatus
+  audited_value : float?
+}
+note bottom of ESGMetric : {unique(report_id, metric_code)}
+class "EmissionCarbone\n(CarbonEmission)" as CarbonEmission <<entity>> {
+  id : UUID
+  scope : int
+  tonnes_co2e : float
+  year : int
+  method : DataMethod
+  pcaf_data_quality : int?
+  review_status : MetricReviewStatus
+  audited_value : float?
+}
+note bottom of CarbonEmission : {scope ∈ 1..3 ; tonnes_co2e ≥ 0}
+class "Preuve\n(Evidence)" as Evidence <<entity>> {
+  id : UUID
+  document_name : str
+  year : int
+  page_start : int
+  page_end : int
+  excerpt_pdf_path : str
+}
+note bottom of Evidence : Preuve réutilisable ; pas de lien direct au rapport
+}
+package "03  Audit des rapports et des valeurs" {
+class "AvisAudit\n(AuditOpinion)" as AuditOpinion <<entity>> {
+  id : UUID
+  decision : AuditDecision
+  comment : str?
+  submitted_at : datetime
+}
+note bottom of AuditOpinion : Schéma : 0..* avis ; parcours courant : au plus 1 par version
+class "RevueValeur\n(MetricReview)" as MetricReview <<entity>> {
+  id : UUID
+  decision : MetricReviewStatus
+  original_value : float
+  new_value : float?
+  reason : ReviewReason?
+  created_at : datetime
+}
+note bottom of MetricReview : {cible ESG XOR cible carbone} ; historique immuable
+}
+package "04  Investissement" {
+class "Portefeuille\n(Portfolio)" as Portfolio <<entity>> {
+  id : UUID
+  name : str
+  reference_currency : Currency
+  archived : bool
+  created_at : datetime
+}
+class "PositionPortefeuille\n(PortfolioPosition)" as PortfolioPosition <<entity>> {
+  id : UUID
+  outstanding_amount : Decimal
+  currency : Currency
+  converted_amount : Decimal
+  weight : Decimal?
+  match_status : MatchStatus
+  duration_type : DurationType
+  start_date : datetime
+  end_date : datetime?
+}
+note bottom of PortfolioPosition : {company_id présent ⇔ MATCHED}
+}
+package "05  Projets et analyses de recherche" {
+class "Projet\n(Project)" as Project <<entity>> {
+  id : UUID
+  name : str
+  objective : str?
+  status : ProjectStatus
+  deadline : datetime?
+  closed_at : datetime?
+}
+class "AffectationChercheur\n(ProjectAssignment)" as ProjectAssignment <<entity>> {
+  id : UUID
+  assigned_at : datetime
+}
+note bottom of ProjectAssignment : {unique(project_id, researcher_id)}
+class "EntrepriseProjet\n(ProjectCompany)" as ProjectCompany <<entity>> {
+  id : UUID
+  added_at : datetime
+}
+note bottom of ProjectCompany : {unique(project_id, company_id)}
+class "DocumentProjet\n(ProjectDocument)" as ProjectDocument <<entity>> {
+  id : UUID
+  added_at : datetime
+}
+note bottom of ProjectDocument : {unique(project_id, report_id)}
+class "Analyse\n(Analysis)" as Analysis <<entity>> {
+  id : UUID
+  title : str
+  content : str
+  status : AnalysisStatus
+  version : int
+  submitted_at : datetime?
+  institution_comment : str?
+}
+note bottom of Analysis : version précédente : 0..1 ; suivantes : 0..*
+class "EntrepriseAnalyse\n(AnalysisCompany)" as AnalysisCompany <<entity>> {
+  id : UUID
+  report_id : UUID?
+  score_id : UUID?
+}
+note bottom of AnalysisCompany : {unique(analysis_id, company_id)} ; sources figées
+}
+package "06  Rattachements et profil institutionnel" {
+class "RattachementChercheur\n(ResearcherAffiliation)" as ResearcherAffiliation <<entity>> {
+  id : UUID
+  status : AffiliationStatus
+  invited_at : datetime
+  responded_at : datetime?
+  collaboration_terms : str?
+}
+note bottom of ResearcherAffiliation : {unique(researcher_id, institution_id)}
+class "ProfilInstitution\n(InstitutionProfile)" as InstitutionProfile <<entity>> {
+  id : UUID
+  export_quota : int
+}
+note bottom of InstitutionProfile : {user_id unique} ; compte de rôle INSTITUTION
+}
+User "0..1" -- "0..*" Company : propriétaire / owner_user_id
+User "0..1" -- "0..*" Company : inscription validée par / onboarded_by_id
+Company "1" -- "0..*" ESGReport : entreprise / company_id
+User "0..1" -- "0..*" ESGReport : affectation / auditor_id
+ESGReport "0..1" -- "0..*" ESGReport : précédent / previous_report_id
+Evidence "0..1" -- "0..*" ESGReport : preuve du score déclaré / declared_global_score_proof_id
+ESGReport "1" -- "0..*" Score : rapport noté / report_id
+ScoringConfig "1" -- "0..*" Score : méthodologie / config_id
+User "0..1" -- "0..*" ScoringConfig : propriétaire / owner_user_id
+ESGReport "1" -- "0..*" ExtractionRun : tentatives / report_id
+ESGReport "1" -- "0..*" MetricCoverage : complétude / report_id
+ESGReport "1" -- "0..*" ESGMetric : rapport / report_id
+ESGReport "1" -- "0..*" CarbonEmission : rapport / report_id
+ExtractionRun "0..1" -- "0..*" ESGMetric : exécution / extraction_run_id
+ExtractionRun "0..1" -- "0..*" CarbonEmission : exécution / extraction_run_id
+Evidence "1" -- "0..*" ESGMetric : preuve / proof_id
+Evidence "1" -- "0..*" CarbonEmission : preuve / proof_id
+User "1" -- "0..*" AuditOpinion : auteur / auditor_id
+ESGReport "1" -- "0..*" AuditOpinion : rapport / report_id
+User "1" -- "0..*" MetricReview : auteur / auditor_id
+ESGReport "1" -- "0..*" MetricReview : rapport / report_id
+ESGMetric "0..1" -- "0..*" MetricReview : cible ESG / metric_id
+CarbonEmission "0..1" -- "0..*" MetricReview : cible carbone / emission_id
+User "1" -- "0..*" Portfolio : titulaire / user_id
+Portfolio "1" -- "0..*" PortfolioPosition : portefeuille / portfolio_id
+Company "0..1" -- "0..*" PortfolioPosition : rapprochement / company_id
+User "1" -- "0..*" Project : institution / institution_id
+Project "1" -- "0..*" ProjectAssignment : projet / project_id
+User "1" -- "0..*" ProjectAssignment : chercheur / researcher_id
+Project "1" -- "0..*" ProjectCompany : projet / project_id
+Company "1" -- "0..*" ProjectCompany : périmètre / company_id
+Project "1" -- "0..*" ProjectDocument : projet / project_id
+ESGReport "1" -- "0..*" ProjectDocument : document / report_id
+Project "1" -- "0..*" Analysis : projet / project_id
+User "1" -- "0..*" Analysis : auteur / researcher_id
+Analysis "0..1" -- "0..*" Analysis : précédente / previous_analysis_id
+Analysis "1" -- "0..*" AnalysisCompany : analyse / analysis_id
+Company "1" -- "0..*" AnalysisCompany : entreprise / company_id
+ESGReport "0..1" -- "0..*" AnalysisCompany : rapport figé / report_id
+Score "0..1" -- "0..*" AnalysisCompany : score figé / score_id
+User "1" -- "0..*" ResearcherAffiliation : institution / institution_id
+User "1" -- "0..*" ResearcherAffiliation : chercheur / researcher_id
+User "1" -- "0..1" InstitutionProfile : profil institutionnel / user_id
+enum Role {
+  ADMIN
+  ENTERPRISE
+  AUDITOR
+  INVESTOR
+  RESEARCHER
+  INSTITUTION
+}
+User ..> Role : type de role
+legend bottom
+? = nullable ; attributs essentiels, avec noms et types réels du code.
+Traits pleins = associations ; cardinalités du schéma SQL déclaré.
+Les opérations métier résident dans les services, pas sur ces entités.
+Propriété : Utilisateur 0..1 -- 0..* Entreprise. Le parcours ORM monoentreprise reste à adapter.
+Rôles contrôlés par les services : auteur avis/revue = AUDITOR ; titulaire portefeuille = INVESTOR ;
+responsable projet = INSTITUTION ; auteur analyse/affectation = RESEARCHER.
+endlegend
+@enduml

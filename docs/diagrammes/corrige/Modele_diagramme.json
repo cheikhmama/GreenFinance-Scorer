@@ -1,0 +1,3304 @@
+{
+  "date": "2026-10-06",
+  "classes": {
+    "User": {
+      "name": "User",
+      "file": "app/auth/models.py",
+      "line": 30,
+      "sha256": "590bf01e4b7f9b481b9fce54d0b2b6b8948c7f514019f138b3f97661a9ae26e3",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 43,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "email": {
+          "type": "str",
+          "line": 44,
+          "relationship": false,
+          "source": "email: str = Field(unique=True, index=True)",
+          "unique": true,
+          "nullable": false
+        },
+        "name": {
+          "type": "str | None",
+          "line": 45,
+          "relationship": false,
+          "source": "name: str | None = None",
+          "nullable": true
+        },
+        "avatar_path": {
+          "type": "str | None",
+          "line": 48,
+          "relationship": false,
+          "source": "avatar_path: str | None = Field(default=None, max_length=255)",
+          "nullable": true
+        },
+        "password_hash": {
+          "type": "str | None",
+          "line": 52,
+          "relationship": false,
+          "source": "password_hash: str | None = None",
+          "nullable": true
+        },
+        "role": {
+          "type": "Role",
+          "line": 53,
+          "relationship": false,
+          "source": "role: Role = Field(sa_column=sa_enum_column(Role))",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 54,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "active": {
+          "type": "bool",
+          "line": 55,
+          "relationship": false,
+          "source": "active: bool = Field(default=True)",
+          "nullable": false
+        },
+        "activated_at": {
+          "type": "datetime | None",
+          "line": 61,
+          "relationship": false,
+          "source": "activated_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "institution_profile": {
+          "type": "Optional['InstitutionProfile']",
+          "line": 63,
+          "relationship": true,
+          "source": "institution_profile: Optional[\"InstitutionProfile\"] = Relationship(back_populates=\"user\")",
+          "nullable": true
+        },
+        "company": {
+          "type": "Optional['Company']",
+          "line": 64,
+          "relationship": true,
+          "source": "company: Optional[\"Company\"] = Relationship(\n        back_populates=\"owner\",\n        sa_relationship_kwargs={\"foreign_keys\": \"[Company.owner_user_id]\"},\n    )",
+          "nullable": true
+        },
+        "audited_reports": {
+          "type": "list['ESGReport']",
+          "line": 68,
+          "relationship": true,
+          "source": "audited_reports: list[\"ESGReport\"] = Relationship(back_populates=\"auditor\")",
+          "nullable": false
+        },
+        "scoring_configs": {
+          "type": "list['ScoringConfig']",
+          "line": 69,
+          "relationship": true,
+          "source": "scoring_configs: list[\"ScoringConfig\"] = Relationship(\n        back_populates=\"owner\"\n    )",
+          "nullable": false
+        },
+        "portfolios": {
+          "type": "list['Portfolio']",
+          "line": 72,
+          "relationship": true,
+          "source": "portfolios: list[\"Portfolio\"] = Relationship(back_populates=\"user\")",
+          "nullable": false
+        },
+        "audit_opinions": {
+          "type": "list['AuditOpinion']",
+          "line": 73,
+          "relationship": true,
+          "source": "audit_opinions: list[\"AuditOpinion\"] = Relationship(back_populates=\"auditor\")",
+          "nullable": false
+        },
+        "notifications": {
+          "type": "list['Notification']",
+          "line": 74,
+          "relationship": true,
+          "source": "notifications: list[\"Notification\"] = Relationship(back_populates=\"user\")",
+          "nullable": false
+        },
+        "projects": {
+          "type": "list['Project']",
+          "line": 75,
+          "relationship": true,
+          "source": "projects: list[\"Project\"] = Relationship(back_populates=\"institution\")",
+          "nullable": false
+        },
+        "project_assignments": {
+          "type": "list['ProjectAssignment']",
+          "line": 76,
+          "relationship": true,
+          "source": "project_assignments: list[\"ProjectAssignment\"] = Relationship(back_populates=\"researcher\")",
+          "nullable": false
+        },
+        "analyses": {
+          "type": "list['Analysis']",
+          "line": 77,
+          "relationship": true,
+          "source": "analyses: list[\"Analysis\"] = Relationship(back_populates=\"researcher\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        CheckConstraint(\"email = lower(email)\", name=\"ck_users_email_lowercase\"),\n    )",
+      "table": "users",
+      "uml_name": "Utilisateur",
+      "displayed_fields": [
+        "email",
+        "name",
+        "password_hash",
+        "role",
+        "active",
+        "created_at"
+      ]
+    },
+    "Company": {
+      "name": "Company",
+      "file": "app/company/models.py",
+      "line": 30,
+      "sha256": "fa8e8a6f9ad96190e0ff07389608ca1de3c457d867a963b9eb2c62b8fa55bfc9",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 33,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "name": {
+          "type": "str",
+          "line": 34,
+          "relationship": false,
+          "source": "name: str",
+          "nullable": false
+        },
+        "sector": {
+          "type": "str",
+          "line": 35,
+          "relationship": false,
+          "source": "sector: str",
+          "nullable": false
+        },
+        "country": {
+          "type": "str",
+          "line": 36,
+          "relationship": false,
+          "source": "country: str",
+          "nullable": false
+        },
+        "logo": {
+          "type": "str | None",
+          "line": 37,
+          "relationship": false,
+          "source": "logo: str | None = None",
+          "nullable": true
+        },
+        "description": {
+          "type": "str | None",
+          "line": 38,
+          "relationship": false,
+          "source": "description: str | None = None",
+          "nullable": true
+        },
+        "website": {
+          "type": "str | None",
+          "line": 39,
+          "relationship": false,
+          "source": "website: str | None = None",
+          "nullable": true
+        },
+        "status": {
+          "type": "RegistrationStatus",
+          "line": 40,
+          "relationship": false,
+          "source": "status: RegistrationStatus = Field(\n        default=RegistrationStatus.ACTIVE, sa_column=sa_enum_column(RegistrationStatus)\n    )",
+          "nullable": false
+        },
+        "owner_user_id": {
+          "type": "uuid.UUID | None",
+          "line": 43,
+          "relationship": false,
+          "source": "owner_user_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"users.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "users.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "User"
+        },
+        "email_verification_code_hash": {
+          "type": "str | None",
+          "line": 53,
+          "relationship": false,
+          "source": "email_verification_code_hash: str | None = Field(default=None, max_length=64)",
+          "nullable": true
+        },
+        "email_verification_sent_at": {
+          "type": "datetime | None",
+          "line": 54,
+          "relationship": false,
+          "source": "email_verification_sent_at: datetime | None = None",
+          "nullable": true
+        },
+        "email_verification_expires_at": {
+          "type": "datetime | None",
+          "line": 55,
+          "relationship": false,
+          "source": "email_verification_expires_at: datetime | None = None",
+          "nullable": true
+        },
+        "email_verification_attempts": {
+          "type": "int",
+          "line": 56,
+          "relationship": false,
+          "source": "email_verification_attempts: int = Field(default=0)",
+          "nullable": false
+        },
+        "email_verified_at": {
+          "type": "datetime | None",
+          "line": 57,
+          "relationship": false,
+          "source": "email_verified_at: datetime | None = None",
+          "nullable": true
+        },
+        "tax_id": {
+          "type": "str | None",
+          "line": 58,
+          "relationship": false,
+          "source": "tax_id: str | None = Field(default=None, max_length=32, index=True)",
+          "nullable": true
+        },
+        "tax_id_type": {
+          "type": "TaxIdType | None",
+          "line": 59,
+          "relationship": false,
+          "source": "tax_id_type: TaxIdType | None = Field(\n        default=None, sa_column=sa_enum_column(TaxIdType, nullable=True)\n    )",
+          "nullable": true
+        },
+        "isin": {
+          "type": "str | None",
+          "line": 62,
+          "relationship": false,
+          "source": "isin: str | None = Field(default=None, max_length=12, unique=True)",
+          "unique": true,
+          "nullable": true
+        },
+        "lei": {
+          "type": "str | None",
+          "line": 63,
+          "relationship": false,
+          "source": "lei: str | None = Field(default=None, max_length=20, unique=True)",
+          "unique": true,
+          "nullable": true
+        },
+        "ticker": {
+          "type": "str | None",
+          "line": 67,
+          "relationship": false,
+          "source": "ticker: str | None = Field(default=None, max_length=20, index=True)",
+          "nullable": true
+        },
+        "minimum_investment_amount": {
+          "type": "Decimal | None",
+          "line": 72,
+          "relationship": false,
+          "source": "minimum_investment_amount: Decimal | None = Field(\n        default=None, sa_column=Column(Numeric(20, 2), nullable=True)\n    )",
+          "nullable": true
+        },
+        "minimum_investment_currency": {
+          "type": "Currency | None",
+          "line": 79,
+          "relationship": false,
+          "source": "minimum_investment_currency: Currency | None = Field(\n        default=None, sa_column=sa_enum_column(Currency, nullable=True)\n    )",
+          "nullable": true
+        },
+        "published_at": {
+          "type": "datetime | None",
+          "line": 86,
+          "relationship": false,
+          "source": "published_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "onboarded_at": {
+          "type": "datetime | None",
+          "line": 89,
+          "relationship": false,
+          "source": "onboarded_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "onboarded_by_id": {
+          "type": "uuid.UUID | None",
+          "line": 90,
+          "relationship": false,
+          "source": "onboarded_by_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"users.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "users.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "User"
+        },
+        "registered_at": {
+          "type": "datetime | None",
+          "line": 96,
+          "relationship": false,
+          "source": "registered_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "status_token_hash": {
+          "type": "str | None",
+          "line": 97,
+          "relationship": false,
+          "source": "status_token_hash: str | None = Field(default=None, max_length=64, unique=True)",
+          "unique": true,
+          "nullable": true
+        },
+        "mandate_letter_path": {
+          "type": "str | None",
+          "line": 98,
+          "relationship": false,
+          "source": "mandate_letter_path: str | None = Field(default=None, max_length=255)",
+          "nullable": true
+        },
+        "mandate_letter_uploaded_at": {
+          "type": "datetime | None",
+          "line": 99,
+          "relationship": false,
+          "source": "mandate_letter_uploaded_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "info_request_message": {
+          "type": "str | None",
+          "line": 100,
+          "relationship": false,
+          "source": "info_request_message: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "info_requested_at": {
+          "type": "datetime | None",
+          "line": 101,
+          "relationship": false,
+          "source": "info_requested_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "info_response_message": {
+          "type": "str | None",
+          "line": 102,
+          "relationship": false,
+          "source": "info_response_message: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "rejection_reason": {
+          "type": "str | None",
+          "line": 103,
+          "relationship": false,
+          "source": "rejection_reason: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "rejected_at": {
+          "type": "datetime | None",
+          "line": 104,
+          "relationship": false,
+          "source": "rejected_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "owner": {
+          "type": "Optional['User']",
+          "line": 108,
+          "relationship": true,
+          "source": "owner: Optional[\"User\"] = Relationship(\n        back_populates=\"company\",\n        sa_relationship_kwargs={\"foreign_keys\": \"[Company.owner_user_id]\"},\n    )",
+          "nullable": true
+        },
+        "reports": {
+          "type": "list['ESGReport']",
+          "line": 112,
+          "relationship": true,
+          "source": "reports: list[\"ESGReport\"] = Relationship(back_populates=\"company\")",
+          "nullable": false
+        },
+        "positions": {
+          "type": "list['PortfolioPosition']",
+          "line": 113,
+          "relationship": true,
+          "source": "positions: list[\"PortfolioPosition\"] = Relationship(back_populates=\"company\")",
+          "nullable": false
+        },
+        "discrepancy_flags": {
+          "type": "list['DiscrepancyFlag']",
+          "line": 114,
+          "relationship": true,
+          "source": "discrepancy_flags: list[\"DiscrepancyFlag\"] = Relationship(back_populates=\"company\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "companies",
+      "uml_name": "Entreprise",
+      "displayed_fields": [
+        "name",
+        "sector",
+        "country",
+        "status",
+        "tax_id",
+        "isin",
+        "lei",
+        "published_at"
+      ]
+    },
+    "ESGReport": {
+      "name": "ESGReport",
+      "file": "app/ingestion/models.py",
+      "line": 43,
+      "sha256": "927c98ae3e7005c9afcf58d9b7d14177f5e54d87f03b5e8d40430c4ed658be98",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 78,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "company_id": {
+          "type": "uuid.UUID",
+          "line": 79,
+          "relationship": false,
+          "source": "company_id: uuid.UUID = Field(foreign_key=\"companies.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "companies.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Company"
+        },
+        "type": {
+          "type": "ReportType",
+          "line": 80,
+          "relationship": false,
+          "source": "type: ReportType = Field(sa_column=sa_enum_column(ReportType))",
+          "nullable": false
+        },
+        "channel": {
+          "type": "SubmissionChannel",
+          "line": 81,
+          "relationship": false,
+          "source": "channel: SubmissionChannel = Field(sa_column=sa_enum_column(SubmissionChannel))",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 82,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "submitted_at": {
+          "type": "datetime | None",
+          "line": 85,
+          "relationship": false,
+          "source": "submitted_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "status": {
+          "type": "ReportStatus",
+          "line": 86,
+          "relationship": false,
+          "source": "status: ReportStatus = Field(\n        default=ReportStatus.EXTRACTING, sa_column=sa_enum_column(ReportStatus)\n    )",
+          "nullable": false
+        },
+        "source_file": {
+          "type": "str | None",
+          "line": 90,
+          "relationship": false,
+          "source": "source_file: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "original_filename": {
+          "type": "str | None",
+          "line": 95,
+          "relationship": false,
+          "source": "original_filename: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "fiscal_year": {
+          "type": "int | None",
+          "line": 98,
+          "relationship": false,
+          "source": "fiscal_year: int | None = Field(default=None)",
+          "nullable": true
+        },
+        "auditor_id": {
+          "type": "uuid.UUID | None",
+          "line": 101,
+          "relationship": false,
+          "source": "auditor_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"users.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "users.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "User"
+        },
+        "assigned_at": {
+          "type": "datetime | None",
+          "line": 106,
+          "relationship": false,
+          "source": "assigned_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "extraction_started_at": {
+          "type": "datetime | None",
+          "line": 113,
+          "relationship": false,
+          "source": "extraction_started_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "extraction_finished_at": {
+          "type": "datetime | None",
+          "line": 114,
+          "relationship": false,
+          "source": "extraction_finished_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "extraction_error": {
+          "type": "str | None",
+          "line": 115,
+          "relationship": false,
+          "source": "extraction_error: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "extraction_attempts": {
+          "type": "int",
+          "line": 116,
+          "relationship": false,
+          "source": "extraction_attempts: int = Field(default=0)",
+          "nullable": false
+        },
+        "version": {
+          "type": "int",
+          "line": 119,
+          "relationship": false,
+          "source": "version: int = Field(default=1)",
+          "nullable": false
+        },
+        "previous_report_id": {
+          "type": "uuid.UUID | None",
+          "line": 120,
+          "relationship": false,
+          "source": "previous_report_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"esg_reports.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "ESGReport"
+        },
+        "checksum_sha256": {
+          "type": "str | None",
+          "line": 124,
+          "relationship": false,
+          "source": "checksum_sha256: str | None = Field(default=None, index=True)",
+          "nullable": true
+        },
+        "declared_global_score": {
+          "type": "float | None",
+          "line": 128,
+          "relationship": false,
+          "source": "declared_global_score: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "declared_global_score_proof_id": {
+          "type": "uuid.UUID | None",
+          "line": 129,
+          "relationship": false,
+          "source": "declared_global_score_proof_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"evidence.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "evidence.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "Evidence"
+        },
+        "synthesis_report_path": {
+          "type": "str | None",
+          "line": 134,
+          "relationship": false,
+          "source": "synthesis_report_path: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "official_score": {
+          "type": "float | None",
+          "line": 137,
+          "relationship": false,
+          "source": "official_score: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "coverage_rate": {
+          "type": "float | None",
+          "line": 138,
+          "relationship": false,
+          "source": "coverage_rate: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "config_hash": {
+          "type": "str | None",
+          "line": 139,
+          "relationship": false,
+          "source": "config_hash: str | None = Field(default=None, max_length=64)",
+          "nullable": true
+        },
+        "revenue": {
+          "type": "Decimal | None",
+          "line": 144,
+          "relationship": false,
+          "source": "revenue: Decimal | None = Field(default=None, sa_column=Column(Numeric(20, 2), nullable=True))",
+          "nullable": true
+        },
+        "revenue_currency": {
+          "type": "Currency | None",
+          "line": 145,
+          "relationship": false,
+          "source": "revenue_currency: Currency | None = Field(\n        default=None, sa_column=sa_enum_column(Currency, nullable=True)\n    )",
+          "nullable": true
+        },
+        "enterprise_value": {
+          "type": "Decimal | None",
+          "line": 148,
+          "relationship": false,
+          "source": "enterprise_value: Decimal | None = Field(\n        default=None, sa_column=Column(Numeric(20, 2), nullable=True)\n    )",
+          "nullable": true
+        },
+        "enterprise_value_currency": {
+          "type": "Currency | None",
+          "line": 151,
+          "relationship": false,
+          "source": "enterprise_value_currency: Currency | None = Field(\n        default=None, sa_column=sa_enum_column(Currency, nullable=True)\n    )",
+          "nullable": true
+        },
+        "evic_date": {
+          "type": "date | None",
+          "line": 154,
+          "relationship": false,
+          "source": "evic_date: date | None = None",
+          "nullable": true
+        },
+        "company": {
+          "type": "'Company'",
+          "line": 156,
+          "relationship": true,
+          "source": "company: \"Company\" = Relationship(back_populates=\"reports\")",
+          "nullable": false
+        },
+        "auditor": {
+          "type": "Optional['User']",
+          "line": 157,
+          "relationship": true,
+          "source": "auditor: Optional[\"User\"] = Relationship(back_populates=\"audited_reports\")",
+          "nullable": true
+        },
+        "metrics": {
+          "type": "list['ESGMetric']",
+          "line": 158,
+          "relationship": true,
+          "source": "metrics: list[\"ESGMetric\"] = Relationship(back_populates=\"report\")",
+          "nullable": false
+        },
+        "carbon_data": {
+          "type": "list['CarbonEmission']",
+          "line": 159,
+          "relationship": true,
+          "source": "carbon_data: list[\"CarbonEmission\"] = Relationship(back_populates=\"report\")",
+          "nullable": false
+        },
+        "scores": {
+          "type": "list['Score']",
+          "line": 160,
+          "relationship": true,
+          "source": "scores: list[\"Score\"] = Relationship(back_populates=\"report\")",
+          "nullable": false
+        },
+        "audit_opinions": {
+          "type": "list['AuditOpinion']",
+          "line": 161,
+          "relationship": true,
+          "source": "audit_opinions: list[\"AuditOpinion\"] = Relationship(back_populates=\"report\")",
+          "nullable": false
+        },
+        "declared_global_score_proof": {
+          "type": "Optional['Evidence']",
+          "line": 162,
+          "relationship": true,
+          "source": "declared_global_score_proof: Optional[\"Evidence\"] = Relationship()",
+          "nullable": true
+        },
+        "coverages": {
+          "type": "list['MetricCoverage']",
+          "line": 163,
+          "relationship": true,
+          "source": "coverages: list[\"MetricCoverage\"] = Relationship(back_populates=\"report\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\n            \"company_id\", \"checksum_sha256\", name=\"uq_esg_reports_company_checksum\"\n        ),\n        Index(\"ix_esg_reports_company_fiscal_year\", \"company_id\", \"fiscal_year\"),\n        # Une seule déclaration non soumise par exercice et par type de rapport (tâche 1.5) :\n        # ouvrir deux sessions pour la même période serait une erreur de saisie, jamais utile.\n        # Depuis la tâche 5.8, un brouillon dont le fichier est en cours d'analyse (EXTRACTING,\n        # pas encore soumis) compte aussi.\n        Index(\n            \"uq_esg_reports_one_draft_per_period\",\n            \"company_id\",\n            \"fiscal_year\",\n            \"type\",\n            unique=True,\n            postgresql_where=text(\"submitted_at IS NULL\"),\n        ),\n        # Hors brouillon, toujours un fichier ; non soumis, seulement en brouillon ou pendant\n        # l'analyse du fichier joint au brouillon (tâche 5.8).\n        CheckConstraint(\n            \"(status = 'DRAFT' OR source_file IS NOT NULL) \"\n            \"AND (submitted_at IS NOT NULL OR status IN ('DRAFT', 'EXTRACTING'))\",\n            name=\"ck_esg_reports_file_and_submission\",\n        ),\n    )",
+      "table": "esg_reports",
+      "uml_name": "RapportESG",
+      "displayed_fields": [
+        "type",
+        "fiscal_year",
+        "status",
+        "version",
+        "source_file",
+        "submitted_at",
+        "assigned_at",
+        "revenue",
+        "revenue_currency",
+        "enterprise_value",
+        "enterprise_value_currency"
+      ]
+    },
+    "Score": {
+      "name": "Score",
+      "file": "app/scoring/models.py",
+      "line": 77,
+      "sha256": "766ccfdb10c132ec84a00cb667f28c716271553569d20f7643d6b26688ceb0f7",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 103,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 104,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "config_id": {
+          "type": "uuid.UUID",
+          "line": 106,
+          "relationship": false,
+          "source": "config_id: uuid.UUID = Field(foreign_key=\"scoring_configs.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "scoring_configs.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "ScoringConfig"
+        },
+        "global_score": {
+          "type": "float",
+          "line": 107,
+          "relationship": false,
+          "source": "global_score: float = Field(ge=0, le=100)",
+          "nullable": false
+        },
+        "environmental_score": {
+          "type": "float | None",
+          "line": 108,
+          "relationship": false,
+          "source": "environmental_score: float | None = Field(default=None, ge=0, le=100)",
+          "nullable": true
+        },
+        "social_score": {
+          "type": "float | None",
+          "line": 109,
+          "relationship": false,
+          "source": "social_score: float | None = Field(default=None, ge=0, le=100)",
+          "nullable": true
+        },
+        "governance_score": {
+          "type": "float | None",
+          "line": 110,
+          "relationship": false,
+          "source": "governance_score: float | None = Field(default=None, ge=0, le=100)",
+          "nullable": true
+        },
+        "coverage_rate": {
+          "type": "float | None",
+          "line": 111,
+          "relationship": false,
+          "source": "coverage_rate: float | None = Field(default=None, ge=0, le=1)",
+          "nullable": true
+        },
+        "computed_at": {
+          "type": "datetime",
+          "line": 112,
+          "relationship": false,
+          "source": "computed_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "report": {
+          "type": "'ESGReport'",
+          "line": 114,
+          "relationship": true,
+          "source": "report: \"ESGReport\" = Relationship(back_populates=\"scores\")",
+          "nullable": false
+        },
+        "config": {
+          "type": "ScoringConfig",
+          "line": 115,
+          "relationship": true,
+          "source": "config: ScoringConfig = Relationship(back_populates=\"scores\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        # Un rapport peut avoir plusieurs scores (un par configuration) mais jamais deux sous la\n        # même : c'est ce doublon-là qui rendrait le score officiel ambigu.\n        UniqueConstraint(\"report_id\", \"config_id\", name=\"uq_scores_report_config\"),\n        CheckConstraint(\"global_score BETWEEN 0 AND 100\", name=\"ck_scores_global_score_range\"),\n        CheckConstraint(\n            \"environmental_score BETWEEN 0 AND 100\", name=\"ck_scores_environmental_score_range\"\n        ),\n        CheckConstraint(\"social_score BETWEEN 0 AND 100\", name=\"ck_scores_social_score_range\"),\n        CheckConstraint(\n            \"governance_score BETWEEN 0 AND 100\", name=\"ck_scores_governance_score_range\"\n        ),\n        CheckConstraint(\"coverage_rate BETWEEN 0 AND 1\", name=\"ck_scores_coverage_rate_range\"),\n    )",
+      "table": "scores",
+      "uml_name": "ScoreESG",
+      "displayed_fields": [
+        "global_score",
+        "environmental_score",
+        "social_score",
+        "governance_score",
+        "coverage_rate",
+        "computed_at"
+      ]
+    },
+    "ScoringConfig": {
+      "name": "ScoringConfig",
+      "file": "app/scoring/models.py",
+      "line": 29,
+      "sha256": "766ccfdb10c132ec84a00cb667f28c716271553569d20f7643d6b26688ceb0f7",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 58,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "name": {
+          "type": "str",
+          "line": 59,
+          "relationship": false,
+          "source": "name: str",
+          "nullable": false
+        },
+        "version": {
+          "type": "int",
+          "line": 62,
+          "relationship": false,
+          "source": "version: int",
+          "nullable": false
+        },
+        "content_yaml": {
+          "type": "str | None",
+          "line": 63,
+          "relationship": false,
+          "source": "content_yaml: str | None = Field(default=None, sa_column=Column(Text, nullable=True))",
+          "nullable": true
+        },
+        "content_hash": {
+          "type": "str | None",
+          "line": 64,
+          "relationship": false,
+          "source": "content_hash: str | None = Field(default=None, min_length=64, max_length=64)",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 65,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "owner_user_id": {
+          "type": "uuid.UUID | None",
+          "line": 69,
+          "relationship": false,
+          "source": "owner_user_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"users.id\", ondelete=\"RESTRICT\", index=True\n    )",
+          "foreign_key": "users.id",
+          "ondelete": "RESTRICT",
+          "nullable": true,
+          "target": "User"
+        },
+        "owner": {
+          "type": "Optional['User']",
+          "line": 73,
+          "relationship": true,
+          "source": "owner: Optional[\"User\"] = Relationship(back_populates=\"scoring_configs\")",
+          "nullable": true
+        },
+        "scores": {
+          "type": "list['Score']",
+          "line": 74,
+          "relationship": true,
+          "source": "scores: list[\"Score\"] = Relationship(back_populates=\"config\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        # Une seule ligne par méthodologie et par propriétaire : cible des INSERT ... ON CONFLICT de\n        # app/scoring/engine.py::enregistrer_configuration (deux validations concurrentes ne créent\n        # jamais de doublon). La référence (propriétaire nul) a son propre index partiel, NULL\n        # n'étant jamais égal à NULL dans une contrainte d'unicité ordinaire.\n        Index(\n            \"uq_scoring_configs_reference_content_hash\",\n            \"content_hash\",\n            unique=True,\n            postgresql_where=text(\"owner_user_id IS NULL\"),\n        ),\n        Index(\n            \"uq_scoring_configs_owner_content_hash\",\n            \"owner_user_id\",\n            \"content_hash\",\n            unique=True,\n            postgresql_where=text(\"owner_user_id IS NOT NULL\"),\n        ),\n        # Contenu et empreinte vont ensemble. Tous deux nuls seulement pour une configuration\n        # antérieure à la tâche 3.1 dont le contenu d'origine n'a pas pu être retrouvé : jamais\n        # recalculable, jamais inventée.\n        CheckConstraint(\n            \"(content_yaml IS NULL) = (content_hash IS NULL)\",\n            name=\"ck_scoring_configs_content_with_hash\",\n        ),\n    )",
+      "table": "scoring_configs",
+      "uml_name": "ConfigurationScore",
+      "displayed_fields": [
+        "name",
+        "version",
+        "content_yaml",
+        "content_hash"
+      ]
+    },
+    "ExtractionRun": {
+      "name": "ExtractionRun",
+      "file": "app/ingestion/models.py",
+      "line": 166,
+      "sha256": "927c98ae3e7005c9afcf58d9b7d14177f5e54d87f03b5e8d40430c4ed658be98",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 174,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 175,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "started_at": {
+          "type": "datetime",
+          "line": 176,
+          "relationship": false,
+          "source": "started_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "finished_at": {
+          "type": "datetime | None",
+          "line": 177,
+          "relationship": false,
+          "source": "finished_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "status": {
+          "type": "ExtractionRunStatus",
+          "line": 178,
+          "relationship": false,
+          "source": "status: ExtractionRunStatus = Field(\n        default=ExtractionRunStatus.RUNNING, sa_column=sa_enum_column(ExtractionRunStatus)\n    )",
+          "nullable": false
+        },
+        "error": {
+          "type": "str | None",
+          "line": 182,
+          "relationship": false,
+          "source": "error: str | None = Field(default=None, max_length=100)",
+          "nullable": true
+        },
+        "docling_version": {
+          "type": "str",
+          "line": 183,
+          "relationship": false,
+          "source": "docling_version: str = Field(max_length=50)",
+          "nullable": false
+        },
+        "llm_model": {
+          "type": "str",
+          "line": 184,
+          "relationship": false,
+          "source": "llm_model: str = Field(max_length=100)",
+          "nullable": false
+        },
+        "prompt_version": {
+          "type": "str",
+          "line": 185,
+          "relationship": false,
+          "source": "prompt_version: str = Field(max_length=50)",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "extraction_runs",
+      "uml_name": "ExecutionExtraction",
+      "displayed_fields": [
+        "status",
+        "started_at",
+        "finished_at",
+        "llm_model",
+        "prompt_version"
+      ]
+    },
+    "MetricCoverage": {
+      "name": "MetricCoverage",
+      "file": "app/ingestion/models.py",
+      "line": 336,
+      "sha256": "927c98ae3e7005c9afcf58d9b7d14177f5e54d87f03b5e8d40430c4ed658be98",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 351,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 352,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "metric_code": {
+          "type": "str",
+          "line": 353,
+          "relationship": false,
+          "source": "metric_code: str",
+          "nullable": false
+        },
+        "status": {
+          "type": "MetricCoverageStatus",
+          "line": 354,
+          "relationship": false,
+          "source": "status: MetricCoverageStatus = Field(sa_column=sa_enum_column(MetricCoverageStatus))",
+          "nullable": false
+        },
+        "pages_examined": {
+          "type": "int",
+          "line": 355,
+          "relationship": false,
+          "source": "pages_examined: int",
+          "nullable": false
+        },
+        "report": {
+          "type": "ESGReport",
+          "line": 357,
+          "relationship": true,
+          "source": "report: ESGReport = Relationship(back_populates=\"coverages\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\"report_id\", \"metric_code\", name=\"uq_metric_coverage_report_metric_code\"),\n    )",
+      "table": "metric_coverage",
+      "uml_name": "CouvertureIndicateur",
+      "displayed_fields": [
+        "metric_code",
+        "status",
+        "pages_examined"
+      ]
+    },
+    "ESGMetric": {
+      "name": "ESGMetric",
+      "file": "app/ingestion/models.py",
+      "line": 207,
+      "sha256": "927c98ae3e7005c9afcf58d9b7d14177f5e54d87f03b5e8d40430c4ed658be98",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 216,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 217,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "pillar": {
+          "type": "Pillar",
+          "line": 218,
+          "relationship": false,
+          "source": "pillar: Pillar = Field(sa_column=sa_enum_column(Pillar))",
+          "nullable": false
+        },
+        "metric_code": {
+          "type": "str",
+          "line": 219,
+          "relationship": false,
+          "source": "metric_code: str",
+          "nullable": false
+        },
+        "value": {
+          "type": "float",
+          "line": 220,
+          "relationship": false,
+          "source": "value: float",
+          "nullable": false
+        },
+        "unit": {
+          "type": "str",
+          "line": 221,
+          "relationship": false,
+          "source": "unit: str",
+          "nullable": false
+        },
+        "method": {
+          "type": "DataMethod",
+          "line": 222,
+          "relationship": false,
+          "source": "method: DataMethod = Field(sa_column=sa_enum_column(DataMethod))",
+          "nullable": false
+        },
+        "proof_id": {
+          "type": "uuid.UUID",
+          "line": 223,
+          "relationship": false,
+          "source": "proof_id: uuid.UUID = Field(\n        foreign_key=\"evidence.id\", ondelete=\"CASCADE\", index=True\n    )",
+          "foreign_key": "evidence.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Evidence"
+        },
+        "raw_value": {
+          "type": "str | None",
+          "line": 231,
+          "relationship": false,
+          "source": "raw_value: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "section": {
+          "type": "str | None",
+          "line": 232,
+          "relationship": false,
+          "source": "section: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "proof_text": {
+          "type": "str | None",
+          "line": 233,
+          "relationship": false,
+          "source": "proof_text: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "value_year": {
+          "type": "int | None",
+          "line": 234,
+          "relationship": false,
+          "source": "value_year: int | None = Field(default=None)",
+          "nullable": true
+        },
+        "confidence": {
+          "type": "ConfidenceLevel | None",
+          "line": 235,
+          "relationship": false,
+          "source": "confidence: ConfidenceLevel | None = Field(\n        default=None, sa_column=sa_enum_column(ConfidenceLevel, nullable=True)\n    )",
+          "nullable": true
+        },
+        "extraction_run_id": {
+          "type": "uuid.UUID | None",
+          "line": 241,
+          "relationship": false,
+          "source": "extraction_run_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"extraction_runs.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "extraction_runs.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "ExtractionRun"
+        },
+        "proof_boxes": {
+          "type": "list[dict]",
+          "line": 247,
+          "relationship": false,
+          "source": "proof_boxes: list[dict] = Field(\n        default_factory=list,\n        sa_column=Column(JSONB, nullable=False, server_default=text(\"'[]'::jsonb\")),\n    )",
+          "nullable": false
+        },
+        "review_status": {
+          "type": "MetricReviewStatus",
+          "line": 254,
+          "relationship": false,
+          "source": "review_status: MetricReviewStatus = Field(\n        default=MetricReviewStatus.PENDING,\n        sa_column=Column(\n            SAEnum(MetricReviewStatus, native_enum=False, length=64),\n            nullable=False,\n            server_default=MetricReviewStatus.PENDING.value,\n        ),\n    )",
+          "nullable": false
+        },
+        "audited_value": {
+          "type": "float | None",
+          "line": 262,
+          "relationship": false,
+          "source": "audited_value: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "report": {
+          "type": "ESGReport",
+          "line": 264,
+          "relationship": true,
+          "source": "report: ESGReport = Relationship(back_populates=\"metrics\")",
+          "nullable": false
+        },
+        "proof": {
+          "type": "Evidence",
+          "line": 265,
+          "relationship": true,
+          "source": "proof: Evidence = Relationship(back_populates=\"metrics\")",
+          "nullable": false
+        },
+        "discrepancy_flags": {
+          "type": "list['DiscrepancyFlag']",
+          "line": 266,
+          "relationship": true,
+          "source": "discrepancy_flags: list[\"DiscrepancyFlag\"] = Relationship(back_populates=\"metric\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\"report_id\", \"metric_code\", name=\"uq_esg_metrics_report_metric_code\"),\n    )",
+      "table": "esg_metrics",
+      "uml_name": "MesureESG",
+      "displayed_fields": [
+        "pillar",
+        "metric_code",
+        "value",
+        "unit",
+        "method",
+        "review_status",
+        "audited_value"
+      ]
+    },
+    "CarbonEmission": {
+      "name": "CarbonEmission",
+      "file": "app/ingestion/models.py",
+      "line": 269,
+      "sha256": "927c98ae3e7005c9afcf58d9b7d14177f5e54d87f03b5e8d40430c4ed658be98",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 288,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 289,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "scope": {
+          "type": "int",
+          "line": 290,
+          "relationship": false,
+          "source": "scope: int = Field(ge=1, le=3)",
+          "nullable": false
+        },
+        "ghg_category": {
+          "type": "str | None",
+          "line": 292,
+          "relationship": false,
+          "source": "ghg_category: str | None = None",
+          "nullable": true
+        },
+        "tonnes_co2e": {
+          "type": "float",
+          "line": 293,
+          "relationship": false,
+          "source": "tonnes_co2e: float = Field(ge=0)",
+          "nullable": false
+        },
+        "year": {
+          "type": "int",
+          "line": 294,
+          "relationship": false,
+          "source": "year: int",
+          "nullable": false
+        },
+        "method": {
+          "type": "DataMethod",
+          "line": 295,
+          "relationship": false,
+          "source": "method: DataMethod = Field(sa_column=sa_enum_column(DataMethod))",
+          "nullable": false
+        },
+        "pcaf_data_quality": {
+          "type": "int | None",
+          "line": 296,
+          "relationship": false,
+          "source": "pcaf_data_quality: int | None = Field(default=None, ge=1, le=5)",
+          "nullable": true
+        },
+        "proof_id": {
+          "type": "uuid.UUID",
+          "line": 297,
+          "relationship": false,
+          "source": "proof_id: uuid.UUID = Field(foreign_key=\"evidence.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "evidence.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Evidence"
+        },
+        "raw_value": {
+          "type": "str | None",
+          "line": 299,
+          "relationship": false,
+          "source": "raw_value: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "section": {
+          "type": "str | None",
+          "line": 300,
+          "relationship": false,
+          "source": "section: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "proof_text": {
+          "type": "str | None",
+          "line": 301,
+          "relationship": false,
+          "source": "proof_text: str | None = Field(default=None)",
+          "nullable": true
+        },
+        "value_year": {
+          "type": "int | None",
+          "line": 302,
+          "relationship": false,
+          "source": "value_year: int | None = Field(default=None)",
+          "nullable": true
+        },
+        "confidence": {
+          "type": "ConfidenceLevel | None",
+          "line": 303,
+          "relationship": false,
+          "source": "confidence: ConfidenceLevel | None = Field(\n        default=None, sa_column=sa_enum_column(ConfidenceLevel, nullable=True)\n    )",
+          "nullable": true
+        },
+        "extraction_run_id": {
+          "type": "uuid.UUID | None",
+          "line": 308,
+          "relationship": false,
+          "source": "extraction_run_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"extraction_runs.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "extraction_runs.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "ExtractionRun"
+        },
+        "proof_boxes": {
+          "type": "list[dict]",
+          "line": 314,
+          "relationship": false,
+          "source": "proof_boxes: list[dict] = Field(\n        default_factory=list,\n        sa_column=Column(JSONB, nullable=False, server_default=text(\"'[]'::jsonb\")),\n    )",
+          "nullable": false
+        },
+        "review_status": {
+          "type": "MetricReviewStatus",
+          "line": 322,
+          "relationship": false,
+          "source": "review_status: MetricReviewStatus = Field(\n        default=MetricReviewStatus.PENDING,\n        sa_column=Column(\n            SAEnum(MetricReviewStatus, native_enum=False, length=64),\n            nullable=False,\n            server_default=MetricReviewStatus.PENDING.value,\n        ),\n    )",
+          "nullable": false
+        },
+        "audited_value": {
+          "type": "float | None",
+          "line": 330,
+          "relationship": false,
+          "source": "audited_value: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "report": {
+          "type": "ESGReport",
+          "line": 332,
+          "relationship": true,
+          "source": "report: ESGReport = Relationship(back_populates=\"carbon_data\")",
+          "nullable": false
+        },
+        "proof": {
+          "type": "Evidence",
+          "line": 333,
+          "relationship": true,
+          "source": "proof: Evidence = Relationship(back_populates=\"carbon_emissions\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        CheckConstraint(\"scope IN (1, 2, 3)\", name=\"ck_carbon_emissions_scope\"),\n        # Nulle acceptée : un CHECK sur NULL n'échoue pas.\n        CheckConstraint(\n            \"pcaf_data_quality BETWEEN 1 AND 5\", name=\"ck_carbon_emissions_pcaf_data_quality_range\"\n        ),\n        CheckConstraint(\"tonnes_co2e >= 0\", name=\"ck_carbon_emissions_tonnes_non_negative\"),\n    )",
+      "table": "carbon_emissions",
+      "uml_name": "EmissionCarbone",
+      "displayed_fields": [
+        "scope",
+        "tonnes_co2e",
+        "year",
+        "method",
+        "pcaf_data_quality",
+        "review_status",
+        "audited_value"
+      ]
+    },
+    "Evidence": {
+      "name": "Evidence",
+      "file": "app/ingestion/models.py",
+      "line": 188,
+      "sha256": "927c98ae3e7005c9afcf58d9b7d14177f5e54d87f03b5e8d40430c4ed658be98",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 194,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "document_name": {
+          "type": "str",
+          "line": 195,
+          "relationship": false,
+          "source": "document_name: str",
+          "nullable": false
+        },
+        "year": {
+          "type": "int",
+          "line": 196,
+          "relationship": false,
+          "source": "year: int",
+          "nullable": false
+        },
+        "total_pages": {
+          "type": "int",
+          "line": 197,
+          "relationship": false,
+          "source": "total_pages: int",
+          "nullable": false
+        },
+        "page_start": {
+          "type": "int",
+          "line": 198,
+          "relationship": false,
+          "source": "page_start: int",
+          "nullable": false
+        },
+        "page_end": {
+          "type": "int",
+          "line": 199,
+          "relationship": false,
+          "source": "page_end: int",
+          "nullable": false
+        },
+        "excerpt_pdf_path": {
+          "type": "str",
+          "line": 201,
+          "relationship": false,
+          "source": "excerpt_pdf_path: str",
+          "nullable": false
+        },
+        "metrics": {
+          "type": "list['ESGMetric']",
+          "line": 203,
+          "relationship": true,
+          "source": "metrics: list[\"ESGMetric\"] = Relationship(back_populates=\"proof\")",
+          "nullable": false
+        },
+        "carbon_emissions": {
+          "type": "list['CarbonEmission']",
+          "line": 204,
+          "relationship": true,
+          "source": "carbon_emissions: list[\"CarbonEmission\"] = Relationship(back_populates=\"proof\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "evidence",
+      "uml_name": "Preuve",
+      "displayed_fields": [
+        "document_name",
+        "year",
+        "page_start",
+        "page_end",
+        "excerpt_pdf_path"
+      ]
+    },
+    "AuditOpinion": {
+      "name": "AuditOpinion",
+      "file": "app/audit/models.py",
+      "line": 29,
+      "sha256": "640ddc12382458e85eb67515e103f2ce9bd17ba6df107fdb461ff1f3681c1142",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 32,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 33,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "auditor_id": {
+          "type": "uuid.UUID",
+          "line": 39,
+          "relationship": false,
+          "source": "auditor_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "User"
+        },
+        "decision": {
+          "type": "AuditDecision",
+          "line": 40,
+          "relationship": false,
+          "source": "decision: AuditDecision = Field(sa_column=sa_enum_column(AuditDecision))",
+          "nullable": false
+        },
+        "comment": {
+          "type": "str | None",
+          "line": 43,
+          "relationship": false,
+          "source": "comment: str | None = None",
+          "nullable": true
+        },
+        "submitted_at": {
+          "type": "datetime",
+          "line": 44,
+          "relationship": false,
+          "source": "submitted_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "report": {
+          "type": "'ESGReport'",
+          "line": 46,
+          "relationship": true,
+          "source": "report: \"ESGReport\" = Relationship(back_populates=\"audit_opinions\")",
+          "nullable": false
+        },
+        "auditor": {
+          "type": "'User'",
+          "line": 47,
+          "relationship": true,
+          "source": "auditor: \"User\" = Relationship(back_populates=\"audit_opinions\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "audit_opinions",
+      "uml_name": "AvisAudit",
+      "displayed_fields": [
+        "decision",
+        "comment",
+        "submitted_at"
+      ]
+    },
+    "MetricReview": {
+      "name": "MetricReview",
+      "file": "app/audit/models.py",
+      "line": 50,
+      "sha256": "640ddc12382458e85eb67515e103f2ce9bd17ba6df107fdb461ff1f3681c1142",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 79,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 80,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "metric_id": {
+          "type": "uuid.UUID | None",
+          "line": 81,
+          "relationship": false,
+          "source": "metric_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"esg_metrics.id\", ondelete=\"RESTRICT\", index=True\n    )",
+          "foreign_key": "esg_metrics.id",
+          "ondelete": "RESTRICT",
+          "nullable": true,
+          "target": "ESGMetric"
+        },
+        "emission_id": {
+          "type": "uuid.UUID | None",
+          "line": 84,
+          "relationship": false,
+          "source": "emission_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"carbon_emissions.id\", ondelete=\"RESTRICT\", index=True\n    )",
+          "foreign_key": "carbon_emissions.id",
+          "ondelete": "RESTRICT",
+          "nullable": true,
+          "target": "CarbonEmission"
+        },
+        "decision": {
+          "type": "MetricReviewStatus",
+          "line": 87,
+          "relationship": false,
+          "source": "decision: MetricReviewStatus = Field(sa_column=sa_enum_column(MetricReviewStatus))",
+          "nullable": false
+        },
+        "original_value": {
+          "type": "float",
+          "line": 89,
+          "relationship": false,
+          "source": "original_value: float",
+          "nullable": false
+        },
+        "new_value": {
+          "type": "float | None",
+          "line": 90,
+          "relationship": false,
+          "source": "new_value: float | None = None",
+          "nullable": true
+        },
+        "reason": {
+          "type": "ReviewReason | None",
+          "line": 91,
+          "relationship": false,
+          "source": "reason: ReviewReason | None = Field(\n        default=None, sa_column=sa_enum_column(ReviewReason, nullable=True)\n    )",
+          "nullable": true
+        },
+        "comment": {
+          "type": "str | None",
+          "line": 94,
+          "relationship": false,
+          "source": "comment: str | None = Field(default=None, max_length=2000)",
+          "nullable": true
+        },
+        "auditor_id": {
+          "type": "uuid.UUID",
+          "line": 95,
+          "relationship": false,
+          "source": "auditor_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "User"
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 96,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        CheckConstraint(\n            \"(metric_id IS NULL) <> (emission_id IS NULL)\",\n            name=\"ck_metric_reviews_one_target\",\n        ),\n        CheckConstraint(\n            \"(decision = 'OVERRIDDEN') = (new_value IS NOT NULL)\",\n            name=\"ck_metric_reviews_new_value_iff_overridden\",\n        ),\n        CheckConstraint(\n            \"decision = 'ACCEPTED' OR reason IS NOT NULL\",\n            name=\"ck_metric_reviews_reason_unless_accepted\",\n        ),\n        CheckConstraint(\n            \"decision <> 'PENDING'\",\n            name=\"ck_metric_reviews_decision_not_pending\",\n        ),\n    )",
+      "table": "metric_reviews",
+      "uml_name": "RevueValeur",
+      "displayed_fields": [
+        "decision",
+        "original_value",
+        "new_value",
+        "reason",
+        "created_at"
+      ]
+    },
+    "Portfolio": {
+      "name": "Portfolio",
+      "file": "app/investor/models.py",
+      "line": 44,
+      "sha256": "b283b7bfbc56272ab6f0b14962f8355f233d6eab98a8644363fbb3db0739aa81",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 47,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "user_id": {
+          "type": "uuid.UUID",
+          "line": 50,
+          "relationship": false,
+          "source": "user_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "User"
+        },
+        "name": {
+          "type": "str",
+          "line": 51,
+          "relationship": false,
+          "source": "name: str",
+          "nullable": false
+        },
+        "reference_currency": {
+          "type": "Currency",
+          "line": 52,
+          "relationship": false,
+          "source": "reference_currency: Currency = Field(sa_column=sa_enum_column(Currency))",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 53,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "archived": {
+          "type": "bool",
+          "line": 57,
+          "relationship": false,
+          "source": "archived: bool = Field(default=False)",
+          "nullable": false
+        },
+        "total_esg_score": {
+          "type": "float | None",
+          "line": 60,
+          "relationship": false,
+          "source": "total_esg_score: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "waci": {
+          "type": "float | None",
+          "line": 61,
+          "relationship": false,
+          "source": "waci: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "financed_emissions_tco2e": {
+          "type": "float | None",
+          "line": 62,
+          "relationship": false,
+          "source": "financed_emissions_tco2e: float | None = Field(default=None)",
+          "nullable": true
+        },
+        "computed_at": {
+          "type": "datetime | None",
+          "line": 63,
+          "relationship": false,
+          "source": "computed_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "config_hash": {
+          "type": "str | None",
+          "line": 64,
+          "relationship": false,
+          "source": "config_hash: str | None = Field(default=None, max_length=64)",
+          "nullable": true
+        },
+        "user": {
+          "type": "'User'",
+          "line": 66,
+          "relationship": true,
+          "source": "user: \"User\" = Relationship(back_populates=\"portfolios\")",
+          "nullable": false
+        },
+        "positions": {
+          "type": "list['PortfolioPosition']",
+          "line": 67,
+          "relationship": true,
+          "source": "positions: list[\"PortfolioPosition\"] = Relationship(back_populates=\"portfolio\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "portfolios",
+      "uml_name": "Portefeuille",
+      "displayed_fields": [
+        "name",
+        "reference_currency",
+        "archived",
+        "created_at"
+      ]
+    },
+    "PortfolioPosition": {
+      "name": "PortfolioPosition",
+      "file": "app/investor/models.py",
+      "line": 70,
+      "sha256": "b283b7bfbc56272ab6f0b14962f8355f233d6eab98a8644363fbb3db0739aa81",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 85,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "portfolio_id": {
+          "type": "uuid.UUID",
+          "line": 86,
+          "relationship": false,
+          "source": "portfolio_id: uuid.UUID = Field(foreign_key=\"portfolios.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "portfolios.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Portfolio"
+        },
+        "company_id": {
+          "type": "uuid.UUID | None",
+          "line": 87,
+          "relationship": false,
+          "source": "company_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"companies.id\", ondelete=\"CASCADE\", index=True\n    )",
+          "foreign_key": "companies.id",
+          "ondelete": "CASCADE",
+          "nullable": true,
+          "target": "Company"
+        },
+        "identifier_type": {
+          "type": "IdentifierType | None",
+          "line": 92,
+          "relationship": false,
+          "source": "identifier_type: IdentifierType | None = Field(\n        default=None, sa_column=sa_enum_column(IdentifierType, nullable=True)\n    )",
+          "nullable": true
+        },
+        "identifier_raw": {
+          "type": "str | None",
+          "line": 95,
+          "relationship": false,
+          "source": "identifier_raw: str | None = Field(default=None, max_length=64)",
+          "nullable": true
+        },
+        "match_status": {
+          "type": "MatchStatus",
+          "line": 96,
+          "relationship": false,
+          "source": "match_status: MatchStatus = Field(\n        default=MatchStatus.MATCHED, sa_column=sa_enum_column(MatchStatus)\n    )",
+          "nullable": false
+        },
+        "outstanding_amount": {
+          "type": "Decimal",
+          "line": 101,
+          "relationship": false,
+          "source": "outstanding_amount: Decimal = Field(sa_column=Column(Numeric(20, 2), nullable=False))",
+          "nullable": false
+        },
+        "currency": {
+          "type": "Currency",
+          "line": 102,
+          "relationship": false,
+          "source": "currency: Currency = Field(sa_column=sa_enum_column(Currency))",
+          "nullable": false
+        },
+        "fx_rate_used": {
+          "type": "Decimal | None",
+          "line": 105,
+          "relationship": false,
+          "source": "fx_rate_used: Decimal | None = Field(\n        default=None, sa_column=Column(Numeric(20, 10), nullable=True)\n    )",
+          "nullable": true
+        },
+        "converted_amount": {
+          "type": "Decimal",
+          "line": 111,
+          "relationship": false,
+          "source": "converted_amount: Decimal = Field(sa_column=Column(Numeric(20, 2), nullable=False))",
+          "nullable": false
+        },
+        "weight": {
+          "type": "Decimal | None",
+          "line": 114,
+          "relationship": false,
+          "source": "weight: Decimal | None = Field(default=None, sa_column=Column(Numeric(11, 10), nullable=True))",
+          "nullable": true
+        },
+        "duration_type": {
+          "type": "DurationType",
+          "line": 115,
+          "relationship": false,
+          "source": "duration_type: DurationType = Field(\n        sa_column=sa_enum_column(DurationType)\n    )",
+          "nullable": false
+        },
+        "start_date": {
+          "type": "datetime",
+          "line": 118,
+          "relationship": false,
+          "source": "start_date: datetime",
+          "nullable": false
+        },
+        "end_date": {
+          "type": "datetime | None",
+          "line": 121,
+          "relationship": false,
+          "source": "end_date: datetime | None = None",
+          "nullable": true
+        },
+        "portfolio": {
+          "type": "Portfolio",
+          "line": 123,
+          "relationship": true,
+          "source": "portfolio: Portfolio = Relationship(back_populates=\"positions\")",
+          "nullable": false
+        },
+        "company": {
+          "type": "Optional['Company']",
+          "line": 124,
+          "relationship": true,
+          "source": "company: Optional[\"Company\"] = Relationship(back_populates=\"positions\")",
+          "nullable": true
+        }
+      },
+      "methods": [
+        {
+          "name": "_valider_regles_duree",
+          "line": 127,
+          "signature": "@model_validator(mode='after')"
+        },
+        {
+          "name": "_valider_montant_minimum",
+          "line": 161,
+          "signature": "@model_validator(mode='after')"
+        }
+      ],
+      "constraints_source": "__table_args__ = (\n        CheckConstraint(\"outstanding_amount > 0\", name=\"ck_portfolio_positions_amount_positive\"),\n        CheckConstraint(\n            \"weight IS NULL OR (weight > 0 AND weight <= 1)\",\n            name=\"ck_portfolio_positions_weight_range\",\n        ),\n        CheckConstraint(\n            \"(match_status = 'MATCHED') = (company_id IS NOT NULL)\",\n            name=\"ck_portfolio_positions_company_iff_matched\",\n        ),\n    )",
+      "table": "portfolio_positions",
+      "uml_name": "PositionPortefeuille",
+      "displayed_fields": [
+        "outstanding_amount",
+        "currency",
+        "converted_amount",
+        "weight",
+        "match_status",
+        "duration_type",
+        "start_date",
+        "end_date"
+      ]
+    },
+    "Project": {
+      "name": "Project",
+      "file": "app/institution/models.py",
+      "line": 26,
+      "sha256": "97648b1642056375ed9d0801864431a6c9f165811af40b79d1fabe4d4167b489",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 31,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "institution_id": {
+          "type": "uuid.UUID",
+          "line": 32,
+          "relationship": false,
+          "source": "institution_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "User"
+        },
+        "name": {
+          "type": "str",
+          "line": 33,
+          "relationship": false,
+          "source": "name: str",
+          "nullable": false
+        },
+        "description": {
+          "type": "str | None",
+          "line": 34,
+          "relationship": false,
+          "source": "description: str | None = None",
+          "nullable": true
+        },
+        "objective": {
+          "type": "str | None",
+          "line": 37,
+          "relationship": false,
+          "source": "objective: str | None = None",
+          "nullable": true
+        },
+        "start_date": {
+          "type": "datetime | None",
+          "line": 42,
+          "relationship": false,
+          "source": "start_date: datetime | None = None",
+          "nullable": true
+        },
+        "planned_end_date": {
+          "type": "datetime | None",
+          "line": 43,
+          "relationship": false,
+          "source": "planned_end_date: datetime | None = None",
+          "nullable": true
+        },
+        "deadline": {
+          "type": "datetime | None",
+          "line": 44,
+          "relationship": false,
+          "source": "deadline: datetime | None = None",
+          "nullable": true
+        },
+        "status": {
+          "type": "ProjectStatus",
+          "line": 45,
+          "relationship": false,
+          "source": "status: ProjectStatus = Field(\n        default=ProjectStatus.OUVERT, sa_column=sa_enum_column(ProjectStatus)\n    )",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 48,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "closed_at": {
+          "type": "datetime | None",
+          "line": 51,
+          "relationship": false,
+          "source": "closed_at: datetime | None = None",
+          "nullable": true
+        },
+        "institution": {
+          "type": "'User'",
+          "line": 53,
+          "relationship": true,
+          "source": "institution: \"User\" = Relationship(back_populates=\"projects\")",
+          "nullable": false
+        },
+        "assignments": {
+          "type": "list['ProjectAssignment']",
+          "line": 54,
+          "relationship": true,
+          "source": "assignments: list[\"ProjectAssignment\"] = Relationship(back_populates=\"project\")",
+          "nullable": false
+        },
+        "analyses": {
+          "type": "list['Analysis']",
+          "line": 55,
+          "relationship": true,
+          "source": "analyses: list[\"Analysis\"] = Relationship(back_populates=\"project\")",
+          "nullable": false
+        },
+        "companies": {
+          "type": "list['ProjectCompany']",
+          "line": 56,
+          "relationship": true,
+          "source": "companies: list[\"ProjectCompany\"] = Relationship(back_populates=\"project\")",
+          "nullable": false
+        },
+        "documents": {
+          "type": "list['ProjectDocument']",
+          "line": 57,
+          "relationship": true,
+          "source": "documents: list[\"ProjectDocument\"] = Relationship(back_populates=\"project\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "projects",
+      "uml_name": "Projet",
+      "displayed_fields": [
+        "name",
+        "objective",
+        "status",
+        "deadline",
+        "closed_at"
+      ]
+    },
+    "ProjectAssignment": {
+      "name": "ProjectAssignment",
+      "file": "app/institution/models.py",
+      "line": 60,
+      "sha256": "97648b1642056375ed9d0801864431a6c9f165811af40b79d1fabe4d4167b489",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 70,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid.UUID",
+          "line": 72,
+          "relationship": false,
+          "source": "project_id: uuid.UUID = Field(foreign_key=\"projects.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "projects.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Project"
+        },
+        "researcher_id": {
+          "type": "uuid.UUID",
+          "line": 73,
+          "relationship": false,
+          "source": "researcher_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "User"
+        },
+        "assigned_at": {
+          "type": "datetime",
+          "line": 74,
+          "relationship": false,
+          "source": "assigned_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "project": {
+          "type": "Project",
+          "line": 76,
+          "relationship": true,
+          "source": "project: Project = Relationship(back_populates=\"assignments\")",
+          "nullable": false
+        },
+        "researcher": {
+          "type": "'User'",
+          "line": 77,
+          "relationship": true,
+          "source": "researcher: \"User\" = Relationship(back_populates=\"project_assignments\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\n            \"project_id\", \"researcher_id\", name=\"uq_project_assignments_project_researcher\"\n        ),\n    )",
+      "table": "project_assignments",
+      "uml_name": "AffectationChercheur",
+      "displayed_fields": [
+        "assigned_at"
+      ]
+    },
+    "ProjectCompany": {
+      "name": "ProjectCompany",
+      "file": "app/institution/models.py",
+      "line": 80,
+      "sha256": "97648b1642056375ed9d0801864431a6c9f165811af40b79d1fabe4d4167b489",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 89,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid.UUID",
+          "line": 90,
+          "relationship": false,
+          "source": "project_id: uuid.UUID = Field(foreign_key=\"projects.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "projects.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Project"
+        },
+        "company_id": {
+          "type": "uuid.UUID",
+          "line": 91,
+          "relationship": false,
+          "source": "company_id: uuid.UUID = Field(foreign_key=\"companies.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "companies.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Company"
+        },
+        "added_at": {
+          "type": "datetime",
+          "line": 92,
+          "relationship": false,
+          "source": "added_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "project": {
+          "type": "Project",
+          "line": 94,
+          "relationship": true,
+          "source": "project: Project = Relationship(back_populates=\"companies\")",
+          "nullable": false
+        },
+        "company": {
+          "type": "'Company'",
+          "line": 95,
+          "relationship": true,
+          "source": "company: \"Company\" = Relationship()",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\"project_id\", \"company_id\", name=\"uq_project_companies_project_company\"),\n    )",
+      "table": "project_companies",
+      "uml_name": "EntrepriseProjet",
+      "displayed_fields": [
+        "added_at"
+      ]
+    },
+    "ProjectDocument": {
+      "name": "ProjectDocument",
+      "file": "app/institution/models.py",
+      "line": 98,
+      "sha256": "97648b1642056375ed9d0801864431a6c9f165811af40b79d1fabe4d4167b489",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 106,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid.UUID",
+          "line": 107,
+          "relationship": false,
+          "source": "project_id: uuid.UUID = Field(foreign_key=\"projects.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "projects.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Project"
+        },
+        "report_id": {
+          "type": "uuid.UUID",
+          "line": 108,
+          "relationship": false,
+          "source": "report_id: uuid.UUID = Field(foreign_key=\"esg_reports.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "ESGReport"
+        },
+        "added_at": {
+          "type": "datetime",
+          "line": 109,
+          "relationship": false,
+          "source": "added_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "project": {
+          "type": "Project",
+          "line": 111,
+          "relationship": true,
+          "source": "project: Project = Relationship(back_populates=\"documents\")",
+          "nullable": false
+        },
+        "report": {
+          "type": "'ESGReport'",
+          "line": 112,
+          "relationship": true,
+          "source": "report: \"ESGReport\" = Relationship()",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\"project_id\", \"report_id\", name=\"uq_project_documents_project_report\"),\n    )",
+      "table": "project_documents",
+      "uml_name": "DocumentProjet",
+      "displayed_fields": [
+        "added_at"
+      ]
+    },
+    "Analysis": {
+      "name": "Analysis",
+      "file": "app/researcher/models.py",
+      "line": 28,
+      "sha256": "1df0f7ee81502b8df60e9d2c02490a3d6a3439119cd37ec9b7d0d1862d93d8df",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 33,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid.UUID",
+          "line": 35,
+          "relationship": false,
+          "source": "project_id: uuid.UUID = Field(foreign_key=\"projects.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "projects.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "Project"
+        },
+        "researcher_id": {
+          "type": "uuid.UUID",
+          "line": 36,
+          "relationship": false,
+          "source": "researcher_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"RESTRICT\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "RESTRICT",
+          "nullable": false,
+          "target": "User"
+        },
+        "title": {
+          "type": "str",
+          "line": 37,
+          "relationship": false,
+          "source": "title: str",
+          "nullable": false
+        },
+        "content": {
+          "type": "str",
+          "line": 38,
+          "relationship": false,
+          "source": "content: str",
+          "nullable": false
+        },
+        "status": {
+          "type": "AnalysisStatus",
+          "line": 39,
+          "relationship": false,
+          "source": "status: AnalysisStatus = Field(\n        default=AnalysisStatus.BROUILLON, sa_column=sa_enum_column(AnalysisStatus)\n    )",
+          "nullable": false
+        },
+        "version": {
+          "type": "int",
+          "line": 42,
+          "relationship": false,
+          "source": "version: int = Field(default=1)",
+          "nullable": false
+        },
+        "previous_analysis_id": {
+          "type": "uuid.UUID | None",
+          "line": 44,
+          "relationship": false,
+          "source": "previous_analysis_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"analyses.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "analyses.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "Analysis"
+        },
+        "institution_comment": {
+          "type": "str | None",
+          "line": 47,
+          "relationship": false,
+          "source": "institution_comment: str | None = None",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "datetime",
+          "line": 48,
+          "relationship": false,
+          "source": "created_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "submitted_at": {
+          "type": "datetime | None",
+          "line": 49,
+          "relationship": false,
+          "source": "submitted_at: datetime | None = None",
+          "nullable": true
+        },
+        "decided_at": {
+          "type": "datetime | None",
+          "line": 50,
+          "relationship": false,
+          "source": "decided_at: datetime | None = None",
+          "nullable": true
+        },
+        "project": {
+          "type": "'Project'",
+          "line": 52,
+          "relationship": true,
+          "source": "project: \"Project\" = Relationship(back_populates=\"analyses\")",
+          "nullable": false
+        },
+        "researcher": {
+          "type": "'User'",
+          "line": 53,
+          "relationship": true,
+          "source": "researcher: \"User\" = Relationship(back_populates=\"analyses\")",
+          "nullable": false
+        },
+        "companies": {
+          "type": "list['AnalysisCompany']",
+          "line": 54,
+          "relationship": true,
+          "source": "companies: list[\"AnalysisCompany\"] = Relationship(back_populates=\"analysis\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "analyses",
+      "uml_name": "Analyse",
+      "displayed_fields": [
+        "title",
+        "content",
+        "status",
+        "version",
+        "submitted_at",
+        "institution_comment"
+      ]
+    },
+    "AnalysisCompany": {
+      "name": "AnalysisCompany",
+      "file": "app/researcher/models.py",
+      "line": 57,
+      "sha256": "1df0f7ee81502b8df60e9d2c02490a3d6a3439119cd37ec9b7d0d1862d93d8df",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 66,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "analysis_id": {
+          "type": "uuid.UUID",
+          "line": 68,
+          "relationship": false,
+          "source": "analysis_id: uuid.UUID = Field(foreign_key=\"analyses.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "analyses.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Analysis"
+        },
+        "company_id": {
+          "type": "uuid.UUID",
+          "line": 69,
+          "relationship": false,
+          "source": "company_id: uuid.UUID = Field(foreign_key=\"companies.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "companies.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "Company"
+        },
+        "report_id": {
+          "type": "uuid.UUID | None",
+          "line": 75,
+          "relationship": false,
+          "source": "report_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"esg_reports.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "esg_reports.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "ESGReport"
+        },
+        "score_id": {
+          "type": "uuid.UUID | None",
+          "line": 80,
+          "relationship": false,
+          "source": "score_id: uuid.UUID | None = Field(\n        default=None, foreign_key=\"scores.id\", ondelete=\"SET NULL\", index=True\n    )",
+          "foreign_key": "scores.id",
+          "ondelete": "SET NULL",
+          "nullable": true,
+          "target": "Score"
+        },
+        "analysis": {
+          "type": "Analysis",
+          "line": 84,
+          "relationship": true,
+          "source": "analysis: Analysis = Relationship(back_populates=\"companies\")",
+          "nullable": false
+        },
+        "company": {
+          "type": "Optional['Company']",
+          "line": 85,
+          "relationship": true,
+          "source": "company: Optional[\"Company\"] = Relationship()",
+          "nullable": true
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\"analysis_id\", \"company_id\", name=\"uq_analysis_companies_analysis_company\"),\n    )",
+      "table": "analysis_companies",
+      "uml_name": "EntrepriseAnalyse",
+      "displayed_fields": [
+        "report_id",
+        "score_id"
+      ]
+    },
+    "ResearcherAffiliation": {
+      "name": "ResearcherAffiliation",
+      "file": "app/auth/models.py",
+      "line": 149,
+      "sha256": "590bf01e4b7f9b481b9fce54d0b2b6b8948c7f514019f138b3f97661a9ae26e3",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 166,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "researcher_id": {
+          "type": "uuid.UUID",
+          "line": 168,
+          "relationship": false,
+          "source": "researcher_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"CASCADE\")",
+          "foreign_key": "users.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "User"
+        },
+        "institution_id": {
+          "type": "uuid.UUID",
+          "line": 169,
+          "relationship": false,
+          "source": "institution_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"CASCADE\", index=True)",
+          "foreign_key": "users.id",
+          "ondelete": "CASCADE",
+          "nullable": false,
+          "target": "User"
+        },
+        "status": {
+          "type": "AffiliationStatus",
+          "line": 170,
+          "relationship": false,
+          "source": "status: AffiliationStatus = Field(\n        default=AffiliationStatus.EN_ATTENTE, sa_column=sa_enum_column(AffiliationStatus)\n    )",
+          "nullable": false
+        },
+        "invited_at": {
+          "type": "datetime",
+          "line": 173,
+          "relationship": false,
+          "source": "invited_at: datetime = Field(default_factory=utcnow)",
+          "nullable": false
+        },
+        "responded_at": {
+          "type": "datetime | None",
+          "line": 174,
+          "relationship": false,
+          "source": "responded_at: datetime | None = Field(default=None)",
+          "nullable": true
+        },
+        "collaboration_terms": {
+          "type": "str | None",
+          "line": 178,
+          "relationship": false,
+          "source": "collaboration_terms: str | None = Field(default=None)",
+          "nullable": true
+        }
+      },
+      "methods": [],
+      "constraints_source": "__table_args__ = (\n        UniqueConstraint(\n            \"researcher_id\", \"institution_id\", name=\"uq_researcher_affiliations_researcher_institution\"\n        ),\n    )",
+      "table": "researcher_affiliations",
+      "uml_name": "RattachementChercheur",
+      "displayed_fields": [
+        "status",
+        "invited_at",
+        "responded_at",
+        "collaboration_terms"
+      ]
+    },
+    "InstitutionProfile": {
+      "name": "InstitutionProfile",
+      "file": "app/auth/models.py",
+      "line": 136,
+      "sha256": "590bf01e4b7f9b481b9fce54d0b2b6b8948c7f514019f138b3f97661a9ae26e3",
+      "bases": [
+        "SQLModel"
+      ],
+      "fields": {
+        "id": {
+          "type": "uuid.UUID",
+          "line": 142,
+          "relationship": false,
+          "source": "id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)",
+          "primary_key": true,
+          "nullable": false
+        },
+        "user_id": {
+          "type": "uuid.UUID",
+          "line": 143,
+          "relationship": false,
+          "source": "user_id: uuid.UUID = Field(foreign_key=\"users.id\", ondelete=\"CASCADE\", unique=True)",
+          "foreign_key": "users.id",
+          "ondelete": "CASCADE",
+          "unique": true,
+          "nullable": false,
+          "target": "User"
+        },
+        "export_quota": {
+          "type": "int",
+          "line": 144,
+          "relationship": false,
+          "source": "export_quota: int",
+          "nullable": false
+        },
+        "user": {
+          "type": "User",
+          "line": 146,
+          "relationship": true,
+          "source": "user: User = Relationship(back_populates=\"institution_profile\")",
+          "nullable": false
+        }
+      },
+      "methods": [],
+      "constraints_source": "",
+      "table": "institution_profiles",
+      "uml_name": "ProfilInstitution",
+      "displayed_fields": [
+        "export_quota"
+      ]
+    }
+  },
+  "associations": [
+    {
+      "child": "company",
+      "parent": "user",
+      "fk": "owner_user_id",
+      "label": "propriétaire",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/company/models.py",
+      "line": 43,
+      "source_class": "Company",
+      "target_class": "User"
+    },
+    {
+      "child": "company",
+      "parent": "user",
+      "fk": "onboarded_by_id",
+      "label": "inscription validée par",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/company/models.py",
+      "line": 90,
+      "source_class": "Company",
+      "target_class": "User"
+    },
+    {
+      "child": "report",
+      "parent": "company",
+      "fk": "company_id",
+      "label": "entreprise",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 79,
+      "source_class": "ESGReport",
+      "target_class": "Company"
+    },
+    {
+      "child": "report",
+      "parent": "assigned",
+      "fk": "auditor_id",
+      "label": "affectation",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 101,
+      "source_class": "ESGReport",
+      "target_class": "User"
+    },
+    {
+      "child": "report",
+      "parent": "report",
+      "fk": "previous_report_id",
+      "label": "précédent",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 120,
+      "source_class": "ESGReport",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "report",
+      "parent": "declared_proof",
+      "fk": "declared_global_score_proof_id",
+      "label": "preuve du score déclaré",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 129,
+      "source_class": "ESGReport",
+      "target_class": "Evidence"
+    },
+    {
+      "child": "score",
+      "parent": "report",
+      "fk": "report_id",
+      "label": "rapport noté",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/scoring/models.py",
+      "line": 104,
+      "source_class": "Score",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "score",
+      "parent": "config",
+      "fk": "config_id",
+      "label": "méthodologie",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/scoring/models.py",
+      "line": 106,
+      "source_class": "Score",
+      "target_class": "ScoringConfig"
+    },
+    {
+      "child": "config",
+      "parent": "user",
+      "fk": "owner_user_id",
+      "label": "propriétaire",
+      "domain": "a",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/scoring/models.py",
+      "line": 69,
+      "source_class": "ScoringConfig",
+      "target_class": "User"
+    },
+    {
+      "child": "run",
+      "parent": "b_report",
+      "fk": "report_id",
+      "label": "tentatives",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 175,
+      "source_class": "ExtractionRun",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "coverage",
+      "parent": "b_report",
+      "fk": "report_id",
+      "label": "complétude",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 352,
+      "source_class": "MetricCoverage",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "metric",
+      "parent": "b_report",
+      "fk": "report_id",
+      "label": "rapport",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 217,
+      "source_class": "ESGMetric",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "carbon",
+      "parent": "b_report",
+      "fk": "report_id",
+      "label": "rapport",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 289,
+      "source_class": "CarbonEmission",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "metric",
+      "parent": "run",
+      "fk": "extraction_run_id",
+      "label": "exécution",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 241,
+      "source_class": "ESGMetric",
+      "target_class": "ExtractionRun"
+    },
+    {
+      "child": "carbon",
+      "parent": "run",
+      "fk": "extraction_run_id",
+      "label": "exécution",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 308,
+      "source_class": "CarbonEmission",
+      "target_class": "ExtractionRun"
+    },
+    {
+      "child": "metric",
+      "parent": "evidence",
+      "fk": "proof_id",
+      "label": "preuve",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 223,
+      "source_class": "ESGMetric",
+      "target_class": "Evidence"
+    },
+    {
+      "child": "carbon",
+      "parent": "evidence",
+      "fk": "proof_id",
+      "label": "preuve",
+      "domain": "b",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/ingestion/models.py",
+      "line": 297,
+      "source_class": "CarbonEmission",
+      "target_class": "Evidence"
+    },
+    {
+      "child": "opinion",
+      "parent": "c_user",
+      "fk": "auditor_id",
+      "label": "auteur",
+      "domain": "c",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/audit/models.py",
+      "line": 39,
+      "source_class": "AuditOpinion",
+      "target_class": "User"
+    },
+    {
+      "child": "opinion",
+      "parent": "c_report",
+      "fk": "report_id",
+      "label": "rapport",
+      "domain": "c",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/audit/models.py",
+      "line": 33,
+      "source_class": "AuditOpinion",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "review",
+      "parent": "c_user",
+      "fk": "auditor_id",
+      "label": "auteur",
+      "domain": "c",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/audit/models.py",
+      "line": 95,
+      "source_class": "MetricReview",
+      "target_class": "User"
+    },
+    {
+      "child": "review",
+      "parent": "c_report",
+      "fk": "report_id",
+      "label": "rapport",
+      "domain": "c",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/audit/models.py",
+      "line": 80,
+      "source_class": "MetricReview",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "review",
+      "parent": "c_metric",
+      "fk": "metric_id",
+      "label": "cible ESG",
+      "domain": "c",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/audit/models.py",
+      "line": 81,
+      "source_class": "MetricReview",
+      "target_class": "ESGMetric"
+    },
+    {
+      "child": "review",
+      "parent": "c_carbon",
+      "fk": "emission_id",
+      "label": "cible carbone",
+      "domain": "c",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/audit/models.py",
+      "line": 84,
+      "source_class": "MetricReview",
+      "target_class": "CarbonEmission"
+    },
+    {
+      "child": "portfolio",
+      "parent": "d_user",
+      "fk": "user_id",
+      "label": "titulaire",
+      "domain": "d",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/investor/models.py",
+      "line": 50,
+      "source_class": "Portfolio",
+      "target_class": "User"
+    },
+    {
+      "child": "position",
+      "parent": "portfolio",
+      "fk": "portfolio_id",
+      "label": "portefeuille",
+      "domain": "d",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/investor/models.py",
+      "line": 86,
+      "source_class": "PortfolioPosition",
+      "target_class": "Portfolio"
+    },
+    {
+      "child": "position",
+      "parent": "d_company",
+      "fk": "company_id",
+      "label": "rapprochement",
+      "domain": "d",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/investor/models.py",
+      "line": 87,
+      "source_class": "PortfolioPosition",
+      "target_class": "Company"
+    },
+    {
+      "child": "project",
+      "parent": "e_institution",
+      "fk": "institution_id",
+      "label": "institution",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 32,
+      "source_class": "Project",
+      "target_class": "User"
+    },
+    {
+      "child": "assignment",
+      "parent": "project",
+      "fk": "project_id",
+      "label": "projet",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 72,
+      "source_class": "ProjectAssignment",
+      "target_class": "Project"
+    },
+    {
+      "child": "assignment",
+      "parent": "e_researcher",
+      "fk": "researcher_id",
+      "label": "chercheur",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 73,
+      "source_class": "ProjectAssignment",
+      "target_class": "User"
+    },
+    {
+      "child": "project_company",
+      "parent": "project",
+      "fk": "project_id",
+      "label": "projet",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 90,
+      "source_class": "ProjectCompany",
+      "target_class": "Project"
+    },
+    {
+      "child": "project_company",
+      "parent": "e_company",
+      "fk": "company_id",
+      "label": "périmètre",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 91,
+      "source_class": "ProjectCompany",
+      "target_class": "Company"
+    },
+    {
+      "child": "project_document",
+      "parent": "project",
+      "fk": "project_id",
+      "label": "projet",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 107,
+      "source_class": "ProjectDocument",
+      "target_class": "Project"
+    },
+    {
+      "child": "project_document",
+      "parent": "e_report",
+      "fk": "report_id",
+      "label": "document",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/institution/models.py",
+      "line": 108,
+      "source_class": "ProjectDocument",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "analysis",
+      "parent": "project",
+      "fk": "project_id",
+      "label": "projet",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 35,
+      "source_class": "Analysis",
+      "target_class": "Project"
+    },
+    {
+      "child": "analysis",
+      "parent": "e_researcher",
+      "fk": "researcher_id",
+      "label": "auteur",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 36,
+      "source_class": "Analysis",
+      "target_class": "User"
+    },
+    {
+      "child": "analysis",
+      "parent": "analysis",
+      "fk": "previous_analysis_id",
+      "label": "précédente",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 44,
+      "source_class": "Analysis",
+      "target_class": "Analysis"
+    },
+    {
+      "child": "analysis_company",
+      "parent": "analysis",
+      "fk": "analysis_id",
+      "label": "analyse",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 68,
+      "source_class": "AnalysisCompany",
+      "target_class": "Analysis"
+    },
+    {
+      "child": "analysis_company",
+      "parent": "e_company",
+      "fk": "company_id",
+      "label": "entreprise",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 69,
+      "source_class": "AnalysisCompany",
+      "target_class": "Company"
+    },
+    {
+      "child": "analysis_company",
+      "parent": "e_report",
+      "fk": "report_id",
+      "label": "rapport figé",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 75,
+      "source_class": "AnalysisCompany",
+      "target_class": "ESGReport"
+    },
+    {
+      "child": "analysis_company",
+      "parent": "e_score",
+      "fk": "score_id",
+      "label": "score figé",
+      "domain": "e",
+      "cm": "0..*",
+      "pm": "0..1",
+      "composition": false,
+      "file": "app/researcher/models.py",
+      "line": 80,
+      "source_class": "AnalysisCompany",
+      "target_class": "Score"
+    },
+    {
+      "child": "affiliation",
+      "parent": "f_institution",
+      "fk": "institution_id",
+      "label": "institution",
+      "domain": "f",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/auth/models.py",
+      "line": 169,
+      "source_class": "ResearcherAffiliation",
+      "target_class": "User"
+    },
+    {
+      "child": "affiliation",
+      "parent": "f_researcher",
+      "fk": "researcher_id",
+      "label": "chercheur",
+      "domain": "f",
+      "cm": "0..*",
+      "pm": "1",
+      "composition": false,
+      "file": "app/auth/models.py",
+      "line": 168,
+      "source_class": "ResearcherAffiliation",
+      "target_class": "User"
+    },
+    {
+      "child": "institution_profile",
+      "parent": "f_institution",
+      "fk": "user_id",
+      "label": "profil institutionnel",
+      "domain": "f",
+      "cm": "0..1",
+      "pm": "1",
+      "composition": false,
+      "file": "app/auth/models.py",
+      "line": 143,
+      "source_class": "InstitutionProfile",
+      "target_class": "User"
+    }
+  ]
+}

@@ -1,0 +1,681 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3700" height="2850" viewBox="0 0 3700 2850" role="img" aria-labelledby="title desc">
+<title id="title">GreenFinance Scorer — diagramme de classes UML</title>
+<desc id="desc">23 classes persistantes. Noms et attributs issus du code SQLModel ; associations fondées sur les clés étrangères. Références répétées dans les cadres pointillés.</desc>
+<rect x="0" y="0" width="3700" height="2850" rx="0" fill="#F2F6F7" stroke="#F2F6F7" stroke-width="1.5"/>
+<text x="45" y="65" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="22.00" fill="#137866">GREENFINANCE SCORER</text>
+<text x="45" y="120" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="46.00" fill="#173347">Diagramme de classes UML</text>
+<text x="3655" y="72" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="22.00" fill="#516878">23 CLASSES PRINCIPALES  /  6 DOMAINES</text>
+<text x="3655" y="115" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="21.00" fill="#516878">État du code • 6 octobre 2026</text>
+<rect x="40" y="165" width="1170" height="1275" rx="12" fill="#FFFFFF" stroke="#D4E0E5" stroke-width="1.5"/>
+<text x="64" y="202" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="29.00" fill="#137866">01  Identité, rapports et notation</text>
+<text x="64" y="232" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="19.00" fill="#516878">Le rapport relie l’entreprise à une notation reproductible.</text>
+<polyline points="700,347.5 680,350 680,330 520,330 500,328.75" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="653.41965197984" y="324.09652654107913" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="670.23166369859" y="340.09652654107913" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="509.097810244038" y="335.46543326807125" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="526.947419619038" y="351.46543326807125" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..1</text>
+<rect x="568.203125" y="307.0" width="63.59375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="600.0" y="322.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">titulaire</text>
+<polyline points="700,430.0 680,430 680,460 520,460 500,456.25" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="655.18798828125" y="403.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="672.0" y="419.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="506.7221952983581" y="466.13603397235437" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="524.5718046733581" y="482.13603397235437" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..1</text>
+<rect x="517.3671875" y="437.0" width="165.265625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="600.0" y="452.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">inscription validée par</text>
+<polyline points="590,851.25 620,850 620,510 680,510 700,512.5" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="601.8298030432308" y="855.0704739175366" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="618.6418147619808" y="871.0704739175366" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="664.6187439554446" y="482.1505814040835" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="674.2007752054446" y="498.1505814040835" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">1</text>
+<rect x="579.61328125" y="657.0" width="80.7734375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="620.0" y="672.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">entreprise</text>
+<polyline points="335.0,750 340,720 340,670 320,668.0" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="338.5734627071143" y="714.0113539295857" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="355.3854744258643" y="730.0113539295857" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="328.4193724465437" y="675.7066991759478" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="346.2689818215437" y="691.7066991759478" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..1</text>
+<rect x="297.3984375" y="672.0" width="85.203125" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="340.0" y="687.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">affectation</text>
+<polyline points="80,851.25 60,850 60,720 210,720 207.5,750" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="36.24056866221201" y="822.5345667319286" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="53.05258038096201" y="838.5345667319286" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="207.92039619282278" y="712.4254464468032" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="225.77000556782278" y="728.4254464468032" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..1</text>
+<rect x="94.3203125" y="697.0" width="81.359375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="135.0" y="712.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">précédent</text>
+<polyline points="207.5,1155 210,1180 210,1260 240,1260 235.0,1280" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="177.55349737047814" y="1173.4531008302158" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="194.36550908922814" y="1189.4531008302158" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="239.46366812834265" y="1245.716579996512" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="257.31327750334265" y="1261.716579996512" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..1</text>
+<rect x="120.671875" y="1197.0" width="178.65625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="210.0" y="1212.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">preuve du score déclaré</text>
+<polyline points="700,1126.25 680,1130 680,1050 620,1050 590,1053.75" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="652.718950486286" y="1104.684123990456" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="669.530962205036" y="1120.684123990456" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="610.18630505141" y="1055.1534734589209" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="619.76833630141" y="1071.1534734589209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">1</text>
+<rect x="630.26171875" y="1067.0" width="99.4765625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="680.0" y="1082.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">rapport noté</text>
+<polyline points="816.25,1050 820,1020 820,970 816.25,945" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="818.7874068771665" y="1013.2007752054446" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="835.5994185959165" y="1029.2007752054446" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="794.998519786154" y="964.0636651271961" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="804.580551036154" y="980.0636651271961" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">1</text>
+<rect x="765.14453125" y="972.0" width="109.7109375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="820.0" y="987.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">méthodologie</text>
+<polyline points="700,881.25 680,880 610,880 610,540 400,540 395.0,520" fill="none" stroke="#137866" stroke-width="2" stroke-linejoin="round"/>
+<rect x="656.240568662212" y="852.5345667319286" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="673.052580380962" y="868.5345667319286" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..*</text>
+<rect x="368.419108123692" y="540.0445600046506" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="386.268717498692" y="556.0445600046506" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#137866">0..1</text>
+<rect x="563.5390625" y="687.0" width="92.921875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="610.0" y="702.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">propriétaire</text>
+<rect x="1240" y="165" width="1170" height="1275" rx="12" fill="#FFFFFF" stroke="#D4E0E5" stroke-width="1.5"/>
+<text x="1264" y="202" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="29.00" fill="#21698B">02  Extraction et preuves</text>
+<text x="1264" y="232" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="19.00" fill="#516878">Chaque valeur possède une preuve documentaire obligatoire.</text>
+<polyline points="1625.0,430 1620,400 1600,400 1600,310 1630,313.0" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1619.3671194180142" y="388.75058633581426" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1636.1791311367642" y="404.75058633581426" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1594.1489869284562" y="283.2933008240522" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1603.7310181784562" y="299.2933008240522" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">1</text>
+<rect x="1560.73828125" y="332.0" width="78.5234375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1600.0" y="347.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">tentatives</text>
+<polyline points="2016.25,430 2020,400 2040,400 2040,310 2010,313.0" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2018.7874068771666" y="393.20077520544464" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2035.5994185959166" y="409.20077520544464" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="2029.8710695802158" y="315.13449091077183" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2039.4531008302158" y="331.13449091077183" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">1</text>
+<rect x="1992.76953125" y="332.0" width="94.4609375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2040.0" y="347.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">complétude</text>
+<polyline points="1740,827.5 1760,830 1760,350 1720,350 1725.0,329" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1748.9872130758054" y="835.8494185959165" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1765.7992247945554" y="851.8494185959165" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1693.367694550465" y="341.53264557429367" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1702.949725800465" y="357.53264557429367" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">1</text>
+<rect x="1728.5625" y="567.0" width="62.875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1760.0" y="582.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">rapport</text>
+<polyline points="1900,827.5 1880,830 1880,350 1920,350 1915.0,329" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1853.4196519798402" y="804.0965265410792" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1870.2316636985902" y="820.0965265410792" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1896.3384440796033" y="348.9445024480869" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1905.9204753296033" y="364.9445024480869" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">1</text>
+<rect x="1848.5625" y="567.0" width="62.875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1880.0" y="582.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">rapport</text>
+<polyline points="1395.0,745 1400,720 1400,700 1395.0,677" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1399.3685308761737" y="709.6815992428652" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1416.1805425949237" y="725.6815992428652" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1367.4635988435045" y="696.7598124991351" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1385.3132082185045" y="712.7598124991351" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..1</text>
+<rect x="1358.375" y="709.5" width="78.25" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1397.5" y="724.5" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">exécution</text>
+<polyline points="1900,910.0 1770,910 1770,620 1760,620 1740,615.25" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1855.18798828125" y="883.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1872.0" y="899.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1745.6954551524134" y="626.2870128737981" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1763.5450645274134" y="642.2870128737981" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..1</text>
+<rect x="1730.875" y="742.0" width="78.25" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1770.0" y="757.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">exécution</text>
+<polyline points="1625.0,1075 1620,1100 1620,1120 1710,1120 1707.5,1150" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1587.0074456863263" y="1088.318400757135" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1603.8194574050763" y="1104.318400757135" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1716.1879743178229" y="1112.425446446803" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1725.7700055678229" y="1128.425446446803" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">1</text>
+<rect x="1635.7890625" y="1097.0" width="58.421875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1665.0" y="1112.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">preuve</text>
+<polyline points="2016.25,1075 2020,1100 2020,1120 1960,1120 1962.5,1150" fill="none" stroke="#21698B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1987.7685393174042" y="1094.0636651271961" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2004.5805510361542" y="1110.0636651271961" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">0..*</text>
+<rect x="1966.5374274460132" y="1109.7679910914835" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1976.1194586960132" y="1125.7679910914835" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#21698B">1</text>
+<rect x="1960.7890625" y="1097.0" width="58.421875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1990.0" y="1112.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">preuve</text>
+<rect x="2440" y="165" width="1220" height="605" rx="12" fill="#FFFFFF" stroke="#D4E0E5" stroke-width="1.5"/>
+<text x="2464" y="202" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="29.00" fill="#80599B">03  Audit des rapports et des valeurs</text>
+<text x="2464" y="232" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="19.00" fill="#516878">L’avis et la revue des valeurs ont des traces distinctes.</text>
+<polyline points="2480,514.25 2460,510 2460,320 2480,318.0" fill="none" stroke="#80599B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2439.1252805486706" y="481.779413222353" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2455.9372922674206" y="497.779413222353" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..*</text>
+<rect x="2440.9648679197844" y="293.86550908922817" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2450.5468991697844" y="309.86550908922817" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">1</text>
+<rect x="2432.19921875" y="392.0" width="55.6015625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2460.0" y="407.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">auteur</text>
+<polyline points="2810.0,465 2810,360 2860,360 2857.5,334" fill="none" stroke="#80599B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2809.18798828125" y="426.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2826.0" y="442.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..*</text>
+<rect x="2834.671371670435" y="352.402851321116" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2844.253402920435" y="368.402851321116" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">1</text>
+<rect x="2778.5625" y="389.5" width="62.875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2810.0" y="404.5" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">rapport</text>
+<polyline points="3130,515.0 3100,520 3100,250 2740,250 2740,290 2710,286.0" fill="none" stroke="#80599B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3082.938574617064" y="492.8208688632357" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3099.750586335814" y="508.8208688632357" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..*</text>
+<rect x="2726.0577304476574" y="294.5602305734707" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2735.6397616976574" y="310.5602305734707" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">1</text>
+<rect x="2892.19921875" y="227.0" width="55.6015625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2920.0" y="242.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">auteur</text>
+<polyline points="3130,585.0 3100,580 3080,580 3080,320 3060,318.0" fill="none" stroke="#80599B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3088.1993422108358" y="553.6145255741357" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3105.0113539295858" y="569.6145255741357" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..*</text>
+<rect x="3076.686950571544" y="325.7066991759478" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3086.268981821544" y="341.7066991759478" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">1</text>
+<rect x="3048.5625" y="427.0" width="62.875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3080.0" y="442.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">rapport</text>
+<polyline points="3375.0,445 3380,420 3380,320 3350,318.0" fill="none" stroke="#80599B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3379.368530876174" y="409.68159924286516" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3396.180542594924" y="425.68159924286516" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..*</text>
+<rect x="3359.024070876605" y="324.8270948203714" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3376.873680251605" y="340.8270948203714" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..1</text>
+<rect x="3342.56640625" y="347.0" width="74.8671875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3380.0" y="362.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">cible ESG</text>
+<polyline points="3497.5,445 3500,420 3500,360 3510,360 3510.0,334" fill="none" stroke="#80599B" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3499.3946874571975" y="407.7310181784563" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3516.2066991759475" y="423.7310181784563" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..*</text>
+<rect x="3476.150390625" y="351.0" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3494.0" y="367.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#80599B">0..1</text>
+<rect x="3447.703125" y="367.0" width="104.59375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3500.0" y="382.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">cible carbone</text>
+<rect x="2440" y="800" width="1220" height="640" rx="12" fill="#FFFFFF" stroke="#D4E0E5" stroke-width="1.5"/>
+<text x="2464" y="837" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="29.00" fill="#A36C28">04  Investissement</text>
+<text x="2464" y="867" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="19.00" fill="#516878">Une position importée peut rester sans entreprise rapprochée.</text>
+<polyline points="2700.0,1110 2700,990 2720,990 2720.0,964" fill="none" stroke="#A36C28" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2699.18798828125" y="1071.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2716.0" y="1087.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#A36C28">0..*</text>
+<rect x="2694.41796875" y="981.0" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2704.0" y="997.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#A36C28">1</text>
+<rect x="2668.203125" y="1027.0" width="63.59375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2700.0" y="1042.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#A36C28">titulaire</text>
+<polyline points="3130,1291.25 3100,1290 3100,1280 2940,1280 2920,1276.5" fill="none" stroke="#A36C28" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3085.878350950059" y="1263.0982155785812" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3102.690362668809" y="1279.0982155785812" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#A36C28">0..*</text>
+<rect x="2935.240736522324" y="1286.0871367635543" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2944.822767772324" y="1302.0871367635543" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#A36C28">1</text>
+<rect x="2974.72265625" y="1257.0" width="90.5546875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3020.0" y="1272.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#A36C28">portefeuille</text>
+<polyline points="3497.5,1025 3500,1000 3500,990 3520,990 3517.5,964" fill="none" stroke="#A36C28" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3499.3946874571975" y="987.7310181784563" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3516.2066991759475" y="1003.7310181784563" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#A36C28">0..*</text>
+<rect x="3486.403793545435" y="982.402851321116" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3504.253402920435" y="998.402851321116" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#A36C28">0..1</text>
+<rect x="3459.3046875" y="954.0" width="118.890625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3518.75" y="969.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#A36C28">rapprochement</text>
+<rect x="40" y="1470" width="2370" height="1040" rx="12" fill="#FFFFFF" stroke="#D4E0E5" stroke-width="1.5"/>
+<text x="64" y="1507" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="29.00" fill="#4B6296">05  Projets et analyses de recherche</text>
+<text x="64" y="1537" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="19.00" fill="#516878">L’institution définit le périmètre ; le chercheur remet une analyse versionnée.</text>
+<polyline points="302.5,1830 300,1800 300,1670 320,1670 320.0,1644" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="299.3074469772634" y="1789.7679910914835" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="316.1194586960134" y="1805.7679910914835" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="294.41796875" y="1661.0" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="304.0" y="1677.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="259.390625" y="1712.0" width="81.21875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="300.0" y="1727.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">institution</text>
+<polyline points="675,1955.0 650,1960 650,1950 550,1950 525,1953.5" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="627.5938711996934" y="1933.8019609728144" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="644.4058829184434" y="1949.8019609728144" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="545.3659031694317" y="1954.463328299826" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="554.9479344194317" y="1970.463328299826" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="573.99609375" y="1927.0" width="52.0078125" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="600.0" y="1942.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">projet</text>
+<polyline points="787.5,1820 790,1800 790,1670 780,1670 780.0,1644" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="790.0374068771665" y="1783.2007752054446" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="806.8494185959165" y="1799.2007752054446" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="754.41796875" y="1661.0" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="764.0" y="1677.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="750.09765625" y="1712.0" width="79.8046875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="790.0" y="1727.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">chercheur</text>
+<polyline points="1392.5,2000 1390,2020 550,2020 525,2015.25" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1356.3385696853334" y="2014.7992247945554" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1373.1505814040834" y="2030.7992247945554" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="539.9392830644675" y="2025.1952893102743" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="549.5213143144675" y="2041.1952893102743" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="943.99609375" y="1997.0" width="52.0078125" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="970.0" y="2012.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">projet</text>
+<polyline points="1617.5,1820 1620,1800 1620,1630 1600,1628.0" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1620.0374068771666" y="1783.2007752054446" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1636.8494185959166" y="1799.2007752054446" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="1616.6869505715438" y="1635.7066991759477" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1626.2689818215438" y="1651.7066991759477" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="1580.64453125" y="1692.0" width="78.7109375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1620.0" y="1707.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">périmètre</text>
+<polyline points="1920,1955.0 1900,1960 1900,2100 410,2100 413.75,2077" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1872.1434282765993" y="1935.268717498692" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1888.9554399953493" y="1951.268717498692" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="383.87076396610524" y="2091.0603966042167" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="393.45279521610524" y="2107.0603966042167" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="1128.99609375" y="2077.0" width="52.0078125" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1155.0" y="2092.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">projet</text>
+<polyline points="2032.5,1820 2030,1800 2060,1800 2060,1630 2030,1628.0" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2028.0914617401709" y="1779.2316636985902" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2044.9034734589209" y="1795.2316636985902" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="2047.291649001605" y="1634.8270948203715" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2056.873680251605" y="1650.8270948203715" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="2019.06640625" y="1692.0" width="81.8671875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2060.0" y="1707.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">document</text>
+<polyline points="675,2256.25 650,2260 300,2260 300,2100 302.5,2077" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="628.1243231540539" y="2233.580551036154" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="644.9363348728039" y="2249.580551036154" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="273.98600027937294" y="2092.1070980736504" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="283.56803152937294" y="2108.1070980736504" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="448.99609375" y="2237.0" width="52.0078125" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="475.0" y="2252.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">projet</text>
+<polyline points="1195,2256.25 1220,2260 1220,1630 980,1630 950,1628.0" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1203.5047589146784" y="2265.2265143279396" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1220.3167706334284" y="2281.2265143279396" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="967.2916490016046" y="1634.8270948203715" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="976.8736802516046" y="1650.8270948203715" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="1192.19921875" y="1922.0" width="55.6015625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1220.0" y="1937.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">auteur</text>
+<polyline points="675,2332.5 650,2330 650,2160 800,2160 805.0,2180" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="631.9190064597063" y="2302.7933008240525" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="648.7310181784563" y="2318.7933008240525" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="795.881673126308" y="2137.9554399953495" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="813.731282501308" y="2153.9554399953495" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..1</text>
+<rect x="605.13671875" y="2222.0" width="89.7265625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="650.0" y="2237.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">précédente</text>
+<polyline points="1730,2312.5 1700,2310 1700,2330 1220,2330 1195,2332.5" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1686.613434728053" y="2283.229994432177" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1703.425446446803" y="2299.229994432177" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="1214.8710695802158" y="2334.634490910772" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1224.4531008302158" y="2350.634490910772" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="1428.9453125" y="2307.0" width="62.109375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1460.0" y="2322.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">analyse</text>
+<polyline points="1890.0,2210 1890,1670 1630,1670 1630,1610 1620,1610 1600,1612.0" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1889.18798828125" y="2171.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1906.0" y="2187.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="1619.8710695802158" y="1614.1344909107718" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1629.4531008302158" y="1630.1344909107718" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">1</text>
+<rect x="1849.61328125" y="1917.0" width="80.7734375" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1890.0" y="1932.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">entreprise</text>
+<polyline points="2210.0,2210 2210,2180 2390,2180 2390,1560 1950,1560 1947.5,1580" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2209.18798828125" y="2171.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2226.0" y="2187.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="1948.9998092209166" y="1543.2007752054446" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1966.8494185959166" y="1559.2007752054446" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..1</text>
+<rect x="2343.03515625" y="1847.0" width="93.9296875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2390.0" y="1862.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">rapport figé</text>
+<polyline points="2050.0,2210 2050,2190 1880,2190 1880,1680 2050,1680 2050,1610 2100,1610 2120,1612.0" fill="none" stroke="#4B6296" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2049.18798828125" y="2171.0" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2066.0" y="2187.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..*</text>
+<rect x="2075.881408803456" y="1582.2933008240523" width="35.69921875" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2093.731018178456" y="1598.2933008240523" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#4B6296">0..1</text>
+<rect x="1840.73046875" y="1912.0" width="78.5390625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="1880.0" y="1927.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">score figé</text>
+<rect x="2440" y="1470" width="1220" height="1040" rx="12" fill="#FFFFFF" stroke="#D4E0E5" stroke-width="1.5"/>
+<text x="2464" y="1507" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="29.00" fill="#427D70">06  Collaboration et validation croisée</text>
+<text x="2464" y="1537" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="19.00" fill="#516878">Rattachements et jeux de référence propres au chercheur.</text>
+<polyline points="2732.5,1760 2730,1740 2730,1670 2720,1670 2720.0,1644" fill="none" stroke="#427D70" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2728.091461740171" y="1719.2316636985902" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2744.903473458921" y="1735.2316636985902" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">0..*</text>
+<rect x="2694.41796875" y="1661.0" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2704.0" y="1677.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">1</text>
+<rect x="2689.390625" y="1682.0" width="81.21875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="2730.0" y="1697.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">institution</text>
+<polyline points="2985,1823.75 3010,1820 3010,1630 3240,1630 3260,1628.0" fill="none" stroke="#427D70" stroke-width="2" stroke-linejoin="round"/>
+<rect x="2998.2516534084466" y="1824.4194489638458" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3015.0636651271966" y="1840.4194489638458" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">0..*</text>
+<rect x="3220.9648679197844" y="1603.8655090892282" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3230.5468991697844" y="1619.8655090892282" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">1</text>
+<rect x="3085.09765625" y="1607.0" width="79.8046875" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3125.0" y="1622.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">chercheur</text>
+<polyline points="3365.0,1760 3360,1740 3360,1670 3350,1670 3350.0,1644" fill="none" stroke="#427D70" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3356.9192707825578" y="1717.9554399953493" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3373.7312825013078" y="1733.9554399953493" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">0..*</text>
+<rect x="3324.41796875" y="1661.0" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3334.0" y="1677.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">1</text>
+<rect x="3332.19921875" y="1682.0" width="55.6015625" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3360.0" y="1697.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">auteur</text>
+<polyline points="3237.5,2180 3240,2160 3240,2090 3237.5,2065" fill="none" stroke="#427D70" stroke-width="2" stroke-linejoin="round"/>
+<rect x="3240.0374068771666" y="2143.2007752054446" width="33.6240234375" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3256.8494185959166" y="2159.2007752054446" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">0..*</text>
+<rect x="3214.783477839228" y="2083.4531008302156" width="19.1640625" height="24" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3224.365509089228" y="2099.4531008302156" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="17.00" fill="#427D70">1</text>
+<polygon points="3237.5,2065 3232.5248140489502,2075.547394216226 3239.49007438042,2084.9007438042 3244.46526033147,2074.3533495879738" fill="#427D70" stroke="#427D70" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="3214.30859375" y="2102.0" width="51.3828125" height="23" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="3240.0" y="2117.0" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">lignes</text>
+<rect x="80" y="265" width="420" height="255" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="80" y="265" width="5" height="255" rx="0" fill="#137866" stroke="#137866" stroke-width="1.5"/>
+<text x="98" y="290" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">« entity »</text>
+<text x="98" y="322" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">User</text>
+<polyline points="81,337 499,337" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="98" y="365" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="98" y="390" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">email : str</text>
+<text x="98" y="415" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">name : str?</text>
+<text x="98" y="440" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">role : Role</text>
+<text x="98" y="465" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">active : bool</text>
+<polyline points="81,482 499,482" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="98" y="506" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">role : 6 valeurs, aucune sous-classe métier</text>
+<rect x="700" y="265" width="465" height="330" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="700" y="265" width="5" height="330" rx="0" fill="#137866" stroke="#137866" stroke-width="1.5"/>
+<text x="718" y="290" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">« entity »</text>
+<text x="718" y="322" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">Company</text>
+<polyline points="701,337 1164,337" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="718" y="365" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="718" y="390" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">name : str</text>
+<text x="718" y="415" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">sector : str</text>
+<text x="718" y="440" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">country : str</text>
+<text x="718" y="465" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : RegistrationStatus</text>
+<text x="718" y="490" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">isin : str?</text>
+<text x="718" y="515" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">lei : str?</text>
+<text x="718" y="540" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">published_at : datetime?</text>
+<polyline points="701,557 1164,557" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="718" y="581" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">published_at distinct de status</text>
+<rect x="80" y="750" width="510" height="405" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="80" y="750" width="5" height="405" rx="0" fill="#137866" stroke="#137866" stroke-width="1.5"/>
+<text x="98" y="775" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">« entity »</text>
+<text x="98" y="807" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ESGReport</text>
+<polyline points="81,822 589,822" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="98" y="850" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="98" y="875" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">type : ReportType</text>
+<text x="98" y="900" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">channel : SubmissionChannel</text>
+<text x="98" y="925" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">fiscal_year : int?</text>
+<text x="98" y="950" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : ReportStatus</text>
+<text x="98" y="975" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">version : int</text>
+<text x="98" y="1000" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">submitted_at : datetime?</text>
+<text x="98" y="1025" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">source_file : str?</text>
+<text x="98" y="1050" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">official_score : float?</text>
+<text x="98" y="1075" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">revenue : Decimal?</text>
+<text x="98" y="1100" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">enterprise_value : Decimal?</text>
+<polyline points="81,1117 589,1117" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="98" y="1141" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">version précédente : 0..1 ; suivantes : 0..*</text>
+<rect x="700" y="690" width="465" height="255" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="700" y="690" width="5" height="255" rx="0" fill="#137866" stroke="#137866" stroke-width="1.5"/>
+<text x="718" y="715" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">« entity »</text>
+<text x="718" y="747" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ScoringConfig</text>
+<polyline points="701,762 1164,762" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="718" y="790" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="718" y="815" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">name : str</text>
+<text x="718" y="840" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">version : int</text>
+<text x="718" y="865" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">content_yaml : str?</text>
+<text x="718" y="890" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">content_hash : str?</text>
+<polyline points="701,907 1164,907" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="718" y="931" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">owner nul = configuration de référence</text>
+<rect x="700" y="1050" width="465" height="305" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="700" y="1050" width="5" height="305" rx="0" fill="#137866" stroke="#137866" stroke-width="1.5"/>
+<text x="718" y="1075" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">« entity »</text>
+<text x="718" y="1107" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">Score</text>
+<polyline points="701,1122 1164,1122" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="718" y="1150" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="718" y="1175" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">global_score : float</text>
+<text x="718" y="1200" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">environmental_score : float?</text>
+<text x="718" y="1225" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">social_score : float?</text>
+<text x="718" y="1250" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">governance_score : float?</text>
+<text x="718" y="1275" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">coverage_rate : float?</text>
+<text x="718" y="1300" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">computed_at : datetime</text>
+<polyline points="701,1317 1164,1317" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="718" y="1341" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#137866">{unique(report_id, config_id)}</text>
+<rect x="80" y="620" width="240" height="64" rx="5" fill="#F8FAFB" stroke="#137866" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="93" y="642" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="15.98" fill="#516878">« référence » · auditeur affecté</text>
+<text x="93" y="668" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#137866">User</text>
+<rect x="80" y="1280" width="310" height="64" rx="5" fill="#F8FAFB" stroke="#137866" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="93" y="1302" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · score déclaré</text>
+<text x="93" y="1328" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#137866">Evidence</text>
+<rect x="1630" y="265" width="380" height="64" rx="5" fill="#F8FAFB" stroke="#21698B" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1643" y="287" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="1643" y="313" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#21698B">ESGReport</text>
+<rect x="1280" y="430" width="460" height="247" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1280" y="430" width="5" height="247" rx="0" fill="#21698B" stroke="#21698B" stroke-width="1.5"/>
+<text x="1298" y="455" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">« entity »</text>
+<text x="1298" y="487" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ExtractionRun</text>
+<polyline points="1281,502 1739,502" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1298" y="530" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1298" y="555" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : ExtractionRunStatus</text>
+<text x="1298" y="580" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">started_at : datetime</text>
+<text x="1298" y="605" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">finished_at : datetime?</text>
+<text x="1298" y="630" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">llm_model : str</text>
+<text x="1298" y="655" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">prompt_version : str</text>
+<rect x="1900" y="430" width="465" height="230" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1900" y="430" width="5" height="230" rx="0" fill="#21698B" stroke="#21698B" stroke-width="1.5"/>
+<text x="1918" y="455" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">« entity »</text>
+<text x="1918" y="487" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">MetricCoverage</text>
+<polyline points="1901,502 2364,502" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1918" y="530" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1918" y="555" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">metric_code : str</text>
+<text x="1918" y="580" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : MetricCoverageStatus</text>
+<text x="1918" y="605" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">pages_examined : int</text>
+<polyline points="1901,622 2364,622" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1918" y="646" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">{unique(report_id, metric_code)}</text>
+<rect x="1280" y="745" width="460" height="330" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1280" y="745" width="5" height="330" rx="0" fill="#21698B" stroke="#21698B" stroke-width="1.5"/>
+<text x="1298" y="770" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">« entity »</text>
+<text x="1298" y="802" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ESGMetric</text>
+<polyline points="1281,817 1739,817" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1298" y="845" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1298" y="870" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">pillar : Pillar</text>
+<text x="1298" y="895" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">metric_code : str</text>
+<text x="1298" y="920" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">value : float</text>
+<text x="1298" y="945" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">unit : str</text>
+<text x="1298" y="970" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">method : DataMethod</text>
+<text x="1298" y="995" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">review_status : MetricReviewStatus</text>
+<text x="1298" y="1020" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">audited_value : float?</text>
+<polyline points="1281,1037 1739,1037" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1298" y="1061" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">{unique(report_id, metric_code)}</text>
+<rect x="1900" y="745" width="465" height="330" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1900" y="745" width="5" height="330" rx="0" fill="#21698B" stroke="#21698B" stroke-width="1.5"/>
+<text x="1918" y="770" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">« entity »</text>
+<text x="1918" y="802" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">CarbonEmission</text>
+<polyline points="1901,817 2364,817" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1918" y="845" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1918" y="870" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">scope : int</text>
+<text x="1918" y="895" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">tonnes_co2e : float</text>
+<text x="1918" y="920" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">year : int</text>
+<text x="1918" y="945" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">method : DataMethod</text>
+<text x="1918" y="970" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">pcaf_data_quality : int?</text>
+<text x="1918" y="995" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">review_status : MetricReviewStatus</text>
+<text x="1918" y="1020" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">audited_value : float?</text>
+<polyline points="1901,1037 2364,1037" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1918" y="1061" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">{scope ∈ 1..3 ; tonnes_co2e ≥ 0}</text>
+<rect x="1580" y="1150" width="510" height="280" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1580" y="1150" width="5" height="280" rx="0" fill="#21698B" stroke="#21698B" stroke-width="1.5"/>
+<text x="1598" y="1175" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">« entity »</text>
+<text x="1598" y="1207" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">Evidence</text>
+<polyline points="1581,1222 2089,1222" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1598" y="1250" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1598" y="1275" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">document_name : str</text>
+<text x="1598" y="1300" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">year : int</text>
+<text x="1598" y="1325" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">page_start : int</text>
+<text x="1598" y="1350" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">page_end : int</text>
+<text x="1598" y="1375" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">excerpt_pdf_path : str</text>
+<polyline points="1581,1392 2089,1392" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1598" y="1416" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#21698B">preuve réutilisable ; aucun report_id</text>
+<rect x="2480" y="270" width="230" height="64" rx="5" fill="#F8FAFB" stroke="#80599B" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="2493" y="292" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · auditeur</text>
+<text x="2493" y="318" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#80599B">User</text>
+<rect x="2790" y="270" width="270" height="64" rx="5" fill="#F8FAFB" stroke="#80599B" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="2803" y="292" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="2803" y="318" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#80599B">ESGReport</text>
+<rect x="3130" y="270" width="220" height="64" rx="5" fill="#F8FAFB" stroke="#80599B" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="3143" y="292" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="3143" y="318" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#80599B">ESGMetric</text>
+<rect x="3400" y="270" width="220" height="64" rx="5" fill="#F8FAFB" stroke="#80599B" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="3413" y="292" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="3413" y="318" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#80599B">CarbonEmission</text>
+<rect x="2480" y="465" width="440" height="197" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="2480" y="465" width="5" height="197" rx="0" fill="#80599B" stroke="#80599B" stroke-width="1.5"/>
+<text x="2498" y="490" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">« entity »</text>
+<text x="2498" y="522" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">AuditOpinion</text>
+<polyline points="2481,537 2919,537" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="2498" y="565" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="2498" y="590" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">decision : AuditDecision</text>
+<text x="2498" y="615" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">comment : str?</text>
+<text x="2498" y="640" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">submitted_at : datetime</text>
+<rect x="3130" y="445" width="490" height="280" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="3130" y="445" width="5" height="280" rx="0" fill="#80599B" stroke="#80599B" stroke-width="1.5"/>
+<text x="3148" y="470" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">« entity »</text>
+<text x="3148" y="502" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">MetricReview</text>
+<polyline points="3131,517 3619,517" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="3148" y="545" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="3148" y="570" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">decision : MetricReviewStatus</text>
+<text x="3148" y="595" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">original_value : float</text>
+<text x="3148" y="620" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">new_value : float?</text>
+<text x="3148" y="645" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">reason : ReviewReason?</text>
+<text x="3148" y="670" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">created_at : datetime</text>
+<polyline points="3131,687 3619,687" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="3148" y="711" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#80599B">{metric_id XOR emission_id} ; journal immuable</text>
+<rect x="2480" y="900" width="320" height="64" rx="5" fill="#F8FAFB" stroke="#A36C28" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="2493" y="922" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · investisseur</text>
+<text x="2493" y="948" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#A36C28">User</text>
+<rect x="3210" y="900" width="410" height="64" rx="5" fill="#F8FAFB" stroke="#A36C28" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="3223" y="922" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="3223" y="948" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#A36C28">Company</text>
+<rect x="2480" y="1110" width="440" height="222" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="2480" y="1110" width="5" height="222" rx="0" fill="#A36C28" stroke="#A36C28" stroke-width="1.5"/>
+<text x="2498" y="1135" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#A36C28">« entity »</text>
+<text x="2498" y="1167" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">Portfolio</text>
+<polyline points="2481,1182 2919,1182" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="2498" y="1210" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="2498" y="1235" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">name : str</text>
+<text x="2498" y="1260" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">reference_currency : Currency</text>
+<text x="2498" y="1285" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">archived : bool</text>
+<text x="2498" y="1310" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">created_at : datetime</text>
+<rect x="3130" y="1025" width="490" height="355" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="3130" y="1025" width="5" height="355" rx="0" fill="#A36C28" stroke="#A36C28" stroke-width="1.5"/>
+<text x="3148" y="1050" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#A36C28">« entity »</text>
+<text x="3148" y="1082" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">PortfolioPosition</text>
+<polyline points="3131,1097 3619,1097" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="3148" y="1125" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="3148" y="1150" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">outstanding_amount : Decimal</text>
+<text x="3148" y="1175" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">currency : Currency</text>
+<text x="3148" y="1200" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">converted_amount : Decimal</text>
+<text x="3148" y="1225" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">weight : Decimal?</text>
+<text x="3148" y="1250" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">match_status : MatchStatus</text>
+<text x="3148" y="1275" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">duration_type : DurationType</text>
+<text x="3148" y="1300" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">start_date : datetime</text>
+<text x="3148" y="1325" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">end_date : datetime?</text>
+<polyline points="3131,1342 3619,1342" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="3148" y="1366" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#A36C28">{company_id présent ⇔ MATCHED}</text>
+<rect x="80" y="1580" width="320" height="64" rx="5" fill="#F8FAFB" stroke="#4B6296" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="93" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · institution</text>
+<text x="93" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#4B6296">User</text>
+<rect x="610" y="1580" width="340" height="64" rx="5" fill="#F8FAFB" stroke="#4B6296" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="623" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · chercheur</text>
+<text x="623" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#4B6296">User</text>
+<rect x="1260" y="1580" width="340" height="64" rx="5" fill="#F8FAFB" stroke="#4B6296" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1273" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="1273" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#4B6296">Company</text>
+<rect x="1700" y="1580" width="330" height="64" rx="5" fill="#F8FAFB" stroke="#4B6296" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1713" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="1713" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#4B6296">ESGReport</text>
+<rect x="2120" y="1580" width="250" height="64" rx="5" fill="#F8FAFB" stroke="#4B6296" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="2133" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence »</text>
+<text x="2133" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#4B6296">Score</text>
+<rect x="80" y="1830" width="445" height="247" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="80" y="1830" width="5" height="247" rx="0" fill="#4B6296" stroke="#4B6296" stroke-width="1.5"/>
+<text x="98" y="1855" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">« entity »</text>
+<text x="98" y="1887" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">Project</text>
+<polyline points="81,1902 524,1902" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="98" y="1930" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="98" y="1955" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">name : str</text>
+<text x="98" y="1980" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">objective : str?</text>
+<text x="98" y="2005" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : ProjectStatus</text>
+<text x="98" y="2030" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">deadline : datetime?</text>
+<text x="98" y="2055" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">closed_at : datetime?</text>
+<rect x="675" y="1820" width="450" height="180" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="675" y="1820" width="5" height="180" rx="0" fill="#4B6296" stroke="#4B6296" stroke-width="1.5"/>
+<text x="693" y="1845" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">« entity »</text>
+<text x="693" y="1877" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ProjectAssignment</text>
+<polyline points="676,1892 1124,1892" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="693" y="1920" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="693" y="1945" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">assigned_at : datetime</text>
+<polyline points="676,1962 1124,1962" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="693" y="1986" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">{unique(project_id, researcher_id)}</text>
+<rect x="1280" y="1820" width="450" height="180" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1280" y="1820" width="5" height="180" rx="0" fill="#4B6296" stroke="#4B6296" stroke-width="1.5"/>
+<text x="1298" y="1845" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">« entity »</text>
+<text x="1298" y="1877" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ProjectCompany</text>
+<polyline points="1281,1892 1729,1892" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1298" y="1920" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1298" y="1945" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">added_at : datetime</text>
+<polyline points="1281,1962 1729,1962" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1298" y="1986" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">{unique(project_id, company_id)}</text>
+<rect x="1920" y="1820" width="450" height="180" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1920" y="1820" width="5" height="180" rx="0" fill="#4B6296" stroke="#4B6296" stroke-width="1.5"/>
+<text x="1938" y="1845" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">« entity »</text>
+<text x="1938" y="1877" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ProjectDocument</text>
+<polyline points="1921,1892 2369,1892" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1938" y="1920" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1938" y="1945" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">added_at : datetime</text>
+<polyline points="1921,1962 2369,1962" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1938" y="1986" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">{unique(project_id, report_id)}</text>
+<rect x="675" y="2180" width="520" height="305" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="675" y="2180" width="5" height="305" rx="0" fill="#4B6296" stroke="#4B6296" stroke-width="1.5"/>
+<text x="693" y="2205" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">« entity »</text>
+<text x="693" y="2237" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">Analysis</text>
+<polyline points="676,2252 1194,2252" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="693" y="2280" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="693" y="2305" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">title : str</text>
+<text x="693" y="2330" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">content : str</text>
+<text x="693" y="2355" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : AnalysisStatus</text>
+<text x="693" y="2380" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">version : int</text>
+<text x="693" y="2405" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">submitted_at : datetime?</text>
+<text x="693" y="2430" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">institution_comment : str?</text>
+<polyline points="676,2447 1194,2447" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="693" y="2471" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">version précédente : 0..1 ; suivantes : 0..*</text>
+<rect x="1730" y="2210" width="640" height="205" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="1730" y="2210" width="5" height="205" rx="0" fill="#4B6296" stroke="#4B6296" stroke-width="1.5"/>
+<text x="1748" y="2235" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">« entity »</text>
+<text x="1748" y="2267" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">AnalysisCompany</text>
+<polyline points="1731,2282 2369,2282" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="1748" y="2310" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="1748" y="2335" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">report_id : UUID? {FK}</text>
+<text x="1748" y="2360" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">score_id : UUID? {FK}</text>
+<polyline points="1731,2377 2369,2377" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="1748" y="2401" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#4B6296">{unique(analysis_id, company_id)} ; sources figées</text>
+<rect x="2480" y="1580" width="320" height="64" rx="5" fill="#F8FAFB" stroke="#427D70" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="2493" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · institution</text>
+<text x="2493" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#427D70">User</text>
+<rect x="3260" y="1580" width="360" height="64" rx="5" fill="#F8FAFB" stroke="#427D70" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="3273" y="1602" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#516878">« référence » · chercheur</text>
+<text x="3273" y="1628" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="24.00" fill="#427D70">User</text>
+<rect x="2480" y="1760" width="505" height="255" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="2480" y="1760" width="5" height="255" rx="0" fill="#427D70" stroke="#427D70" stroke-width="1.5"/>
+<text x="2498" y="1785" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">« entity »</text>
+<text x="2498" y="1817" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ResearcherAffiliation</text>
+<polyline points="2481,1832 2984,1832" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="2498" y="1860" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="2498" y="1885" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">status : AffiliationStatus</text>
+<text x="2498" y="1910" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">invited_at : datetime</text>
+<text x="2498" y="1935" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">responded_at : datetime?</text>
+<text x="2498" y="1960" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">collaboration_terms : str?</text>
+<polyline points="2481,1977 2984,1977" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="2498" y="2001" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">{unique(researcher_id, institution_id)}</text>
+<rect x="3110" y="1760" width="510" height="305" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="3110" y="1760" width="5" height="305" rx="0" fill="#427D70" stroke="#427D70" stroke-width="1.5"/>
+<text x="3128" y="1785" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">« entity »</text>
+<text x="3128" y="1817" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ReferenceDataset</text>
+<polyline points="3111,1832 3619,1832" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="3128" y="1860" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="3128" y="1885" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">name : str</text>
+<text x="3128" y="1910" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">source_url : str</text>
+<text x="3128" y="1935" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">licence : str</text>
+<text x="3128" y="1960" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">scale_min : float</text>
+<text x="3128" y="1985" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">scale_max : float</text>
+<text x="3128" y="2010" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">higher_is_better : bool</text>
+<polyline points="3111,2027 3619,2027" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="3128" y="2051" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">{scale_max &gt; scale_min}</text>
+<rect x="3110" y="2180" width="510" height="330" rx="5" fill="#FFFFFF" stroke="#CDDADF" stroke-width="1.5"/>
+<rect x="3110" y="2180" width="5" height="330" rx="0" fill="#427D70" stroke="#427D70" stroke-width="1.5"/>
+<text x="3128" y="2205" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">« entity »</text>
+<text x="3128" y="2237" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="28.00" fill="#173347">ReferenceDatasetRow</text>
+<polyline points="3111,2252 3619,2252" fill="none" stroke="#CDDADF" stroke-width="1" stroke-linejoin="round"/>
+<text x="3128" y="2280" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">id : UUID {PK}</text>
+<text x="3128" y="2305" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">line_number : int</text>
+<text x="3128" y="2330" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">isin : str?</text>
+<text x="3128" y="2355" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">lei : str?</text>
+<text x="3128" y="2380" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">environmental_score : float?</text>
+<text x="3128" y="2405" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">social_score : float?</text>
+<text x="3128" y="2430" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">governance_score : float?</text>
+<text x="3128" y="2455" text-anchor="start" font-family="Consolas,monospace" font-weight="400" font-size="20.00" fill="#173347">total_score : float?</text>
+<polyline points="3111,2472 3619,2472" fill="none" stroke="#E0E9ED" stroke-width="1" stroke-linejoin="round"/>
+<text x="3128" y="2496" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="16.00" fill="#427D70">{isin ou lei obligatoire}</text>
+<rect x="40" y="2545" width="3620" height="255" rx="10" fill="#E6EEF1" stroke="#E6EEF1" stroke-width="1.5"/>
+<text x="65" y="2585" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="21.00" fill="#173347">CONVENTIONS DE LECTURE</text>
+<text x="65" y="2625" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="20.00" fill="#516878">Trait plein : association. Multiplicités à chaque extrémité : 1 obligatoire · 0..1 optionnel · 0..* multiple. Losange plein : composition (lignes d’un jeu de référence).</text>
+<text x="65" y="2654" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="20.00" fill="#516878">Cadre pointillé « référence » : même classe répétée pour garder des liens courts ; aucune nouvelle classe. Les six cadres sont des regroupements de lecture.</text>
+<text x="65" y="2683" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="20.00" fill="#516878">Attributs : noms et types réels ; ? = nullable ; {PK} = identifiant ; {FK} = clé étrangère. Les autres FK sont matérialisées par les associations (table complète dans la traçabilité).</text>
+<text x="65" y="2712" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="20.00" fill="#516878">Toutes les entités héritent de SQLModel ; aucun héritage métier. Les opérations de dépôt, audit et calcul sont des fonctions de services, pas des méthodes de ces entités.</text>
+<text x="65" y="2741" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="20.00" fill="#516878">Cardinalités du schéma déclaré : Company.owner_user_id non unique (malgré User.company scalaire). Analysis exige ≥ 1 entreprise à la création via le service.</text>
+<text x="65" y="2770" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="20.00" fill="#516878">Vue de synthèse : 23 / 31 classes persistantes ; 8 classes complémentaires dans l’audit. Source : modèles SQLModel + migrations + services ; base en exécution non inspectée.</text>
+<text x="45" y="2830" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="18.00" fill="#516878">UML-01  •  Sources, contraintes et écarts : 02_audit_modele_reel.md / 03_tracabilite_classes.md</text>
+<text x="3655" y="2830" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-weight="400" font-size="18.00" fill="#516878">SVG et PDF vectoriels • agrandir par domaine pour la soutenance</text>
+</svg>
