@@ -24,6 +24,7 @@ os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -57,6 +58,8 @@ from app.ingestion.etat_extraction import (
 )
 from app.ingestion.llm.base import ErreurLLMTransitoire, QuotaLLMEpuise
 from app.ingestion.llm.openai_compat import FournisseurOpenAICompat
+from app.ingestion.lots import DocumentTropLong
+from app.ingestion.memoire import pic_memoire_mo
 from app.ingestion.models import (
     CarbonEmission,
     ESGMetric,
@@ -269,15 +272,41 @@ def _iter_page_chunks(doc: DoclingDocument, max_chars: int = 1200) -> list[dict]
     return chunks
 
 
+class IndexIncremental:
+    """Index sémantique alimenté document par document (un lot de pages à la fois) : seuls les
+    textes des chunks et leurs vecteurs restent en mémoire, jamais les documents Docling — ce
+    qui borne la mémoire d'un rapport de plusieurs centaines de pages (conversion par lots)."""
+
+    def __init__(self, embed_model: BGEM3FlagModel) -> None:
+        self._embed_model = embed_model
+        self.chunks: list[dict] = []
+        self._index: faiss.IndexFlatIP | None = None
+
+    def ajouter(self, doc: DoclingDocument) -> int:
+        chunks = _iter_page_chunks(doc)
+        if chunks:
+            vecteurs = self._encoder([c["text"] for c in chunks])
+            if self._index is None:
+                self._index = faiss.IndexFlatIP(vecteurs.shape[1])
+            self._index.add(vecteurs)
+            self.chunks.extend(chunks)
+        return len(chunks)
+
+    def en_dictionnaire(self) -> dict:
+        if self._index is None:  # aucun texte exploitable : index vide de la bonne dimension
+            self._index = faiss.IndexFlatIP(self._encoder(["vide"]).shape[1])
+        return {"chunks": self.chunks, "index": self._index}
+
+    def _encoder(self, textes: list[str]) -> np.ndarray:
+        vecteurs = np.asarray(self._embed_model.encode(textes, batch_size=8)["dense_vecs"], dtype="float32")
+        faiss.normalize_L2(vecteurs)
+        return vecteurs
+
+
 def _build_search_index(doc: DoclingDocument) -> dict:
-    chunks = _iter_page_chunks(doc)
-    embed_model = _get_embed_model()
-    embeddings = embed_model.encode([c["text"] for c in chunks], batch_size=8)["dense_vecs"]
-    embeddings = np.asarray(embeddings, dtype="float32")
-    faiss.normalize_L2(embeddings)
-    index = faiss.IndexFlatIP(embeddings.shape[1])
-    index.add(embeddings)
-    return {"chunks": chunks, "index": index}
+    index = IndexIncremental(_get_embed_model())
+    index.ajouter(doc)
+    return index.en_dictionnaire()
 
 
 def _search_all_chunks(
@@ -614,7 +643,7 @@ def _indicateur_trouve(extraction: ExtractionEntreprise, code: str) -> bool:
 
 def _deduire_pages_manquantes(
     extraction: ExtractionEntreprise,
-    document: Any,
+    document_de_la_page: Callable[[int], Any],
     pages_vues_par_code: dict[str, set[int]],
     rapport_id: uuid.UUID,
 ) -> ExtractionEntreprise:
@@ -630,7 +659,7 @@ def _deduire_pages_manquantes(
             for page in sorted(pages_vues_par_code.get(indicateur.code, set())):
                 try:
                     boites = localisation.localiser(
-                        document,
+                        document_de_la_page(page),
                         page,
                         citation=indicateur.citation_source,
                         valeur_brute=indicateur.valeur_brute,
@@ -782,7 +811,10 @@ def _extraction_demo_synthetique(*, nom_entreprise: str, codes: list[str]) -> Ex
 
 
 def _boites_de_la_valeur(
-    document: Any, page: int, indicateur: IndicateurExtrait, rapport_id: uuid.UUID
+    document_de_la_page: Callable[[int], Any],
+    page: int,
+    indicateur: IndicateurExtrait,
+    rapport_id: uuid.UUID,
 ) -> list[dict]:
     """Best-effort : une localisation impossible laisse la valeur sans surlignage, elle ne fait
     jamais échouer l'extraction (la page reste la preuve)."""
@@ -790,7 +822,7 @@ def _boites_de_la_valeur(
         return [
             boite.en_dict()
             for boite in localisation.localiser(
-                document,
+                document_de_la_page(page),
                 page,
                 citation=indicateur.citation_source,
                 valeur_brute=indicateur.valeur_brute,
@@ -891,22 +923,45 @@ def run_extraction_pipeline(
 
             etape = "docling_conversion_echouee"
             logger.info("docling_conversion_demarree", rapport_id=str(rapport_id))
-            conversion = docling_pipeline.convert_pdf(source_path)
-            docling_json_path = storage.resolve_path(f"docling_json/{rapport_id}.json")
-            docling_pipeline.persist_docling_json(conversion.document, docling_json_path)
+            embed_model = _get_embed_model()
+            index = IndexIncremental(embed_model)
+
+            def indexer(document: DoclingDocument) -> None:
+                try:
+                    index.ajouter(document)
+                except Exception as exc:
+                    _marquer_etape(exc, "indexation_semantique_echouee")
+                    raise
+
+            # Lot par lot (app/ingestion/lots.py) : un lot converti est indexé puis relâché, un lot
+            # déjà converti par une exécution interrompue est repris depuis son JSON.
+            settings = get_settings()
+            try:
+                conversion = docling_pipeline.convertir_rapport(
+                    source_path,
+                    storage.resolve_path(f"docling_json/{rapport_id}"),
+                    taille=settings.extraction_pages_par_lot,
+                    pages_max=settings.extraction_pages_max,
+                    threads=settings.extraction_threads,
+                    indexer=indexer,
+                )
+            except DocumentTropLong as exc:
+                _marquer_etape(exc, "document_trop_long")
+                raise
             logger.info(
                 "docling_conversion_terminee",
                 rapport_id=str(rapport_id),
                 elapsed_s=conversion.elapsed_s,
-                pages=conversion.pages_docling,
+                pages=conversion.pages_total,
+                pages_ocr=conversion.pages_ocr,
             )
 
             etape = "indexation_semantique_echouee"
-            search_index = _build_search_index(conversion.document)
-            embed_model = _get_embed_model()
+            search_index = index.en_dictionnaire()
             codes = [cible.code for cible in INDICATEURS_CIBLES]
 
             etape = "appel_llm_echoue"
+            debut_llm = time.monotonic()
             if demo:
                 _context, pages_used, pages_par_code = _build_context(
                     search_index, embed_model, codes, CONTEXT_TOKEN_BUDGET
@@ -936,7 +991,10 @@ def run_extraction_pipeline(
                     if execution_en_cours is not None:
                         execution_en_cours.llm_model = modele
                         session.add(execution_en_cours)
-            logger.info("extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo)
+            duree_llm_s = round(time.monotonic() - debut_llm, 1)
+            logger.info(
+                "extraction_llm_terminee", rapport_id=str(rapport_id), demo=demo, duree_s=duree_llm_s
+            )
 
             etape = "persistance_echouee"
             # Purge des données dérivées d'une extraction précédente sur ce même rapport, pour que
@@ -978,7 +1036,7 @@ def run_extraction_pipeline(
             session.flush()
 
             extraction = _deduire_pages_manquantes(
-                extraction, conversion.document, pages_vues_par_code, rapport_id
+                extraction, conversion.document_de_la_page, pages_vues_par_code, rapport_id
             )
             cibles_par_code = {cible.code: cible for cible in INDICATEURS_CIBLES}
             preuves_par_page: dict[int, Evidence] = {}
@@ -1017,7 +1075,7 @@ def run_extraction_pipeline(
                         source_pdf_path=source_path,
                         nom_document=nom_document,
                         annee=annee_reporting,
-                        nombre_pages_total=conversion.pages_docling,
+                        nombre_pages_total=conversion.pages_total,
                         page=page,
                         rapport_id=rapport_id,
                     )
@@ -1026,7 +1084,9 @@ def run_extraction_pipeline(
                     preuves_par_page[page] = preuve
                 preuve = preuves_par_page[page]
                 # Où la valeur se lit sur la page (surlignage de l'espace Auditeur, tâche 5.7).
-                boites = _boites_de_la_valeur(conversion.document, page, indicateur, rapport_id)
+                boites = _boites_de_la_valeur(
+                    conversion.document_de_la_page, page, indicateur, rapport_id
+                )
 
                 if cible.cible == "donnee_carbone":
                     assert cible.scope is not None  # invariant garanti par INDICATEURS_CIBLES
@@ -1105,6 +1165,11 @@ def run_extraction_pipeline(
             assert execution_reussie is not None  # créée et commitée plus haut
             execution_reussie.status = ExtractionRunStatus.SUCCEEDED
             execution_reussie.finished_at = rapport.extraction_finished_at
+            execution_reussie.pages = conversion.pages_total
+            execution_reussie.pages_ocr = conversion.pages_ocr
+            execution_reussie.duree_conversion_s = conversion.elapsed_s
+            execution_reussie.duree_llm_s = duree_llm_s
+            execution_reussie.pic_memoire_mo = pic_memoire_mo()
             session.add(execution_reussie)
 
             if brouillon:

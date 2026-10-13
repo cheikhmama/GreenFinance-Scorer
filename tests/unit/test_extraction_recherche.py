@@ -299,3 +299,30 @@ def test_appel_llm_sans_appel_d_outil_est_une_erreur_explicite(monkeypatch) -> N
 
     with pytest.raises(ValueError, match="aucun appel"):
         extractor._call_llm_extraction(nom_entreprise="A", context="c", codes=["scope_1"])
+
+
+# --- index incrémental (conversion par lots) --------------------------------------------------------
+
+
+def test_index_incremental_equivaut_a_l_index_du_document_entier(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lot après lot, sans jamais garder les documents Docling : mêmes chunks, même classement
+    qu'un index construit d'un coup sur le rapport entier."""
+    monkeypatch.setattr(extractor, "_get_embed_model", lambda: _EncodeurMots())
+    lot_1 = _Document(texts=[_texte(1, "Message du président"), _texte(2, "Scope 1 emissions 1200 tCO2e")])
+    lot_2 = _Document(
+        texts=[_texte(3, "Women on the board 40 percent")],
+        tables=[_Tableau("| Scope 2 | 300 tCO2e |", [_Provenance(4)])],
+    )
+    entier = _Document(texts=lot_1.texts + lot_2.texts, tables=lot_2.tables)
+
+    incremental = extractor.IndexIncremental(_EncodeurMots())
+    assert incremental.ajouter(lot_1) == 2  # type: ignore[arg-type]
+    assert incremental.ajouter(lot_2) == 2  # type: ignore[arg-type]
+    index_lots = incremental.en_dictionnaire()
+    index_entier = extractor._build_search_index(entier)  # type: ignore[arg-type]
+
+    assert index_lots["chunks"] == index_entier["chunks"]
+    requete = extractor.REQUETES_PAR_CODE["scope_1"]
+    assert extractor._search_all_chunks(index_lots, _EncodeurMots(), requete) == (
+        extractor._search_all_chunks(index_entier, _EncodeurMots(), requete)
+    )

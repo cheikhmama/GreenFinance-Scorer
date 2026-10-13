@@ -155,7 +155,7 @@ def test_echec_de_lanalyse_ramene_le_brouillon_et_bloque_la_soumission(
     def _echec(*_args, **_kwargs):
         raise RuntimeError("docling indisponible pour ce test")
 
-    monkeypatch.setattr("app.ingestion.extractor.docling_pipeline.convert_pdf", _echec)
+    monkeypatch.setattr("app.ingestion.extractor.docling_pipeline.convertir_rapport", _echec)
 
     run_extraction_pipeline(uuid.UUID(rapport_id), 2024)
 

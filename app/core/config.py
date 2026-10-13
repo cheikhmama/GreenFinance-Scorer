@@ -48,7 +48,13 @@ class Settings(BaseSettings):
     # compte comme "bloqué" (traitement probablement interrompu) plutôt que "encore en cours" —
     # même principe de configuration que sla_audit_jours. Docling seul a pris ~9 min sur un rapport
     # de 25 pages (mesuré Phase 5) ; généreux pour éviter un faux positif sur un long rapport.
-    extraction_timeout_minutes: int = 60
+    extraction_timeout_minutes: int = 180
+    # Conversion par lots (app/ingestion/lots.py) : pages par lot — le pic mémoire du worker en
+    # dépend, pas la longueur du rapport —, plafond de pages refusé avant toute conversion, et
+    # threads CPU de Docling/ONNX/torch (à aligner sur la limite cpus du conteneur).
+    extraction_pages_par_lot: int = Field(default=20, ge=1, le=200)
+    extraction_pages_max: int = Field(default=600, ge=1)
+    extraction_threads: int = Field(default=3, ge=1, le=64)
     # Contrôle KYC d'une inscription (tâche 5.3) : fiche LEI publique de la GLEIF. Délai court —
     # l'Administrateur attend la réponse ; GLEIF indisponible donne « non vérifiable », jamais une
     # erreur ni un blocage de la décision.
