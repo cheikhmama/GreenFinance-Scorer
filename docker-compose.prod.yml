@@ -1,44 +1,107 @@
-# Production (tâche 4.2) :
+# Production (tâche 4.2) — dimensionnée pour une VM ARM Oracle Cloud Always Free
+# (4 OCPU, 24 Go ; voir docs/DEPLOIEMENT_ORACLE.md) :
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # POSTGRES_PASSWORD et REDIS_PASSWORD sont obligatoires (environnement ou .env du déploiement) :
-# sans eux, la commande échoue avant de démarrer quoi que ce soit. Seule l'API publie un port —
-# derrière le reverse proxy, qui doit aussi figurer dans FORWARDED_ALLOW_IPS. Postgres et Redis ne
-# sont joignables que sur le réseau Docker. La base de données de .env (DATABASE_URL, REDIS_URL)
-# est remplacée ici pour pointer sur ces services avec leurs mots de passe.
+# sans eux, la commande échoue avant de démarrer quoi que ce soit. Seul Caddy publie des ports
+# (80/443) : il sert le frontend et relaie /api vers l'API, joignable uniquement sur le réseau
+# Docker, comme Postgres et Redis. La base de données de .env (DATABASE_URL, REDIS_URL) est
+# remplacée ici pour pointer sur ces services avec leurs mots de passe.
+#
+# Budget mémoire (≈ 16 Go en régime établi, le reste pour le système et le cache disque) :
+#   db 2g · redis 256m · api 768m · worker 768m · worker-extraction 12g · caddy 128m.
+# Le pic du worker d'extraction dépend de la taille d'un lot (EXTRACTION_PAGES_PAR_LOT), pas de la
+# longueur du rapport ; chaque exécution enregistre le sien (ExtractionRun.pic_memoire_mo).
 
 x-environnement-prod: &environnement-prod
   DATABASE_URL: postgresql+psycopg://greenfinance:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}@db:5432/greenfinance
   REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD requis}@redis:6379/0
   ENVIRONMENT: production
+  # Seul Caddy atteint l'API (aucun port publié) : ses en-têtes X-Forwarded-* font foi.
+  FORWARDED_ALLOW_IPS: "*"
 
 services:
   migrate:
     environment: *environnement-prod
 
   api:
-    ports:
-      - "8000:8000"
+    command:
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--workers", "2"]
     environment: *environnement-prod
     restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   worker:
     environment: *environnement-prod
     restart: unless-stopped
+    mem_limit: 768m
+    cpus: 0.5
 
   worker-extraction:
-    environment: *environnement-prod
+    environment:
+      <<: *environnement-prod
+      # Threads de calcul alignés sur cpus : au-delà, Docling, ONNX Runtime et torch se disputent
+      # les cœurs sans aller plus vite, et chaque thread ajoute ses tampons mémoire.
+      EXTRACTION_THREADS: "3"
+      OMP_NUM_THREADS: "3"
+      MKL_NUM_THREADS: "3"
+      TOKENIZERS_PARALLELISM: "false"
+      EXTRACTION_PAGES_PAR_LOT: "20"
     restart: unless-stopped
+    mem_limit: 12g
+    memswap_limit: 14g
+    cpus: 3
+
+  caddy:
+    build:
+      context: ./frontend
+    environment:
+      DOMAINE: ${DOMAINE:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
 
   db:
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "work_mem=16MB"]
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
     restart: unless-stopped
+    mem_limit: 2g
+    cpus: 1
 
   redis:
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD requis}"]
+    command:
+      [
+        "redis-server",
+        "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD requis}",
+        # File de jobs arq : jamais d'éviction silencieuse d'un job, une erreur à la place.
+        "--maxmemory", "200mb",
+        "--maxmemory-policy", "noeviction",
+      ]
     environment:
       # Lu par redis-cli (healthcheck) : le mot de passe n'apparaît pas dans la commande.
       REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD requis}
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.25
+
+volumes:
+  caddy_data:
+  caddy_config:

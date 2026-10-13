@@ -35,6 +35,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Téléchargés une fois, à la construction : le worker démarre hors ligne, sans dossier de cache à
 # écrire et sans dépendre de Hugging Face au premier rapport (voir app/ingestion/modeles.py).
 FROM construction-worker AS modeles
+# Mêmes bibliothèques système que l'image worker : le téléchargement des modèles OCR importe
+# OpenCV (cv2), qui en a besoin dès l'import.
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
 ENV PATH="/opt/venv/bin:$PATH" \
     HF_HOME=/opt/modeles/hf
 COPY app ./app
