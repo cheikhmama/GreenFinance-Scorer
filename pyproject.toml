@@ -40,11 +40,10 @@ dependencies = [
 # elle, sur l'image légère. Installée par défaut en local (tests, mypy), voir default-groups.
 extraction = [
     "docling",
-    "paddlepaddle",
-    "paddleocr",
     "faiss-cpu",
     "FlagEmbedding",
     "google-genai",
+    "onnxruntime>=1.31.0",
     "torch",
     "torchvision",
 ]

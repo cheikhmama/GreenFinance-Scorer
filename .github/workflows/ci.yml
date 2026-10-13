@@ -119,3 +119,41 @@ jobs:
           present = [m for m in ('pytest', 'mypy', 'torch', 'docling') if u.find_spec(m)]
           assert not present, present
           "
+
+  image-worker-arm64:
+    # Hôte cible : VM ARM Oracle Always Free. Construit l'image worker pour linux/arm64 (QEMU) et
+    # vérifie que la pile d'extraction s'importe et que les modèles sont intégrés à l'image : une
+    # dépendance sans roue aarch64 (ex. paddlepaddle, retiré pour cette raison) casse ce job, pas
+    # le déploiement. Lent (émulation, plusieurs Go de modèles) : cache GitHub Actions.
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build worker image (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          platforms: linux/arm64
+          tags: greenfinance-worker:arm64-ci
+          load: true
+          cache-from: type=gha,scope=worker-arm64
+          cache-to: type=gha,mode=max,scope=worker-arm64
+
+      - name: Extraction stack imports, models baked in, offline
+        run: |
+          docker run --rm --platform linux/arm64 --entrypoint python greenfinance-worker:arm64-ci -c "
+          import os, pathlib
+          import docling, onnxruntime, faiss, FlagEmbedding
+          assert os.environ['HF_HUB_OFFLINE'] == '1'
+          assert any(pathlib.Path('/opt/modeles/docling').iterdir())
+          assert any(pathlib.Path('/opt/modeles/hf/hub').glob('models--BAAI--bge-m3'))
+          "

@@ -41,16 +41,20 @@ class ConversionResult:
     elapsed_s: float
 
 
+def options_pipeline() -> PdfPipelineOptions:
+    """OCR RapidOCR sur le moteur ONNX Runtime (mêmes modèles PP-OCR qu'avec Paddle) :
+    paddlepaddle n'a pas de roue Linux aarch64, ce qui empêchait de construire l'image worker sur
+    l'hôte ARM visé (Oracle Always Free), alors qu'onnxruntime en a une."""
+    return PdfPipelineOptions(do_ocr=True, ocr_options=RapidOcrOptions(backend="onnxruntime"))
+
+
 @lru_cache
 def _get_converter() -> DocumentConverter:
-    """Backend OCR "PaddleOCR" via RapidOcrOptions(backend="paddle") — Docling ne l'expose pas comme
-    classe dédiée, seulement via ce frontal RapidOCR/moteur Paddle. Construit une seule fois par
-    processus (chargement de modèles coûteux) ; lazy (pas au niveau module) pour ne pas alourdir le
-    démarrage de l'API pour les requêtes qui ne touchent jamais l'ingestion."""
-    ocr_options = RapidOcrOptions(backend="paddle")
-    pipeline_options = PdfPipelineOptions(do_ocr=True, ocr_options=ocr_options)
+    """Construit une seule fois par processus (chargement de modèles coûteux) ; lazy (pas au niveau
+    module) pour ne pas alourdir le démarrage de l'API pour les requêtes qui ne touchent jamais
+    l'ingestion."""
     return DocumentConverter(
-        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
+        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options_pipeline())}
     )
 
 

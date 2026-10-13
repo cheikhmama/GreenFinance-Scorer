@@ -283,7 +283,7 @@ def test_ni_l_api_ni_le_worker_par_defaut_ne_chargent_la_pile_d_extraction() -> 
     code = (
         "import sys, app.main, app.worker.settings; "
         "print(sorted(m for m in ('torch', 'torchvision', 'docling', 'FlagEmbedding', 'faiss', "
-        "'paddle', 'paddleocr', 'google.genai', 'app.ingestion.extractor') if m in sys.modules))"
+        "'onnxruntime', 'google.genai', 'app.ingestion.extractor') if m in sys.modules))"
     )
     sortie = subprocess.run(
         [sys.executable, "-c", code],
