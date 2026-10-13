@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
 import type {
   EntreprisePublieePublic,
   PositionDetail,
@@ -51,11 +52,11 @@ import {
   TYPES_DUREE,
 } from "../schemas";
 import { EntrepriseCombobox } from "./EntrepriseCombobox";
-import { ImportPositionsForm } from "./ImportPositionsForm";
 import { PortfolioCarbonCard } from "./PortfolioCarbonCard";
 
 export function PortfolioDetailPage() {
-  const { portefeuilleId = "" } = useParams();
+  const { portefeuilleId: segment = "" } = useParams();
+  const portefeuilleId = idDepuisSlug(segment);
   const navigate = useNavigate();
   const { data: portefeuille, isLoading, isError } = usePortfolioDetail(portefeuilleId);
   const archiver = useArchivePortfolio(portefeuilleId);
@@ -181,10 +182,7 @@ export function PortfolioDetailPage() {
                 Ce portefeuille ne contient encore aucune position.
               </p>
               {!portefeuille.archived ? (
-                <>
-                  <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
-                  <ImportPositionsForm portefeuilleId={portefeuille.id} />
-                </>
+                <Button onClick={() => setAjoutOuvert(true)}>Créer une position</Button>
               ) : null}
             </div>
           ) : (
@@ -262,7 +260,9 @@ export function PortfolioDetailPage() {
                         <div className="flex flex-wrap gap-2">
                           {position.company ? (
                             <Button size="sm" variant="outline" asChild>
-                              <Link to={`/investor/entreprises/${position.company.id}`}>
+                              <Link
+                                to={`/investor/entreprises/${creerSlug(position.company.name, position.company.id)}`}
+                              >
                                 Détails
                               </Link>
                             </Button>

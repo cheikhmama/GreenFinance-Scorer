@@ -3,6 +3,7 @@ import { CarbonSummary, ScoreSummary } from "@/shared/esg/EsgSummary";
 import { CarbonTable, IndicatorsTable } from "@/shared/esg/EvidenceTables";
 import { ScoreWaterfall } from "@/shared/esg/ScoreWaterfall";
 import { libellePays } from "@/shared/format/pays";
+import { idDepuisSlug } from "@/shared/format/slug";
 import { BackLink } from "@/shared/ui/back-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -10,7 +11,8 @@ import { PageSkeleton } from "@/shared/ui/skeleton";
 import { useCompanyDetail } from "../api";
 
 export function CompanyDetailPage() {
-  const { entrepriseId = "" } = useParams();
+  const { entrepriseId: segment = "" } = useParams();
+  const entrepriseId = idDepuisSlug(segment);
   const { data: entreprise, isLoading, isError } = useCompanyDetail(entrepriseId);
 
   if (isLoading) return <PageSkeleton />;

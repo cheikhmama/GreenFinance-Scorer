@@ -1,15 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search } from "lucide-react";
+import { ArrowRight, Search, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
-import { formatPourcentage, formatScore } from "@/shared/format/etatPosition";
+import type { PortefeuilleResume } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { formatPourcentage, formatScore, variantScore } from "@/shared/format/etatPosition";
+import { creerSlug } from "@/shared/format/slug";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent } from "@/shared/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
@@ -18,6 +20,10 @@ import { Select } from "@/shared/ui/select";
 import { CardListSkeleton } from "@/shared/ui/skeleton";
 import { useCreatePortfolio, useMyPortfolios } from "../api";
 import { type CreerPortefeuilleForm, creerPortefeuilleSchema } from "../schemas";
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR");
+}
 
 export function PortfoliosPage() {
   const [recherche, setRecherche] = useState("");
@@ -82,29 +88,7 @@ export function PortfoliosPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {portefeuilles.map((portefeuille) => (
-          <Link key={portefeuille.id} to={`/investor/portefeuilles/${portefeuille.id}`}>
-            <Card className="h-full transition hover:border-brand-green">
-              <CardHeader className="flex flex-row items-start justify-between gap-2">
-                <CardTitle className="text-base text-foreground">{portefeuille.name}</CardTitle>
-                {portefeuille.archived ? <Badge variant="secondary">archivé</Badge> : null}
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="text-2xl font-semibold tabular-nums text-foreground">
-                  {portefeuille.total_amount.toLocaleString("fr-FR")}{" "}
-                  {portefeuille.reference_currency}
-                </p>
-                <p className="text-muted-foreground">{portefeuille.position_count} position(s)</p>
-                <div className="flex items-center gap-4 pt-1">
-                  <span>
-                    Score : <strong>{formatScore(portefeuille.aggregated_esg_score)}</strong>
-                  </span>
-                  <span>
-                    Couverture : <strong>{formatPourcentage(portefeuille.esg_coverage)}</strong>
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <PortfolioCard key={portefeuille.id} portefeuille={portefeuille} />
         ))}
       </div>
 
@@ -119,6 +103,117 @@ export function PortfoliosPage() {
         </Button>
       ) : null}
     </div>
+  );
+}
+
+const TEINTE_PILIER: Record<"E" | "S" | "G", string> = {
+  E: "bg-emerald-500",
+  S: "bg-blue-500",
+  G: "bg-violet-500",
+};
+
+/** Niveau 0-100 d'un pilier, même langage visuel que shared/esg/EsgSummary.tsx (couleurs et
+ * forme de barre identiques) pour que le portefeuille se lise avec les mêmes repères qu'une
+ * fiche entreprise. */
+function MiniPilier({ label, valeur }: { label: "E" | "S" | "G"; valeur: number | null }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="text-xs font-semibold tabular-nums text-foreground">
+          {formatScore(valeur)}
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        {valeur !== null ? (
+          <div
+            className={`h-full rounded-full ${TEINTE_PILIER[label]}`}
+            style={{ width: `${Math.max(0, Math.min(100, valeur))}%` }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Carte d'un portefeuille (tâche post-création) : un portefeuille tout juste créé n'a encore
+ * aucune position — plutôt qu'un score à zéro et une couverture à 0 % (bruyant, trompeur), un
+ * état « vide » dédié invite à la première action. Une fois alimenté, la carte structure
+ * l'information par priorité de lecture : valeur totale (le chiffre qu'un investisseur cherche
+ * en premier), score global, puis décomposition E/S/G — même palette que la fiche entreprise
+ * (shared/esg/EsgSummary.tsx) pour une identité visuelle cohérente entre les espaces. */
+function PortfolioCard({ portefeuille }: { portefeuille: PortefeuilleResume }) {
+  const vide = portefeuille.position_count === 0;
+
+  return (
+    <Link
+      to={`/investor/portefeuilles/${creerSlug(portefeuille.name, portefeuille.id)}`}
+      className="group block h-full"
+    >
+      <Card className="h-full overflow-hidden transition-all duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-brand-green/70 group-hover:shadow-md">
+        <CardContent className="flex h-full flex-col gap-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-green-light text-brand-green">
+                <Wallet className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">{portefeuille.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  Créé le {formatDate(portefeuille.created_at)}
+                </p>
+              </div>
+            </div>
+            {portefeuille.archived ? <Badge variant="secondary">Archivé</Badge> : null}
+          </div>
+
+          {vide ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-center">
+              <p className="text-sm font-medium text-foreground">Portefeuille vide</p>
+              <p className="max-w-56 text-xs text-muted-foreground">
+                Ajoutez une première position pour démarrer le suivi ESG et carbone.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Valeur totale
+                </p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums text-brand-blue">
+                  {portefeuille.total_amount.toLocaleString("fr-FR")}{" "}
+                  <span className="text-base font-medium text-muted-foreground">
+                    {portefeuille.reference_currency}
+                  </span>
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {portefeuille.position_count} position
+                  {portefeuille.position_count > 1 ? "s" : ""} · couverture{" "}
+                  {formatPourcentage(portefeuille.esg_coverage)}
+                </span>
+                <Badge variant={variantScore(portefeuille.aggregated_esg_score)}>
+                  Score {formatScore(portefeuille.aggregated_esg_score)}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 border-t pt-3">
+                <MiniPilier label="E" valeur={portefeuille.aggregated_environmental_score} />
+                <MiniPilier label="S" valeur={portefeuille.aggregated_social_score} />
+                <MiniPilier label="G" valeur={portefeuille.aggregated_governance_score} />
+              </div>
+            </>
+          )}
+
+          <div className="mt-auto flex items-center gap-1 pt-1 text-sm font-medium text-brand-green">
+            Voir le détail
+            <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

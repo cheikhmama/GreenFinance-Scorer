@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { libellePays } from "@/shared/format/pays";
+import { creerSlug } from "@/shared/format/slug";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -71,7 +72,7 @@ export function CompaniesPage() {
         {entreprises.map((entreprise) => (
           <Link
             key={entreprise.id}
-            to={`/investor/entreprises/${entreprise.id}`}
+            to={`/investor/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
             className="group block"
           >
             <Card className="h-full transition group-hover:border-brand-green group-hover:shadow-md">

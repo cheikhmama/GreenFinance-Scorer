@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { formatPourcentage, formatScore, variantScore } from "@/shared/format/etatPosition";
+import { creerSlug } from "@/shared/format/slug";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -84,7 +85,7 @@ export function InvestorDashboardPage() {
               data.recent_publications.map((entreprise) => (
                 <Link
                   key={entreprise.id}
-                  to={`/investor/entreprises/${entreprise.id}`}
+                  to={`/investor/entreprises/${creerSlug(entreprise.name, entreprise.id)}`}
                   className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-muted/50"
                 >
                   <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} />
