@@ -165,7 +165,7 @@ uv run arq app.worker.settings.WorkerSettings              # terminal 3 : e-mail
 uv run arq app.worker.settings.ExtractionWorkerSettings    # terminal 4 : extraction des rapports
 ```
 
-Frontend sur `http://localhost:5173`, API sur `http://localhost:8000` (documentation interactive :
+Frontend sur `http://localhost:5174`, API sur `http://localhost:8000` (documentation interactive :
 `/api/v1/docs`). Le proxy Vite fait apparaître `/api/v1` comme same-origin depuis le frontend
 (`frontend/vite.config.ts`), ce qui permet le cookie de session sans configuration CORS.
 
