@@ -26,7 +26,7 @@ import {
   SheetTitle,
 } from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports } from "../api";
+import { useActualisationSurNotification, useCompanyReports } from "../api";
 import { libelleExercice, separerDeclarations } from "../session/etat";
 import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
 import { SessionStepper } from "../session/SessionStepper";
@@ -54,6 +54,7 @@ function score(rapport: RapportESGPublic) {
  * puis l'historique en table de données (tâche 5.18) : couverture, empreinte du fichier et PDF de
  * synthèse dans le tiroir de chaque ligne. */
 export function CompanyDeclarationsPage() {
+  useActualisationSurNotification();
   const { data: rapports, isPending, isError } = useCompanyReports();
   const [creation, setCreation] = useState(false);
   const { enCours, historique, sessionBloquante } = separerDeclarations(rapports ?? []);

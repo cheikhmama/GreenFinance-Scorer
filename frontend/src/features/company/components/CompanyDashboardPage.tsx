@@ -16,7 +16,12 @@ import {
   CardTitle,
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports, useMyCompanyProfile, useReportChecklist } from "../api";
+import {
+  useActualisationSurNotification,
+  useCompanyReports,
+  useMyCompanyProfile,
+  useReportChecklist,
+} from "../api";
 import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
 import { dernierScoreAffichable, presentationSession } from "../session/presentation";
 
@@ -38,6 +43,7 @@ function libelleJalon(type: string, exercice: string | null): string | null {
  * l'espace ; les immatriculations (secteur, LEI, ISIN) vivent dans le Profil. Uniquement des
  * composants partagés et des jetons de thème : rendu identique en clair et en sombre. */
 export function CompanyDashboardPage() {
+  useActualisationSurNotification();
   const { data: rapports, isPending } = useCompanyReports();
   const { data: entreprise } = useMyCompanyProfile();
   const notifications = useMyNotifications(20);
