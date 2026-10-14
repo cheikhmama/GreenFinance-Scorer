@@ -42,7 +42,10 @@ dependencies = [
 # (app/ingestion/extractor.py, docling_pipeline.py) — l'API et le worker par défaut tournent sans
 # elle, sur l'image légère. Installée par défaut en local (tests, mypy), voir default-groups.
 extraction = [
-    "docling",
+    # Maintenu en 2.119 : 2.120+ impose docling-ibm-models 4 (nouveaux modèles de mise en page et de
+    # tableaux), plus rapide (-40 à -55 %) mais dont l'OCR des pages scannées est légèrement moins
+    # fidèle sur le corpus de référence. À réévaluer dans une PR dédiée (bissection des versions).
+    "docling<2.120",
     "faiss-cpu",
     "FlagEmbedding",
     "google-genai",
@@ -71,6 +74,10 @@ notebook = [
 [tool.uv]
 # Local et CI : tout (tests et mypy importent le pipeline). Images : --no-default-groups.
 default-groups = ["dev", "extraction"]
+# Dépendance transitive de docling, liée à sa version : docling 2.119 importe
+# rapidocr.utils.model_resolver.COMMON_LANG_ALIASES, retiré en 3.10 (l'OCR échouerait au premier
+# lot scanné). À relever avec docling.
+constraint-dependencies = ["rapidocr<3.10"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]
