@@ -8,6 +8,8 @@ import { useTheme } from "@/shared/theme/ThemeProvider";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/cn";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
+import { Breadcrumbs } from "./Breadcrumbs";
+import type { HandleRoute } from "./handle";
 import { roleNavConfig } from "./roleNav";
 
 /**
@@ -28,7 +30,7 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   // Une route peut demander toute la largeur via `handle: { pleineLargeur: true }` (tâche 5.7).
   const pleineLargeur = useMatches().some(
-    (match) => (match.handle as { pleineLargeur?: boolean } | undefined)?.pleineLargeur,
+    (match) => (match.handle as HandleRoute | undefined)?.pleineLargeur,
   );
 
   // RequireRole a déjà garanti une session valide avant de monter ce composant ; ce garde-fou ne
@@ -217,6 +219,7 @@ export function AppShell() {
           id="app-content"
           className={cn("mx-auto p-4 sm:p-6", pleineLargeur ? "max-w-none" : "max-w-7xl")}
         >
+          <Breadcrumbs />
           <Outlet />
         </main>
       </div>
