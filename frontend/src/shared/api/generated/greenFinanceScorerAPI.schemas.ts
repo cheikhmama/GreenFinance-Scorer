@@ -403,16 +403,16 @@ export interface BaselineInfo {
 }
 
 export interface BodyAttachReportFile {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyImportPortfolioPositions {
-  file: Blob;
+  file: Blob | File;
   total_value?: number | string | null;
 }
 
 export interface BodyImportReferenceDataset {
-  file: Blob;
+  file: Blob | File;
   name: string;
   source_url: string;
   licence: string;
@@ -422,7 +422,7 @@ export interface BodyImportReferenceDataset {
 }
 
 export interface BodyRegisterCompany {
-  mandate_letter: Blob;
+  mandate_letter: Blob | File;
   company_name: string;
   sector: string;
   country: string;
@@ -436,7 +436,7 @@ export interface BodyRegisterCompany {
 }
 
 export interface BodyReplyToRegistrationInfoRequest {
-  mandate_letter: Blob;
+  mandate_letter: Blob | File;
   /**
      * @minLength 20
      * @maxLength 200
@@ -446,22 +446,22 @@ export interface BodyReplyToRegistrationInfoRequest {
 }
 
 export interface BodySubmitCompanyReport {
-  fichier: Blob;
+  fichier: Blob | File;
   type: ReportType;
   annee_reporting: number;
 }
 
 export interface BodySubmitCompanyReportCorrection {
-  fichier: Blob;
+  fichier: Blob | File;
   annee_reporting: number;
 }
 
 export interface BodyUploadCompanyLogo {
-  fichier: Blob;
+  fichier: Blob | File;
 }
 
 export interface BodyUploadMyAvatar {
-  fichier: Blob;
+  fichier: Blob | File;
 }
 
 /**

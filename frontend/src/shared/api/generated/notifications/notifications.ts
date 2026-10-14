@@ -30,7 +30,7 @@ export const getListMyNotificationsUrl = (params?: ListMyNotificationsParams,) =
 /**
  * @summary Lister mes notifications, les plus récentes d'abord
  */
-export const listMyNotifications = async (params?: ListMyNotificationsParams, options?: RequestInit): Promise<PageNotificationPublic> => {
+export const listMyNotifications = async (params?: ListMyNotificationsParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageNotificationPublic> => {
 
   return apiFetch<PageNotificationPublic>(getListMyNotificationsUrl(params),
   {
@@ -53,7 +53,7 @@ export const getMarkNotificationReadUrl = (notificationId: string,) => {
 /**
  * @summary Marquer une de mes notifications comme lue
  */
-export const markNotificationRead = async (notificationId: string, options?: RequestInit): Promise<NotificationPublic> => {
+export const markNotificationRead = async (notificationId: string, options?: Parameters<typeof apiFetch>[1]): Promise<NotificationPublic> => {
 
   return apiFetch<NotificationPublic>(getMarkNotificationReadUrl(notificationId),
   {

@@ -42,7 +42,7 @@ export const getGetMyInstitutionProfileUrl = () => {
 /**
  * @summary Consulter mon quota d'export restant
  */
-export const getMyInstitutionProfile = async ( options?: RequestInit): Promise<InstitutionProfilPublic> => {
+export const getMyInstitutionProfile = async ( options?: Parameters<typeof apiFetch>[1]): Promise<InstitutionProfilPublic> => {
 
   return apiFetch<InstitutionProfilPublic>(getGetMyInstitutionProfileUrl(),
   {
@@ -65,7 +65,7 @@ export const getListAvailableResearchersUrl = () => {
 /**
  * @summary Lister les comptes Chercheur disponibles à inviter
  */
-export const listAvailableResearchers = async ( options?: RequestInit): Promise<ChercheurDisponible[]> => {
+export const listAvailableResearchers = async ( options?: Parameters<typeof apiFetch>[1]): Promise<ChercheurDisponible[]> => {
 
   return apiFetch<ChercheurDisponible[]>(getListAvailableResearchersUrl(),
   {
@@ -88,13 +88,21 @@ export const getInviteResearcherUrl = () => {
 /**
  * @summary Inviter un chercheur
  */
-export const inviteResearcher = async (inviterChercheurRequest: InviterChercheurRequest, options?: RequestInit): Promise<RattachementPublic> => {
+export const inviteResearcher = async (inviterChercheurRequest: InviterChercheurRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RattachementPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RattachementPublic>(getInviteResearcherUrl(),
   {
@@ -124,7 +132,7 @@ export const getListMyResearchersUrl = (params?: ListMyResearchersParams,) => {
 /**
  * @summary Lister mes rattachements chercheurs (invités, acceptés, refusés)
  */
-export const listMyResearchers = async (params?: ListMyResearchersParams, options?: RequestInit): Promise<RattachementPublic[]> => {
+export const listMyResearchers = async (params?: ListMyResearchersParams, options?: Parameters<typeof apiFetch>[1]): Promise<RattachementPublic[]> => {
 
   return apiFetch<RattachementPublic[]>(getListMyResearchersUrl(params),
   {
@@ -154,7 +162,7 @@ export const getListPublishedCompaniesForInstitutionUrl = (params?: ListPublishe
 /**
  * @summary Lister les entreprises publiées, pour composer le périmètre d'un projet
  */
-export const listPublishedCompaniesForInstitution = async (params?: ListPublishedCompaniesForInstitutionParams, options?: RequestInit): Promise<PageEntreprisePublieePublic> => {
+export const listPublishedCompaniesForInstitution = async (params?: ListPublishedCompaniesForInstitutionParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntreprisePublieePublic> => {
 
   return apiFetch<PageEntreprisePublieePublic>(getListPublishedCompaniesForInstitutionUrl(params),
   {
@@ -177,7 +185,7 @@ export const getGetPublishedCompanyDetailForInstitutionUrl = (entrepriseId: stri
 /**
  * @summary Consulter le détail d'une entreprise publiée (indicateurs, carbone, preuves)
  */
-export const getPublishedCompanyDetailForInstitution = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseDetailInvestisseur> => {
+export const getPublishedCompanyDetailForInstitution = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseDetailInvestisseur> => {
 
   return apiFetch<EntrepriseDetailInvestisseur>(getGetPublishedCompanyDetailForInstitutionUrl(entrepriseId),
   {
@@ -202,7 +210,7 @@ export const getGetEvidenceFileForInstitutionUrl = (entrepriseId: string,
  * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
  */
 export const getEvidenceFileForInstitution = async (entrepriseId: string,
-    preuveId: string, options?: RequestInit): Promise<unknown> => {
+    preuveId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetEvidenceFileForInstitutionUrl(entrepriseId,preuveId),
   {
@@ -225,13 +233,21 @@ export const getCreateProjectUrl = () => {
 /**
  * @summary Créer un projet
  */
-export const createProject = async (creerProjetRequest: CreerProjetRequest, options?: RequestInit): Promise<ProjetPublic> => {
+export const createProject = async (creerProjetRequest: CreerProjetRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ProjetPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<ProjetPublic>(getCreateProjectUrl(),
   {
@@ -254,7 +270,7 @@ export const getListMyProjectsUrl = () => {
 /**
  * @summary Lister mes projets
  */
-export const listMyProjects = async ( options?: RequestInit): Promise<ProjetPublic[]> => {
+export const listMyProjects = async ( options?: Parameters<typeof apiFetch>[1]): Promise<ProjetPublic[]> => {
 
   return apiFetch<ProjetPublic[]>(getListMyProjectsUrl(),
   {
@@ -277,7 +293,7 @@ export const getGetProjectDetailUrl = (projetId: string,) => {
 /**
  * @summary Consulter le détail d'un projet (chercheurs affectés, analyses)
  */
-export const getProjectDetail = async (projetId: string, options?: RequestInit): Promise<ProjetDetail> => {
+export const getProjectDetail = async (projetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ProjetDetail> => {
 
   return apiFetch<ProjetDetail>(getGetProjectDetailUrl(projetId),
   {
@@ -301,13 +317,21 @@ export const getAssignResearcherToProjectUrl = (projetId: string,) => {
  * @summary Affecter un chercheur accepté à un projet
  */
 export const assignResearcherToProject = async (projetId: string,
-    affecterChercheurRequest: AffecterChercheurRequest, options?: RequestInit): Promise<AffectationPublic> => {
+    affecterChercheurRequest: AffecterChercheurRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AffectationPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AffectationPublic>(getAssignResearcherToProjectUrl(projetId),
   {
@@ -330,7 +354,7 @@ export const getCloseProjectUrl = (projetId: string,) => {
 /**
  * @summary Clôturer un projet
  */
-export const closeProject = async (projetId: string, options?: RequestInit): Promise<ProjetPublic> => {
+export const closeProject = async (projetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ProjetPublic> => {
 
   return apiFetch<ProjetPublic>(getCloseProjectUrl(projetId),
   {
@@ -354,13 +378,21 @@ export const getAddCompanyToProjectScopeUrl = (projetId: string,) => {
  * @summary Ajouter une entreprise publiée au périmètre autorisé du projet
  */
 export const addCompanyToProjectScope = async (projetId: string,
-    ajouterEntreprisePerimetreRequest: AjouterEntreprisePerimetreRequest, options?: RequestInit): Promise<EntreprisePerimetrePublic> => {
+    ajouterEntreprisePerimetreRequest: AjouterEntreprisePerimetreRequest, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePerimetrePublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<EntreprisePerimetrePublic>(getAddCompanyToProjectScopeUrl(projetId),
   {
@@ -383,7 +415,7 @@ export const getListProjectScopeUrl = (projetId: string,) => {
 /**
  * @summary Lister les entreprises autorisées dans le périmètre du projet
  */
-export const listProjectScope = async (projetId: string, options?: RequestInit): Promise<EntreprisePerimetrePublic[]> => {
+export const listProjectScope = async (projetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePerimetrePublic[]> => {
 
   return apiFetch<EntreprisePerimetrePublic[]>(getListProjectScopeUrl(projetId),
   {
@@ -407,13 +439,21 @@ export const getAddDocumentToProjectUrl = (projetId: string,) => {
  * @summary Mettre à disposition le rapport publié d'une entreprise du périmètre
  */
 export const addDocumentToProject = async (projetId: string,
-    ajouterDocumentRequest: AjouterDocumentRequest, options?: RequestInit): Promise<DocumentProjetPublic> => {
+    ajouterDocumentRequest: AjouterDocumentRequest, options?: Parameters<typeof apiFetch>[1]): Promise<DocumentProjetPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<DocumentProjetPublic>(getAddDocumentToProjectUrl(projetId),
   {
@@ -436,7 +476,7 @@ export const getListProjectDocumentsUrl = (projetId: string,) => {
 /**
  * @summary Lister les documents mis à disposition sur le projet
  */
-export const listProjectDocuments = async (projetId: string, options?: RequestInit): Promise<DocumentProjetPublic[]> => {
+export const listProjectDocuments = async (projetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<DocumentProjetPublic[]> => {
 
   return apiFetch<DocumentProjetPublic[]>(getListProjectDocumentsUrl(projetId),
   {
@@ -466,7 +506,7 @@ export const getListMyAnalysesForInstitutionUrl = (params?: ListMyAnalysesForIns
 /**
  * @summary Lister mes analyses reçues, tous projets confondus
  */
-export const listMyAnalysesForInstitution = async (params?: ListMyAnalysesForInstitutionParams, options?: RequestInit): Promise<AnalyseInstitutionPublic[]> => {
+export const listMyAnalysesForInstitution = async (params?: ListMyAnalysesForInstitutionParams, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseInstitutionPublic[]> => {
 
   return apiFetch<AnalyseInstitutionPublic[]>(getListMyAnalysesForInstitutionUrl(params),
   {
@@ -489,7 +529,7 @@ export const getGetAnalysisDetailForInstitutionUrl = (analyseId: string,) => {
 /**
  * @summary Consulter le détail d'une analyse soumise sur l'un de mes projets
  */
-export const getAnalysisDetailForInstitution = async (analyseId: string, options?: RequestInit): Promise<AnalyseDetail> => {
+export const getAnalysisDetailForInstitution = async (analyseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseDetail> => {
 
   return apiFetch<AnalyseDetail>(getGetAnalysisDetailForInstitutionUrl(analyseId),
   {
@@ -513,13 +553,21 @@ export const getApproveAnalysisUrl = (analyseId: string,) => {
  * @summary Valider une analyse soumise
  */
 export const approveAnalysis = async (analyseId: string,
-    decisionAnalyseRequest: DecisionAnalyseRequest, options?: RequestInit): Promise<AnalysePublic> => {
+    decisionAnalyseRequest: DecisionAnalyseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AnalysePublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AnalysePublic>(getApproveAnalysisUrl(analyseId),
   {
@@ -543,13 +591,21 @@ export const getRequestAnalysisCorrectionUrl = (analyseId: string,) => {
  * @summary Demander une correction sur une analyse soumise
  */
 export const requestAnalysisCorrection = async (analyseId: string,
-    decisionAnalyseRequest: DecisionAnalyseRequest, options?: RequestInit): Promise<AnalysePublic> => {
+    decisionAnalyseRequest: DecisionAnalyseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AnalysePublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AnalysePublic>(getRequestAnalysisCorrectionUrl(analyseId),
   {
@@ -572,7 +628,7 @@ export const getGetAnalysisHistoryForInstitutionUrl = (analyseId: string,) => {
 /**
  * @summary Reconstruire la chaîne complète des versions d'une analyse (v1 -> correction -> v2 -> ...)
  */
-export const getAnalysisHistoryForInstitution = async (analyseId: string, options?: RequestInit): Promise<AnalysePublic[]> => {
+export const getAnalysisHistoryForInstitution = async (analyseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AnalysePublic[]> => {
 
   return apiFetch<AnalysePublic[]>(getGetAnalysisHistoryForInstitutionUrl(analyseId),
   {
@@ -595,7 +651,7 @@ export const getExportAnalysisUrl = (analyseId: string,) => {
 /**
  * @summary Exporter une analyse au format CSV (consomme le quota d'export)
  */
-export const exportAnalysis = async (analyseId: string, options?: RequestInit): Promise<unknown> => {
+export const exportAnalysis = async (analyseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getExportAnalysisUrl(analyseId),
   {

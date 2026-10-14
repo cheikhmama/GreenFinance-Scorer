@@ -45,7 +45,7 @@ export const getListPublishedCompaniesUrl = (params?: ListPublishedCompaniesPara
 /**
  * @summary Lister les entreprises publiées, avec leur score ESG et leurs émissions Scope 1/2/3
  */
-export const listPublishedCompanies = async (params?: ListPublishedCompaniesParams, options?: RequestInit): Promise<PageEntreprisePublieePublic> => {
+export const listPublishedCompanies = async (params?: ListPublishedCompaniesParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntreprisePublieePublic> => {
 
   return apiFetch<PageEntreprisePublieePublic>(getListPublishedCompaniesUrl(params),
   {
@@ -68,7 +68,7 @@ export const getGetPublishedCompanyDetailUrl = (entrepriseId: string,) => {
 /**
  * @summary Consulter le détail d'une entreprise publiée (indicateurs, carbone, preuves)
  */
-export const getPublishedCompanyDetail = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseDetailInvestisseur> => {
+export const getPublishedCompanyDetail = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseDetailInvestisseur> => {
 
   return apiFetch<EntrepriseDetailInvestisseur>(getGetPublishedCompanyDetailUrl(entrepriseId),
   {
@@ -93,7 +93,7 @@ export const getGetEvidenceFileUrl = (entrepriseId: string,
  * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
  */
 export const getEvidenceFile = async (entrepriseId: string,
-    preuveId: string, options?: RequestInit): Promise<unknown> => {
+    preuveId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetEvidenceFileUrl(entrepriseId,preuveId),
   {
@@ -129,7 +129,7 @@ export const getCompareCompaniesUrl = (params: CompareCompaniesParams,) => {
 /**
  * @summary Comparer jusqu'à 4 entreprises publiées (score, indicateurs, carbone détaillés)
  */
-export const compareCompanies = async (params: CompareCompaniesParams, options?: RequestInit): Promise<EntrepriseDetailInvestisseur[]> => {
+export const compareCompanies = async (params: CompareCompaniesParams, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseDetailInvestisseur[]> => {
 
   return apiFetch<EntrepriseDetailInvestisseur[]>(getCompareCompaniesUrl(params),
   {
@@ -152,7 +152,7 @@ export const getGetInvestorDashboardUrl = () => {
 /**
  * @summary Tableau de bord de l'espace Investisseur
  */
-export const getInvestorDashboard = async ( options?: RequestInit): Promise<TableauDeBordInvestisseur> => {
+export const getInvestorDashboard = async ( options?: Parameters<typeof apiFetch>[1]): Promise<TableauDeBordInvestisseur> => {
 
   return apiFetch<TableauDeBordInvestisseur>(getGetInvestorDashboardUrl(),
   {
@@ -175,13 +175,21 @@ export const getCreatePortfolioUrl = () => {
 /**
  * @summary Créer un portefeuille
  */
-export const createPortfolio = async (creerPortefeuilleRequest: CreerPortefeuilleRequest, options?: RequestInit): Promise<PortefeuilleResume> => {
+export const createPortfolio = async (creerPortefeuilleRequest: CreerPortefeuilleRequest, options?: Parameters<typeof apiFetch>[1]): Promise<PortefeuilleResume> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<PortefeuilleResume>(getCreatePortfolioUrl(),
   {
@@ -211,7 +219,7 @@ export const getListMyPortfoliosUrl = (params?: ListMyPortfoliosParams,) => {
 /**
  * @summary Lister mes portefeuilles
  */
-export const listMyPortfolios = async (params?: ListMyPortfoliosParams, options?: RequestInit): Promise<PagePortefeuilleResume> => {
+export const listMyPortfolios = async (params?: ListMyPortfoliosParams, options?: Parameters<typeof apiFetch>[1]): Promise<PagePortefeuilleResume> => {
 
   return apiFetch<PagePortefeuilleResume>(getListMyPortfoliosUrl(params),
   {
@@ -234,7 +242,7 @@ export const getGetPortfolioDetailUrl = (portefeuilleId: string,) => {
 /**
  * @summary Consulter le détail d'un portefeuille (positions, score agrégé, couverture)
  */
-export const getPortfolioDetail = async (portefeuilleId: string, options?: RequestInit): Promise<PortefeuilleDetail> => {
+export const getPortfolioDetail = async (portefeuilleId: string, options?: Parameters<typeof apiFetch>[1]): Promise<PortefeuilleDetail> => {
 
   return apiFetch<PortefeuilleDetail>(getGetPortfolioDetailUrl(portefeuilleId),
   {
@@ -258,13 +266,21 @@ export const getRenamePortfolioUrl = (portefeuilleId: string,) => {
  * @summary Renommer un portefeuille
  */
 export const renamePortfolio = async (portefeuilleId: string,
-    renommerPortefeuilleRequest: RenommerPortefeuilleRequest, options?: RequestInit): Promise<PortefeuilleResume> => {
+    renommerPortefeuilleRequest: RenommerPortefeuilleRequest, options?: Parameters<typeof apiFetch>[1]): Promise<PortefeuilleResume> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<PortefeuilleResume>(getRenamePortfolioUrl(portefeuilleId),
   {
@@ -287,7 +303,7 @@ export const getDeletePortfolioUrl = (portefeuilleId: string,) => {
 /**
  * @summary Supprimer un portefeuille n'ayant jamais eu de position
  */
-export const deletePortfolio = async (portefeuilleId: string, options?: RequestInit): Promise<void> => {
+export const deletePortfolio = async (portefeuilleId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getDeletePortfolioUrl(portefeuilleId),
   {
@@ -310,7 +326,7 @@ export const getArchivePortfolioUrl = (portefeuilleId: string,) => {
 /**
  * @summary Archiver un portefeuille
  */
-export const archivePortfolio = async (portefeuilleId: string, options?: RequestInit): Promise<PortefeuilleResume> => {
+export const archivePortfolio = async (portefeuilleId: string, options?: Parameters<typeof apiFetch>[1]): Promise<PortefeuilleResume> => {
 
   return apiFetch<PortefeuilleResume>(getArchivePortfolioUrl(portefeuilleId),
   {
@@ -333,7 +349,7 @@ export const getRestorePortfolioUrl = (portefeuilleId: string,) => {
 /**
  * @summary Restaurer un portefeuille archivé
  */
-export const restorePortfolio = async (portefeuilleId: string, options?: RequestInit): Promise<PortefeuilleResume> => {
+export const restorePortfolio = async (portefeuilleId: string, options?: Parameters<typeof apiFetch>[1]): Promise<PortefeuilleResume> => {
 
   return apiFetch<PortefeuilleResume>(getRestorePortfolioUrl(portefeuilleId),
   {
@@ -356,7 +372,7 @@ export const getExportPortfolioUrl = (portefeuilleId: string,) => {
 /**
  * @summary Exporter les positions d'un portefeuille au format CSV
  */
-export const exportPortfolio = async (portefeuilleId: string, options?: RequestInit): Promise<unknown> => {
+export const exportPortfolio = async (portefeuilleId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getExportPortfolioUrl(portefeuilleId),
   {
@@ -379,7 +395,7 @@ export const getGetPortfolioCarbonUrl = (portfolioId: string,) => {
 /**
  * @summary Empreinte carbone PCAF d'un portefeuille (Scopes 1+2, Scope 3 à part)
  */
-export const getPortfolioCarbon = async (portfolioId: string, options?: RequestInit): Promise<PortfolioCarbon> => {
+export const getPortfolioCarbon = async (portfolioId: string, options?: Parameters<typeof apiFetch>[1]): Promise<PortfolioCarbon> => {
 
   return apiFetch<PortfolioCarbon>(getGetPortfolioCarbonUrl(portfolioId),
   {
@@ -403,7 +419,7 @@ export const getImportPortfolioPositionsUrl = (portfolioId: string,) => {
  * @summary Importer les positions d'un portefeuille vide (CSV ou JSON, par ISIN ou ticker)
  */
 export const importPortfolioPositions = async (portfolioId: string,
-    bodyImportPortfolioPositions: BodyImportPortfolioPositions, options?: RequestInit): Promise<PortfolioImportResult> => {
+    bodyImportPortfolioPositions: BodyImportPortfolioPositions, options?: Parameters<typeof apiFetch>[1]): Promise<PortfolioImportResult> => {
     const formData = new FormData();
 formData.append(`file`, bodyImportPortfolioPositions.file);
 if(bodyImportPortfolioPositions.total_value !== undefined && bodyImportPortfolioPositions.total_value !== null) {
@@ -432,13 +448,21 @@ export const getAddPositionUrl = (portefeuilleId: string,) => {
  * @summary Ajouter une position (ou renforcer, en ajoutant une nouvelle position sur la même entreprise)
  */
 export const addPosition = async (portefeuilleId: string,
-    ajouterPositionRequest: AjouterPositionRequest, options?: RequestInit): Promise<PositionDetail> => {
+    ajouterPositionRequest: AjouterPositionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<PositionDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<PositionDetail>(getAddPositionUrl(portefeuilleId),
   {
@@ -464,13 +488,21 @@ export const getUpdatePositionUrl = (portefeuilleId: string,
  */
 export const updatePosition = async (portefeuilleId: string,
     positionId: string,
-    modifierPositionRequest: ModifierPositionRequest, options?: RequestInit): Promise<PositionDetail> => {
+    modifierPositionRequest: ModifierPositionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<PositionDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<PositionDetail>(getUpdatePositionUrl(portefeuilleId,positionId),
   {
@@ -495,7 +527,7 @@ export const getDeletePositionUrl = (portefeuilleId: string,
  * @summary Supprimer une position encore planifiée
  */
 export const deletePosition = async (portefeuilleId: string,
-    positionId: string, options?: RequestInit): Promise<void> => {
+    positionId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getDeletePositionUrl(portefeuilleId,positionId),
   {
@@ -521,13 +553,21 @@ export const getClosePositionUrl = (portefeuilleId: string,
  */
 export const closePosition = async (portefeuilleId: string,
     positionId: string,
-    fermerPositionRequest: FermerPositionRequest, options?: RequestInit): Promise<PositionDetail> => {
+    fermerPositionRequest: FermerPositionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<PositionDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<PositionDetail>(getClosePositionUrl(portefeuilleId,positionId),
   {

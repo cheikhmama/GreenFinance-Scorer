@@ -43,7 +43,7 @@ export const getListPublishedCompaniesForResearcherUrl = (params?: ListPublished
 /**
  * @summary Lister les entreprises publiées, avec leur score ESG et leurs émissions Scope 1/2/3
  */
-export const listPublishedCompaniesForResearcher = async (params?: ListPublishedCompaniesForResearcherParams, options?: RequestInit): Promise<PageEntreprisePublieePublic> => {
+export const listPublishedCompaniesForResearcher = async (params?: ListPublishedCompaniesForResearcherParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntreprisePublieePublic> => {
 
   return apiFetch<PageEntreprisePublieePublic>(getListPublishedCompaniesForResearcherUrl(params),
   {
@@ -66,7 +66,7 @@ export const getGetPublishedCompanyDetailForResearcherUrl = (entrepriseId: strin
 /**
  * @summary Consulter le détail d'une entreprise publiée (indicateurs, carbone, preuves)
  */
-export const getPublishedCompanyDetailForResearcher = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseDetailInvestisseur> => {
+export const getPublishedCompanyDetailForResearcher = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseDetailInvestisseur> => {
 
   return apiFetch<EntrepriseDetailInvestisseur>(getGetPublishedCompanyDetailForResearcherUrl(entrepriseId),
   {
@@ -91,7 +91,7 @@ export const getGetEvidenceFileForResearcherUrl = (entrepriseId: string,
  * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
  */
 export const getEvidenceFileForResearcher = async (entrepriseId: string,
-    preuveId: string, options?: RequestInit): Promise<unknown> => {
+    preuveId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetEvidenceFileForResearcherUrl(entrepriseId,preuveId),
   {
@@ -127,7 +127,7 @@ export const getCompareCompaniesForResearcherUrl = (params: CompareCompaniesForR
 /**
  * @summary Comparer jusqu'à 4 entreprises publiées (score, indicateurs, carbone détaillés)
  */
-export const compareCompaniesForResearcher = async (params: CompareCompaniesForResearcherParams, options?: RequestInit): Promise<EntrepriseDetailInvestisseur[]> => {
+export const compareCompaniesForResearcher = async (params: CompareCompaniesForResearcherParams, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseDetailInvestisseur[]> => {
 
   return apiFetch<EntrepriseDetailInvestisseur[]>(getCompareCompaniesForResearcherUrl(params),
   {
@@ -150,7 +150,7 @@ export const getListMyInstitutionInvitationsUrl = () => {
 /**
  * @summary Lister les invitations reçues d'institutions
  */
-export const listMyInstitutionInvitations = async ( options?: RequestInit): Promise<RattachementPublic[]> => {
+export const listMyInstitutionInvitations = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RattachementPublic[]> => {
 
   return apiFetch<RattachementPublic[]>(getListMyInstitutionInvitationsUrl(),
   {
@@ -173,7 +173,7 @@ export const getAcceptInstitutionInvitationUrl = (rattachementId: string,) => {
 /**
  * @summary Accepter une invitation d'institution
  */
-export const acceptInstitutionInvitation = async (rattachementId: string, options?: RequestInit): Promise<RattachementPublic> => {
+export const acceptInstitutionInvitation = async (rattachementId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RattachementPublic> => {
 
   return apiFetch<RattachementPublic>(getAcceptInstitutionInvitationUrl(rattachementId),
   {
@@ -196,7 +196,7 @@ export const getDeclineInstitutionInvitationUrl = (rattachementId: string,) => {
 /**
  * @summary Refuser une invitation d'institution
  */
-export const declineInstitutionInvitation = async (rattachementId: string, options?: RequestInit): Promise<RattachementPublic> => {
+export const declineInstitutionInvitation = async (rattachementId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RattachementPublic> => {
 
   return apiFetch<RattachementPublic>(getDeclineInstitutionInvitationUrl(rattachementId),
   {
@@ -219,7 +219,7 @@ export const getListMyAssignedProjectsUrl = () => {
 /**
  * @summary Lister les projets sur lesquels je suis affecté
  */
-export const listMyAssignedProjects = async ( options?: RequestInit): Promise<ProjetAffecte[]> => {
+export const listMyAssignedProjects = async ( options?: Parameters<typeof apiFetch>[1]): Promise<ProjetAffecte[]> => {
 
   return apiFetch<ProjetAffecte[]>(getListMyAssignedProjectsUrl(),
   {
@@ -242,7 +242,7 @@ export const getListProjectScopeForResearcherUrl = (projetId: string,) => {
 /**
  * @summary Lister les entreprises autorisées dans le périmètre d'un projet affecté
  */
-export const listProjectScopeForResearcher = async (projetId: string, options?: RequestInit): Promise<EntreprisePerimetrePublic[]> => {
+export const listProjectScopeForResearcher = async (projetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePerimetrePublic[]> => {
 
   return apiFetch<EntreprisePerimetrePublic[]>(getListProjectScopeForResearcherUrl(projetId),
   {
@@ -265,7 +265,7 @@ export const getListProjectDocumentsForResearcherUrl = (projetId: string,) => {
 /**
  * @summary Lister les documents mis à disposition sur un projet affecté
  */
-export const listProjectDocumentsForResearcher = async (projetId: string, options?: RequestInit): Promise<DocumentProjetPublic[]> => {
+export const listProjectDocumentsForResearcher = async (projetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<DocumentProjetPublic[]> => {
 
   return apiFetch<DocumentProjetPublic[]>(getListProjectDocumentsForResearcherUrl(projetId),
   {
@@ -289,13 +289,21 @@ export const getCreateAnalysisUrl = (projetId: string,) => {
  * @summary Créer une analyse (brouillon) sur un projet affecté
  */
 export const createAnalysis = async (projetId: string,
-    creerAnalyseRequest: CreerAnalyseRequest, options?: RequestInit): Promise<AnalyseDetail> => {
+    creerAnalyseRequest: CreerAnalyseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AnalyseDetail>(getCreateAnalysisUrl(projetId),
   {
@@ -318,7 +326,7 @@ export const getListMyAnalysesUrl = () => {
 /**
  * @summary Lister mes analyses, tous projets confondus
  */
-export const listMyAnalyses = async ( options?: RequestInit): Promise<AnalysePublic[]> => {
+export const listMyAnalyses = async ( options?: Parameters<typeof apiFetch>[1]): Promise<AnalysePublic[]> => {
 
   return apiFetch<AnalysePublic[]>(getListMyAnalysesUrl(),
   {
@@ -341,7 +349,7 @@ export const getGetAnalysisDetailUrl = (analyseId: string,) => {
 /**
  * @summary Consulter le détail d'une analyse (statut, décision de l'institution)
  */
-export const getAnalysisDetail = async (analyseId: string, options?: RequestInit): Promise<AnalyseDetail> => {
+export const getAnalysisDetail = async (analyseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseDetail> => {
 
   return apiFetch<AnalyseDetail>(getGetAnalysisDetailUrl(analyseId),
   {
@@ -365,13 +373,21 @@ export const getUpdateAnalysisUrl = (analyseId: string,) => {
  * @summary Modifier une analyse encore en brouillon
  */
 export const updateAnalysis = async (analyseId: string,
-    modifierAnalyseRequest: ModifierAnalyseRequest, options?: RequestInit): Promise<AnalyseDetail> => {
+    modifierAnalyseRequest: ModifierAnalyseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AnalyseDetail>(getUpdateAnalysisUrl(analyseId),
   {
@@ -394,7 +410,7 @@ export const getSubmitAnalysisUrl = (analyseId: string,) => {
 /**
  * @summary Soumettre une analyse à la décision de l'institution
  */
-export const submitAnalysis = async (analyseId: string, options?: RequestInit): Promise<AnalyseDetail> => {
+export const submitAnalysis = async (analyseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseDetail> => {
 
   return apiFetch<AnalyseDetail>(getSubmitAnalysisUrl(analyseId),
   {
@@ -418,13 +434,21 @@ export const getCorrectAnalysisUrl = (analyseId: string,) => {
  * @summary Créer une nouvelle version d'une analyse suite à une correction demandée
  */
 export const correctAnalysis = async (analyseId: string,
-    modifierAnalyseRequest: ModifierAnalyseRequest, options?: RequestInit): Promise<AnalyseDetail> => {
+    modifierAnalyseRequest: ModifierAnalyseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyseDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AnalyseDetail>(getCorrectAnalysisUrl(analyseId),
   {
@@ -447,7 +471,7 @@ export const getGetAnalysisHistoryUrl = (analyseId: string,) => {
 /**
  * @summary Reconstruire la chaîne complète des versions d'une analyse (v1 -> correction -> v2 -> ...)
  */
-export const getAnalysisHistory = async (analyseId: string, options?: RequestInit): Promise<AnalysePublic[]> => {
+export const getAnalysisHistory = async (analyseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AnalysePublic[]> => {
 
   return apiFetch<AnalysePublic[]>(getGetAnalysisHistoryUrl(analyseId),
   {
@@ -470,7 +494,7 @@ export const getImportReferenceDatasetUrl = () => {
 /**
  * @summary Importer un jeu de données ESG public (CSV) pour une validation croisée
  */
-export const importReferenceDataset = async (bodyImportReferenceDataset: BodyImportReferenceDataset, options?: RequestInit): Promise<ReferenceDatasetImportResult> => {
+export const importReferenceDataset = async (bodyImportReferenceDataset: BodyImportReferenceDataset, options?: Parameters<typeof apiFetch>[1]): Promise<ReferenceDatasetImportResult> => {
     const formData = new FormData();
 formData.append(`file`, bodyImportReferenceDataset.file);
 formData.append(`name`, bodyImportReferenceDataset.name);
@@ -507,7 +531,7 @@ export const getListReferenceDatasetsUrl = () => {
 /**
  * @summary Lister mes jeux de données de référence
  */
-export const listReferenceDatasets = async ( options?: RequestInit): Promise<ReferenceDatasetSummary[]> => {
+export const listReferenceDatasets = async ( options?: Parameters<typeof apiFetch>[1]): Promise<ReferenceDatasetSummary[]> => {
 
   return apiFetch<ReferenceDatasetSummary[]>(getListReferenceDatasetsUrl(),
   {
@@ -530,7 +554,7 @@ export const getGetCrossValidationReportUrl = (datasetId: string,) => {
 /**
  * @summary Comparer les scores de la plateforme à un jeu de données de référence
  */
-export const getCrossValidationReport = async (datasetId: string, options?: RequestInit): Promise<CrossValidationReport> => {
+export const getCrossValidationReport = async (datasetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<CrossValidationReport> => {
 
   return apiFetch<CrossValidationReport>(getGetCrossValidationReportUrl(datasetId),
   {
@@ -553,7 +577,7 @@ export const getDeleteReferenceDatasetUrl = (datasetId: string,) => {
 /**
  * @summary Supprimer un jeu de données de référence
  */
-export const deleteReferenceDataset = async (datasetId: string, options?: RequestInit): Promise<void> => {
+export const deleteReferenceDataset = async (datasetId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getDeleteReferenceDatasetUrl(datasetId),
   {

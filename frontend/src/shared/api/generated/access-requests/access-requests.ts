@@ -24,13 +24,21 @@ export const getRequestAccessUrl = () => {
 /**
  * @summary Demander un accès Investisseur ou Chercheur (validation par l'Administrateur)
  */
-export const requestAccess = async (accessRequestCreate: AccessRequestCreate, options?: RequestInit): Promise<unknown> => {
+export const requestAccess = async (accessRequestCreate: AccessRequestCreate, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<unknown>(getRequestAccessUrl(),
   {
@@ -60,7 +68,7 @@ export const getListAccessRequestsUrl = (params?: ListAccessRequestsParams,) => 
 /**
  * @summary Lister les demandes d'accès Investisseur / Chercheur
  */
-export const listAccessRequests = async (params?: ListAccessRequestsParams, options?: RequestInit): Promise<AccessRequestView[]> => {
+export const listAccessRequests = async (params?: ListAccessRequestsParams, options?: Parameters<typeof apiFetch>[1]): Promise<AccessRequestView[]> => {
 
   return apiFetch<AccessRequestView[]>(getListAccessRequestsUrl(params),
   {
@@ -84,13 +92,21 @@ export const getDecideAccessRequestUrl = (requestId: string,) => {
  * @summary Approuver (lien d'activation) ou refuser (motif) une demande d'accès
  */
 export const decideAccessRequest = async (requestId: string,
-    accessDecisionRequest: AccessDecisionRequest, options?: RequestInit): Promise<AccessRequestView> => {
+    accessDecisionRequest: AccessDecisionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AccessRequestView> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AccessRequestView>(getDecideAccessRequestUrl(requestId),
   {

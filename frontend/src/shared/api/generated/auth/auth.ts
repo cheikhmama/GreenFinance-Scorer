@@ -30,13 +30,21 @@ export const getLoginUrl = () => {
 /**
  * @summary Ouvrir une session par e-mail et mot de passe
  */
-export const login = async (loginRequest: LoginRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const login = async (loginRequest: LoginRequest, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<UtilisateurPublic>(getLoginUrl(),
   {
@@ -59,13 +67,21 @@ export const getDemanderReinitialisationMotDePasseUrl = () => {
 /**
  * @summary Demander un lien de réinitialisation de mot de passe
  */
-export const demanderReinitialisationMotDePasse = async (demanderReinitialisationRequest: DemanderReinitialisationRequest, options?: RequestInit): Promise<void> => {
+export const demanderReinitialisationMotDePasse = async (demanderReinitialisationRequest: DemanderReinitialisationRequest, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<void>(getDemanderReinitialisationMotDePasseUrl(),
   {
@@ -88,13 +104,21 @@ export const getReinitialiserMotDePasseUrl = () => {
 /**
  * @summary Poser un nouveau mot de passe à partir d'un jeton de réinitialisation
  */
-export const reinitialiserMotDePasse = async (reinitialiserMotDePasseRequest: ReinitialiserMotDePasseRequest, options?: RequestInit): Promise<void> => {
+export const reinitialiserMotDePasse = async (reinitialiserMotDePasseRequest: ReinitialiserMotDePasseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<void>(getReinitialiserMotDePasseUrl(),
   {
@@ -117,13 +141,21 @@ export const getActivateAccountUrl = () => {
 /**
  * @summary Poser son mot de passe, activer le compte et ouvrir la session
  */
-export const activateAccount = async (activerCompteRequest: ActiverCompteRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const activateAccount = async (activerCompteRequest: ActiverCompteRequest, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<UtilisateurPublic>(getActivateAccountUrl(),
   {
@@ -146,7 +178,7 @@ export const getLogoutUrl = () => {
 /**
  * @summary Fermer la session courante
  */
-export const logout = async ( options?: RequestInit): Promise<void> => {
+export const logout = async ( options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getLogoutUrl(),
   {
@@ -169,7 +201,7 @@ export const getGetCurrentUserUrl = () => {
 /**
  * @summary Consulter le compte actuellement connecté
  */
-export const getCurrentUser = async ( options?: RequestInit): Promise<UtilisateurPublic> => {
+export const getCurrentUser = async ( options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
   return apiFetch<UtilisateurPublic>(getGetCurrentUserUrl(),
   {
@@ -195,13 +227,21 @@ export const getUpdateMyProfileUrl = () => {
  * le lien de confirmation a été envoyé.
  * @summary Modifier mon nom, et demander un changement d'e-mail
  */
-export const updateMyProfile = async (modifierProfilRequest: ModifierProfilRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const updateMyProfile = async (modifierProfilRequest: ModifierProfilRequest, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<UtilisateurPublic>(getUpdateMyProfileUrl(),
   {
@@ -224,13 +264,21 @@ export const getConfirmEmailChangeUrl = () => {
 /**
  * @summary Confirmer un changement d'e-mail à partir du lien reçu à la nouvelle adresse
  */
-export const confirmEmailChange = async (confirmerChangementEmailRequest: ConfirmerChangementEmailRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const confirmEmailChange = async (confirmerChangementEmailRequest: ConfirmerChangementEmailRequest, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<UtilisateurPublic>(getConfirmEmailChangeUrl(),
   {
@@ -253,7 +301,7 @@ export const getUploadMyAvatarUrl = () => {
 /**
  * @summary Ajouter ou remplacer ma photo de profil
  */
-export const uploadMyAvatar = async (bodyUploadMyAvatar: BodyUploadMyAvatar, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const uploadMyAvatar = async (bodyUploadMyAvatar: BodyUploadMyAvatar, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
     const formData = new FormData();
 formData.append(`fichier`, bodyUploadMyAvatar.fichier);
 
@@ -278,7 +326,7 @@ export const getDeleteMyAvatarUrl = () => {
 /**
  * @summary Retirer ma photo de profil
  */
-export const deleteMyAvatar = async ( options?: RequestInit): Promise<UtilisateurPublic> => {
+export const deleteMyAvatar = async ( options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
   return apiFetch<UtilisateurPublic>(getDeleteMyAvatarUrl(),
   {
@@ -303,7 +351,7 @@ export const getGetUserAvatarUrl = (userId: string,
  * @summary Photo de profil d'un utilisateur (URL fournie par le champ `avatar`)
  */
 export const getUserAvatar = async (userId: string,
-    nomFichier: string, options?: RequestInit): Promise<void> => {
+    nomFichier: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getGetUserAvatarUrl(userId,nomFichier),
   {
@@ -326,13 +374,21 @@ export const getVerifyMyPasswordUrl = () => {
 /**
  * @summary Vérifier mon mot de passe actuel, sans rien modifier (étape 1 du changement)
  */
-export const verifyMyPassword = async (verifierMotDePasseRequest: VerifierMotDePasseRequest, options?: RequestInit): Promise<void> => {
+export const verifyMyPassword = async (verifierMotDePasseRequest: VerifierMotDePasseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<void>(getVerifyMyPasswordUrl(),
   {
@@ -355,13 +411,21 @@ export const getChangePasswordUrl = () => {
 /**
  * @summary Changer son mot de passe et ouvrir une nouvelle session
  */
-export const changePassword = async (changerMotDePasseRequest: ChangerMotDePasseRequest, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const changePassword = async (changerMotDePasseRequest: ChangerMotDePasseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<UtilisateurPublic>(getChangePasswordUrl(),
   {
