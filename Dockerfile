@@ -10,12 +10,12 @@
 # (pytest, mypy, ruff) ni tests/ dans les images : `uv sync --no-default-groups`, et seuls app/,
 # alembic/ et config/ sont copiés. Les deux images tournent sous un utilisateur sans privilèges.
 
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.12
 
 # --- construction : environnement virtuel de l'API ---------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS construction-api
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \

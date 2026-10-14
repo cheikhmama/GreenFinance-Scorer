@@ -16,7 +16,6 @@ explicite plutôt qu'un accès qui réussirait sans que la révocation ait pu ê
 
 import uuid
 from collections.abc import Callable
-from typing import TypeVar
 
 import redis
 import structlog
@@ -26,14 +25,13 @@ from app.core.redis import get_redis_client, incrementer, lire_entier
 
 logger = structlog.get_logger(__name__)
 
-T = TypeVar("T")
 
 
 def _key(user_id: uuid.UUID) -> str:
     return f"session_generation:{user_id}"
 
 
-def _guarded(operation: str, call: Callable[[], T]) -> T:
+def _guarded[T](operation: str, call: Callable[[], T]) -> T:
     try:
         return call()
     except redis.RedisError as exc:

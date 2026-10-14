@@ -8,14 +8,11 @@ n'appartiennent à aucun espace acteur en particulier.
 
 import uuid
 from datetime import datetime
-from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-T = TypeVar("T")
 
-
-class Page(BaseModel, Generic[T]):
+class Page[T](BaseModel):
     """Enveloppe commune à toute liste paginée de l'API : {"items", "page", "page_size",
     "total", "pages"}.
 

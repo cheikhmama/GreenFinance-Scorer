@@ -6,13 +6,14 @@
 #
 #   docker build -t greenfinance-frontend frontend
 
-FROM node:22-alpine AS construction
+FROM node:24-alpine AS construction
 WORKDIR /app
-COPY package.json package-lock.json ./
+# .npmrc avec le verrou : legacy-peer-deps (peer react@^18 de @tremor/react), sans quoi npm ci échoue.
+COPY package.json package-lock.json .npmrc ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
 RUN npm run build
 
-FROM caddy:2-alpine
+FROM caddy:2.11-alpine
 COPY --from=construction /app/dist /srv
 # La configuration (deploy/Caddyfile) est montée par docker-compose.prod.yml.

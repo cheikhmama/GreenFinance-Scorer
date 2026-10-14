@@ -2,7 +2,7 @@
 name = "greenfinance-scorer"
 version = "0.1.0"
 description = "Plateforme de scoring ESG et carbone pour entreprises"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",

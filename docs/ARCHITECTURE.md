@@ -36,7 +36,7 @@ standardises on **`INVESTOR`** (matches the `users` role list in the brief and t
 
 | Layer | Target | Current | Note |
 |---|---|---|---|
-| API | FastAPI, Python 3.11+ | same | unchanged |
+| API | FastAPI, Python 3.12+ | same | unchanged |
 | ORM | SQLAlchemy 2.0 (via SQLModel) | SQLModel, sync sessions | API stays **sync**; ARQ jobs may use async sessions. A full async migration of the API isn't planned: it costs a lot and doesn't make anything faster, because the heavy work moves to the worker anyway. |
 | Database | PostgreSQL 16 (+ pgvector image) | same | unchanged |
 | Migrations | Alembic | same | one migration per task; no hand-edited schema |

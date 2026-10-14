@@ -15,7 +15,6 @@ import hashlib
 import secrets
 from collections.abc import Callable
 from datetime import timedelta
-from typing import TypeVar
 
 import redis
 import structlog
@@ -50,14 +49,13 @@ TOKEN_TTL = timedelta(minutes=30)
 _RATE_LIMIT_MAX = 3
 _RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 
-T = TypeVar("T")
 
 
 def _rate_limit_key(email: str) -> str:
     return f"password_reset_requests:{email.strip().lower()}"
 
 
-def _guarded(operation: str, call: Callable[[], T]) -> T:
+def _guarded[T](operation: str, call: Callable[[], T]) -> T:
     try:
         return call()
     except redis.RedisError as exc:
