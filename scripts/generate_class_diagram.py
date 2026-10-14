@@ -10,6 +10,7 @@ import ast
 import hashlib
 import heapq
 import html
+import itertools
 import json
 import math
 from pathlib import Path
@@ -134,13 +135,13 @@ NODES, PANELS, EDGES = {}, [], []
 
 
 def panel(key, title, desc, x, y, w, h):
-    PANELS.append(dict(key=key, title=title, desc=desc, x=x, y=y, w=w, h=h))
+    PANELS.append({"key": key, "title": title, "desc": desc, "x": x, "y": y, "w": w, "h": h})
 
 
 def node(key, cls, domain, x, y, w=440, ref=False, role=""):
     assert cls in MODELS
-    NODES[key] = dict(key=key, cls=cls, domain=domain, x=x, y=y, w=w,
-                      h=64 if ref else height(cls), ref=ref, role=role)
+    NODES[key] = {"key": key, "cls": cls, "domain": domain, "x": x, "y": y, "w": w,
+                      "h": 64 if ref else height(cls), "ref": ref, "role": role}
 
 
 def edge(child, parent, fk, label=None, composition=False):
@@ -148,10 +149,10 @@ def edge(child, parent, fk, label=None, composition=False):
     field = MODELS[c["cls"]]["fields"][fk]
     assert field["target"] == p["cls"], (child, parent, fk)
     assert c["domain"] == p["domain"]
-    EDGES.append(dict(child=child, parent=parent, fk=fk, label=label or fk,
-                      domain=c["domain"], cm="0..1" if field.get("unique") else "0..*",
-                      pm="0..1" if field["nullable"] else "1", composition=composition,
-                      file=MODELS[c["cls"]]["file"], line=field["line"]))
+    EDGES.append({"child": child, "parent": parent, "fk": fk, "label": label or fk,
+                      "domain": c["domain"], "cm": "0..1" if field.get("unique") else "0..*",
+                      "pm": "0..1" if field["nullable"] else "1", "composition": composition,
+                      "file": MODELS[c["cls"]]["file"], "line": field["line"]})
 
 
 # A — principal chain; aliases keep long transverse associations local.
@@ -448,7 +449,7 @@ def draw_edge(d, e):
         ux,uy=dx/ln,dy/ln
         diamond=[end,(end[0]+ux*10-uy*6,end[1]+uy*10+ux*6),(end[0]+ux*20,end[1]+uy*20),(end[0]+ux*10+uy*6,end[1]+uy*10-ux*6)]
         d.path(diamond,color,1.5,color,True)
-    segments = sorted(zip(points,points[1:]),key=lambda ab: abs(ab[0][0]-ab[1][0])+abs(ab[0][1]-ab[1][1]),reverse=True)
+    segments = sorted(itertools.pairwise(points),key=lambda ab: abs(ab[0][0]-ab[1][0])+abs(ab[0][1]-ab[1][1]),reverse=True)
     a,b = segments[0]
     # Name belongs to the association; source/FK mapping is in the ledger.
     d.pill((a[0]+b[0])/2,(a[1]+b[1])/2-8,e["label"],16,color)
@@ -489,9 +490,9 @@ def write_sources():
     text += ["legend bottom", "? = nullable ; toutes les classes dérivent de SQLModel.", "Rôles : ADMIN, ENTERPRISE, AUDITOR, INVESTOR, RESEARCHER, INSTITUTION.", "Cardinalités du schéma ; classes complémentaires et règles de service dans l’audit.", "endlegend", "@enduml"]
     (OUT/"GreenFinance_Diagramme_Classes.puml").write_text("\n".join(text)+"\n",encoding="utf-8")
     ledger=["# Traçabilité du diagramme de classes", "", "Généré depuis l’AST des modèles. Aucun accès à une base en exécution.", "", "## Classes et attributs affichés", "", "| Classe | Source | Attributs affichés |", "|---|---|---|"]
-    for name in FIELDS:
+    for name, champs in FIELDS.items():
         c=MODELS[name]
-        ledger.append(f'| `{name}` | [{c["file"]}:{c["line"]}](../../{c["file"]}#L{c["line"]}) | '+", ".join(f'`{k}` (L{c["fields"][k]["line"]})' for k in ["id"]+FIELDS[name].split())+" |")
+        ledger.append(f'| `{name}` | [{c["file"]}:{c["line"]}](../../{c["file"]}#L{c["line"]}) | '+", ".join(f'`{k}` (L{c["fields"][k]["line"]})' for k in ["id"]+champs.split())+" |")
     ledger += ["", "## Associations affichées", "", "Lecture : pour une instance de la classe source, la cible est obligatoire (1) ou optionnelle (0..1). La colonne inverse indique combien de sources une cible peut référencer.", "", "| Source et FK réelle | Cible | Multiplicité cible | Inverse | Suppression SQL | Preuve |", "|---|---|---|---|---|---|"]
     for e in EDGES:
         name=NODES[e["child"]]["cls"]

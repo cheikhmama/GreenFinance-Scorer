@@ -1,6 +1,8 @@
 import uuid
+from typing import cast
 
 import pymupdf
+from docling_core.types.doc.document import DoclingDocument
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
@@ -597,7 +599,7 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
 
 
 def _simuler_pipeline_extraction(
-    monkeypatch, extraction: ExtractionEntreprise, document: object | None = None
+    monkeypatch, extraction: ExtractionEntreprise, document: DoclingDocument | None = None
 ) -> None:
     """Remplace Docling, l'indexation, le modèle d'embedding, le LLM et la génération de preuve
     par des doubles : run_extraction_pipeline ne dépend plus que de `extraction`, la réponse
@@ -607,7 +609,7 @@ def _simuler_pipeline_extraction(
 
     # Conversion par lots simulée : la localisation des preuves (tâche 5.5) lit la page
     # dans ce document ; un double minimal la fait échouer sans conséquence.
-    document_simule = document if document is not None else object()
+    document_simule = document if document is not None else cast(DoclingDocument, object())
     fake_conversion = RapportConverti(
         pages_total=5,
         pages_ocr=0,
@@ -770,7 +772,7 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
 
     # Conversion par lots simulée : la localisation des preuves (tâche 5.5) lit la page
     # dans ce document ; un double minimal la fait échouer sans conséquence.
-    document_simule = object()
+    document_simule = cast(DoclingDocument, object())
     fake_conversion = RapportConverti(
         pages_total=5,
         pages_ocr=0,

@@ -93,13 +93,12 @@ def test_pipeline_un_seul_appel_sans_contrainte(monkeypatch) -> None:
     from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 
     contextes: list[tuple[int, int | None]] = []
-    monkeypatch.setattr(
-        extractor,
-        "_build_context",
-        lambda _i, _e, codes, budget, plafond_tokens=None: (
-            contextes.append((budget, plafond_tokens)) or ("--- Page 1 ---\nx", [1], {})
-        ),
-    )
+
+    def construire_contexte(_i, _e, codes, budget, plafond_tokens=None):
+        contextes.append((budget, plafond_tokens))
+        return "--- Page 1 ---\nx", [1], {}
+
+    monkeypatch.setattr(extractor, "_build_context", construire_contexte)
     monkeypatch.setattr(
         extractor,
         "_appeler_avec_secours",

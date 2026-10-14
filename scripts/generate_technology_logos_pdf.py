@@ -127,7 +127,7 @@ if __name__ == "__main__":
     for i, item in enumerate(manifest):
         try:
             loaded[item["name"]] = load_logo(item, i, rendered)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — un logo illisible ne bloque pas le PDF
             print(f"Asset failure {item['name']}: {exc}")
     review_sheet(manifest, loaded)
     create_pdf(manifest, loaded)

@@ -3,6 +3,7 @@ import random
 import re
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -922,7 +923,7 @@ def test_modifier_entreprise_ne_touche_plus_description_site_ni_montant(session)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     entreprise.description = "Description existante."
     entreprise.website = "https://existant.test"
-    entreprise.minimum_investment_amount = 500
+    entreprise.minimum_investment_amount = Decimal(500)
     entreprise.minimum_investment_currency = Currency.EUR
     session.add(entreprise)
     session.commit()

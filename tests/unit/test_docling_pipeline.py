@@ -17,7 +17,10 @@ def test_ocr_passe_par_onnxruntime_disponible_sur_arm() -> None:
 
 def test_options_par_lot_sans_ocr_threads_bornes_tableaux_precis() -> None:
     from docling.datamodel.accelerator_options import AcceleratorDevice
-    from docling.datamodel.pipeline_options import TableFormerMode
+    from docling.datamodel.pipeline_options import (
+        TableFormerMode,
+        TableStructureOptions,
+    )
 
     options = options_pipeline(ocr=False, threads=3)
 
@@ -25,6 +28,7 @@ def test_options_par_lot_sans_ocr_threads_bornes_tableaux_precis() -> None:
     assert options.accelerator_options.num_threads == 3
     assert options.accelerator_options.device == AcceleratorDevice.CPU
     assert options.do_table_structure is True
+    assert isinstance(options.table_structure_options, TableStructureOptions)
     assert options.table_structure_options.mode == TableFormerMode.ACCURATE
     assert options.generate_page_images is False
 
@@ -221,13 +225,18 @@ def test_reprise_apres_interruption_au_deuxieme_lot(tmp_path) -> None:
         list(convertir_par_lots(tmp_path / "r.pdf", tmp_path, lots, threads=1, convertir=premier_essai))
 
     convertis = []
+
+    def convertir(_p, lot):
+        convertis.append(lot)
+        return DoclingDocument(name="lot-3")
+
     list(
         convertir_par_lots(
             tmp_path / "r.pdf",
             tmp_path,
             lots,
             threads=1,
-            convertir=lambda _p, lot: convertis.append(lot) or DoclingDocument(name="lot-3"),
+            convertir=convertir,
         )
     )
     assert convertis == [lots[1]]

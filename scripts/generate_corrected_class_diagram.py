@@ -9,9 +9,8 @@ import json
 import math
 import xml.etree.ElementTree as ET
 
-import pymupdf
-
 import generate_class_diagram as base
+import pymupdf
 
 OUT = base.ROOT / "docs" / "diagrammes" / "corrige"
 OUT.mkdir(parents=True, exist_ok=True)

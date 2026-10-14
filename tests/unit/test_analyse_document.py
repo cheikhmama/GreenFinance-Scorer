@@ -2,8 +2,10 @@
 
 import uuid
 from pathlib import Path
+from typing import cast
 
 import pytest
+from docling_core.types.doc.document import DoclingDocument
 
 from app.ingestion import extractor
 from app.ingestion.docling_pipeline import RapportConverti
@@ -30,13 +32,19 @@ class _IndexVide:
 def doublures(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     appels: list[str] = []
     conversion = RapportConverti(
-        pages_total=250, pages_ocr=20, elapsed_s=900.0, document_de_la_page=lambda _p: object()
+        pages_total=250,
+        pages_ocr=20,
+        elapsed_s=900.0,
+        document_de_la_page=lambda _p: cast(DoclingDocument, object()),
     )
+
+    def convertir_rapport(*_a, **_k) -> RapportConverti:
+        appels.append("conversion")
+        return conversion
+
     monkeypatch.setattr(extractor, "_get_embed_model", lambda: _Encodeur())
     monkeypatch.setattr(extractor, "IndexIncremental", _IndexVide)
-    monkeypatch.setattr(
-        extractor.docling_pipeline, "convertir_rapport", lambda *_a, **_k: appels.append("conversion") or conversion
-    )
+    monkeypatch.setattr(extractor.docling_pipeline, "convertir_rapport", convertir_rapport)
     monkeypatch.setattr(
         extractor,
         "_build_context",

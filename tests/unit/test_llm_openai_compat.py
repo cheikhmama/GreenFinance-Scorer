@@ -5,7 +5,8 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-import httpx
+# openai 3.x construit ses requêtes avec httpx2 (même API que httpx), pas httpx.
+import httpx2 as httpx
 import openai
 import pytest
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 from pathlib import Path
+
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +58,7 @@ def download_manifest():
                 path.write_bytes(content)
                 item["source_url"] = url
                 return item["name"], "downloaded", len(content)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — téléchargement au mieux, l’erreur est conservée
                 errors.append(str(exc)[:170])
         item["error"] = errors
         return item["name"], "FAILED", errors

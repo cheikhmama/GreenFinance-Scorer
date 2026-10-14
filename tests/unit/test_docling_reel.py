@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pymupdf
 import pytest
+from docling_core.types.doc.document import DoclingDocument
 
 from app.ingestion.docling_pipeline import convertir_rapport
 
@@ -20,7 +21,7 @@ def _textes(documents) -> str:
 
 
 def test_rapport_numerique_converti_par_lots_sans_ocr(tmp_path: Path) -> None:
-    documents = []
+    documents: list[DoclingDocument] = []
 
     rapport = convertir_rapport(
         ATLAS, tmp_path, taille=3, pages_max=600, threads=2, indexer=documents.append
@@ -39,7 +40,7 @@ def test_page_scannee_lue_par_l_ocr_onnx(tmp_path: Path) -> None:
     scan.new_page().insert_image(scan[0].rect, pixmap=source[0].get_pixmap(dpi=200))
     pdf = tmp_path / "scan.pdf"
     scan.save(pdf)
-    documents = []
+    documents: list[DoclingDocument] = []
 
     rapport = convertir_rapport(pdf, tmp_path / "json", taille=20, pages_max=600, threads=2, indexer=documents.append)
 
