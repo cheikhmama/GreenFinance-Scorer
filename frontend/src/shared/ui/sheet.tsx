@@ -10,11 +10,19 @@ function Sheet(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="sheet" {...props} />;
 }
 
+const LARGEURS = {
+  /** Consultation (tiroir de détail d'une table). */
+  standard: "sm:max-w-[460px]",
+  /** Formulaire (modification d'un objet, assistant court). */
+  large: "sm:max-w-[640px]",
+} as const;
+
 function SheetContent({
   className,
   children,
+  taille = "standard",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { taille?: keyof typeof LARGEURS }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -24,7 +32,8 @@ function SheetContent({
       <DialogPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed inset-y-0 right-0 z-[60] flex w-full flex-col border-l bg-card shadow-(--shadow-e4) outline-none sm:max-w-[460px]",
+          "fixed inset-y-0 right-0 z-[60] flex w-full flex-col border-l bg-card shadow-(--shadow-e4) outline-none",
+          LARGEURS[taille],
           className,
         )}
         {...props}
