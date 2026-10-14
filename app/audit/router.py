@@ -89,14 +89,20 @@ def consulter_dossier(
         raise NotFoundError("Rapport introuvable.", code="rapport_introuvable")
     detail = RapportESGDetail.model_validate(rapport)
     entreprise = session.get(Company, rapport.company_id)
-    return DossierAuditeurDetail.model_validate(
+    # official_score exclu du dict de validation puis posé par model_copy (même pattern que
+    # app/admin/router.py::consulter_rapport_route et app/company/router.py) : son alias de
+    # validation ("official_score_public") entre en collision avec celui, homonyme par
+    # coïncidence, du champ official_global_score ("official_score") — passé tel quel dans le
+    # dict, l'objet ScoreESGPublic atterrissait sur ce dernier (float attendu) et faisait
+    # échouer la validation avec une 500 (tâche post-5.17bis, dossier introuvable en pratique).
+    dossier = DossierAuditeurDetail.model_validate(
         {
-            **detail.model_dump(),
-            "official_score": score_public(session, rapport_id),
+            **detail.model_dump(exclude={"official_score"}),
             "company_name": entreprise.name if entreprise else "",
             "company_sector": entreprise.sector if entreprise else "",
         }
     )
+    return dossier.model_copy(update={"official_score": score_public(session, rapport_id)})
 
 
 @router.get(

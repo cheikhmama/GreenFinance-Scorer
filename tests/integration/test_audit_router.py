@@ -27,6 +27,8 @@ from app.ingestion.models import (
     Evidence,
 )
 from app.main import app
+from app.scoring.engine import obtenir_configuration_reference
+from app.scoring.models import Score
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -101,6 +103,36 @@ def test_consulter_dossier_dun_autre_auditeur_est_404(session) -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "rapport_introuvable"
+
+
+def test_consulter_dossier_dun_rapport_valide_renvoie_le_score_officiel(session) -> None:
+    """Régression : un rapport déjà validé (donc avec un Score) faisait échouer la validation de
+    DossierAuditeurDetail avec une 500 — l'alias de validation de official_global_score
+    ("official_score") entrait en collision avec le dict posé par consulter_dossier, qui y
+    plaçait l'objet ScoreESGPublic attendu par le champ official_score. Seul ce chemin (dossier
+    déjà décidé, visible depuis l'historique de l'Auditeur) exerçait cette combinaison."""
+    auditeur = _create_utilisateur(session, Role.AUDITOR)
+    rapport = _create_rapport_affecte(session, auditeur.id)
+    rapport.status = ReportStatus.VALIDATED
+    session.add(rapport)
+    configuration = obtenir_configuration_reference(session)
+    session.add(
+        Score(
+            report_id=rapport.id,
+            config_id=configuration.id,
+            global_score=70.0,
+            environmental_score=70.0,
+            social_score=70.0,
+            governance_score=70.0,
+        )
+    )
+    session.commit()
+
+    authed_client = _login(auditeur.email, "s3cret-pass")
+    response = authed_client.get(f"/api/v1/audit/rapports/{rapport.id}")
+
+    assert response.status_code == 200
+    assert response.json()["official_score"]["global_score"] == 70.0
 
 
 def test_consulter_dossier_retourne_indicateurs_et_donnees_carbone(session) -> None:
