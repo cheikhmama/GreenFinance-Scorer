@@ -1,6 +1,7 @@
 # Frontend hierarchical navigation — foundation + Company pilot
 
-Status: approved design, 2026-10-14. Branch `feat/refonte-navigation-entreprise` (cut from
+Status: approved design, 2026-10-14 (four factual corrections made while writing the plan:
+§2.2 L5 evidence link, §3.1 step 3, §3.3 step state, §4.1 `MetriqueVue.id`/`cle`). Branch `feat/refonte-navigation-entreprise` (cut from
 `chore/upgrade-2026-10`).
 
 ## 1. Intent
@@ -90,7 +91,10 @@ L5  Metric + citation (slide-over)       …/:pilier/:famille/:code             
   market-based, tCO₂e). Expanded: compact list (label, value, unit, period, method badge); each row
   opens L5.
 - **L5 `MetricSheet`**: value, unit, period, method, confidence, audit review status (and audited
-  value when overridden), and "Rapport YYYY — p. X–Y" opening the server-cut PDF excerpt.
+  value when overridden), and "Rapport YYYY — p. X–Y" opening the company's own original PDF at
+  that page (`/api/v1/company/rapports/{id}/fichier#page=X`, served inline). There is no
+  company-scoped excerpt endpoint (only investor/researcher/institution/audit have one); adding one
+  is out of scope.
 - **L2 list**: unchanged DataTable and quick-look sheet, plus an "Ouvrir" link to L3.
 - Below `md`, `MasterDetailLayout` turns the rail into its own list page (index) and the detail into
   a full screen; breadcrumbs collapse to "‹ parent".
@@ -103,7 +107,7 @@ L5  Metric + citation (slide-over)       …/:pilier/:famille/:code             
 |---|---|---|---|
 | 1 Exercice | `/company/declarations/nouvelle/exercice` | fiscal_year, report_type | none (wizard form state) |
 | 2 Données financières | `…/nouvelle/finances` | currency; revenue and enterprise_value shown once a currency is chosen | `openReport` (201) → navigate to `/company/declarations/:id/brouillon/document` |
-| 3 Document | `/company/declarations/:id/brouillon/document` | `FileDrop` or official URL import; analysis starts | none; progress shown, user may leave |
+| 3 Document | `/company/declarations/:id/brouillon/document` | `FileDrop` (PDF); analysis starts. URL import is not offered: `import-url` creates a separate direct deposit, it cannot attach to a draft | none; progress shown, user may leave |
 | 4 Vérification | `…/brouillon/verification` | completeness checklist (counts per group only), summary of steps 1–2, confirmation checkbox | `submitReport` (202) → receipt (SHA-256, ID) |
 
 - Steps 1–2 share one React Hook Form instance with a Zod schema split per step; "Suivant"
@@ -130,7 +134,9 @@ L5  Metric + citation (slide-over)       …/:pilier/:famille/:code             
 `CompanyRegistrationPage` moves onto the same `Wizard`: Entreprise (company_name, sector, country,
 tax_id) → Contact & mandat (contact_name, contact_email, mandate_letter) → Identifiants optionnels
 (lei, isin, website), then the existing e-mail verification and confirmation steps. Fields,
-validation and API calls are unchanged.
+validation and API calls are unchanged. Steps are held in component state, not the URL: this
+public form carries a file that cannot survive a reload. A submit-time error on a field of an
+earlier step (e.g. e-mail domain vs website) brings the user back to that step.
 
 ### 3.4 Conventions (apply to every space from now on)
 
@@ -149,7 +155,7 @@ validation and API calls are unchanged.
 
   ```ts
   interface MetriqueVue {
-    code: string; libelle: string; pilier: Pillar; famille: string;
+    id: string; cle: string; libelle: string; pilier: Pillar; famille: string;
     valeur: number | null; unite: string | null; periode: number | null;
     methode: DataMethod; confiance: ConfidenceLevel | null;
     revue: MetricReviewStatus; valeurAuditee: number | null;
@@ -160,7 +166,7 @@ validation and API calls are unchanged.
   (Exact field types follow the generated schema; the key set is the contract.)
 - `proof_text`, `raw_value`, `section`, `proof_boxes` are never copied. New backend fields stay
   hidden until explicitly mapped.
-- Evidence = the server-cut PDF excerpt only, addressed by report and page.
+- Evidence = the company's own original PDF opened at the cited page (see §2.2 L5).
 - Extraction failures show `libelleCauseExtraction` wording, never backend error text.
 - Error views show a message, a recovery action and the copyable `correlation_id`; never payloads.
 
