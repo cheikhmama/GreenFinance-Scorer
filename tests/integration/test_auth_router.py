@@ -22,6 +22,7 @@ from app.core.email import EmailDeliveryError
 from app.core.enums import Role
 from app.core.models import AuditLogEntry
 from app.main import app
+from tests.unit.test_hashing import HACHAGE_BCRYPT_ANCIEN, MOT_DE_PASSE_ANCIEN
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -75,6 +76,41 @@ def test_login_with_wrong_password_is_rejected(session) -> None:
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "invalid_credentials"
     assert COOKIE_NAME not in response.cookies
+
+
+def _utilisateur_hachage_bcrypt(session) -> User:
+    """Compte créé avant pwdlib : hachage bcrypt écrit par passlib (tests/unit/test_hashing.py)."""
+    user = _create_utilisateur(session, password="inutilise")
+    user.password_hash = HACHAGE_BCRYPT_ANCIEN
+    session.add(user)
+    session.commit()
+    return user
+
+
+def test_login_with_a_legacy_bcrypt_hash_succeeds_and_upgrades_it_to_argon2id(session) -> None:
+    user = _utilisateur_hachage_bcrypt(session)
+
+    response = client.post(
+        "/api/v1/auth/login", json={"email": user.email, "password": MOT_DE_PASSE_ANCIEN}
+    )
+
+    assert response.status_code == 200
+    session.refresh(user)
+    assert user.password_hash is not None and user.password_hash.startswith("$argon2id$")
+    assert verify_password(MOT_DE_PASSE_ANCIEN, user.password_hash)
+
+
+def test_login_with_a_password_over_72_bytes_is_a_401_not_a_500(session) -> None:
+    user = _utilisateur_hachage_bcrypt(session)
+
+    response = client.post(
+        "/api/v1/auth/login", json={"email": user.email, "password": MOT_DE_PASSE_ANCIEN + "é" * 40}
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "invalid_credentials"
+    session.refresh(user)
+    assert user.password_hash == HACHAGE_BCRYPT_ANCIEN
 
 
 def test_login_with_unknown_email_is_rejected() -> None:

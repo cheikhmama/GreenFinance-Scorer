@@ -16,8 +16,8 @@ dependencies = [
     "pydantic[email]",
     "structlog",
     "pyjwt",
-    "passlib[bcrypt]",
-    "bcrypt<4.1",  # passlib 1.7.4 ne reconnaît pas l'API de bcrypt >=4.1 (module __about__ retiré)
+    # Argon2id pour les nouveaux hachages, bcrypt pour vérifier les anciens (app/auth/hashing.py).
+    "pwdlib[argon2,bcrypt]",
     "redis",
     "python-multipart",  # requis par FastAPI pour UploadFile/Form (POST /company/rapports, Étape 5)
     # Validation des PDF déposés (app/company/upload_validation.py) et extraits de preuve : l'API
@@ -61,7 +61,6 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
-    "types-passlib",
     "types-pyyaml",
     "types-reportlab>=5.0.0.20260911",
     "hypothesis>=6.168.3",

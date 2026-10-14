@@ -16,7 +16,7 @@ from app.auth import avatar
 from app.auth.activation import activer_compte
 from app.auth.csrf import generate_csrf_token
 from app.auth.email_change import confirmer_changement_email, demander_changement_email
-from app.auth.hashing import hash_password, verify_password
+from app.auth.hashing import hash_password, verifier_et_mettre_a_jour, verify_password
 from app.auth.models import User
 from app.auth.password_reset import (
     demander_reinitialisation,
@@ -104,12 +104,12 @@ def login(
     enforce_login_rate_limit(payload.email, adresse_ip)
 
     user = session.exec(select(User).where(User.email == payload.email)).first()
-    if (
-        user is None
-        or not user.active
-        or user.password_hash is None
-        or not verify_password(payload.password, user.password_hash)
-    ):
+    valide, nouveau_hachage = (
+        verifier_et_mettre_a_jour(payload.password, user.password_hash)
+        if user is not None and user.active and user.password_hash is not None
+        else (False, None)
+    )
+    if user is None or not valide:
         register_failed_login_attempt(payload.email, adresse_ip)
         auditer(
             session,
@@ -123,6 +123,10 @@ def login(
         raise UnauthorizedError("Identifiants invalides.", code="invalid_credentials")
 
     clear_login_attempts(payload.email)
+    if nouveau_hachage is not None:
+        # Ancien hachage bcrypt (passlib) remplacé par Argon2id, commité avec l'audit ci-dessous.
+        user.password_hash = nouveau_hachage
+        session.add(user)
     auditer(session, user.id, "login", "User", user.id, "success")
     session.commit()
 
