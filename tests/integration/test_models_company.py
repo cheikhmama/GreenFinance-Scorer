@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -21,7 +22,7 @@ def test_creation_avec_montant_minimum(session) -> None:
         name="Acme Green",
         sector="Energie",
         country="MR",
-        minimum_investment_amount=1000.0,
+        minimum_investment_amount=Decimal(1000),
     )
     session.add(entreprise)
     session.flush()
@@ -32,7 +33,7 @@ def test_creation_avec_montant_minimum(session) -> None:
 def test_montant_minimum_nul_distinct_de_zero(session) -> None:
     sans_minimum = Company(name="SansMin", sector="X", country="MR")
     avec_minimum_zero = Company(
-        name="MinZero", sector="X", country="MR", minimum_investment_amount=0.0
+        name="MinZero", sector="X", country="MR", minimum_investment_amount=Decimal(0)
     )
     session.add(sans_minimum)
     session.add(avec_minimum_zero)

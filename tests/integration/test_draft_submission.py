@@ -7,7 +7,13 @@ from fastapi.testclient import TestClient
 from sqlmodel import col, select
 
 from app.auth.models import User
-from app.core.enums import ConfidenceLevel, ReportStatus, Role
+from app.core.enums import (
+    ConfidenceLevel,
+    ReportStatus,
+    ReportType,
+    Role,
+    SubmissionChannel,
+)
 from app.core.models import AuditLogEntry, Notification
 from app.ingestion.models import ESGReport
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
@@ -257,8 +263,8 @@ def test_la_liste_resume_le_score_officiel_et_la_synthese(session, entreprise) -
     user, client = entreprise
     valide = ESGReport(
         company_id=user.company.id,
-        type="RAPPORT_ESG",
-        channel="ENTREPRISE",
+        type=ReportType.RAPPORT_ESG,
+        channel=SubmissionChannel.ENTREPRISE,
         fiscal_year=2023,
         status=ReportStatus.VALIDATED,
         source_file="rapports/test/v.pdf",

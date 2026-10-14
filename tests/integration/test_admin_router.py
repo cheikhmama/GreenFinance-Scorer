@@ -5,6 +5,7 @@ import uuid
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -91,7 +92,7 @@ def _create_entreprise_avec_utilisateur(session) -> tuple[Company, User]:
 
 
 def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> ESGReport:
-    valeurs = {
+    valeurs: dict[str, Any] = {
         "company_id": entreprise_id,
         "type": ReportType.RAPPORT_ESG,
         "channel": SubmissionChannel.ENTREPRISE,

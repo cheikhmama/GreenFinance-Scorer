@@ -29,6 +29,7 @@ import math
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from sqlmodel import Session, col, func, select
 
@@ -162,7 +163,8 @@ def _ligne_importee(
     lei = _identifiant(ligne.valeurs.get("lei", ""), lei_valide)
     if isin is None and lei is None:
         raise ValueError("aucun ISIN ni LEI valide")
-    scores: dict[str, float] = {}
+    # Any : déballé en arguments nommés de ReferenceDatasetRow (champs score_*, tous float).
+    scores: dict[str, Any] = {}
     for colonne, (attribut, _compare) in _COLONNES_SCORE.items():
         brut = ligne.valeurs.get(colonne, "")
         if not brut:

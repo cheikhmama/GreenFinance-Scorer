@@ -3,12 +3,13 @@ chiffre d'affaires et EVIC portés par le rapport de l'exercice)."""
 
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.database import utcnow
-from app.core.enums import ReportStatus, ReportType, Role, SubmissionChannel
+from app.core.enums import Currency, ReportStatus, ReportType, Role, SubmissionChannel
 from app.ingestion.models import ESGReport
 from app.investor.entreprises import dernier_rapport_valide
 from tests.integration.test_company_registration import _isin_aleatoire
@@ -130,10 +131,10 @@ def test_empreinte_carbone_du_portefeuille(session, admin, investisseur) -> None
         source_file="rapports/x.pdf",
         submitted_at=utcnow() + timedelta(minutes=1),
         fiscal_year=2026,
-        revenue=1,
-        revenue_currency="USD",
-        enterprise_value=1,
-        enterprise_value_currency="USD",
+        revenue=Decimal(1),
+        revenue_currency=Currency.USD,
+        enterprise_value=Decimal(1),
+        enterprise_value_currency=Currency.USD,
     )
     session.add(en_audit)
     session.commit()

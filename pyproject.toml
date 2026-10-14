@@ -6,7 +6,10 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
-    "sqlmodel",
+    # 0.0.45 passe tous les champs datetime en DateTime(timezone=True) et refuse les valeurs naïves :
+    # le schéma est en TIMESTAMP WITHOUT TIME ZONE (app/core/database.py::utcnow). Passage à l'UTC
+    # « aware » = migration de schéma dédiée, hors mise à jour des dépendances.
+    "sqlmodel<0.0.45",
     "alembic",
     "psycopg[binary]",
     "pydantic-settings",

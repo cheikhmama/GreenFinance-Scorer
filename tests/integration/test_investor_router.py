@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
@@ -69,7 +70,7 @@ def _entreprise_publiee(
         sector=secteur,
         country=pays,
         status=RegistrationStatus.ACTIVE if actif else RegistrationStatus.SUSPENDED,
-        minimum_investment_amount=montant_minimum,
+        minimum_investment_amount=Decimal(str(montant_minimum)) if montant_minimum is not None else None,
         minimum_investment_currency=Currency.USD if montant_minimum is not None else None,
         published_at=utcnow(),
     )

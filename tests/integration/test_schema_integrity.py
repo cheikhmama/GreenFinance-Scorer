@@ -61,7 +61,7 @@ def test_scenario_complet_schema_pivot_relations_bidirectionnelles(session) -> N
         name="Acme Verte",
         sector="Industrie",
         country="MR",
-        minimum_investment_amount=500.0,
+        minimum_investment_amount=Decimal(500),
     )
     session.add(entreprise)
     session.flush()

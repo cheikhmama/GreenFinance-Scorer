@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -31,7 +32,7 @@ def _entreprise(session, **kwargs) -> Company:
 
 
 def _rapport(entreprise_id: uuid.UUID, **kwargs) -> ESGReport:
-    defaults = {
+    defaults: dict[str, Any] = {
         "company_id": entreprise_id,
         "type": ReportType.RAPPORT_ESG,
         "channel": SubmissionChannel.AUTOMATIQUE,
