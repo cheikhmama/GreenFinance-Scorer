@@ -16,7 +16,7 @@ export const DEVISES = Object.values(Currency);
  * post-Phase-0 : bascule de cette modification de l'Administrateur vers l'Entreprise). Même
  * principe que l'ancien formulaire Admin : impose_minimum est purement local (jamais envoyé),
  * il pilote l'affichage du couple montant/devise et la décision d'envoyer (null, null) sinon —
- * voir ProfilePage.tsx. Le serveur applique la même règle "ensemble ou aucun"
+ * voir ProfileEditSheet.tsx. Le serveur applique la même règle "ensemble ou aucun"
  * (app/company/schemas.py::ModifierProfilEntrepriseRequest), reproduite ici pour un message
  * d'erreur immédiat. */
 export const modifierProfilEntrepriseSchema = z

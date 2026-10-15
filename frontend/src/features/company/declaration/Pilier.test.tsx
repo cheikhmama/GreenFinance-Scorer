@@ -68,7 +68,7 @@ function servir(corps: Record<string, unknown>) {
   fetchMock.mockImplementation(async (url) =>
     String(url).includes("/notifications")
       ? Response.json({ items: [], total: 0, page: 1, page_size: 1 })
-      : Response.json(corps),
+      : Response.json(String(url).endsWith("/company/rapports") ? [] : corps),
   );
 }
 
@@ -79,6 +79,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Pilier (niveau 4) et indicateur (niveau 5)", () => {
+  it("brouillon : un pilier saisi à la main renvoie à l’assistant", async () => {
+    servir(rapport({ submitted_at: null, status: "DRAFT" }));
+    const { router } = renderCompany(`/company/declarations/${ID}/environnement`);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toMatch(
+        new RegExp(`^/company/declarations/${ID}/brouillon/`),
+      ),
+    );
+  });
+
   it("lien profond vers une famille : ouverte, fil complet, aucune fuite", async () => {
     servir(rapport());
     renderCompany(`/company/declarations/${ID}/environnement/emissions-ges`);

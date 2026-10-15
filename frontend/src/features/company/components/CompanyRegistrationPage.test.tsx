@@ -12,7 +12,17 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+/** Sans délai entre frappes : les tests ne portent pas sur le rythme de saisie. */
+function utilisateur() {
+  return userEvent.setup({ delay: null });
+}
+
+type Utilisateur = ReturnType<typeof utilisateur>;
 
 function renderPage() {
   return render(
@@ -27,20 +37,14 @@ function renderPage() {
 const NOMS_PAYS: Record<string, string> = { MR: "Mauritanie", FR: "France", US: "États-Unis" };
 
 /** Ouvre la liste avec recherche, tape la recherche, puis choisit l'option. */
-async function choisir(
-  user: ReturnType<typeof userEvent.setup>,
-  champ: string,
-  recherche: string,
-  option: string,
-) {
+async function choisir(user: Utilisateur, champ: string, recherche: string, option: string) {
   await user.click(screen.getByRole("combobox", { name: champ }));
-  await user.type(await screen.findByPlaceholderText(/Rechercher/), recherche);
-  await user.click(await screen.findByRole("option", { name: option }));
+  const recherche_ = await screen.findByPlaceholderText(/Rechercher/, {}, { timeout: 5000 });
+  await user.type(recherche_, recherche);
+  await user.click(await screen.findByRole("option", { name: option }, { timeout: 5000 }));
 }
 
 const MANDAT = new File(["%PDF-1.4"], "mandat.pdf", { type: "application/pdf" });
-
-type Utilisateur = ReturnType<typeof userEvent.setup>;
 
 async function remplirEtape1(user: Utilisateur, { pays = "MR", identifiant = "12345678" } = {}) {
   await user.type(screen.getByLabelText("Nom de l’entreprise"), "Minière du Nord");
@@ -53,6 +57,19 @@ async function remplirEtape1(user: Utilisateur, { pays = "MR", identifiant = "12
   await user.click(screen.getByRole("button", { name: "Suivant" }));
 }
 
+/** Étape 1 remplie et validée : attend l'étape Contact (la validation de « Suivant » est asynchrone). */
+async function allerAEtape2(user: Utilisateur, options: Parameters<typeof remplirEtape1>[1] = {}) {
+  await remplirEtape1(user, options);
+  await screen.findByLabelText("Nom & Prénom du responsable");
+}
+
+/** Étapes 1 et 2 remplies et validées : attend l'étape Identifiants. */
+async function allerAEtape3(user: Utilisateur, options: { avecMandat?: boolean } = {}) {
+  await allerAEtape2(user);
+  await remplirEtape2(user, options);
+  await screen.findByLabelText("Code ISIN");
+}
+
 async function remplirEtape2(user: Utilisateur, { avecMandat = true } = {}) {
   await user.type(await screen.findByLabelText("Nom & Prénom du responsable"), "Aïcha Ba");
   await user.type(screen.getByLabelText("E-mail professionnel"), "aicha@miniere.mr");
@@ -62,16 +79,12 @@ async function remplirEtape2(user: Utilisateur, { avecMandat = true } = {}) {
   await user.click(screen.getByRole("button", { name: "Suivant" }));
 }
 
-/** Parcourt les étapes ; n'envoie que si une étape précédente n'a pas bloqué. */
-async function remplirEtEnvoyer(
-  options: { avecMandat?: boolean; pays?: string; identifiant?: string } = {},
-) {
-  const user = userEvent.setup();
-  await remplirEtape1(user, options);
-  if (!screen.queryByLabelText("Nom & Prénom du responsable")) return user;
-  await remplirEtape2(user, options);
-  const envoyer = screen.queryByRole("button", { name: /Envoyer la demande/ });
-  if (envoyer) await user.click(envoyer);
+/** Parcourt les trois étapes jusqu'au clic sur « Envoyer la demande ». Les tests qui attendent un
+ * blocage en cours de route pilotent eux-mêmes les étapes (remplirEtape1/2). */
+async function remplirEtEnvoyer() {
+  const user = utilisateur();
+  await allerAEtape3(user);
+  await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
   return user;
 }
 
@@ -123,7 +136,7 @@ describe("CompanyRegistrationPage", () => {
   });
 
   it("adapte l’identifiant fiscal au pays : NIF, SIREN, EIN", async () => {
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
 
     for (const [recherche, pays, libelle] of [
@@ -139,7 +152,7 @@ describe("CompanyRegistrationPage", () => {
   });
 
   it("recherche sans tenir compte des accents ni de la casse, code ISO compris", async () => {
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
 
     await user.click(screen.getByRole("combobox", { name: "Secteur d’activité" }));
@@ -157,21 +170,25 @@ describe("CompanyRegistrationPage", () => {
 
   it("vérifie la forme de l’identifiant fiscal selon le pays avant tout envoi", async () => {
     renderPage();
-    await remplirEtEnvoyer({ pays: "FR", identifiant: "732829321" });
+    const user = utilisateur();
+    await allerAEtape2(user, { pays: "FR", identifiant: "732829321" });
+    await remplirEtape2(user);
+    await screen.findByLabelText("Code ISIN");
+    await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
 
     expect(await screen.findByText("Numéro SIREN invalide (clé de contrôle).")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("ISIN, LEI et site web sur l’étape 3, marqués facultatifs", async () => {
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
 
     expect(screen.queryByLabelText("Code ISIN")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Site web officiel")).not.toBeInTheDocument();
     expect(screen.queryByText(/Présentez votre entreprise/)).not.toBeInTheDocument();
 
-    await remplirEtape1(user);
+    await allerAEtape2(user);
     expect(screen.getByRole("link", { name: /Télécharger modèle \.docx/ })).toHaveAttribute(
       "href",
       "/modeles/lettre-de-mandat.docx",
@@ -187,7 +204,7 @@ describe("CompanyRegistrationPage", () => {
   });
 
   it("trois étapes ; « Suivant » ne vérifie que l’étape affichée", async () => {
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
     expect(screen.getByRole("navigation", { name: "Étapes" })).toHaveTextContent("Étape 1 sur 3");
     await user.click(screen.getByRole("button", { name: "Suivant" }));
@@ -197,9 +214,12 @@ describe("CompanyRegistrationPage", () => {
 
   it("exige la lettre de mandat avant tout envoi", async () => {
     renderPage();
-    await remplirEtEnvoyer({ avecMandat: false });
+    const user = utilisateur();
+    await allerAEtape2(user);
+    await remplirEtape2(user, { avecMandat: false });
 
     expect(await screen.findByText("La lettre de mandat (PDF) est requise.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Code ISIN")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -219,11 +239,11 @@ describe("CompanyRegistrationPage", () => {
   });
 
   it("refuse une messagerie grand public dès la saisie", async () => {
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
-    await remplirEtape1(user);
+    await allerAEtape2(user);
 
-    await user.type(await screen.findByLabelText("E-mail professionnel"), "aicha@gmail.com");
+    await user.type(screen.getByLabelText("E-mail professionnel"), "aicha@gmail.com");
     await user.click(screen.getByRole("button", { name: "Suivant" }));
 
     expect(
@@ -235,14 +255,10 @@ describe("CompanyRegistrationPage", () => {
   });
 
   it("erreur d’adresse trouvée à l’envoi : retour à l’étape Contact avec le message (Review Focus 4)", async () => {
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
-    await remplirEtape1(user);
-    await remplirEtape2(user);
-    await user.type(
-      await screen.findByLabelText("Site web officiel"),
-      "https://www.autre-groupe.mr",
-    );
+    await allerAEtape3(user);
+    await user.type(screen.getByLabelText("Site web officiel"), "https://www.autre-groupe.mr");
     await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
 
     expect(await screen.findByLabelText("E-mail professionnel")).toBeInTheDocument();
@@ -257,12 +273,13 @@ describe("CompanyRegistrationPage", () => {
 
   it("conserve les valeurs en changeant d’étape et les envoie à l’étape 3", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
-    const user = userEvent.setup();
+    const user = utilisateur();
     renderPage();
-    await remplirEtape1(user);
-    await remplirEtape2(user);
-    await user.click(await screen.findByRole("button", { name: "Précédent" }));
-    await user.click(await screen.findByRole("button", { name: "Précédent" }));
+    await allerAEtape3(user);
+    await user.click(screen.getByRole("button", { name: "Précédent" }));
+    await screen.findByLabelText("Nom & Prénom du responsable");
+    await user.click(screen.getByRole("button", { name: "Précédent" }));
+    await screen.findByLabelText("Nom de l’entreprise");
 
     expect(screen.getByLabelText("Nom de l’entreprise")).toHaveValue("Minière du Nord");
     expect(screen.getByRole("combobox", { name: "Pays" })).toHaveTextContent("Mauritanie");
@@ -288,11 +305,10 @@ describe("CompanyRegistrationPage", () => {
   ])(
     "%s invalide à l’envoi : reste à l’étape 3 avec le message",
     async (champ, saisie, message) => {
-      const user = userEvent.setup();
+      const user = utilisateur();
       renderPage();
-      await remplirEtape1(user);
-      await remplirEtape2(user);
-      await user.type(await screen.findByLabelText(champ), saisie);
+      await allerAEtape3(user);
+      await user.type(screen.getByLabelText(champ), saisie);
       await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
 
       expect(await screen.findByText(message)).toBeInTheDocument();
@@ -337,6 +353,5 @@ describe("CompanyRegistrationPage", () => {
     await user.click(await screen.findByRole("button", { name: "Renvoyer le code" }));
     expect(await screen.findByText(/un nouveau code vient d’être envoyé/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/resend-code"))).toBe(true);
-    vi.useRealTimers();
   });
 });

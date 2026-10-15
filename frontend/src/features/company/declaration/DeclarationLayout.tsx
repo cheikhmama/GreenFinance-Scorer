@@ -12,7 +12,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { PhaseProgress } from "@/shared/ui/phase-progress";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { WizardStepper } from "@/shared/ui/wizard";
-import { rapportQueryOptions, useActualisationSurNotification } from "../api";
+import { rapportQueryOptions, useActualisationSurNotification, useCompanyReports } from "../api";
 import { libelleExercice } from "../session/etat";
 import { ETAPES_DECLARATION } from "../wizard/etapes";
 import { RailDeclaration } from "./RailDeclaration";
@@ -44,6 +44,7 @@ export function DeclarationLayout() {
   const { rapportId: segment = "", pilier, etape } = useParams();
   const { data: rapport, isPending, error } = useQuery(rapportQueryOptions(idDepuisSlug(segment)));
   useActualisationSurNotification();
+  const { data: rapports } = useCompanyReports();
 
   if (isPending) {
     return (
@@ -73,6 +74,7 @@ export function DeclarationLayout() {
           ton: phase.ton === "danger" ? ("danger" as const) : ("attention" as const),
         };
   const brouillon = rapport.submitted_at === null;
+  const dejaCorrige = rapports?.some((r) => r.previous_report_id === rapport.id) ?? false;
 
   return (
     <div className="space-y-6">
@@ -88,7 +90,7 @@ export function DeclarationLayout() {
         action={
           <>
             <StatutDeclaration rapport={rapport} />
-            {rapport.status === "REVISION_REQUESTED" ? (
+            {rapport.status === "REVISION_REQUESTED" && !dejaCorrige ? (
               <Button asChild size="sm">
                 <Link to={`/company/declarations/${segment}/correction`}>Corriger</Link>
               </Button>

@@ -55,9 +55,11 @@ function renderPage() {
 
 /** Compteur de notifications non lues, lu par useActualisationSurNotification. */
 function notifications(url: unknown) {
-  return String(url).includes("/notifications")
-    ? Response.json({ items: [], total: 0, page: 1, page_size: 1 })
-    : null;
+  const chemin = String(url);
+  if (chemin.includes("/notifications"))
+    return Response.json({ items: [], total: 0, page: 1, page_size: 1 });
+  // Liste des rapports de l'entreprise (lue par l'en-tête pour masquer « Corriger »).
+  return chemin.endsWith("/company/rapports") ? Response.json([]) : null;
 }
 
 function progression() {

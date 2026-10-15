@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, Outlet, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, Outlet, useNavigate, useParams } from "react-router-dom";
 import { formatValeur, libelleMethode, libellePilier } from "@/shared/format/indicateurs";
 import { libelleStatutRevue } from "@/shared/format/revue";
 import { idDepuisSlug } from "@/shared/format/slug";
@@ -10,6 +10,7 @@ import { DisclosureCard } from "@/shared/ui/disclosure-card";
 import { rapportQueryOptions } from "../api";
 import { FAMILLE_AUTRES, type Famille, famillesDuPilier, pilierDepuisSlug } from "../esg/taxonomie";
 import { type MetriqueVue, metriquesDuRapport } from "../esg/vueMetrique";
+import { etapeReprise } from "../session/etat";
 
 function resumeFamille(famille: Famille, lignes: MetriqueVue[]): string {
   if (lignes.length === 0) return "Aucun indicateur trouvé";
@@ -49,12 +50,19 @@ export function PillarPage() {
   const { rapportId: segment = "", pilier: slug, famille: familleOuverte } = useParams();
   const navigate = useNavigate();
   const pilier = pilierDepuisSlug(slug);
-  const { data: metriques } = useQuery({
-    ...rapportQueryOptions(idDepuisSlug(segment)),
-    select: metriquesDuRapport,
-  });
+  const { data: rapport } = useQuery(rapportQueryOptions(idDepuisSlug(segment)));
   if (!pilier) return <SectionIntrouvable texte="Ce pilier n’existe pas." />;
-  if (!metriques) return null;
+  if (!rapport) return null;
+  // Un brouillon n'a pas de piliers à parcourir : retour à l'étape de l'assistant où il en est.
+  if (rapport.submitted_at === null) {
+    return (
+      <Navigate
+        to={`/company/declarations/${segment}/brouillon/${etapeReprise(rapport)}`}
+        replace
+      />
+    );
+  }
+  const metriques = metriquesDuRapport(rapport);
 
   const base = `/company/declarations/${segment}/${slug}`;
   const familles = famillesDuPilier(pilier)

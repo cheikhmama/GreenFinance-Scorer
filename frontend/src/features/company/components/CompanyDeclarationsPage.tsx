@@ -46,7 +46,7 @@ function score(rapport: RapportESGPublic) {
 }
 
 /** Mes déclarations (tâche 5.9) : l'action « Nouvelle déclaration » dans l'en-tête, la règle
- * « une seule déclaration à la fois » en bandeau, les déclarations en cours avec leur stepper,
+ * « une seule déclaration à la fois » en bandeau, les déclarations en cours avec leur progression,
  * puis l'historique en table de données (tâche 5.18) : couverture, empreinte du fichier et PDF de
  * synthèse dans le tiroir de chaque ligne. */
 export function CompanyDeclarationsPage() {

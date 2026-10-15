@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
-import { idDepuisSlug } from "@/shared/format/slug";
+import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { FileDrop } from "@/shared/ui/file-drop";
@@ -52,7 +53,11 @@ function EtapesCorrection({
   function envoyer(valeurs: CorrectionForm) {
     setErreur(null);
     correction.mutate(valeurs, {
-      onSuccess: () => navigate(retour, { state: { correctionEnvoyee: true } }),
+      // La nouvelle version devient la déclaration courante : l'original n'offre plus « Corriger ».
+      onSuccess: (nouveau) =>
+        navigate(`/company/declarations/${creerSlug(titreDeclaration(nouveau), nouveau.id)}`, {
+          state: { correctionEnvoyee: true },
+        }),
       onError: (error) =>
         setErreur(
           error instanceof ApiError ? error.message : "Une erreur inattendue est survenue.",

@@ -4,7 +4,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 
 /** Tiroir adressable (refonte de la navigation, spec §7.1) : ouvert tant que sa route est active,
  * le fermer (Échap, ×, clic à côté) ramène à `retour`, la route parente. Le focus revient à
- * l'élément qui l'a ouvert (Radix le mémorise au montage et le rend au démontage). */
+ * l'élément qui l'a ouvert : RouteSheet le capture lui-même au montage et le refocalise à la
+ * fermeture (Radix ne restaure le focus que sur un Trigger, qu'un tiroir routé n'a pas). */
 export function RouteSheet({
   retour,
   titre,

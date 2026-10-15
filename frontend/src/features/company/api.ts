@@ -80,10 +80,6 @@ export function rapportQueryOptions(rapportId: string) {
   });
 }
 
-export function useCompanyReport(rapportId: string) {
-  return useQuery(rapportQueryOptions(rapportId));
-}
-
 /** L'examen est fait par des personnes : pas de suivi périodique. Une décision produit une
  * notification ; quand le compteur de non-lues (déjà suivi chaque minute) augmente, les
  * déclarations sont relues (spec §6). Une baisse (lecture) ne déclenche rien. */

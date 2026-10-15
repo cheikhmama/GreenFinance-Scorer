@@ -13,8 +13,9 @@ import { useMyCompanyProfile } from "../api";
 import { CompanyRegistrationsCard } from "./CompanyRegistrationsCard";
 
 /** Nom, secteur, pays et logo restent gérés par l'Administrateur (gouvernance Phase 0) ; la
- * description, le site officiel et le montant minimum d'investissement sont modifiables ici par
- * l'Entreprise elle-même (tâche post-Phase-0, bascule depuis AdminCompanyDetailPage.tsx). Trois
+ * description, le site officiel et le montant minimum d'investissement sont modifiables par
+ * l'Entreprise elle-même dans le tiroir « Modifier » (tâche post-Phase-0, bascule depuis
+ * AdminCompanyDetailPage.tsx). Trois
  * sections en cartes : le compte et son contact, la fiche entreprise telle que les investisseurs
  * la voient une fois publiée, puis ses immatriculations (secteur, LEI, ISIN, contrôle GLEIF). */
 export function ProfilePage() {

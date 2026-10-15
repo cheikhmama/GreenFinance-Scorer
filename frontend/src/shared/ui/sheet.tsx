@@ -5,7 +5,8 @@ import { cn } from "@/shared/ui/cn";
 
 /* Tiroir latéral de détail (tâche 5.17) : s'ouvre depuis la droite au-dessus de la table, qui
    reste visible dessous ; plein écran au téléphone. Même primitive que Dialog (focus piégé,
-   Échap ferme, le focus revient à l'élément d'origine). */
+   Échap ferme). Le focus revient au Trigger ; pour un tiroir routé sans Trigger, RouteSheet
+   capture l'élément d'origine et restaure le focus lui-même. */
 function Sheet(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="sheet" {...props} />;
 }

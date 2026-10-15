@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import type { RapportESGDetail } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
@@ -27,12 +27,20 @@ export function VerificationStep({ rapport }: { rapport: RapportESGDetail }) {
   const soumettre = useSubmitDraft(rapport.id);
   const [confirme, setConfirme] = useState(false);
   const recu = soumettre.data;
+  const titreRecu = useRef<HTMLHeadingElement>(null);
+  const recuAffiche = Boolean(recu?.submitted_at);
+  // Le reçu remplace le formulaire : le focus clavier suit, sinon il serait perdu avec le bouton.
+  useEffect(() => {
+    if (recuAffiche) titreRecu.current?.focus();
+  }, [recuAffiche]);
 
   if (recu?.submitted_at) {
     return (
       <Card role="region" aria-label="Reçu de soumission">
         <CardHeader>
-          <CardTitle>Reçu de soumission</CardTitle>
+          <h2 ref={titreRecu} tabIndex={-1} className="font-semibold leading-none outline-none">
+            Reçu de soumission
+          </h2>
           <CardDescription>
             Votre rapport est transmis et verrouillé. Conservez ce reçu : l’empreinte identifie
             exactement le fichier soumis.

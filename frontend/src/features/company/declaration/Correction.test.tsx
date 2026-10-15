@@ -5,6 +5,8 @@ import { renderCompany } from "../test/renderCompany";
 
 const ID = "99999999-9999-9999-9999-999999999999";
 const fetchMock = vi.fn<typeof fetch>();
+const NOUVEAU = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+let liste: Record<string, unknown>[] = [];
 const PDF = new File(["%PDF-1.7"], "corrige.pdf", { type: "application/pdf" });
 
 function rapport() {
@@ -35,26 +37,30 @@ function rapport() {
   };
 }
 
+function nouvelleVersion() {
+  return { ...rapport(), id: NOUVEAU, status: "IN_AUDIT", version: 2, previous_report_id: ID };
+}
+
 beforeEach(() => {
   fetchMock.mockReset();
+  liste = [];
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockImplementation(async (url, init) => {
     const chemin = String(url);
     if (chemin.includes("/notifications"))
       return Response.json({ items: [], total: 0, page: 1, page_size: 1 });
     if (init?.method === "POST" && chemin.endsWith("/corrections")) {
-      return Response.json(
-        { ...rapport(), id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", status: "DRAFT" },
-        { status: 201 },
-      );
+      return Response.json(nouvelleVersion(), { status: 201 });
     }
+    if (chemin.endsWith("/company/rapports")) return Response.json(liste);
+    if (chemin.includes(NOUVEAU)) return Response.json(nouvelleVersion());
     return Response.json(rapport());
   });
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Correction demandée — tiroir en deux étapes", () => {
-  it("depuis l’en-tête : demande, puis exercice et PDF ; envoi puis retour à la synthèse", async () => {
+  it("depuis l’en-tête : demande, puis exercice et PDF ; envoi puis arrivée sur la nouvelle version", async () => {
     const user = userEvent.setup();
     const { router } = renderCompany(`/company/declarations/${ID}`);
     await user.click(await screen.findByRole("link", { name: "Corriger" }));
@@ -68,8 +74,10 @@ describe("Correction demandée — tiroir en deux étapes", () => {
     await user.upload(within(tiroir).getByLabelText("Fichier PDF corrigé"), PDF);
     await user.click(within(tiroir).getByRole("button", { name: "Envoyer la correction" }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/company/declarations/${ID}`));
+    await waitFor(() => expect(router.state.location.pathname).toContain(NOUVEAU));
+    expect(router.state.location.pathname).not.toContain(ID);
     expect(await screen.findByText("Nouvelle version déposée")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Corriger" })).not.toBeInTheDocument();
 
     const envoi = fetchMock.mock.calls.filter(
       ([url, init]) => init?.method === "POST" && String(url).endsWith("/corrections"),
@@ -96,6 +104,16 @@ describe("Correction demandée — tiroir en deux étapes", () => {
       "En cours d’examen",
     );
     expect(progression.parentElement).toHaveTextContent("Correction demandée");
+  });
+
+  it("une déclaration déjà corrigée n’offre plus « Corriger »", async () => {
+    liste = [rapport(), nouvelleVersion()];
+    renderCompany(`/company/declarations/${ID}`);
+    await screen.findByText(/version 1/);
+    // Le lien est d’abord offert, le temps que la liste des rapports arrive.
+    await waitFor(() =>
+      expect(screen.queryByRole("link", { name: "Corriger" })).not.toBeInTheDocument(),
+    );
   });
 
   it("aucun formulaire de correction dans la synthèse elle-même", async () => {

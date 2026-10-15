@@ -233,6 +233,7 @@ describe("Brouillon — document puis vérification", () => {
     await user.click(soumettre);
     const recu = await screen.findByRole("region", { name: "Reçu de soumission" });
     expect(recu).toHaveTextContent(SHA);
+    expect(within(recu).getByRole("heading", { name: "Reçu de soumission" })).toHaveFocus();
     expect(appels("POST", "/submit")).toHaveLength(1);
     // Le statut bascule (rail des piliers) : le reçu reste le même élément, monté.
     await screen.findByRole("navigation", { name: "Sections de la déclaration" });
