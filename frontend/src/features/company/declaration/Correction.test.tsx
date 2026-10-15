@@ -70,6 +70,32 @@ describe("Correction demandée — tiroir en deux étapes", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/company/declarations/${ID}`));
     expect(await screen.findByText("Nouvelle version déposée")).toBeInTheDocument();
+
+    const envoi = fetchMock.mock.calls.filter(
+      ([url, init]) => init?.method === "POST" && String(url).endsWith("/corrections"),
+    );
+    expect(envoi).toHaveLength(1);
+    const corps = envoi[0][1]?.body as FormData;
+    expect(corps.get("annee_reporting")).toBe("2025");
+    expect((corps.get("fichier") as File).name).toBe("corrige.pdf");
+  });
+
+  it("lien direct (cache froid) : l’exercice proposé est celui de la déclaration", async () => {
+    const user = userEvent.setup();
+    renderCompany(`/company/declarations/${ID}/correction`);
+    const tiroir = await screen.findByRole("dialog", { name: "Correction demandée" });
+    await user.click(within(tiroir).getByRole("button", { name: "Continuer" }));
+    expect(within(tiroir).getByLabelText("Exercice")).toHaveValue(2025);
+  });
+
+  it("la progression reste à « En cours d’examen » avec la branche « Correction demandée »", async () => {
+    renderCompany(`/company/declarations/${ID}`);
+    await screen.findByRole("link", { name: "Corriger" });
+    const progression = screen.getByRole("list", { name: "Progression" });
+    expect(progression.querySelector("[aria-current='step']")).toHaveTextContent(
+      "En cours d’examen",
+    );
+    expect(progression.parentElement).toHaveTextContent("Correction demandée");
   });
 
   it("aucun formulaire de correction dans la synthèse elle-même", async () => {

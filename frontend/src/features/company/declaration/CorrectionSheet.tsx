@@ -22,19 +22,32 @@ const ANNEE_COURANTE = new Date().getFullYear();
  * nouvelle version liée ; l'original reste conservé tel quel. */
 export function CorrectionSheet() {
   const { rapportId: segment = "" } = useParams();
-  const navigate = useNavigate();
   const retour = `/company/declarations/${segment}`;
   const { data: rapport } = useQuery(rapportQueryOptions(idDepuisSlug(segment)));
-  const [etape, setEtape] = useState<1 | 2>(1);
-  const correction = useSubmitCorrection(rapport?.id ?? "");
-  const [erreur, setErreur] = useState<string | null>(null);
-  const form = useForm<CorrectionForm>({
-    resolver: zodResolver(correctionSchema),
-    defaultValues: { annee_reporting: rapport?.fiscal_year ?? ANNEE_COURANTE },
-  });
 
   if (!rapport) return null;
   if (rapport.status !== "REVISION_REQUESTED") return <Navigate to={retour} replace />;
+  // Formulaire monté seulement une fois le rapport chargé : l'exercice par défaut est le bon.
+  return <EtapesCorrection rapportId={rapport.id} exercice={rapport.fiscal_year} retour={retour} />;
+}
+
+function EtapesCorrection({
+  rapportId,
+  exercice,
+  retour,
+}: {
+  rapportId: string;
+  exercice: number | null;
+  retour: string;
+}) {
+  const navigate = useNavigate();
+  const [etape, setEtape] = useState<1 | 2>(1);
+  const correction = useSubmitCorrection(rapportId);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const form = useForm<CorrectionForm>({
+    resolver: zodResolver(correctionSchema),
+    defaultValues: { annee_reporting: exercice ?? ANNEE_COURANTE },
+  });
 
   function envoyer(valeurs: CorrectionForm) {
     setErreur(null);
