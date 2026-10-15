@@ -3,13 +3,16 @@ import random
 import re
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import col, select
 
+from app.access_requests.models import AccessRequest
 from app.audit.models import AuditOpinion
 from app.auth.hashing import hash_password
 from app.auth.models import AccountActivationToken, User
@@ -20,9 +23,11 @@ from app.core.audit import auditer
 from app.core.config import get_settings
 from app.core.database import utcnow
 from app.core.enums import (
+    AccessRequestStatus,
     AuditDecision,
     Currency,
     DataMethod,
+    InvestorType,
     Pillar,
     ReportStatus,
     ReportType,
@@ -87,7 +92,7 @@ def _create_entreprise_avec_utilisateur(session) -> tuple[Company, User]:
 
 
 def _create_rapport(session, entreprise_id: uuid.UUID, **overrides) -> ESGReport:
-    valeurs = {
+    valeurs: dict[str, Any] = {
         "company_id": entreprise_id,
         "type": ReportType.RAPPORT_ESG,
         "channel": SubmissionChannel.ENTREPRISE,
@@ -919,7 +924,7 @@ def test_modifier_entreprise_ne_touche_plus_description_site_ni_montant(session)
     entreprise, _ = _create_entreprise_avec_utilisateur(session)
     entreprise.description = "Description existante."
     entreprise.website = "https://existant.test"
-    entreprise.minimum_investment_amount = 500
+    entreprise.minimum_investment_amount = Decimal(500)
     entreprise.minimum_investment_currency = Currency.EUR
     session.add(entreprise)
     session.commit()
@@ -1410,6 +1415,31 @@ def test_lister_rapports_echec_extraction_filtre_correctement(session) -> None:
     assert str(qualifiant.id) not in ids
 
 
+def test_lister_tous_les_rapports_expose_le_score_officiel(session) -> None:
+    """La colonne « Score ESG » de la table Rapports lit official_global_score : un rapport validé
+    doit le porter, un rapport non validé non (jamais un 0 fabriqué)."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    valide = _create_rapport(
+        session,
+        entreprise.id,
+        status=ReportStatus.VALIDATED,
+        extraction_finished_at=utcnow(),
+        official_score=72.5,
+    )
+    en_audit = _create_rapport(
+        session, entreprise.id, status=ReportStatus.IN_AUDIT, extraction_finished_at=utcnow()
+    )
+
+    authed_client = _login(admin.email, "s3cret-pass")
+    response = authed_client.get("/api/v1/admin/rapports", params={"page_size": 100})
+
+    assert response.status_code == 200
+    scores = {item["id"]: item["official_global_score"] for item in response.json()["items"]}
+    assert scores[str(valide.id)] == 72.5
+    assert scores[str(en_audit.id)] is None
+
+
 def test_lister_rapports_orphelins_en_validation(session) -> None:
     """Un rapport EN_VALIDATION sans aucun avis d'audit est un état incohérent, inatteignable via
     l'API seule (voir app/admin/review_queue.py::_rapport_en_validation) mais qui doit rester
@@ -1645,3 +1675,102 @@ def test_consulter_un_rapport_ou_son_score_ne_cree_aucune_configuration(
     assert verification.status_code == 200
     assert verification.json()["computable"] is True
     assert _references_de_version(session, version_de_reference_inedite) == []
+
+
+def test_table_utilisateurs_tous_roles_avec_organisation_et_type(session) -> None:
+    """Tâche 5.17 : sans `role`, la table liste tous les rôles ; chaque ligne porte l'organisation
+    et la précision du rôle tirées de la demande d'accès (None pour un compte sans demande)."""
+    marqueur = f"tous-{uuid.uuid4()}"
+    admin = _create_utilisateur(session, Role.ADMIN)
+    investisseur = _create_utilisateur_avec_email(session, Role.INVESTOR, f"{marqueur}-inv@example.com")
+    auditeur = _create_utilisateur_avec_email(session, Role.AUDITOR, f"{marqueur}-aud@example.com")
+    session.add(
+        AccessRequest(
+            user_id=investisseur.id,
+            role=Role.INVESTOR,
+            organization="Fonds Sahel Capital",
+            investor_type=InvestorType.INVESTMENT_FUND,
+            status=AccessRequestStatus.APPROVED,
+        )
+    )
+    session.commit()
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/utilisateurs", params={"recherche": marqueur, "page_size": 100}
+    )
+
+    assert response.status_code == 200
+    lignes = {item["email"]: item for item in response.json()["items"]}
+    assert set(lignes) == {investisseur.email, auditeur.email}
+    assert lignes[investisseur.email]["organization"] == "Fonds Sahel Capital"
+    assert lignes[investisseur.email]["profile_detail"] == "INVESTMENT_FUND"
+    assert lignes[auditeur.email]["organization"] is None
+
+
+def test_table_entreprises_porte_le_score_officiel(session) -> None:
+    """Tâche 5.17 : colonne « Score officiel » = score du dernier rapport validé, None sans."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    marqueur = f"score-{uuid.uuid4()}"
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    entreprise.name = f"{marqueur} notee"
+    sans_score, _ = _create_entreprise_avec_utilisateur(session)
+    sans_score.name = f"{marqueur} sans"
+    session.add(entreprise)
+    session.add(sans_score)
+    session.commit()
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
+    _create_score(session, rapport.id)
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/entreprises", params={"recherche": marqueur, "page_size": 100}
+    )
+
+    scores = {item["name"]: item["official_global_score"] for item in response.json()["items"]}
+    assert scores == {f"{marqueur} notee": 70.0, f"{marqueur} sans": None}
+
+
+
+def test_table_entreprises_score_officiel_du_dernier_rapport_valide_sous_reference(session) -> None:
+    """Score lu en lot pour toute la page (plus deux requêtes par entreprise) : même règle que
+    dernier_rapport_valide + score_officiel — le rapport validé le plus récent, et sous la
+    configuration de référence, jamais une pondération personnalisée calculée après."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    marqueur = f"score-lot-{uuid.uuid4()}"
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    entreprise.name = marqueur
+    session.add(entreprise)
+    session.commit()
+    ancien = _create_rapport(
+        session,
+        entreprise.id,
+        status=ReportStatus.VALIDATED,
+        submitted_at=utcnow() - timedelta(days=30),
+    )
+    _create_score(session, ancien.id)
+    recent = _create_rapport(session, entreprise.id, status=ReportStatus.VALIDATED)
+    officiel = _create_score(session, recent.id)
+    officiel.global_score = 82.0
+    personnalisee = ScoringConfig(
+        name="perso", version=1, content_yaml="perso: 1", content_hash="f" * 64, owner_user_id=admin.id
+    )
+    session.add(officiel)
+    session.add(personnalisee)
+    session.commit()
+    session.add(
+        Score(
+            report_id=recent.id,
+            config_id=personnalisee.id,
+            global_score=99.0,
+            environmental_score=99.0,
+            social_score=99.0,
+            governance_score=99.0,
+            computed_at=utcnow() + timedelta(minutes=5),
+        )
+    )
+    session.commit()
+
+    response = _login(admin.email, "s3cret-pass").get(
+        "/api/v1/admin/entreprises", params={"recherche": marqueur, "page_size": 100}
+    )
+
+    assert [item["official_global_score"] for item in response.json()["items"]] == [82.0]

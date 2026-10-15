@@ -4,6 +4,8 @@ import type {
   NotificationPublic,
   RapportESGPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { creerSlug } from "@/shared/format/slug";
+import { titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { useMyNotifications } from "@/shared/notifications/api";
 import { Button } from "@/shared/ui/button";
@@ -16,8 +18,14 @@ import {
   CardTitle,
 } from "@/shared/ui/card";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports, useMyCompanyProfile, useReportChecklist } from "../api";
-import { libelleExercice, separerDeclarations, totaux } from "../session/etat";
+import {
+  useActualisationSurNotification,
+  useCompanyReports,
+  useMyCompanyProfile,
+  useReportChecklist,
+} from "../api";
+import { StatutDeclaration } from "../declaration/StatutDeclaration";
+import { etapeReprise, libelleExercice, separerDeclarations, totaux } from "../session/etat";
 import { dernierScoreAffichable, presentationSession } from "../session/presentation";
 
 /** Les seuls jalons montrés à l'Entreprise : la transmission de son rapport et la publication de
@@ -38,6 +46,7 @@ function libelleJalon(type: string, exercice: string | null): string | null {
  * l'espace ; les immatriculations (secteur, LEI, ISIN) vivent dans le Profil. Uniquement des
  * composants partagés et des jetons de thème : rendu identique en clair et en sombre. */
 export function CompanyDashboardPage() {
+  useActualisationSurNotification();
   const { data: rapports, isPending } = useCompanyReports();
   const { data: entreprise } = useMyCompanyProfile();
   const notifications = useMyNotifications(20);
@@ -110,6 +119,11 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
   const total = liste.data ? totaux(liste.data) : null;
   const presentation = rapport ? presentationSession(rapport.status) : null;
   const exercice = rapport ? libelleExercice(rapport.fiscal_year) : null;
+  const brouillon = rapport?.submitted_at === null;
+  const base = rapport
+    ? `/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`
+    : "/company/declarations";
+  const lien = rapport && brouillon ? `${base}/brouillon/${etapeReprise(rapport)}` : base;
 
   return (
     <Card role="region" aria-label="Session active">
@@ -132,8 +146,8 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
                 : `Brouillon ouvert le ${dateCourte(rapport.created_at)}`}
             </p>
             <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-xs font-medium text-foreground">Statut : {presentation.libelle}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{presentation.description}</p>
+              <StatutDeclaration rapport={rapport} />
+              <p className="mt-1.5 text-xs text-muted-foreground">{presentation.description}</p>
               {total ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                   {total.found}/{total.expected} indicateurs détectés
@@ -147,8 +161,8 @@ function SessionActive({ rapport }: { rapport: RapportESGPublic | undefined }) {
       </CardContent>
       <CardFooter>
         <Button asChild variant="link" size="sm" className="h-auto px-0">
-          <Link to="/company/declarations">
-            {rapport ? "Voir le suivi" : "Ouvrir une déclaration"}
+          <Link to={lien}>
+            {rapport ? (brouillon ? "Reprendre" : "Voir la déclaration") : "Ouvrir une déclaration"}
             <ArrowRight aria-hidden="true" />
           </Link>
         </Button>

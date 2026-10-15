@@ -3,17 +3,20 @@ import {
   erreurAdresseProfessionnelle,
   erreurIdentifiantFiscal,
 } from "@/features/registration/referentiels";
-import { Currency, ReportType } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import {
+  Currency,
+  type ReportCreateRequest,
+  ReportType,
+} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { auPlusDeuxDecimales, MESSAGE_DEUX_DECIMALES } from "@/shared/format/montant";
 
-export { Currency, ReportType };
 export const DEVISES = Object.values(Currency);
 
 /** Description, site officiel et montant minimum de sa propre fiche entreprise (tâche
  * post-Phase-0 : bascule de cette modification de l'Administrateur vers l'Entreprise). Même
  * principe que l'ancien formulaire Admin : impose_minimum est purement local (jamais envoyé),
  * il pilote l'affichage du couple montant/devise et la décision d'envoyer (null, null) sinon —
- * voir ProfilePage.tsx. Le serveur applique la même règle "ensemble ou aucun"
+ * voir ProfileEditSheet.tsx. Le serveur applique la même règle "ensemble ou aucun"
  * (app/company/schemas.py::ModifierProfilEntrepriseRequest), reproduite ici pour un message
  * d'erreur immédiat. */
 export const modifierProfilEntrepriseSchema = z
@@ -70,12 +73,20 @@ export const ouvrirDeclarationSchema = z.object({
     new Date().getFullYear(),
     "L'exercice ne peut pas être postérieur à l'année en cours.",
   ),
-  currency: z.enum(Currency),
+  // Facultative : sans devise, ni chiffre d'affaires ni valeur d'entreprise (spec §3.1).
+  currency: z.enum(Currency).optional(),
   revenue: montantFacultatif,
   enterprise_value: montantFacultatif,
 });
 
 export type OuvrirDeclarationForm = z.infer<typeof ouvrirDeclarationSchema>;
+
+/** Corps de POST /reports : les montants ne partent qu'avec leur devise — un montant saisi puis
+ * masqué (devise retirée) n'est jamais envoyé. */
+export function corpsOuverture(valeurs: OuvrirDeclarationForm): ReportCreateRequest {
+  const { currency, revenue, enterprise_value, ...base } = valeurs;
+  return currency ? { ...base, currency, revenue, enterprise_value } : base;
+}
 
 /** PDF joint à un brouillon : mêmes bornes que le serveur (50 Mo), qui reste seul juge. */
 export const fichierBrouillonSchema = z

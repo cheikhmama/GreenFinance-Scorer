@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Currency, Role } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 
-export { Currency, Role };
+export { Role };
 export const DEVISES = Object.values(Currency);
 
 /** Jamais ADMIN — même règle déjà validée côté prototype (docs/PROTOTYPE_FRONTEND.md) et
@@ -53,18 +53,6 @@ export const creerUtilisateurSchema = z
   });
 
 export type CreerUtilisateurForm = z.infer<typeof creerUtilisateurSchema>;
-
-export const changerRoleSchema = z.object({
-  role: z.enum(ROLES_ATTRIBUABLES),
-});
-
-export type ChangerRoleForm = z.infer<typeof changerRoleSchema>;
-
-export const decisionSchema = z.object({
-  comment: z.string().optional(),
-});
-
-export type DecisionForm = z.infer<typeof decisionSchema>;
 
 /** Identité seulement (nom, secteur, pays) : description, site officiel et montant minimum sont
  * désormais modifiables par l'Entreprise elle-même, jamais par l'Admin (voir

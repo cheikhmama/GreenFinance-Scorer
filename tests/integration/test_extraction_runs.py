@@ -76,6 +76,12 @@ def test_execution_reussie_enregistree_et_valeurs_localisees(session, monkeypatc
     # Clé GEMINI_API_KEY factice en test : le mode démonstration est enregistré comme tel.
     attendu = extractor.MODELE_DEMO if get_settings().gemini_api_key_is_placeholder else extractor.EXTRACTION_MODEL
     assert execution.llm_model == attendu
+    # Mesures de l'exécution (rapports longs, VM à mémoire bornée) : pages converties, pages
+    # passées à l'OCR, durées des deux étapes coûteuses et pic mémoire du processus.
+    assert (execution.pages, execution.pages_ocr) == (5, 0)
+    assert execution.duree_conversion_s is not None and execution.duree_conversion_s >= 0
+    assert execution.duree_llm_s is not None and execution.duree_llm_s >= 0
+    assert execution.pic_memoire_mo is not None and execution.pic_memoire_mo > 0
 
     emission = session.exec(select(CarbonEmission).where(CarbonEmission.report_id == rapport.id)).one()
     indicateur = session.exec(select(ESGMetric).where(ESGMetric.report_id == rapport.id)).one()
@@ -243,3 +249,57 @@ def test_valeur_sans_page_introuvable_ni_enregistree_ni_comptee(session, monkeyp
     ).all() == []
     # Plus d'écart entre la liste de complétude et ce qui est enregistré.
     assert _couverture(session, rapport.id, "scope_1").status != MetricCoverageStatus.TROUVE
+
+
+def test_document_trop_long_echoue_aussitot_avec_sa_cause(session, monkeypatch) -> None:
+    """Au-delà de EXTRACTION_PAGES_MAX : refusé avant toute conversion, sans reprise (le document
+    ne raccourcira pas), avec une cause qui le dit."""
+    from app.ingestion.lots import DocumentTropLong
+
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2024)
+    _simuler_pipeline_extraction(monkeypatch, _extraction_atlas())
+
+    def _trop_long(*_a, **_k):
+        raise DocumentTropLong("700 pages, plafond 600.")
+
+    monkeypatch.setattr("app.ingestion.extractor.docling_pipeline.convertir_rapport", _trop_long)
+
+    extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=False)
+
+    [execution] = _executions(session, rapport.id)
+    assert (execution.status, execution.error) == (ExtractionRunStatus.FAILED, "document_trop_long")
+    session.refresh(rapport)
+    assert rapport.extraction_error == "document_trop_long"
+
+
+def test_contexte_trop_grand_pour_le_fournisseur_echoue_avec_sa_cause(session, monkeypatch) -> None:
+    """413 du fournisseur (limite de tokens) : sans reprise, cause qui dit quoi régler."""
+    from app.ingestion.llm.base import ContexteLLMTropGrand
+
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    rapport = _create_rapport(session, entreprise.id, status=ReportStatus.EXTRACTING, fiscal_year=2024)
+    _simuler_pipeline_extraction(monkeypatch, _extraction_atlas())
+
+    def _trop_grand(**_k):
+        raise ContexteLLMTropGrand("413")
+
+    monkeypatch.setattr("app.ingestion.extractor._call_llm_extraction", _trop_grand)
+    monkeypatch.setattr("app.ingestion.extractor.get_settings", lambda: _reglages_reels(llm_demo=False))
+
+    extractor.run_extraction_pipeline(rapport.id, 2024, derniere_tentative=False)
+
+    [execution] = _executions(session, rapport.id)
+    assert (execution.status, execution.error) == (ExtractionRunStatus.FAILED, "contexte_llm_trop_grand")
+
+
+def _reglages_reels(**valeurs):
+    """Réglages de l'application avec quelques valeurs remplacées (ex. forcer un vrai appel LLM
+    alors que la clé de test est factice)."""
+    reglages = get_settings()
+
+    class _Reglages:
+        def __getattr__(self, nom):
+            return valeurs[nom] if nom in valeurs else getattr(reglages, nom)
+
+    return _Reglages()

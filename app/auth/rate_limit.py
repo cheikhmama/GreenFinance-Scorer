@@ -17,7 +17,6 @@ Redis (voir tests/unit/test_rate_limit.py::test_service_unavailable_never_logs_a
 
 import hashlib
 from collections.abc import Callable
-from typing import TypeVar
 
 import redis
 import structlog
@@ -31,7 +30,6 @@ MAX_ATTEMPTS = 5
 MAX_ATTEMPTS_PAR_IP = 30
 WINDOW_SECONDS = 15 * 60
 
-T = TypeVar("T")
 
 
 def _key(email: str) -> str:
@@ -43,7 +41,7 @@ def _key_ip(adresse_ip: str) -> str:
     return f"login_attempts_ip:{hashlib.sha256(adresse_ip.encode()).hexdigest()}"
 
 
-def _guarded(operation: str, call: Callable[[], T]) -> T:
+def _guarded[T](operation: str, call: Callable[[], T]) -> T:
     try:
         return call()
     except redis.RedisError as exc:

@@ -1,0 +1,18 @@
+@startuml st-03-analyse
+!include _style.iuml
+title Diagramme d'états-transitions — Analyse d'un chercheur (AnalysisStatus)
+hide empty description
+
+[*] --> BROUILLON : créer une analyse\n[chercheur affecté au projet]
+BROUILLON --> BROUILLON : modifier (entreprises du périmètre)
+BROUILLON --> SOUMISE : soumettre
+SOUMISE --> VALIDEE : valider (institution)
+SOUMISE --> CORRECTION_DEMANDEE : demander une correction\n(commentaire)
+CORRECTION_DEMANDEE --> [*] : corriger\n/ nouvelle analyse en BROUILLON\n(version + 1, previous_analysis_id)
+VALIDEE --> [*]
+
+note right of CORRECTION_DEMANDEE
+  L'analyse corrigée n'est jamais réécrite :
+  la correction crée une nouvelle ligne.
+end note
+@enduml

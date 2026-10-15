@@ -1,0 +1,68 @@
+@startuml act-01-traitement-rapport
+!include _style.iuml
+title Diagramme d'activité — Traitement d'un rapport ESG, du dépôt à la publication
+
+|Entreprise|
+start
+:Ouvrir une session de déclaration;
+:Joindre le rapport PDF;
+|Système|
+:Valider le fichier\n(format, taille, empreinte SHA-256);
+if (Fichier valide ?) then (non)
+  |Entreprise|
+  :Corriger le fichier;
+  stop
+else (oui)
+endif
+|Système|
+:Mettre le rapport en file d'extraction;
+:Extraire les indicateurs ESG et carbone\n(Docling, recherche sémantique, Gemini);
+if (Extraction réussie ?) then (non)
+  :Enregistrer la cause de l'échec;
+  |Administrateur|
+  :Relancer l'extraction;
+  detach
+else (oui)
+endif
+|Système|
+:Enregistrer valeurs, preuves et couverture;
+:Calculer le pré-score;
+|Entreprise|
+:Consulter la checklist de complétude;
+:Soumettre le rapport (verrouillage);
+|Administrateur|
+:Affecter un auditeur;
+|Auditeur|
+repeat
+  :Examiner une valeur et sa preuve;
+  :Accepter, corriger ou déclarer introuvable;
+repeat while (Reste-t-il des valeurs à revoir ?) is (oui) not (non)
+:Rendre l'avis d'audit;
+|Administrateur|
+:Consulter l'avis et la vérification du score;
+switch (Décision de l'administrateur ?)
+case (valider)
+  |Système|
+  :Calculer le score officiel
+(valeurs effectives, configuration de référence);
+  if (Couverture suffisante ?) then (oui)
+    :Publier le score
+(transaction unique);
+    :Générer le PDF de synthèse
+et notifier l'entreprise;
+    stop
+  else (non)
+    :Annuler la transaction
+(rapport inchangé);
+    detach
+  endif
+case (demander une correction)
+  |Entreprise|
+  :Déposer une nouvelle version;
+  detach
+case (rejeter)
+  |Système|
+  :Notifier le rejet avec le motif;
+  stop
+endswitch
+@enduml

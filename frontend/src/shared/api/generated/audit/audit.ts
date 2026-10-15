@@ -28,7 +28,7 @@ export const getListAssignedReportsUrl = () => {
 /**
  * @summary Lister les dossiers affectés à l'auditeur, en attente d'avis
  */
-export const listAssignedReports = async ( options?: RequestInit): Promise<DossierAuditeur[]> => {
+export const listAssignedReports = async ( options?: Parameters<typeof apiFetch>[1]): Promise<DossierAuditeur[]> => {
 
   return apiFetch<DossierAuditeur[]>(getListAssignedReportsUrl(),
   {
@@ -51,7 +51,7 @@ export const getGetAssignedReportUrl = (rapportId: string,) => {
 /**
  * @summary Consulter le détail d'un dossier affecté à l'auditeur
  */
-export const getAssignedReport = async (rapportId: string, options?: RequestInit): Promise<DossierAuditeurDetail> => {
+export const getAssignedReport = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<DossierAuditeurDetail> => {
 
   return apiFetch<DossierAuditeurDetail>(getGetAssignedReportUrl(rapportId),
   {
@@ -76,7 +76,7 @@ export const getGetEvidenceFileForAuditUrl = (rapportId: string,
  * @summary Consulter l'extrait PDF (une page) prouvant un indicateur ou une donnée carbone
  */
 export const getEvidenceFileForAudit = async (rapportId: string,
-    preuveId: string, options?: RequestInit): Promise<unknown> => {
+    preuveId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetEvidenceFileForAuditUrl(rapportId,preuveId),
   {
@@ -99,7 +99,7 @@ export const getListMyAuditOpinionsUrl = () => {
 /**
  * @summary Lister l'historique des avis déjà rendus par l'auditeur
  */
-export const listMyAuditOpinions = async ( options?: RequestInit): Promise<AvisHistorique[]> => {
+export const listMyAuditOpinions = async ( options?: Parameters<typeof apiFetch>[1]): Promise<AvisHistorique[]> => {
 
   return apiFetch<AvisHistorique[]>(getListMyAuditOpinionsUrl(),
   {
@@ -123,13 +123,21 @@ export const getSubmitAuditOpinionUrl = (rapportId: string,) => {
  * @summary Soumettre un avis d'audit sur un dossier affecté
  */
 export const submitAuditOpinion = async (rapportId: string,
-    soumettreAvisRequest: SoumettreAvisRequest, options?: RequestInit): Promise<AvisAuditAdmin> => {
+    soumettreAvisRequest: SoumettreAvisRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AvisAuditAdmin> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<AvisAuditAdmin>(getSubmitAuditOpinionUrl(rapportId),
   {
@@ -153,13 +161,21 @@ export const getReviewReportValueUrl = (rapportId: string,) => {
  * @summary Accepter, corriger ou déclarer non trouvée une valeur extraite (Auditeur affecté)
  */
 export const reviewReportValue = async (rapportId: string,
-    metricReviewRequest: MetricReviewRequest, options?: RequestInit): Promise<MetricReviewEntry> => {
+    metricReviewRequest: MetricReviewRequest, options?: Parameters<typeof apiFetch>[1]): Promise<MetricReviewEntry> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<MetricReviewEntry>(getReviewReportValueUrl(rapportId),
   {
@@ -182,7 +198,7 @@ export const getListAuditReviewsUrl = (rapportId: string,) => {
 /**
  * @summary Journal des revues d'un dossier affecté
  */
-export const listAuditReviews = async (rapportId: string, options?: RequestInit): Promise<MetricReviewEntry[]> => {
+export const listAuditReviews = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<MetricReviewEntry[]> => {
 
   return apiFetch<MetricReviewEntry[]>(getListAuditReviewsUrl(rapportId),
   {
@@ -205,7 +221,7 @@ export const getGetAuditPreScoreUrl = (rapportId: string,) => {
 /**
  * @summary Pré-score avec les valeurs revues — visible seulement après l'avis
  */
-export const getAuditPreScore = async (rapportId: string, options?: RequestInit): Promise<PreScore> => {
+export const getAuditPreScore = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<PreScore> => {
 
   return apiFetch<PreScore>(getGetAuditPreScoreUrl(rapportId),
   {

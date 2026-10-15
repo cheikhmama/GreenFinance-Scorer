@@ -1,0 +1,56 @@
+@startuml seq-01-authentification
+!include _style.iuml
+title Diagramme de séquence — Authentification et contrôle d'accès
+autonumber "<b>0."
+
+actor "Utilisateur" as U
+participant "SPA React\n(client.ts)" as SPA
+participant "CSRFMiddleware" as CSRF
+participant "Routeur auth\n/api/v1/auth" as API
+participant "get_current_user\nrequire_role" as DEP
+database "Redis" as R
+database "PostgreSQL" as DB
+
+== Connexion ==
+U -> SPA : saisit e-mail et mot de passe
+SPA -> API : POST /auth/login
+activate API
+API -> R : enforce_login_rate_limit(email, IP)
+API -> DB : SELECT user WHERE email = ?
+alt identifiants invalides ou compte inactif
+  API -> R : register_failed_login_attempt()
+  API -> DB : journal d'audit (login, failure)
+  API --> SPA : 401 invalid_credentials
+else identifiants valides
+  API -> R : clear_login_attempts()
+  API -> DB : journal d'audit (login, success)
+  API -> R : current_generation(user_id)
+  API --> SPA : 200 + Set-Cookie __Host-access_token\n(JWT HS256 : sub, role, gen ; 12 h ; httpOnly)\n+ Set-Cookie __Host-csrf_token
+end
+deactivate API
+
+== Requête authentifiée (méthode mutante) ==
+SPA -> CSRF : POST/PUT/PATCH/DELETE\ncookies + en-tête X-CSRF-Token
+activate CSRF
+alt Origin non autorisée ou jeton CSRF différent
+  CSRF --> SPA : 403
+else contrôle CSRF réussi
+  CSRF -> DEP : transmet la requête
+  activate DEP
+  DEP -> DEP : decode_access_token(cookie)
+  DEP -> R : is_session_revoked(user_id, gen)
+  DEP -> DB : charge l'utilisateur (actif ?)
+  alt jeton invalide, session révoquée ou compte inactif
+    DEP --> SPA : 401
+  else rôle non autorisé pour la route
+    DEP --> SPA : 403
+  else autorisé
+    DEP --> SPA : 200 (réponse métier)
+  end
+  deactivate DEP
+end
+deactivate CSRF
+
+== Révocation (déconnexion, suspension, changement de mot de passe) ==
+API -> R : revoke_all_sessions(user_id)\n(génération + 1 : tous les jetons émis deviennent invalides)
+@enduml

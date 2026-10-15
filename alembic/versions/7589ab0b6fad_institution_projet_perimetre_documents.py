@@ -5,18 +5,18 @@ Revises: 019f78ca4522
 Create Date: 2026-09-14 11:10:36.630262
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 import sqlmodel
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '7589ab0b6fad'
-down_revision: Union[str, Sequence[str], None] = '019f78ca4522'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '019f78ca4522'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 _FK_RAPPORT_NAME = 'fk_analyse_entreprise_rapport_id_rapport_esg'
 _FK_SCORE_NAME = 'fk_analyse_entreprise_score_esg_id_score_esg'

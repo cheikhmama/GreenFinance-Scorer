@@ -13,6 +13,9 @@ const LIBELLES: Record<string, string> = {
   appel_llm_echoue: "Échec de l'appel au modèle d'extraction (réseau ou fournisseur indisponible)",
   quota_llm_epuise:
     "Quota journalier des modèles d'extraction atteint — relancez l'analyse demain ou utilisez une clé API payante",
+  contexte_llm_trop_grand:
+    "Extraits trop longs pour la limite du fournisseur du modèle d'extraction — réduire LLM_CONTEXT_TOKENS",
+  document_trop_long: "Document trop long (au-delà du nombre de pages accepté)",
   persistance_echouee: "Échec de l'enregistrement des données extraites",
   erreur_inattendue: "Erreur inattendue",
   // Posée par la tâche planifiée du worker (tâche 4.1) : traitement interrompu au-delà du délai.

@@ -25,15 +25,10 @@ export function etatBrouillon(rapport: RapportSession): EtatBrouillon | null {
   return "PRET";
 }
 
-export const ETAPES = ["Préparation", "Soumission", "Examen", "Décision"] as const;
-
-const DECISIONS: readonly ReportStatus[] = ["VALIDATED", "REJECTED", "REVISION_REQUESTED"];
-
-/** Étape courante du stepper : 0 tant que la déclaration n'est pas soumise, 2 pendant l'examen,
- * 3 une fois la décision rendue (toutes les étapes sont alors franchies). */
-export function etapeCourante(rapport: RapportSession): number {
-  if (rapport.submitted_at === null) return 0;
-  return DECISIONS.includes(rapport.status) ? 3 : 2;
+/** Étape où reprendre un brouillon (spec §3.1) : la vérification seulement une fois le fichier
+ * analysé sans erreur ; sinon le document. */
+export function etapeReprise(rapport: RapportSession): "document" | "verification" {
+  return etatBrouillon(rapport) === "PRET" ? "verification" : "document";
 }
 
 const LIBELLES_GROUPES: Record<string, string> = {

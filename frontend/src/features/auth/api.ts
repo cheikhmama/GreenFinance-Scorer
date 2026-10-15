@@ -113,19 +113,19 @@ export function useConfirmEmailChange(token: string | null) {
   });
 }
 
-/** POST /auth/logout (204, pas de corps). Vide le cache de useCurrentUser : toute vue encore
- * montée (ex. le temps d'une redirection) reflète aussitôt l'état déconnecté, sans attendre un
- * refetch. La navigation vers /login elle-même est explicite, portée par l'appelant (ex.
- * AppShell::seDeconnecter) — jamais laissée au redirect réactif de RequireRole, réservé à une
- * session perdue en cours de navigation (voir session.ts::pageDeRetour). */
+/** POST /auth/logout (204, pas de corps). Vide TOUT le cache : rien de ce que le compte quitté a
+ * chargé ne doit rester en mémoire pour le compte suivant sur ce navigateur. Les vues encore
+ * montées gardent leurs dernières données jusqu'au démontage : la navigation vers /login est
+ * donc explicite, portée par l'appelant (ex. AppShell::seDeconnecter) — jamais laissée au
+ * redirect réactif de RequireRole, réservé à une session perdue en cours de navigation (voir
+ * session.ts::pageDeRetour), qui renverrait le compte suivant vers la page quittée. */
 export function useLogout() {
   const queryClient = useQueryClient();
 
   return useMutation<void, ApiError, void>({
     mutationFn: () => logout(),
     onSuccess: () => {
-      queryClient.setQueryData(CURRENT_USER_QUERY_KEY, undefined);
-      queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+      queryClient.clear();
     },
   });
 }

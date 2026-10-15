@@ -1,0 +1,122 @@
+' Style commun — sobre, lisible à l'impression (rapport de PFE)
+skinparam dpi 200
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam defaultFontColor #1A1A1A
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam ArrowColor #2B2B2B
+skinparam ArrowThickness 1
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #333333
+skinparam nodesep 40
+skinparam ranksep 50
+
+skinparam note {
+  BackgroundColor #FFF8DC
+  BorderColor #B8A04A
+  FontSize 11
+}
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3B57
+  HeaderBackgroundColor #DCE6F0
+  AttributeFontSize 11
+  FontStyle bold
+}
+skinparam classAttributeIconSize 0
+skinparam stereotypeCBackgroundColor #A9C4DE
+skinparam stereotypeEBackgroundColor #F2D49B
+
+skinparam package {
+  BackgroundColor #F7F9FB
+  BorderColor #5A7690
+  FontStyle bold
+}
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3B57
+}
+skinparam usecase {
+  BackgroundColor #EEF3F8
+  BorderColor #1F3B57
+  FontSize 11
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3B57
+}
+
+skinparam sequence {
+  ParticipantBackgroundColor #DCE6F0
+  ParticipantBorderColor #1F3B57
+  ActorBackgroundColor #FFFFFF
+  ActorBorderColor #1F3B57
+  LifeLineBorderColor #7A8FA3
+  LifeLineBackgroundColor #EEF3F8
+  GroupBackgroundColor #EEF3F8
+  GroupBorderColor #5A7690
+  DividerBackgroundColor #EEF3F8
+  BoxBackgroundColor #F7F9FB
+  MessageAlign center
+}
+skinparam responseMessageBelowArrow true
+
+skinparam state {
+  BackgroundColor #EEF3F8
+  BorderColor #1F3B57
+  StartColor #1A1A1A
+  EndColor #1A1A1A
+  AttributeFontSize 11
+}
+
+skinparam activity {
+  BackgroundColor #EEF3F8
+  BorderColor #1F3B57
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #1F3B57
+  StartColor #1A1A1A
+  EndColor #1A1A1A
+}
+skinparam partition {
+  BorderColor #5A7690
+}
+skinparam swimlane {
+  BorderColor #5A7690
+  TitleFontStyle bold
+}
+
+skinparam component {
+  BackgroundColor #EEF3F8
+  BorderColor #1F3B57
+}
+skinparam interface {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3B57
+}
+skinparam node {
+  BackgroundColor #F7F9FB
+  BorderColor #1F3B57
+  FontStyle bold
+}
+skinparam database {
+  BackgroundColor #EEF3F8
+  BorderColor #1F3B57
+}
+skinparam artifact {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3B57
+}
+skinparam cloud {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3B57
+}
+skinparam queue {
+  BackgroundColor #EEF3F8
+  BorderColor #1F3B57
+}

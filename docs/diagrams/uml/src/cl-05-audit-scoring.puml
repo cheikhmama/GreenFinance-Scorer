@@ -1,0 +1,115 @@
+@startuml cl-05-audit-scoring
+!include _style.iuml
+title Diagramme de classes — Audit et scoring
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 65
+hide empty methods
+
+class User {
+  - role : Role = AUDITOR
+}
+class ESGReport {
+  - status : ReportStatus
+  - official_score : float [0..1]
+  - coverage_rate : float [0..1]
+  - config_hash : str [0..1]
+}
+class "Valeur extraite" as ExtractedValue <<abstraction>> {
+  - review_status : MetricReviewStatus
+  - audited_value : float [0..1]
+}
+hide User methods
+hide ESGReport methods
+hide ExtractedValue methods
+
+class MetricReview <<append-only>> {
+  - decision : MetricReviewStatus
+  - original_value : float
+  - new_value : float [0..1]
+  - reason : ReviewReason [0..1]
+  - comment : str [0..1]
+  - created_at : datetime
+  .. audit/revue.py ..
+  + {static} enregistrer_revue(rapport_id : UUID, auditeur_id : UUID, demande : MetricReviewRequest) : MetricReview
+  + {static} valeurs_non_revues(rapport_id : UUID) : int
+}
+
+class AuditOpinion {
+  - decision : AuditDecision
+  - comment : str [0..1]
+  - submitted_at : datetime
+  .. audit/opinion.py ..
+  + {static} soumettre_avis(rapport_id : UUID, auditeur_id : UUID, decision : AuditDecision, commentaire : str) : AuditOpinion
+  .. audit/revue.py ..
+  + {static} pre_score(rapport_id : UUID, auditeur_id : UUID) : PreScore
+}
+
+class ScoringConfig {
+  - name : str
+  - version : int
+  - content_yaml : str [0..1]
+  - content_hash : str [0..1]
+  - created_at : datetime
+  .. scoring/engine.py ..
+  + {static} enregistrer_configuration(contenu_yaml : str, proprietaire_id : UUID) : ScoringConfig
+  + {static} obtenir_configuration_reference() : ScoringConfig
+  + schema_configuration() : ConfigurationScoring
+}
+
+class Score {
+  - global_score : float
+  - environmental_score : float [0..1]
+  - social_score : float [0..1]
+  - governance_score : float [0..1]
+  - coverage_rate : float [0..1]
+  - computed_at : datetime
+  .. scoring/engine.py ..
+  + {static} calculer_score(rapport_id : UUID) : Score
+  + {static} apercu_score(rapport_id : UUID) : ApercuScore
+  + {static} score_officiel(rapport_id : UUID) : Score [0..1]
+  + {static} score_public(rapport_id : UUID) : ScoreESGPublic [0..1]
+  .. explainability/explanation.py, decomposition.py ..
+  + {static} expliquer_score(user : User, rapport_id : UUID, portee : BaselineScope) : ScoreExplanation
+  + {static} decomposer(termes : list<TermeScore>, references : dict) : Decomposition
+}
+
+enum MetricReviewStatus <<enumeration>> {
+  PENDING
+  ACCEPTED
+  OVERRIDDEN
+  NOT_FOUND
+}
+enum ReviewReason <<enumeration>> {
+  EXTRACTION_ERROR
+  UNIT_ERROR
+  WRONG_PERIOD
+  WRONG_SCOPE
+  NOT_IN_SOURCE
+  OTHER
+}
+enum AuditDecision <<enumeration>> {
+  FAVORABLE
+  FAVORABLE_WITH_RESERVATIONS
+  CORRECTION_REQUIRED
+  UNFAVORABLE
+}
+
+ESGReport "1" *-- "0..*" MetricReview : journal de revue >
+ExtractedValue "1" -- "0..*" MetricReview : révisée par <
+User "1" -- "0..*" MetricReview : auditeur >
+ESGReport "1" *-- "0..*" AuditOpinion
+User "1" -- "0..*" AuditOpinion : auditeur >
+ESGReport "1" *-- "0..*" Score
+ScoringConfig "1" -- "0..*" Score : méthode >
+User "0..1" -- "0..*" ScoringConfig : pondérations perso >
+MetricReview ..> MetricReviewStatus
+MetricReview ..> ReviewReason
+AuditOpinion ..> AuditDecision
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (« .. module .. »).
+  L'objet courant et la session sont omis. Souligné = opération de classe.
+  valeur_effective : valeur auditée si OVERRIDDEN, exclue si NOT_FOUND, sinon extraite.
+endlegend
+@enduml

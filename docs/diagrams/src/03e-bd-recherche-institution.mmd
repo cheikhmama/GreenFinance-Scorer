@@ -1,0 +1,106 @@
+---
+title: Schéma BD (5/5) — Recherche et institutions
+---
+erDiagram
+  users {
+    uuid id PK
+    string role "INSTITUTION ou RESEARCHER"
+  }
+  companies {
+    uuid id PK
+  }
+  esg_reports {
+    uuid id PK
+  }
+  scores {
+    uuid id PK
+  }
+  projects {
+    uuid id PK
+    uuid institution_id FK
+    string name
+    string description
+    string objective
+    datetime start_date
+    datetime planned_end_date
+    datetime deadline
+    string status
+    datetime closed_at
+  }
+  project_assignments {
+    uuid id PK
+    uuid project_id FK
+    uuid researcher_id FK
+    datetime assigned_at
+  }
+  project_companies {
+    uuid id PK
+    uuid project_id FK
+    uuid company_id FK
+    datetime added_at
+  }
+  project_documents {
+    uuid id PK
+    uuid project_id FK
+    uuid report_id FK
+    datetime added_at
+  }
+  analyses {
+    uuid id PK
+    uuid project_id FK
+    uuid researcher_id FK
+    uuid previous_analysis_id FK
+    string title
+    string content
+    string status
+    int version
+    string institution_comment
+    datetime submitted_at
+    datetime decided_at
+  }
+  analysis_companies {
+    uuid id PK
+    uuid analysis_id FK
+    uuid company_id FK
+    uuid report_id FK
+    uuid score_id FK
+  }
+  reference_datasets {
+    uuid id PK
+    uuid owner_user_id FK
+    string name
+    string source_url
+    string licence
+    float scale_min
+    float scale_max
+    bool higher_is_better
+  }
+  reference_dataset_rows {
+    uuid id PK
+    uuid dataset_id FK
+    int line_number
+    string isin
+    string lei
+    string company_name
+    float environmental_score
+    float social_score
+    float governance_score
+    float total_score
+  }
+
+  users ||--o{ projects : "institution"
+  projects ||--o{ project_assignments : "affecte"
+  users ||--o{ project_assignments : "chercheur"
+  projects ||--o{ project_companies : "périmètre"
+  companies ||--o{ project_companies : "étudiée"
+  projects ||--o{ project_documents : "documents"
+  esg_reports ||--o{ project_documents : "joint"
+  projects ||--o{ analyses : "analyses"
+  users ||--o{ analyses : "rédige"
+  analyses |o--o{ analyses : "version précédente"
+  analyses ||--o{ analysis_companies : "porte sur"
+  companies ||--o{ analysis_companies : "analysée"
+  esg_reports |o--o{ analysis_companies : "rapport cité"
+  scores |o--o{ analysis_companies : "score cité"
+  users ||--o{ reference_datasets : "importe"
+  reference_datasets ||--o{ reference_dataset_rows : "lignes"

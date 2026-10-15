@@ -19,11 +19,19 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    BaseDocTemplate, CondPageBreak, Flowable, Frame, KeepTogether, PageBreak, PageTemplate,
-    Paragraph, Spacer, Table, TableStyle,
+    BaseDocTemplate,
+    CondPageBreak,
+    Flowable,
+    Frame,
+    KeepTogether,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
 )
 from reportlab.platypus.tableofcontents import TableOfContents
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
@@ -407,8 +415,9 @@ def build_docx(parsed):
 
 def inspect_pdf():
     sys.path.append(str(ROOT / ".venv" / "Lib" / "site-packages"))
-    import pymupdf
     import json
+
+    import pymupdf
     document = pymupdf.open(PDF)
     PREVIEW.mkdir(exist_ok=True)
     texts = [p.get_text() for p in document]

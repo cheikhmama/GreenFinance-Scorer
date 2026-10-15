@@ -1,0 +1,55 @@
+# Reverse proxy de production (docker-compose.prod.yml, service caddy).
+# DOMAINE : nom public de la VM (certificat TLS Let's Encrypt automatique) ; « localhost » sans
+# domaine (certificat local, essai sur la VM elle-même).
+
+# En-têtes de sécurité des fichiers du frontend. Les réponses /api portent déjà les leurs
+# (app/core/security_headers.py) : ne pas les doubler ici.
+# CSP : tout vient du site lui-même — scripts (dont public/theme-init.js, sans script en ligne),
+# polices auto-hébergées (@fontsource), worker pdf.js, appels /api. style-src garde
+# 'unsafe-inline' pour les attributs style posés par React et Radix. img-src : logos et avatars
+# en data: URI, rendu pdf.js en blob:.
+(entetes_securite) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+}
+
+{$DOMAINE:localhost} {
+	encode zstd gzip
+
+	# Rapports jusqu'à 50 Mo (app/company/upload_validation.py), avec une marge pour le formulaire.
+	request_body {
+		max_size 60MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	# Fichiers de build au nom haché (Vite) : jamais modifiés, mis en cache un an. Un fichier absent
+	# renvoie 404, jamais index.html (qui serait alors mis en cache comme un script).
+	handle /assets/* {
+		import entetes_securite
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Application monopage : toute autre route renvoie index.html (routage côté navigateur),
+	# revalidé à chaque visite pour qu'un nouveau déploiement soit pris en compte immédiatement.
+	handle {
+		import entetes_securite
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

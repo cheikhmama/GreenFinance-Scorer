@@ -26,13 +26,21 @@ export const getOpenReportUrl = () => {
 /**
  * @summary Ouvrir une déclaration (brouillon) pour un exercice
  */
-export const openReport = async (reportCreateRequest: ReportCreateRequest, options?: RequestInit): Promise<ReportResponse> => {
+export const openReport = async (reportCreateRequest: ReportCreateRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ReportResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<ReportResponse>(getOpenReportUrl(),
   {
@@ -62,7 +70,7 @@ export const getListReportsUrl = (params?: ListReportsParams,) => {
 /**
  * @summary Lister les rapports visibles pour mon rôle
  */
-export const listReports = async (params?: ListReportsParams, options?: RequestInit): Promise<PageReportResponse> => {
+export const listReports = async (params?: ListReportsParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageReportResponse> => {
 
   return apiFetch<PageReportResponse>(getListReportsUrl(params),
   {
@@ -85,7 +93,7 @@ export const getGetReportUrl = (reportId: string,) => {
 /**
  * @summary Consulter un rapport de mon périmètre
  */
-export const getReport = async (reportId: string, options?: RequestInit): Promise<ReportResponse> => {
+export const getReport = async (reportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ReportResponse> => {
 
   return apiFetch<ReportResponse>(getGetReportUrl(reportId),
   {
@@ -108,7 +116,7 @@ export const getDiscardReportUrl = (reportId: string,) => {
 /**
  * @summary Abandonner un brouillon
  */
-export const discardReport = async (reportId: string, options?: RequestInit): Promise<void> => {
+export const discardReport = async (reportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getDiscardReportUrl(reportId),
   {
@@ -132,7 +140,7 @@ export const getAttachReportFileUrl = (reportId: string,) => {
  * @summary Joindre (ou remplacer) le PDF d'un brouillon et lancer son analyse
  */
 export const attachReportFile = async (reportId: string,
-    bodyAttachReportFile: BodyAttachReportFile, options?: RequestInit): Promise<ReportResponse> => {
+    bodyAttachReportFile: BodyAttachReportFile, options?: Parameters<typeof apiFetch>[1]): Promise<ReportResponse> => {
     const formData = new FormData();
 formData.append(`file`, bodyAttachReportFile.file);
 
@@ -157,7 +165,7 @@ export const getGetReportChecklistUrl = (reportId: string,) => {
 /**
  * @summary Liste de complétude : indicateurs trouvés / attendus par groupe, sans valeurs
  */
-export const getReportChecklist = async (reportId: string, options?: RequestInit): Promise<GroupeCompletude[]> => {
+export const getReportChecklist = async (reportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<GroupeCompletude[]> => {
 
   return apiFetch<GroupeCompletude[]>(getGetReportChecklistUrl(reportId),
   {
@@ -180,7 +188,7 @@ export const getSubmitReportUrl = (reportId: string,) => {
 /**
  * @summary Soumettre un brouillon analysé : le rapport est verrouillé
  */
-export const submitReport = async (reportId: string, options?: RequestInit): Promise<ReportResponse> => {
+export const submitReport = async (reportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ReportResponse> => {
 
   return apiFetch<ReportResponse>(getSubmitReportUrl(reportId),
   {

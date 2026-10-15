@@ -34,7 +34,13 @@ export async function downloadFile(path: string, filename: string): Promise<void
     });
   }
 
-  const blob = await response.blob();
+  enregistrerBlob(await response.blob(), filename);
+}
+
+/** Déclenche le téléchargement navigateur d'un contenu déjà en mémoire. Le lien est rattaché au
+ * document le temps du clic, et l'URL révoquée après coup : la révoquer aussitôt annule ou casse
+ * le téléchargement sous Firefox et Safari. */
+export function enregistrerBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -42,5 +48,5 @@ export async function downloadFile(path: string, filename: string): Promise<void
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

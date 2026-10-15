@@ -183,6 +183,14 @@ class ExtractionRun(SQLModel, table=True):
     docling_version: str = Field(max_length=50)
     llm_model: str = Field(max_length=100)
     prompt_version: str = Field(max_length=50)
+    # Mesures d'une exécution réussie (rapports longs, VM à mémoire bornée) : pages converties,
+    # pages passées à l'OCR, durée de la conversion Docling et des appels LLM, pic mémoire en Mo
+    # (conteneur via cgroup, sinon processus — app/ingestion/memoire.py).
+    pages: int | None = Field(default=None, ge=0)
+    pages_ocr: int | None = Field(default=None, ge=0)
+    duree_conversion_s: float | None = Field(default=None, ge=0)
+    duree_llm_s: float | None = Field(default=None, ge=0)
+    pic_memoire_mo: int | None = Field(default=None, ge=0)
 
 
 class Evidence(SQLModel, table=True):

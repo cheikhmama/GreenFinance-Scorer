@@ -1,5 +1,4 @@
 import type {
-  AccessRequestStatus,
   InvestorType,
   ResearchDomain,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
@@ -17,10 +16,4 @@ export const LIBELLES_DOMAINE_RECHERCHE: Record<ResearchDomain, string> = {
   CARBON_FOOTPRINT: "Empreinte carbone",
   GOVERNANCE: "Gouvernance",
   OTHER: "Autre",
-};
-
-export const LIBELLES_STATUT_DEMANDE: Record<AccessRequestStatus, string> = {
-  PENDING_APPROVAL: "En attente",
-  APPROVED: "Approuvée",
-  REJECTED: "Refusée",
 };

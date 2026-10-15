@@ -1,0 +1,47 @@
+@startuml seq-06-portefeuille-pcaf
+!include _style.iuml
+title Diagramme de séquence — Import d'un portefeuille et analyse carbone PCAF
+autonumber "<b>0."
+
+actor "Investisseur" as I
+participant "API Investisseur" as API
+participant "importation.py" as IMP
+participant "fx.py\n(taux de change)" as FX
+participant "carbon.py +\ncarbon/pcaf.py" as PCAF
+database "PostgreSQL" as DB
+
+I -> API : POST /investor/portefeuilles (nom, devise)
+API -> DB : INSERT portfolios
+API --> I : 201
+
+I -> API : POST /portfolios/{id}/positions/import (CSV / JSON)
+activate API
+API -> IMP : importer(fichier)
+activate IMP
+IMP -> IMP : valide chaque ligne\n(ISIN avec clé de contrôle, montant ou poids)
+alt au moins une ligne invalide
+  IMP --> API : erreurs par ligne
+  API --> I : 422 (aucune ligne importée)
+else fichier valide
+  IMP -> DB : rapproche ISIN / ticker\navec les entreprises publiées
+  IMP -> FX : convertit les montants\nvers la devise de référence
+  FX --> IMP : montant converti + taux figé
+  IMP -> DB : INSERT portfolio_positions\n(MATCHED / UNMATCHED / AMBIGUOUS)
+  IMP --> API : positions créées
+  deactivate IMP
+  API --> I : 201
+end
+deactivate API
+
+I -> API : GET /portfolios/{id}/carbon
+activate API
+API -> PCAF : données des positions actives
+PCAF -> DB : dernier rapport VALIDATED de chaque entreprise\n(émissions, EVIC, chiffre d'affaires)
+loop pour chaque position couverte
+  PCAF -> PCAF : AF = montant / EVIC\némissions financées S1+S2 (S3 à part)
+end
+PCAF -> PCAF : empreinte carbone, WACI,\nqualité moyenne PCAF (1 à 5), couvertures
+PCAF --> API : résultat + lignes exclues avec motif
+API --> I : 200
+deactivate API
+@enduml

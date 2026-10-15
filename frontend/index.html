@@ -6,16 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GreenFinance-Scorer</title>
-    <script>
-      // Applique la classe `dark` avant le premier paint pour éviter un flash du mauvais thème —
-      // doit rester synchronisé avec shared/theme/ThemeProvider.tsx (même clé, même repli sur
-      // le mode nuit par défaut). AuthLayout retire ensuite cette classe sur les pages publiques.
-      (function () {
-        var stocke = localStorage.getItem("gfs-theme");
-        var sombre = stocke !== "light";
-        if (sombre) document.documentElement.classList.add("dark");
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -34,7 +34,7 @@ export const getRegisterCompanyUrl = () => {
 /**
  * @summary Demander l'inscription d'une entreprise (validation par l'Administrateur)
  */
-export const registerCompany = async (bodyRegisterCompany: BodyRegisterCompany, options?: RequestInit): Promise<unknown> => {
+export const registerCompany = async (bodyRegisterCompany: BodyRegisterCompany, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
     const formData = new FormData();
 formData.append(`mandate_letter`, bodyRegisterCompany.mandate_letter);
 formData.append(`company_name`, bodyRegisterCompany.company_name);
@@ -77,13 +77,21 @@ export const getVerifyRegistrationEmailUrl = () => {
 /**
  * @summary Confirmer l'adresse du demandeur avec le code reçu par e-mail
  */
-export const verifyRegistrationEmail = async (registrationEmailVerification: RegistrationEmailVerification, options?: RequestInit): Promise<void> => {
+export const verifyRegistrationEmail = async (registrationEmailVerification: RegistrationEmailVerification, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<void>(getVerifyRegistrationEmailUrl(),
   {
@@ -106,13 +114,21 @@ export const getResendRegistrationCodeUrl = () => {
 /**
  * @summary Recevoir un nouveau code de vérification (réponse identique dans tous les cas)
  */
-export const resendRegistrationCode = async (registrationEmailResend: RegistrationEmailResend, options?: RequestInit): Promise<unknown> => {
+export const resendRegistrationCode = async (registrationEmailResend: RegistrationEmailResend, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<unknown>(getResendRegistrationCodeUrl(),
   {
@@ -135,13 +151,21 @@ export const getGetRegistrationStatusUrl = () => {
 /**
  * @summary Suivre une demande d'inscription (jeton reçu par e-mail)
  */
-export const getRegistrationStatus = async (registrationStatusRequest: RegistrationStatusRequest, options?: RequestInit): Promise<RegistrationStatusView> => {
+export const getRegistrationStatus = async (registrationStatusRequest: RegistrationStatusRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RegistrationStatusView> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RegistrationStatusView>(getGetRegistrationStatusUrl(),
   {
@@ -164,7 +188,7 @@ export const getReplyToRegistrationInfoRequestUrl = () => {
 /**
  * @summary Répondre à une demande d'informations : nouvelle lettre de mandat
  */
-export const replyToRegistrationInfoRequest = async (bodyReplyToRegistrationInfoRequest: BodyReplyToRegistrationInfoRequest, options?: RequestInit): Promise<RegistrationStatusView> => {
+export const replyToRegistrationInfoRequest = async (bodyReplyToRegistrationInfoRequest: BodyReplyToRegistrationInfoRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RegistrationStatusView> => {
     const formData = new FormData();
 formData.append(`mandate_letter`, bodyReplyToRegistrationInfoRequest.mandate_letter);
 formData.append(`token`, bodyReplyToRegistrationInfoRequest.token);
@@ -193,7 +217,7 @@ export const getGetMyCompanyProfileUrl = () => {
 /**
  * @summary Consulter la fiche de mon entreprise, telle que vue par les investisseurs
  */
-export const getMyCompanyProfile = async ( options?: RequestInit): Promise<EntreprisePublic> => {
+export const getMyCompanyProfile = async ( options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePublic> => {
 
   return apiFetch<EntreprisePublic>(getGetMyCompanyProfileUrl(),
   {
@@ -216,13 +240,21 @@ export const getUpdateMyCompanyProfileUrl = () => {
 /**
  * @summary Modifier la description, le site officiel et le montant minimum de ma fiche entreprise
  */
-export const updateMyCompanyProfile = async (modifierProfilEntrepriseRequest: ModifierProfilEntrepriseRequest, options?: RequestInit): Promise<EntreprisePublic> => {
+export const updateMyCompanyProfile = async (modifierProfilEntrepriseRequest: ModifierProfilEntrepriseRequest, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<EntreprisePublic>(getUpdateMyCompanyProfileUrl(),
   {
@@ -247,7 +279,7 @@ export const getGetMyLeiVerificationUrl = () => {
  * KYC de l'Administrateur (app/admin/kyc.py), refait à chaque appel, jamais stocké.
  * @summary Vérifier en direct le LEI de mon entreprise auprès de la GLEIF
  */
-export const getMyLeiVerification = async ( options?: RequestInit): Promise<VerificationLei> => {
+export const getMyLeiVerification = async ( options?: Parameters<typeof apiFetch>[1]): Promise<VerificationLei> => {
 
   return apiFetch<VerificationLei>(getGetMyLeiVerificationUrl(),
   {
@@ -270,7 +302,7 @@ export const getListCompanyReportsUrl = () => {
 /**
  * @summary Lister les rapports déposés par l'entreprise
  */
-export const listCompanyReports = async ( options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listCompanyReports = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic[]> => {
 
   return apiFetch<RapportESGPublic[]>(getListCompanyReportsUrl(),
   {
@@ -293,7 +325,7 @@ export const getSubmitCompanyReportUrl = () => {
 /**
  * @summary Déposer un rapport ESG/climat
  */
-export const submitCompanyReport = async (bodySubmitCompanyReport: BodySubmitCompanyReport, options?: RequestInit): Promise<RapportESGPublic> => {
+export const submitCompanyReport = async (bodySubmitCompanyReport: BodySubmitCompanyReport, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
     const formData = new FormData();
 formData.append(`fichier`, bodySubmitCompanyReport.fichier);
 formData.append(`type`, bodySubmitCompanyReport.type);
@@ -320,13 +352,21 @@ export const getImportCompanyReportFromURLUrl = () => {
 /**
  * @summary Importer un rapport ESG/climat depuis une URL (canal automatique)
  */
-export const importCompanyReportFromURL = async (importerRapportParURLRequest: ImporterRapportParURLRequest, options?: RequestInit): Promise<RapportESGPublic> => {
+export const importCompanyReportFromURL = async (importerRapportParURLRequest: ImporterRapportParURLRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RapportESGPublic>(getImportCompanyReportFromURLUrl(),
   {
@@ -350,7 +390,7 @@ export const getSubmitCompanyReportCorrectionUrl = (rapportId: string,) => {
  * @summary Déposer une nouvelle version d'un rapport en attente de correction
  */
 export const submitCompanyReportCorrection = async (rapportId: string,
-    bodySubmitCompanyReportCorrection: BodySubmitCompanyReportCorrection, options?: RequestInit): Promise<RapportESGPublic> => {
+    bodySubmitCompanyReportCorrection: BodySubmitCompanyReportCorrection, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
     const formData = new FormData();
 formData.append(`fichier`, bodySubmitCompanyReportCorrection.fichier);
 formData.append(`annee_reporting`, bodySubmitCompanyReportCorrection.annee_reporting.toString())
@@ -376,7 +416,7 @@ export const getGetCompanyReportUrl = (rapportId: string,) => {
 /**
  * @summary Consulter le détail d'un rapport déposé par l'entreprise
  */
-export const getCompanyReport = async (rapportId: string, options?: RequestInit): Promise<RapportESGDetail> => {
+export const getCompanyReport = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGDetail> => {
 
   return apiFetch<RapportESGDetail>(getGetCompanyReportUrl(rapportId),
   {
@@ -399,7 +439,7 @@ export const getGetCompanyReportOriginalFileUrl = (rapportId: string,) => {
 /**
  * @summary Télécharger le PDF original tel que déposé (non le rapport de synthèse)
  */
-export const getCompanyReportOriginalFile = async (rapportId: string, options?: RequestInit): Promise<unknown> => {
+export const getCompanyReportOriginalFile = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetCompanyReportOriginalFileUrl(rapportId),
   {
@@ -422,7 +462,7 @@ export const getGetCompanyReportSynthesisFileUrl = (rapportId: string,) => {
 /**
  * @summary Télécharger le rapport de synthèse généré par la plateforme
  */
-export const getCompanyReportSynthesisFile = async (rapportId: string, options?: RequestInit): Promise<unknown> => {
+export const getCompanyReportSynthesisFile = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetCompanyReportSynthesisFileUrl(rapportId),
   {

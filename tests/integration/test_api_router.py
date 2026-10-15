@@ -136,3 +136,16 @@ def test_route_avec_le_mauvais_role_est_rejetee(
 
     assert response.status_code == 403, f"{methode} {chemin} : attendu 403, reçu {response.status_code}"
     assert response.json()["error"]["code"] == "permission_denied"
+
+
+def test_documentation_masquee_en_production() -> None:
+    from fastapi import FastAPI
+
+    from app.api.router import urls_documentation
+
+    application = FastAPI(**urls_documentation("production"))
+    client_production = TestClient(application)
+
+    for chemin in ("/docs", "/redoc", "/openapi.json"):
+        assert client_production.get(chemin).status_code == 404
+    assert urls_documentation("development")["openapi_url"] == "/openapi.json"

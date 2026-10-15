@@ -1,179 +1,218 @@
-import { History } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { JournalAuditPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import {
   libelleActionJournal,
   libelleResultatJournal,
   libelleTypeRessource,
   libelleValeurJournal,
-  OPTIONS_TYPES_RESSOURCE,
-  trierOptionsActionsParNombre,
 } from "@/shared/format/journal";
 import { libelleRole } from "@/shared/format/role";
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { Select } from "@/shared/ui/select";
-import { Skeleton } from "@/shared/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-import { useActionCountsJournalAudit, useJournalAudit } from "../api";
+import { Badge } from "@/shared/ui/badge";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFields,
+  SheetHeader,
+  SheetSection,
+  SheetTitle,
+} from "@/shared/ui/sheet";
+import { useTableJournal } from "../api";
 
-/** Trace des événements de compte et de session (connexion, déconnexion, changement de mot de
- * passe, changement de rôle, désactivation) — voir app/core/models.py::AuditLogEntry. Ne couvre
- * pas les décisions métier (affectation, validation, rejet), déjà notifiées à l'entreprise
- * concernée et visibles dans l'historique de son rapport. */
+function dateHeure(iso: string): string {
+  return new Date(iso).toLocaleString("fr-FR");
+}
+
+function acteur(e: JournalAuditPublic): string {
+  return e.actor_name ?? e.actor_email ?? "Anonyme";
+}
+
+/** Un compte est désigné par son rôle (« Investisseur »), toute autre ressource par son type. */
+function ressource(e: JournalAuditPublic): string {
+  if (e.resource_type !== "User") return libelleTypeRessource(e.resource_type);
+  return e.resource_user_role ? libelleRole(e.resource_user_role) : "Compte supprimé";
+}
+
+/** Deux catégories masquées à l'écran, jamais supprimées ni modifiées en base (le journal reste
+ * immuable) : une ressource de type compte dont le rôle est introuvable (compte supprimé depuis),
+ * et toute entrée sans acteur identifié — aucune action du code actuel n'en écrit plus (voir
+ * app/core/audit.py), une telle ligne ne peut venir que d'un compte de test supprimé après coup.
+ * Une entrée AVEC acteur connu reste affichée même en échec : c'est le signal le plus utile pour
+ * repérer une activité suspecte sur un vrai compte. */
+function affichable(e: JournalAuditPublic): boolean {
+  return (
+    (e.resource_type !== "User" || Boolean(e.resource_user_role)) &&
+    Boolean(e.actor_name || e.actor_email)
+  );
+}
+
+/** Journal d'audit (table de données, tâche 5.17) : ressource, action, acteur, résultat et date ;
+ * avant / après, identifiants et corrélation dans le tiroir. `concerneId` restreint à l'historique
+ * d'un compte ou d'une entreprise (actions faites ou subies). */
 export function JournalAuditSection({ concerneId }: { concerneId?: string }) {
-  const [action, setAction] = useState("");
-  const [typeRessource, setTypeRessource] = useState("");
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useJournalAudit({
-      concerne_id: concerneId,
-      action: action || undefined,
-      type_ressource: typeRessource || undefined,
-    });
-  const { data: compteursActions } = useActionCountsJournalAudit();
+  const { data, isLoading, isError } = useTableJournal(concerneId);
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
 
-  // Deux catégories masquées à l'écran, sur demande explicite — jamais supprimées ni modifiées en
-  // base (le journal reste immuable) : 1) une ressource de type compte dont le rôle est
-  // introuvable (compte supprimé depuis) ; 2) toute entrée sans acteur identifié, succès compris —
-  // aucune action du code actuel n'écrit plus jamais "success" sans acteur (voir app/core/
-  // audit.py, tous les appels passent désormais un id réel), donc une telle ligne ne peut venir
-  // que d'un compte de test supprimé après coup, jamais d'un usage réel de la plateforme. Une
-  // entrée AVEC acteur connu reste affichée même en échec : c'est le signal le plus utile pour
-  // repérer une activité suspecte sur un vrai compte.
-  const entrees = (data?.pages.flatMap((page) => page.items) ?? []).filter(
-    (entree) =>
-      (entree.resource_type !== "User" || entree.resource_user_role) &&
-      (entree.actor_name || entree.actor_email),
+  const lignes = useMemo(() => data?.lignes.filter(affichable), [data]);
+
+  const colonnes = useMemo<ColonneTable<JournalAuditPublic>[]>(
+    () => [
+      {
+        id: "ressource",
+        entete: "Ressource",
+        masquable: false,
+        valeurTri: (e) => ressource(e),
+        cellule: (e) => <span className="text-muted-foreground">{ressource(e)}</span>,
+      },
+      {
+        id: "action",
+        entete: "Action",
+        valeurTri: (e) => libelleActionJournal(e.action),
+        cellule: (e) => (
+          <span className="font-medium text-foreground">{libelleActionJournal(e.action)}</span>
+        ),
+      },
+      {
+        id: "acteur",
+        entete: "Par",
+        valeurTri: (e) => acteur(e),
+        cellule: (e) => (
+          <span className="flex flex-col">
+            <span title={e.actor_email ?? undefined}>{acteur(e)}</span>
+            {/* Pas de doublon avec Ressource quand l'acteur agit sur lui-même (ex. connexion) :
+             * Ressource montre déjà ce même rôle. */}
+            {e.actor_role && e.actor_id !== e.resource_id ? (
+              <span className="text-xs text-muted-foreground">{libelleRole(e.actor_role)}</span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: "resultat",
+        entete: "Résultat",
+        valeurTri: (e) => libelleResultatJournal(e.result),
+        cellule: (e) => (
+          <Badge variant={e.result === "success" ? "success" : "destructive"}>
+            {libelleResultatJournal(e.result)}
+          </Badge>
+        ),
+      },
+      {
+        id: "date",
+        entete: "Date",
+        valeurTri: (e) => e.occurred_at,
+        valeurExport: (e) => dateHeure(e.occurred_at),
+        cellule: (e) => (
+          <span className="font-mono whitespace-nowrap">{dateHeure(e.occurred_at)}</span>
+        ),
+      },
+    ],
+    [],
   );
-  const optionsActions = trierOptionsActionsParNombre(
-    Object.fromEntries((compteursActions ?? []).map((c) => [c.action, c.count])),
-  );
-  // Seuls les changements (rôle, état du compte, e-mail) ont un avant/après : une colonne
-  // toujours vide n'est affichée que si au moins une entrée chargée en a un.
-  const avecDetail = entrees.some((entree) => entree.old_value && entree.new_value);
+  const ouvert = lignes?.find((e) => e.id === ouvertId) ?? null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Journal d'audit</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {concerneId ? null : (
-          <div className="mb-4 flex flex-wrap gap-3">
-            <label htmlFor="journal-action" className="block w-full max-w-xs">
-              <span className="sr-only">Filtrer par action</span>
-              <Select
-                id="journal-action"
-                value={action}
-                onChange={(event) => setAction(event.target.value)}
+    <>
+      <DataTable
+        libelle="Journal d’audit"
+        lignes={lignes}
+        tronque={data?.tronque}
+        colonnes={colonnes}
+        cle={(e) => e.id}
+        rechercheDans={(e) =>
+          `${libelleActionJournal(e.action)} ${acteur(e)} ${e.actor_email ?? ""} ${ressource(e)}`
+        }
+        placeholderRecherche="Action, personne, ressource…"
+        filtres={[
+          { id: "action", libelle: "Action", valeur: (e) => libelleActionJournal(e.action) },
+          {
+            id: "ressource",
+            libelle: "Ressource",
+            valeur: (e) => ressource(e),
+          },
+          { id: "resultat", libelle: "Résultat", valeur: (e) => libelleResultatJournal(e.result) },
+        ]}
+        triInitial={{ colonne: "date", sens: "desc" }}
+        surOuvrir={(e) => setOuvertId(e.id)}
+        libelleLigne={(e) => `${libelleActionJournal(e.action)} du ${dateHeure(e.occurred_at)}`}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucune entrée."
+        nomExport="journal-audit"
+        memoire="admin-journal"
+      />
+      <Sheet open={ouvert !== null} onOpenChange={(o) => !o && setOuvertId(null)}>
+        {ouvert ? (
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>{libelleActionJournal(ouvert.action)}</SheetTitle>
+              <SheetDescription>{dateHeure(ouvert.occurred_at)}</SheetDescription>
+              <Badge
+                variant={ouvert.result === "success" ? "success" : "destructive"}
+                className="w-fit"
               >
-                <option value="">Toutes les actions</option>
-                {optionsActions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label htmlFor="journal-type-ressource" className="block w-full max-w-56">
-              <span className="sr-only">Filtrer par type de ressource</span>
-              <Select
-                id="journal-type-ressource"
-                value={typeRessource}
-                onChange={(event) => setTypeRessource(event.target.value)}
-              >
-                <option value="">Toutes les ressources</option>
-                {OPTIONS_TYPES_RESSOURCE.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+                {libelleResultatJournal(ouvert.result)}
+              </Badge>
+            </SheetHeader>
+            <SheetBody>
+              <SheetSection titre="Événement">
+                <SheetFields
+                  champs={[
+                    { libelle: "Par", valeur: acteur(ouvert) },
+                    { libelle: "E-mail", valeur: ouvert.actor_email ?? null },
+                    { libelle: "Ressource", valeur: ressource(ouvert) },
+                    {
+                      libelle: "Code de l’action",
+                      valeur: <code className="font-mono text-xs">{ouvert.action}</code>,
+                    },
+                  ]}
+                />
+              </SheetSection>
+              {ouvert.old_value || ouvert.new_value ? (
+                <SheetSection titre="Changement">
+                  <SheetFields
+                    champs={[
+                      {
+                        libelle: "Avant",
+                        valeur: ouvert.old_value ? libelleValeurJournal(ouvert.old_value) : null,
+                      },
+                      {
+                        libelle: "Après",
+                        valeur: ouvert.new_value ? libelleValeurJournal(ouvert.new_value) : null,
+                      },
+                    ]}
+                  />
+                </SheetSection>
+              ) : null}
+              <SheetSection titre="Identifiants techniques">
+                <SheetFields
+                  champs={[
+                    {
+                      libelle: "Ressource",
+                      valeur: (
+                        <code className="font-mono text-xs">{ouvert.resource_id ?? "—"}</code>
+                      ),
+                    },
+                    {
+                      libelle: "Acteur",
+                      valeur: <code className="font-mono text-xs">{ouvert.actor_id ?? "—"}</code>,
+                    },
+                    {
+                      libelle: "Corrélation",
+                      valeur: (
+                        <code className="font-mono text-xs">{ouvert.correlation_id ?? "—"}</code>
+                      ),
+                    },
+                  ]}
+                />
+              </SheetSection>
+            </SheetBody>
+          </SheetContent>
         ) : null}
-        {isError ? <p className="text-destructive">Impossible de charger le journal.</p> : null}
-        {!isLoading && !isError && entrees.length === 0 ? (
-          <EmptyState icon={History} message="Aucune entrée pour ce filtre." />
-        ) : null}
-        {entrees.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ressource</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Par</TableHead>
-                <TableHead>Résultat</TableHead>
-                <TableHead>Date</TableHead>
-                {avecDetail ? <TableHead>Détail</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entrees.map((entree) => (
-                <TableRow key={entree.id}>
-                  <TableCell>
-                    {entree.resource_type !== "User" ? (
-                      libelleTypeRessource(entree.resource_type)
-                    ) : entree.resource_user_role ? (
-                      libelleRole(entree.resource_user_role)
-                    ) : (
-                      <span className="text-muted-foreground">Compte supprimé</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{libelleActionJournal(entree.action)}</TableCell>
-                  <TableCell>
-                    {entree.actor_name || entree.actor_email ? (
-                      <span className="flex flex-col">
-                        <span title={entree.actor_email ?? undefined}>
-                          {entree.actor_name ?? entree.actor_email}
-                        </span>
-                        {/* Pas de doublon avec Ressource quand l'acteur agit sur lui-même (ex.
-                         * connexion/déconnexion) : Ressource montre déjà ce même rôle. */}
-                        {entree.actor_role && entree.actor_id !== entree.resource_id ? (
-                          <span className="text-xs text-muted-foreground">
-                            {libelleRole(entree.actor_role)}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{libelleResultatJournal(entree.result)}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {new Date(entree.occurred_at).toLocaleString("fr-FR")}
-                  </TableCell>
-                  {avecDetail ? (
-                    <TableCell className="text-muted-foreground">
-                      {entree.old_value && entree.new_value
-                        ? `${libelleValeurJournal(entree.old_value)} → ${libelleValeurJournal(entree.new_value)}`
-                        : null}
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : null}
-        {entrees.length > 0 && hasNextPage ? (
-          <div className="mt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isFetchingNextPage}
-              onClick={() => fetchNextPage()}
-            >
-              {isFetchingNextPage ? "Chargement..." : "Voir plus"}
-            </Button>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      </Sheet>
+    </>
   );
 }

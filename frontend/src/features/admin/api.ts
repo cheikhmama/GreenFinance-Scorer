@@ -59,45 +59,46 @@ import type {
   AccessRequestStatus,
   AccessRequestView,
   AffecterAuditeurRequest,
-  AnalysisStatus,
+  AnalyseAdmin,
   ApercuActeursAdmin,
+  ChargeAuditeurAdmin,
   CompanyOnboardingRequest,
   CompanyOnboardingResult,
   CreerUtilisateurRequest,
   DecisionAdminRequest,
   EntrepriseAdmin,
+  EntrepriseAvecScoreAdmin,
   EntreprisePublic,
   ExtractionRunPublic,
+  JournalAuditPublic,
   JournalAuditActionCompte,
   KycReport,
   ListAuditLogParams,
   ModifierEntrepriseAdminRequest,
-  PageAnalyseAdmin,
-  PageChargeAuditeurAdmin,
-  PageEntrepriseAdmin,
-  PageEntrepriseAvecScoreAdmin,
-  PageEntreprisePublic,
   PageJournalAuditPublic,
-  PagePortefeuilleAdmin,
-  PageProjetAdmin,
-  PageRapportAdminListe,
-  PageUtilisateurPublic,
   PendingRegistration,
   PerformanceESGAdmin,
-  ProjectStatus,
+  PortefeuilleAdmin,
+  ProjetAdmin,
   RapportAdminListe,
   RapportESGDetail,
   RapportESGPublic,
   ReportFinancials,
   ReportFinancialsRequest,
-  ReportStatus,
   Role,
   ScoreRecalculeAdmin,
   ScoreVerificationAdmin,
   TableauDeBordAdmin,
+  UtilisateurAdmin,
   UtilisateurCree,
   UtilisateurPublic,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import {
+  chargerToutesLesPages,
+  chargerToutesLesPagesAvecEtat,
+  TAILLE_PAGE_TABLE,
+  type ToutesLesPages,
+} from "@/shared/api/toutesLesPages";
 
 // Chargement initial de 10 éléments, puis +10 par clic sur "Voir plus", jusqu'à épuisement réel
 // de la liste côté serveur (voir UsersSection / PublishableCompaniesSection). 3 obligeait à
@@ -122,6 +123,7 @@ const UTILISATEURS_KEY = ["admin", "utilisateurs"] as const;
 const utilisateursKey = (role?: Role) => [...UTILISATEURS_KEY, role ?? "tous"] as const;
 const versionsKey = (rapportId: string) => ["admin", "rapports", rapportId, "versions"] as const;
 const JOURNAL_AUDIT_KEY = ["admin", "journal-audit"] as const;
+const UTILISATEURS_TABLE_KEY = ["admin", "utilisateurs", "table"] as const;
 const APERCU_ACTEURS_KEY = ["admin", "apercu-acteurs"] as const;
 const PERFORMANCE_ESG_KEY = ["admin", "performance-esg"] as const;
 const ENTREPRISES_SCORES_KEY = ["admin", "entreprises", "scores"] as const;
@@ -142,6 +144,7 @@ function pageSuivante<T extends { page: number; pages: number }>(
 function invalidateFileDattente(queryClient: ReturnType<typeof useQueryClient>, rapportId: string) {
   queryClient.invalidateQueries({ queryKey: A_AFFECTER_KEY });
   queryClient.invalidateQueries({ queryKey: EN_VALIDATION_KEY });
+  queryClient.invalidateQueries({ queryKey: TOUS_RAPPORTS_KEY });
   queryClient.invalidateQueries({ queryKey: rapportKey(rapportId) });
 }
 
@@ -207,18 +210,6 @@ export function useOverdueReports() {
   });
 }
 
-/** Vue globale de tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut
- * (voir app/admin/review_queue.py::lister_tous_les_rapports) — sert le suivi transverse depuis le
- * tableau de bord (ex. "rapports validés"), distinct des files scopées à une étape du workflow. */
-export function useAllReports(statut?: ReportStatus) {
-  return useInfiniteQuery<PageRapportAdminListe, ApiError>({
-    queryKey: [...TOUS_RAPPORTS_KEY, statut ?? "tous"],
-    queryFn: ({ pageParam }) =>
-      listAllReports({ statut, page: pageParam as number, page_size: TAILLE_PAGE_ADMIN }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
 export function useAdminReport(rapportId: string) {
   return useQuery<RapportESGDetail, ApiError>({
@@ -275,6 +266,10 @@ export function useValidateReport(rapportId: string) {
     onSuccess: () => {
       invalidateFileDattente(queryClient, rapportId);
       queryClient.invalidateQueries({ queryKey: PUBLIABLES_KEY });
+      // Statut, score officiel et « à republier » de la table Entreprises changent avec la validation.
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+      queryClient.invalidateQueries({ queryKey: A_REPUBLIER_KEY });
+      queryClient.invalidateQueries({ queryKey: ENTREPRISES_SCORES_KEY });
     },
   });
 }
@@ -283,7 +278,10 @@ export function useRejectReport(rapportId: string) {
   const queryClient = useQueryClient();
   return useMutation<RapportESGPublic, ApiError, DecisionAdminRequest>({
     mutationFn: (payload) => rejectReport(rapportId, payload),
-    onSuccess: () => invalidateFileDattente(queryClient, rapportId),
+    onSuccess: () => {
+      invalidateFileDattente(queryClient, rapportId);
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
   });
 }
 
@@ -291,53 +289,15 @@ export function useRequestReportCorrection(rapportId: string) {
   const queryClient = useQueryClient();
   return useMutation<RapportESGPublic, ApiError, DecisionAdminRequest>({
     mutationFn: (payload) => requestReportCorrection(rapportId, payload),
-    onSuccess: () => invalidateFileDattente(queryClient, rapportId),
+    onSuccess: () => {
+      invalidateFileDattente(queryClient, rapportId);
+      queryClient.invalidateQueries({ queryKey: TOUTES_ENTREPRISES_KEY });
+    },
   });
 }
 
-export function usePublishableCompanies(recherche = "") {
-  return useInfiniteQuery<PageEntreprisePublic, ApiError>({
-    queryKey: [...PUBLIABLES_KEY, recherche],
-    queryFn: ({ pageParam }) =>
-      listPublishableCompanies({
-        recherche: recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_ADMIN,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
-/** GET /admin/entreprises — contrairement à usePublishableCompanies, remonte TOUTE entreprise
- * (y compris sans rapport, sans compte utilisateur rattaché) avec un résumé de statut : vue de
- * suivi pour l'Administrateur, pas un sélecteur d'action de publication. */
-export function useAllCompanies(recherche = "") {
-  return useInfiniteQuery<PageEntrepriseAdmin, ApiError>({
-    queryKey: [...TOUTES_ENTREPRISES_KEY, recherche],
-    queryFn: ({ pageParam }) =>
-      listAllCompanies({
-        recherche: recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_ADMIN,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
-/** Entreprises déjà publiées dont un rapport a été validé après la dernière publication — voir
- * app/admin/review_queue.py::lister_entreprises_a_republier. Republication elle-même : même
- * geste que publier_entreprise (POST .../publier), pas d'action distincte. */
-export function useCompaniesToRepublish() {
-  return useInfiniteQuery<PageEntreprisePublic, ApiError>({
-    queryKey: A_REPUBLIER_KEY,
-    queryFn: ({ pageParam }) =>
-      listCompaniesToRepublish({ page: pageParam as number, page_size: TAILLE_PAGE_ADMIN }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
 export function usePublishCompany() {
   const queryClient = useQueryClient();
@@ -523,29 +483,6 @@ export function useUtilisateursSelectionnables(role: Role) {
   });
 }
 
-export function useUsersByRole(
-  role: Role | undefined,
-  recherche = "",
-  inclureInactifs = false,
-  enAttente = false,
-  actif = true,
-) {
-  return useInfiniteQuery<PageUtilisateurPublic, ApiError>({
-    queryKey: [...utilisateursKey(role), recherche, inclureInactifs, enAttente],
-    queryFn: ({ pageParam }) =>
-      listUsersByRole({
-        role,
-        recherche: recherche || undefined,
-        inclure_inactifs: inclureInactifs,
-        en_attente_activation: enAttente || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_ADMIN,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-    enabled: actif,
-  });
-}
 
 /** Comptes actifs, tous rôles confondus, qui n'ont pas encore cliqué leur lien d'activation —
  * voir app/admin/utilisateurs.py::lister_utilisateurs_en_attente. Distinct de useUsersByRole
@@ -657,80 +594,10 @@ export function usePerformanceESG() {
   });
 }
 
-/** Détail derrière les cartes de performance ESG (indicateur → liste filtrée) — chaque entreprise
- * publiée avec son score admissible, filtrable par secteur/pays. */
-export function useCompaniesWithScore(secteur?: string, pays?: string) {
-  return useInfiniteQuery<PageEntrepriseAvecScoreAdmin, ApiError>({
-    queryKey: [...ENTREPRISES_SCORES_KEY, secteur ?? "", pays ?? ""],
-    queryFn: ({ pageParam }) =>
-      listCompaniesWithScore({
-        secteur: secteur || undefined,
-        pays: pays || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_ADMIN,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
-/** Charge de travail par Auditeur actif — détail derrière "Dossiers affectés" de l'onglet
- * Auditeur (app/audit/assignment.py::lister_charge_auditeurs). */
-export function useAuditorWorkload(recherche = "") {
-  return useInfiniteQuery<PageChargeAuditeurAdmin, ApiError>({
-    queryKey: [...AUDITEURS_CHARGE_KEY, recherche],
-    queryFn: ({ pageParam }) =>
-      listAuditorWorkload({
-        recherche: recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_ADMIN,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
-/** Tous les portefeuilles non archivés, tous Investisseurs confondus — détail derrière
- * "Portefeuilles non archivés" de l'onglet Investisseur (app/investor/portfolio.py::
- * lister_portefeuilles_admin). */
-export function usePortfoliosAdmin(recherche = "") {
-  return useInfiniteQuery<PagePortefeuilleAdmin, ApiError>({
-    queryKey: [...PORTEFEUILLES_ADMIN_KEY, recherche],
-    queryFn: ({ pageParam }) =>
-      listPortfoliosAdmin({
-        recherche: recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_ADMIN,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
-/** Toutes les analyses Chercheur, filtrable par statut — détail derrière "Analyses par statut" de
- * l'onglet Chercheur/Institution (app/researcher/analyses.py::lister_analyses_admin). Une ligne =
- * une version précise, jamais fusionnée avec ses versions précédentes/suivantes. */
-export function useAnalysesAdmin(statut?: AnalysisStatus) {
-  return useInfiniteQuery<PageAnalyseAdmin, ApiError>({
-    queryKey: [...ANALYSES_ADMIN_KEY, statut ?? "tous"],
-    queryFn: ({ pageParam }) =>
-      listAnalysesAdmin({ statut, page: pageParam as number, page_size: TAILLE_PAGE_ADMIN }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
-/** Tous les projets Institution, filtrable par statut — détail derrière "Projets ouverts/clôturés"
- * de l'onglet Institution (app/institution/projets.py::lister_projets_admin). */
-export function useProjectsAdmin(statut?: ProjectStatus) {
-  return useInfiniteQuery<PageProjetAdmin, ApiError>({
-    queryKey: [...PROJETS_ADMIN_KEY, statut ?? "tous"],
-    queryFn: ({ pageParam }) =>
-      listProjectsAdmin({ statut, page: pageParam as number, page_size: TAILLE_PAGE_ADMIN }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
-  });
-}
 
 const DEMANDES_ACCES_KEY = ["admin", "access-requests"] as const;
 
@@ -754,6 +621,119 @@ export function useDecideAccessRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: DEMANDES_ACCES_KEY });
       queryClient.invalidateQueries({ queryKey: UTILISATEURS_EN_ATTENTE_KEY });
+      queryClient.invalidateQueries({ queryKey: UTILISATEURS_TABLE_KEY });
     },
+  });
+}
+
+// --- Tables de données (tâche 5.17) : liste complète, chargée page par page, puis recherchée,
+// filtrée, triée et paginée par la table. Les clés prolongent celles des listes existantes :
+// toute mutation qui invalidait la liste rafraîchit aussi la table.
+
+export function useTableEntreprises() {
+  return useQuery<EntrepriseAdmin[], ApiError>({
+    queryKey: [...TOUTES_ENTREPRISES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listAllCompanies({ page, page_size: TAILLE_PAGE_TABLE })),
+  });
+}
+
+export function useIdsEntreprisesPubliables() {
+  return useQuery<Set<string>, ApiError>({
+    queryKey: [...PUBLIABLES_KEY, "table"],
+    queryFn: async () =>
+      new Set(
+        (
+          await chargerToutesLesPages((page) =>
+            listPublishableCompanies({ page, page_size: TAILLE_PAGE_TABLE }),
+          )
+        ).map((e) => e.id),
+      ),
+  });
+}
+
+export function useIdsEntreprisesARepublier() {
+  return useQuery<Set<string>, ApiError>({
+    queryKey: [...A_REPUBLIER_KEY, "table"],
+    queryFn: async () =>
+      new Set(
+        (
+          await chargerToutesLesPages((page) =>
+            listCompaniesToRepublish({ page, page_size: TAILLE_PAGE_TABLE }),
+          )
+        ).map((e) => e.id),
+      ),
+  });
+}
+
+export function useTableScores() {
+  return useQuery<EntrepriseAvecScoreAdmin[], ApiError>({
+    queryKey: [...ENTREPRISES_SCORES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listCompaniesWithScore({ page, page_size: TAILLE_PAGE_TABLE }),
+      ),
+  });
+}
+
+export function useTableRapports() {
+  return useQuery<RapportAdminListe[], ApiError>({
+    queryKey: [...TOUS_RAPPORTS_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listAllReports({ page, page_size: TAILLE_PAGE_TABLE })),
+  });
+}
+
+export function useTableUtilisateurs() {
+  return useQuery<UtilisateurAdmin[], ApiError>({
+    queryKey: UTILISATEURS_TABLE_KEY,
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listUsersByRole({ page, page_size: TAILLE_PAGE_TABLE, inclure_inactifs: true }),
+      ),
+  });
+}
+
+export function useTableAuditeurs() {
+  return useQuery<ChargeAuditeurAdmin[], ApiError>({
+    queryKey: [...AUDITEURS_CHARGE_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listAuditorWorkload({ page, page_size: TAILLE_PAGE_TABLE })),
+  });
+}
+
+export function useTablePortefeuilles() {
+  return useQuery<PortefeuilleAdmin[], ApiError>({
+    queryKey: [...PORTEFEUILLES_ADMIN_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listPortfoliosAdmin({ page, page_size: TAILLE_PAGE_TABLE })),
+  });
+}
+
+export function useTableProjets() {
+  return useQuery<ProjetAdmin[], ApiError>({
+    queryKey: [...PROJETS_ADMIN_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listProjectsAdmin({ page, page_size: TAILLE_PAGE_TABLE })),
+  });
+}
+
+export function useTableAnalyses() {
+  return useQuery<AnalyseAdmin[], ApiError>({
+    queryKey: [...ANALYSES_ADMIN_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listAnalysesAdmin({ page, page_size: TAILLE_PAGE_TABLE })),
+  });
+}
+
+/** Journal complet (ou celui d'un compte / d'une entreprise : `concerneId`), plus récent d'abord. */
+export function useTableJournal(concerneId?: string) {
+  // Le journal ne fait que grandir : seul à signaler qu'il dépasse le plafond de chargement.
+  return useQuery<ToutesLesPages<JournalAuditPublic>, ApiError>({
+    queryKey: [...JOURNAL_AUDIT_KEY, "table", concerneId ?? "tout"],
+    queryFn: () =>
+      chargerToutesLesPagesAvecEtat((page) =>
+        listAuditLog({ concerne_id: concerneId, page, page_size: TAILLE_PAGE_TABLE }),
+      ),
   });
 }

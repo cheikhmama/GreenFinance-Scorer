@@ -1,12 +1,16 @@
 import { ArrowUpRight, Leaf, MessageCircle, ShieldCheck } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
+import { useTitrePage } from "@/shared/hooks/useTitrePage";
 import "./AuthLayout.css";
 
 type AuthLayoutProps = {
   children: ReactNode;
   eyebrow?: string;
   title?: string;
+  /** Nom de la page quand aucun titre n'est affiché (connexion) : h1 réservé aux lecteurs
+   * d'écran et titre de l'onglet — toute page garde ainsi un h1 et un titre d'onglet propre. */
+  titreAccessible?: string;
   description?: string;
   /** « centered » : sans la colonne illustrée, panneau élargi et centré — pour un choix à
    * plusieurs cartes (choix du profil d'inscription). */
@@ -18,10 +22,12 @@ export function AuthLayout({
   children,
   eyebrow = "VOTRE ESPACE GREENFINANCE",
   title,
+  titreAccessible,
   description,
   layout = "split",
 }: AuthLayoutProps) {
   const headingId = useId();
+  useTitrePage(title ?? titreAccessible);
 
   // Pages publiques (connexion, inscription, mot de passe oublié...) toujours en mode clair,
   // indépendamment du thème choisi pour l'espace connecté (qui, lui, démarre en mode nuit par
@@ -44,7 +50,9 @@ export function AuthLayout({
       </a>
       <div className="auth-container">
         <header className="auth-header">
-          <Link to="/login" className="auth-brand" aria-label="GreenFinance-Scorer — connexion">
+          {/* Nom accessible = texte visible + destination (WCAG 2.5.3 : un aria-label différent du
+              texte affiché gêne la commande vocale). */}
+          <Link to="/login" className="auth-brand">
             <img src="/favicon.svg" alt="" width="44" height="44" />
             <span>
               <span className="auth-brand-name">
@@ -52,6 +60,7 @@ export function AuthLayout({
               </span>
               <span className="auth-brand-caption">LA FINANCE, DURABLEMENT.</span>
             </span>
+            <span className="sr-only"> — connexion</span>
           </Link>
         </header>
 
@@ -61,11 +70,11 @@ export function AuthLayout({
               <div className="auth-kicker">
                 <Leaf size={15} aria-hidden="true" /> INTELLIGENCE ESG & CARBONE
               </div>
-              <h2 className="auth-story-title">
+              <p className="auth-story-title">
                 La donnée éclaire.
                 <br />
                 <span>L’impact se mesure.</span>
-              </h2>
+              </p>
               <div className="auth-illustration" aria-hidden="true">
                 <div className="auth-illustration-inner">
                   <div className="auth-illustration-grid" />
@@ -125,7 +134,11 @@ export function AuthLayout({
               <p className="auth-form-eyebrow" id={headingId}>
                 {eyebrow}
               </p>
-              {title ? <h1>{title}</h1> : null}
+              {title ? (
+                <h1>{title}</h1>
+              ) : titreAccessible ? (
+                <h1 className="sr-only">{titreAccessible}</h1>
+              ) : null}
               {description ? <p className="auth-form-description">{description}</p> : null}
             </div>
             {children}
@@ -134,9 +147,17 @@ export function AuthLayout({
 
         <footer className="auth-footer">
           <span>© {new Date().getFullYear()} GreenFinance-Scorer</span>
-          <Link to="/contact">
-            <MessageCircle size={18} aria-hidden="true" /> Contactez-nous
-          </Link>
+          <nav className="auth-footer-links" aria-label="Informations légales et contact">
+            <Link to="/confidentialite" className="auth-footer-legal">
+              Confidentialité
+            </Link>
+            <Link to="/mentions-legales" className="auth-footer-legal">
+              Mentions légales
+            </Link>
+            <Link to="/contact">
+              <MessageCircle size={18} aria-hidden="true" /> Contactez-nous
+            </Link>
+          </nav>
         </footer>
       </div>
     </div>

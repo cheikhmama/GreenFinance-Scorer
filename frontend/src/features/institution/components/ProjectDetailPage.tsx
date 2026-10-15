@@ -124,6 +124,7 @@ export function ProjectDetailPage() {
               <Select
                 value={chercheurASelectionner}
                 onChange={(event) => setChercheurASelectionner(event.target.value)}
+                aria-label="Chercheur à affecter"
                 className="w-56"
               >
                 <option value="">Sélectionner un chercheur accepté...</option>

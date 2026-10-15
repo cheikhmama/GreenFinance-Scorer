@@ -1,0 +1,38 @@
+@startuml uc-00-acteurs
+!include _style.iuml
+title Hiérarchie des acteurs
+top to bottom direction
+
+actor "Visiteur\n(non authentifié)" as V
+actor "Utilisateur authentifié" as U
+actor "Entreprise" as E
+actor "Administrateur" as A
+actor "Auditeur" as AU
+actor "Investisseur" as I
+actor "Chercheur" as C
+actor "Institution" as IN
+
+actor "Gemini (LLM)" as LLM <<système externe>>
+actor "GLEIF" as GL <<système externe>>
+actor "Serveur SMTP" as SMTP <<système externe>>
+
+U <|-- E
+U <|-- A
+U <|-- AU
+U <|-- I
+U <|-- C
+U <|-- IN
+
+V -[hidden]right- U
+U -[hidden]right- LLM
+LLM -[hidden]right- GL
+GL -[hidden]right- SMTP
+
+note bottom of U
+  Rôle unique par compte (enum Role) :
+  ADMIN, ENTERPRISE, AUDITOR,
+  INVESTOR, RESEARCHER, INSTITUTION.
+  Compte créé sans mot de passe,
+  activé par lien e-mail (72 h).
+end note
+@enduml

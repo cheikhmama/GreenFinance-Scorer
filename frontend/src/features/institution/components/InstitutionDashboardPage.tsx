@@ -97,7 +97,7 @@ export function InstitutionDashboardPage() {
                 {chercheursAcceptes}/{invitationsEnvoyees} accepté(s)
               </span>
             </div>
-            <ProgressBar value={tauxAcceptation} />
+            <ProgressBar value={tauxAcceptation} ariaLabel="Taux d'acceptation des invitations" />
           </CardContent>
         </Card>
       ) : null}

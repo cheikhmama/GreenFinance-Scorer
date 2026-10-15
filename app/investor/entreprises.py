@@ -78,6 +78,27 @@ def dernier_rapport_valide(session: Session, entreprise_id: uuid.UUID) -> ESGRep
     ).first()
 
 
+def derniers_rapports_valides(
+    session: Session, entreprise_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, ESGReport]:
+    """dernier_rapport_valide pour plusieurs entreprises en une seule requête (même règle : le
+    VALIDATED le plus récent fait foi). Une entreprise sans rapport validé est absente du dict."""
+    if not entreprise_ids:
+        return {}
+    rapports = session.exec(
+        select(ESGReport)
+        .where(
+            col(ESGReport.company_id).in_(entreprise_ids),
+            ESGReport.status == ReportStatus.VALIDATED,
+        )
+        .order_by(col(ESGReport.submitted_at).desc())
+    ).all()
+    derniers: dict[uuid.UUID, ESGReport] = {}
+    for rapport in rapports:
+        derniers.setdefault(rapport.company_id, rapport)
+    return derniers
+
+
 def score_public(session: Session, rapport: ESGReport | None) -> ScoreEntreprisePublic:
     if rapport is None:
         return _SCORE_VIDE

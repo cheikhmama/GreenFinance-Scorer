@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { downloadFile } from "@/shared/api/download";
 import type { ApiError } from "@/shared/api/errors";
+import { chargerToutesLesPages, TAILLE_PAGE_TABLE } from "@/shared/api/toutesLesPages";
 import type {
   AffectationPublic,
   AffecterChercheurRequest,
@@ -19,6 +20,7 @@ import type {
   EntreprisePerimetrePublic,
   InstitutionProfilPublic,
   InviterChercheurRequest,
+  EntreprisePublieePublic,
   PageEntreprisePublieePublic,
   ProjetDetail,
   ProjetPublic,
@@ -41,8 +43,6 @@ import {
   listMyAnalysesForInstitution,
   listMyProjects,
   listMyResearchers,
-  listProjectDocuments,
-  listProjectScope,
   listPublishedCompaniesForInstitution,
   requestAnalysisCorrection,
 } from "@/shared/api/generated/institution/institution";
@@ -53,10 +53,6 @@ const CHERCHEURS_DISPONIBLES_KEY = ["institution", "chercheurs", "disponibles"] 
 const MES_CHERCHEURS_KEY = ["institution", "chercheurs"] as const;
 const PROJETS_KEY = ["institution", "projets"] as const;
 const projetKey = (id: string) => ["institution", "projets", id] as const;
-const perimetreKey = (projetId: string) =>
-  ["institution", "projets", projetId, "perimetre"] as const;
-const documentsKey = (projetId: string) =>
-  ["institution", "projets", projetId, "documents"] as const;
 const MES_ANALYSES_KEY = ["institution", "analyses"] as const;
 const analyseKey = (id: string) => ["institution", "analyses", id] as const;
 const historiqueKey = (id: string) => ["institution", "analyses", id, "historique"] as const;
@@ -131,20 +127,11 @@ export function useProjectDetail(projetId: string) {
 /** Périmètre du projet (ProjetEntreprise) — les entreprises que le Chercheur affecté pourra
  * comparer dans une analyse (voir app/researcher/analyses.py::
  * _verifier_perimetre_et_recuperer_snapshots). */
-export function useProjectScope(projetId: string) {
-  return useQuery<EntreprisePerimetrePublic[], ApiError>({
-    queryKey: perimetreKey(projetId),
-    queryFn: () => listProjectScope(projetId),
-    enabled: projetId.length > 0,
-  });
-}
-
 export function useAddCompanyToScope(projetId: string) {
   const queryClient = useQueryClient();
   return useMutation<EntreprisePerimetrePublic, ApiError, AjouterEntreprisePerimetreRequest>({
     mutationFn: (payload) => addCompanyToProjectScope(projetId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: perimetreKey(projetId) });
       queryClient.invalidateQueries({ queryKey: projetKey(projetId) });
     },
   });
@@ -153,20 +140,11 @@ export function useAddCompanyToScope(projetId: string) {
 /** Documents explicitement mis à disposition (ProjetDocument) — distinct du périmètre : une
  * entreprise autorisée n'y donne pas automatiquement accès à son rapport tant qu'il n'est pas
  * ici (voir app/institution/projets.py::ajouter_document). */
-export function useProjectDocuments(projetId: string) {
-  return useQuery<DocumentProjetPublic[], ApiError>({
-    queryKey: documentsKey(projetId),
-    queryFn: () => listProjectDocuments(projetId),
-    enabled: projetId.length > 0,
-  });
-}
-
 export function useAddDocument(projetId: string) {
   const queryClient = useQueryClient();
   return useMutation<DocumentProjetPublic, ApiError, AjouterDocumentRequest>({
     mutationFn: (payload) => addDocumentToProject(projetId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: documentsKey(projetId) });
       queryClient.invalidateQueries({ queryKey: projetKey(projetId) });
     },
   });
@@ -185,6 +163,18 @@ export function usePublishedCompaniesForInstitution(filtres: { recherche?: strin
       }),
     initialPageParam: 1,
     getNextPageParam: pageSuivante,
+  });
+}
+
+/** Catalogue complet pour la table de données (tâche 5.18) : recherche, filtres et tri se font
+ * côté navigateur. */
+export function useTableEntreprisesInstitution() {
+  return useQuery<EntreprisePublieePublic[], ApiError>({
+    queryKey: [...ENTREPRISES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listPublishedCompaniesForInstitution({ page, page_size: TAILLE_PAGE_TABLE }),
+      ),
   });
 }
 

@@ -211,14 +211,17 @@ POSTGRES_PASSWORD=… REDIS_PASSWORD=… \
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-- Deux images depuis le même `Dockerfile` multi-étapes : `api` (API, worker par défaut,
-  migrations — sans la pile d'extraction) et `worker` (extraction Docling/torch). Utilisateur non
-  privilégié, ni tests ni outils de développement.
+- Cible dimensionnée : VM ARM Oracle Cloud Always Free (4 OCPU / 24 Go), limites mémoire et CPU
+  par service — guide complet dans [docs/DEPLOIEMENT_ORACLE.md](docs/DEPLOIEMENT_ORACLE.md).
+- Trois images depuis le même `Dockerfile` multi-étapes : `api` (API, worker par défaut,
+  migrations — sans la pile d'extraction), `worker` (extraction Docling/ONNX/torch, modèles
+  intégrés à la construction, démarrage hors ligne) et `mcp` (outil MCP `extract_esg_report`).
+  Utilisateur non privilégié, ni tests ni outils de développement. Le frontend est servi par Caddy
+  (`frontend/Dockerfile`), qui relaie aussi `/api` (même origine) et gère TLS.
 - Le service `migrate` applique `alembic upgrade head` avant tout le reste.
-- Seul le port de l'API est publié ; PostgreSQL et Redis restent sur le réseau Docker, Redis exige
-  un mot de passe.
-- Derrière un reverse proxy, lancer uvicorn avec `FORWARDED_ALLOW_IPS=<adresse du proxy>` : les
-  limites par IP (connexion, contact) reposent sur la vraie adresse du client.
+- Seul Caddy publie des ports (80/443) ; l'API, PostgreSQL et Redis restent sur le réseau Docker,
+  Redis exige un mot de passe. Les limites par IP (connexion, contact) reposent sur l'adresse
+  transmise par Caddy (`FORWARDED_ALLOW_IPS`).
 
 Variables principales (liste complète et valeurs par défaut dans `.env.example`) :
 
@@ -228,7 +231,9 @@ Variables principales (liste complète et valeurs par défaut dans `.env.example
 | `SECRET_KEY` | Signature des jetons de session |
 | `FRONTEND_BASE_URL`, `CORS_ALLOWED_ORIGINS` | Liens des e-mails, origines autorisées |
 | `SMTP_*`, `MAIL_FROM`, `CONTACT_TO_EMAIL` | Envoi des e-mails |
-| `GEMINI_API_KEY` | Extraction par LLM (mode démonstration si absente) |
+| `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | LLM d'extraction : `openai_compat` (modèles ouverts via Groq, OpenRouter, vLLM…) ou `gemini` (`GEMINI_API_KEY`) ; démonstration tant que la clé est factice |
+| `LLM_CONTEXT_TOKENS` | Budget de contexte par appel (sous 24 000 : un appel par famille d'indicateurs) |
+| `EXTRACTION_PAGES_PAR_LOT`, `EXTRACTION_THREADS`, `EXTRACTION_PAGES_MAX` | Conversion par lots des longs rapports (mémoire bornée) |
 | `STORAGE_PATH` | Fichiers déposés, extraits de preuve, synthèses, avatars |
 | `DEFAULT_SCORING_CONFIG`, `FX_RATES_PATH` | Méthodologie de scoring (`config/weights/`), taux de change (`config/fx/`) |
 

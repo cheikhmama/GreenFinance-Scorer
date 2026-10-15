@@ -2,19 +2,22 @@
 name = "greenfinance-scorer"
 version = "0.1.0"
 description = "Plateforme de scoring ESG et carbone pour entreprises"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
-    "sqlmodel",
+    # 0.0.45 passe tous les champs datetime en DateTime(timezone=True) et refuse les valeurs naïves :
+    # le schéma est en TIMESTAMP WITHOUT TIME ZONE (app/core/database.py::utcnow). Passage à l'UTC
+    # « aware » = migration de schéma dédiée, hors mise à jour des dépendances.
+    "sqlmodel<0.0.45",
     "alembic",
     "psycopg[binary]",
     "pydantic-settings",
     "pydantic[email]",
     "structlog",
     "pyjwt",
-    "passlib[bcrypt]",
-    "bcrypt<4.1",  # passlib 1.7.4 ne reconnaît pas l'API de bcrypt >=4.1 (module __about__ retiré)
+    # Argon2id pour les nouveaux hachages, bcrypt pour vérifier les anciens (app/auth/hashing.py).
+    "pwdlib[argon2,bcrypt]",
     "redis",
     "python-multipart",  # requis par FastAPI pour UploadFile/Form (POST /company/rapports, Étape 5)
     # Validation des PDF déposés (app/company/upload_validation.py) et extraits de preuve : l'API
@@ -39,12 +42,16 @@ dependencies = [
 # (app/ingestion/extractor.py, docling_pipeline.py) — l'API et le worker par défaut tournent sans
 # elle, sur l'image légère. Installée par défaut en local (tests, mypy), voir default-groups.
 extraction = [
-    "docling",
-    "paddlepaddle",
-    "paddleocr",
+    # Maintenu en 2.119 : 2.120+ impose docling-ibm-models 4 (nouveaux modèles de mise en page et de
+    # tableaux), plus rapide (-40 à -55 %) mais dont l'OCR des pages scannées est légèrement moins
+    # fidèle sur le corpus de référence. À réévaluer dans une PR dédiée (bissection des versions).
+    "docling<2.120",
     "faiss-cpu",
     "FlagEmbedding",
     "google-genai",
+    "mcp>=2.3.0",
+    "onnxruntime>=1.31.0",
+    "openai>=3.29.0",
     "torch",
     "torchvision",
 ]
@@ -54,7 +61,6 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
-    "types-passlib",
     "types-pyyaml",
     "types-reportlab>=5.0.0.20260911",
     "hypothesis>=6.168.3",
@@ -67,6 +73,10 @@ notebook = [
 [tool.uv]
 # Local et CI : tout (tests et mypy importent le pipeline). Images : --no-default-groups.
 default-groups = ["dev", "extraction"]
+# Dépendance transitive de docling, liée à sa version : docling 2.119 importe
+# rapidocr.utils.model_resolver.COMMON_LANG_ALIASES, retiré en 3.10 (l'OCR échouerait au premier
+# lot scanné). À relever avec docling.
+constraint-dependencies = ["rapidocr<3.10"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]
@@ -107,3 +117,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+# Tests « slow » : Docling, OCR et modèles réels (plusieurs minutes, modèles téléchargés au premier
+# lancement). Exclus par défaut ; à lancer avant un déploiement : uv run pytest -m slow
+markers = ["slow: conversion Docling réelle (modèles réels, plusieurs minutes)"]
+addopts = "-m 'not slow'"

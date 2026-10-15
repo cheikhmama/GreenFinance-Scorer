@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
+import { MentionCollecte } from "@/shared/legal/MentionCollecte";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import {
@@ -170,10 +171,7 @@ export function ContactPage() {
               />
             </fieldset>
 
-            <p className="text-xs leading-5 text-muted-foreground">
-              Votre nom, votre adresse e-mail et votre message seront transmis à l’équipe pour
-              traiter votre demande.
-            </p>
+            <MentionCollecte finalite="pour répondre à votre message ; ils lui sont transmis par e-mail et ne sont pas enregistrés sur la plateforme" />
             <Button type="submit" className="h-12 w-full rounded-xl" disabled={contact.isPending}>
               {contact.isPending ? (
                 <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />

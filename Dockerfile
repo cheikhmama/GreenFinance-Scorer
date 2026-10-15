@@ -10,12 +10,12 @@
 # (pytest, mypy, ruff) ni tests/ dans les images : `uv sync --no-default-groups`, et seuls app/,
 # alembic/ et config/ sont copiés. Les deux images tournent sous un utilisateur sans privilèges.
 
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.12
 
 # --- construction : environnement virtuel de l'API ---------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS construction-api
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
@@ -30,6 +30,25 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM construction-api AS construction-worker
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-default-groups --group extraction --no-install-project
+
+# --- construction : modèles du pipeline d'extraction (Docling, OCR ONNX, bge-m3) ------------------
+# Téléchargés une fois, à la construction : le worker démarre hors ligne, sans dossier de cache à
+# écrire et sans dépendre de Hugging Face au premier rapport (voir app/ingestion/modeles.py).
+FROM construction-worker AS modeles
+# Mêmes bibliothèques système que l'image worker : le téléchargement des modèles OCR importe
+# OpenCV (cv2), qui en a besoin dès l'import.
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH="/opt/venv/bin:$PATH" \
+    HF_HOME=/opt/modeles/hf
+# Seul le script de téléchargement : une modification ailleurs dans app/ ne doit pas invalider cette
+# couche, sans quoi chaque construction retéléchargerait plusieurs Go de modèles.
+COPY app/__init__.py ./app/__init__.py
+COPY app/ingestion/__init__.py ./app/ingestion/__init__.py
+COPY app/ingestion/modeles.py ./app/ingestion/modeles.py
+RUN python -m app.ingestion.modeles /opt/modeles
 
 # --- base d'exécution commune --------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS execution
@@ -60,22 +79,34 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-
 # --- image worker d'extraction --------------------------------------------------------------------
 FROM execution AS worker
 
-# Bibliothèques système requises par Docling / PaddleOCR (rendu, OCR), absentes de l'image API.
+# Bibliothèques système requises par Docling / OpenCV (rendu des pages, OCR), absentes de l'image API.
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
         libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 libxcb1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=construction-worker /opt/venv /opt/venv
+COPY --from=modeles --chown=greenfinance:greenfinance /opt/modeles /opt/modeles
 COPY --chown=greenfinance:greenfinance app ./app
 COPY --chown=greenfinance:greenfinance config ./config
 RUN install -d -o greenfinance -g greenfinance /code/storage
 
 # Pas de compilateur C++ dans cette image slim : torch.compile (modèles de structuration Docling)
-# échouerait et retenterait en boucle — l'exécution eager suffit sur CPU.
+# échouerait et retenterait en boucle — l'exécution eager suffit sur CPU. Modèles lus depuis
+# /opt/modeles uniquement (étape « modeles »), jamais téléchargés à l'exécution.
 ENV TORCHDYNAMO_DISABLE=1 \
     TORCH_COMPILE_DISABLE=1 \
-    HF_HOME=/home/greenfinance/.cache/huggingface
+    HF_HOME=/opt/modeles/hf \
+    DOCLING_ARTIFACTS_PATH=/opt/modeles/docling \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
 
 USER greenfinance
 CMD ["arq", "app.worker.settings.ExtractionWorkerSettings"]
+
+# --- serveur MCP (stdio) de l'extraction -----------------------------------------------------------
+# Même pile et mêmes modèles que le worker ; lancé à la demande par un agent, jamais exposé sur le
+# réseau (voir app/mcp/serveur.py et le profil « mcp » de docker-compose.yml).
+FROM worker AS mcp
+ENV MCP_RACINE_FICHIERS=/data
+CMD ["python", "-m", "app.mcp.serveur"]

@@ -87,10 +87,9 @@ describe("Espace Entreprise — Mes déclarations", () => {
     const enCours = await screen.findByRole("region", { name: "En cours" });
     expect(within(enCours).getByText("FY2025")).toBeInTheDocument();
     expect(within(enCours).queryByText("FY2023")).not.toBeInTheDocument();
-    expect(within(enCours).getByText("Brouillon")).toBeInTheDocument();
-    expect(within(enCours).getAllByRole("list", { name: "Étapes de la déclaration" })).toHaveLength(
-      1,
-    );
+    // Le badge de phase et l’étape « Déposé » de la progression.
+    expect(within(enCours).getAllByText("Déposé")).toHaveLength(2);
+    expect(within(enCours).getAllByRole("list", { name: "Progression" })).toHaveLength(1);
 
     // Une déclaration est active : pas d’ouverture d’une autre, et la raison est dite.
     expect(screen.getByRole("button", { name: "Nouvelle déclaration" })).toBeDisabled();
@@ -108,12 +107,30 @@ describe("Espace Entreprise — Mes déclarations", () => {
     const lignes = within(historique).getAllByRole("row").slice(1);
     expect(lignes).toHaveLength(2);
     expect(lignes[0]).toHaveTextContent("FY2024");
-    expect(lignes[0]).toHaveTextContent("Validé");
+    expect(lignes[0]).toHaveTextContent("Validé & publié");
     expect(lignes[0]).toHaveTextContent("74,5/100");
-    expect(lignes[0]).toHaveTextContent("couverture 88 %");
+
+    // Le filtre « Statut » parle le même vocabulaire de phases que le badge.
+    const filtreStatut = screen
+      .getAllByRole("button", { name: "Statut" })
+      .find((bouton) => bouton.hasAttribute("aria-haspopup"));
+    await userEvent.setup().click(filtreStatut as HTMLElement);
+    expect(screen.getByRole("checkbox", { name: "Validé & publié" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Validé" })).not.toBeInTheDocument();
+    await userEvent.setup().keyboard("{Escape}");
+
+    // Couverture, empreinte et synthèse vivent dans le tiroir de la ligne.
+    await userEvent
+      .setup()
+      .click(
+        within(lignes[0] as HTMLElement).getByRole("button", { name: /Voir le détail de FY2024/ }),
+      );
+    const tiroir = await screen.findByRole("dialog");
+    expect(tiroir).toHaveTextContent("Validé & publié");
+    expect(tiroir).toHaveTextContent("Couverture88 %");
     // Empreinte tronquée : 8 premiers et 4 derniers caractères, complète au survol.
-    expect(within(lignes[0] as HTMLElement).getByTitle(SHA)).toHaveTextContent("ffffffff…ffff");
-    expect(within(lignes[0] as HTMLElement).getByRole("link", { name: "PDF" })).toHaveAttribute(
+    expect(within(tiroir).getByTitle(SHA)).toHaveTextContent("ffffffff…ffff");
+    expect(within(tiroir).getByRole("link", { name: "PDF" })).toHaveAttribute(
       "href",
       "/api/v1/company/rapports/valide/synthese/fichier",
     );
@@ -145,43 +162,22 @@ describe("Espace Entreprise — Mes déclarations", () => {
     expect(screen.getByRole("button", { name: "Nouvelle déclaration" })).toBeDisabled();
   });
 
-  it("ouvre un exercice avec ses données financières depuis la modale, puis mène au brouillon", async () => {
-    fetchMock.mockImplementation(async (_url, init) =>
-      init?.method === "POST"
-        ? Response.json({ id: "nouveau" }, { status: 201 })
-        : Response.json([rapportListe("valide")]),
-    );
-    const user = userEvent.setup();
+  it("« Nouvelle déclaration » est un lien vers l’assistant quand rien n’est en cours", async () => {
+    fetchMock.mockImplementation(async () => Response.json([rapportListe("valide")]));
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Nouvelle déclaration" }));
-    const modale = await screen.findByRole("dialog");
-    expect(
-      within(within(modale).getByLabelText("Exercice fiscal")).queryByRole("option", {
-        name: "FY2024",
-      }),
-    ).not.toBeInTheDocument();
-    const annee = new Date().getFullYear() - 3;
-    await user.selectOptions(within(modale).getByLabelText("Exercice fiscal"), String(annee));
-    await user.selectOptions(within(modale).getByLabelText("Devise"), "MRU");
-    await user.type(within(modale).getByLabelText("Chiffre d’affaires"), "820000000");
-    await user.type(within(modale).getByLabelText("Valeur d’entreprise (EVIC)"), "-5");
-    await user.click(within(modale).getByRole("button", { name: "Ouvrir la déclaration" }));
-    expect(await within(modale).findByText("Le montant doit être positif.")).toBeInTheDocument();
+    const lien = await screen.findByRole("link", { name: "Nouvelle déclaration" });
+    expect(lien).toHaveAttribute("href", "/company/declarations/nouvelle/exercice");
+  });
 
-    await user.clear(within(modale).getByLabelText("Valeur d’entreprise (EVIC)"));
-    await user.type(within(modale).getByLabelText("Valeur d’entreprise (EVIC)"), "1450000000");
-    await user.click(within(modale).getByRole("button", { name: "Ouvrir la déclaration" }));
+  it("le lien d’une déclaration en cours reprend le brouillon analysé à la vérification", async () => {
+    fetchMock.mockImplementation(async () => Response.json(RAPPORTS));
+    renderPage();
 
-    expect(await screen.findByRole("heading", { name: "Page du brouillon" })).toBeInTheDocument();
-    const envoi = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-    expect(envoi?.[0]).toBe("/api/v1/reports");
-    expect(JSON.parse(envoi?.[1]?.body as string)).toEqual({
-      report_type: "RAPPORT_ESG",
-      fiscal_year: annee,
-      currency: "MRU",
-      revenue: 820000000,
-      enterprise_value: 1450000000,
-    });
+    const enCours = await screen.findByRole("region", { name: "En cours" });
+    expect(within(enCours).getByRole("link", { name: "Ouvrir" })).toHaveAttribute(
+      "href",
+      "/company/declarations/rapport-esg-exercice-2025-brouillon/brouillon/verification",
+    );
   });
 });

@@ -31,7 +31,7 @@ export const getGetScoreExplanationUrl = (reportId: string,
  * @summary Décomposer le score officiel d'un rapport par indicateur (SHAP exact)
  */
 export const getScoreExplanation = async (reportId: string,
-    params?: GetScoreExplanationParams, options?: RequestInit): Promise<ScoreExplanation> => {
+    params?: GetScoreExplanationParams, options?: Parameters<typeof apiFetch>[1]): Promise<ScoreExplanation> => {
 
   return apiFetch<ScoreExplanation>(getGetScoreExplanationUrl(reportId,params),
   {

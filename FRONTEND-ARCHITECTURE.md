@@ -30,6 +30,14 @@ configuration SMTP décrite dans `docs/PUBLIC-AUTH.md` ; le contact confirme uni
 les messages acceptés par le serveur SMTP. La page de réinitialisation ne transmet
 pas son URL dans l’en-tête Referer (`no-referrer`) et retire le jeton après succès.
 
+**Navigation hiérarchique au 2026-10-14 (espace Entreprise, pilote).** Les niveaux d'un espace
+sont des routes imbriquées qui déclarent leur libellé de fil d'Ariane (`handle.fil`,
+`shared/layout/handle.ts`) ; `AppShell` affiche le fil (`shared/layout/Breadcrumbs`). Les tiroirs
+sont des routes (`shared/ui/route-sheet`), les saisies en plusieurs temps des assistants
+(`shared/ui/wizard`). Espace Entreprise : Tableau de bord → Mes déclarations → Déclaration →
+Pilier → Famille → Indicateur (tiroir). Les cinq autres espaces adopteront ce socle dans des specs
+séparées. Spec : `docs/superpowers/specs/2026-10-14-frontend-hierarchical-navigation-design.md`.
+
 Le frontend est l'interface de décision d'une plateforme ESG et carbone. Sa qualité ne se mesure donc pas au
 nombre de graphiques, mais à la capacité de répondre rapidement à quatre questions :
 
@@ -303,6 +311,22 @@ Les skeletons reproduisent la structure finale et n'apparaissent pas pour une tr
 vide explique pourquoi elle est vide et propose l'action pertinente. Toute mutation empêche le double envoi,
 annonce son avancement et confirme son résultat.
 
+### 5.4 Navigation et formulaires
+
+- Un niveau de la hiérarchie = une route imbriquée avec `handle.fil` ; jamais deux niveaux empilés
+  sur une même page.
+- Un tiroir de détail ou de modification est une route enfant (`RouteSheet`) : lien profond,
+  Échap et retour navigateur ramènent au parent, le focus revient à l'élément d'origine
+  (`RouteSheet` le restitue lui-même, Radix ne le fait que pour un déclencheur).
+- Dialogue = confirmation ou au plus 3 champs ; modification plus longue d'un objet = tiroir
+  (`taille="large"`) ; plusieurs étapes ou appel serveur entre deux étapes = assistant.
+- Un champ dépendant reste masqué tant qu'il ne s'applique pas et n'est pas validé masqué.
+- Une section repliée montre toujours un résumé (`DisclosureCard`).
+- Statut d'objet : `StatusBadge` (libellé + icône + ton) ; progression : `PhaseProgress`.
+- Données affichées depuis une valeur extraite : par une vue en liste blanche
+  (`features/company/esg/vueMetrique.ts`), jamais le DTO généré directement.
+- Statut d'une déclaration côté Entreprise : `phaseDeclaration` (quatre phases), jamais l'état interne.
+
 ## 6. Accessibilité
 
 La cible est **WCAG 2.2 niveau AA** :
@@ -337,6 +361,11 @@ Le visualiseur :
 
 L'objectif UX est de passer d'une métrique à sa preuve en un clic, puis de revenir exactement au contexte
 initial.
+
+> Espace Entreprise (2026-10-14) : aucun extrait textuel n'est affiché ; la preuve ouvre le PDF
+> d'origine de l'entreprise à la page citée. Le retrait de `proof_text`, `raw_value`, `section` et
+> `proof_boxes` du schéma de réponse Entreprise est une PR backend séparée (spec §4.2) ; ce
+> paragraphe sera alors restreint à l'espace Auditeur.
 
 ## 8. Performance
 

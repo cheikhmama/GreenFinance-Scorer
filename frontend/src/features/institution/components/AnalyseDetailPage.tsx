@@ -21,6 +21,7 @@ import {
   useCompanyDetailForInstitution,
   useRequestAnalysisCorrection,
 } from "../api";
+import { Label } from "@/shared/ui/label";
 
 export function AnalyseDetailPage() {
   const { analyseId: segment = "" } = useParams();
@@ -104,7 +105,9 @@ export function AnalyseDetailPage() {
             <CardTitle className="text-base text-foreground">Décision</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <Label htmlFor="commentaire-decision">Commentaire</Label>
             <Textarea
+              id="commentaire-decision"
               rows={3}
               placeholder="Commentaire (requis pour demander une correction)"
               value={commentaire}

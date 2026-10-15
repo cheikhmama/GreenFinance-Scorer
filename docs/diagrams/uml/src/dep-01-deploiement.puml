@@ -1,0 +1,64 @@
+@startuml dep-01-deploiement
+!include _style.iuml
+title Diagramme de déploiement — GreenFinance-Scorer (docker compose)
+skinparam nodesep 40
+skinparam ranksep 70
+top to bottom direction
+
+node "Poste client" as CLIENT {
+  node "Navigateur web" as NAV {
+    artifact "SPA React\n(build Vite)" as SPA
+  }
+}
+
+node "Serveur hôte — Docker Engine" as HOST {
+
+  node "Services applicatifs" as APPS {
+    node "api\n<<image api>>" as API {
+      artifact "uvicorn app.main:app\nport 8000" as UV
+    }
+    node "worker\n<<image api>>" as W {
+      artifact "arq WorkerSettings\ne-mails, PDF de synthèse,\ncron toutes les 5 min" as WS
+    }
+    node "worker-extraction\n<<image worker>>" as WX {
+      artifact "arq ExtractionWorkerSettings\nDocling, bge-m3, FAISS" as WXS
+    }
+    node "migrate\n<<image api>>" as MIG {
+      artifact "alembic upgrade head\n(une fois, au démarrage)" as ALB
+    }
+  }
+
+  node "Services de données" as DATA {
+    node "db\n<<pgvector/pgvector:pg16>>" as DBN {
+      database "PostgreSQL 16\n+ pgvector" as PG
+    }
+    node "redis\n<<redis:7-alpine>>" as RN {
+      database "Redis 7\nfiles arq, sessions,\nlimitation de débit" as RD
+    }
+  }
+
+  folder "Volumes Docker" as VOL {
+    folder "storage\nPDF, preuves, synthèses" as VS
+    folder "modeles\ncache bge-m3 / Docling" as VM
+    folder "pgdata" as VP
+  }
+}
+
+cloud "Services externes" as EXT {
+  rectangle "Google Gemini API" as GEM
+  rectangle "API GLEIF" as GL
+  rectangle "Serveur SMTP" as SMTP
+}
+
+SPA --> UV : HTTPS\nREST JSON + cookies
+APPS --> DATA : TCP 5432 (PostgreSQL)\nTCP 6379 (Redis)
+APPS --> VOL : montage /code/storage\n(+ cache modèles pour l'extraction)
+DATA --> VP
+APPS --> EXT : HTTPS / SMTP STARTTLS
+
+note right of EXT
+  Gemini : worker-extraction
+  GLEIF  : api (revue KYC)
+  SMTP   : worker (e-mails)
+end note
+@enduml

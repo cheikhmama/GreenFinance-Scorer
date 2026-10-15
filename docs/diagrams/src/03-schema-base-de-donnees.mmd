@@ -1,0 +1,278 @@
+---
+title: Schéma de la base de données (PostgreSQL) — entités et relations
+---
+erDiagram
+  users {
+    uuid id PK
+    string email UK
+    string role "6 rôles"
+    string password_hash "null avant activation"
+    bool active
+  }
+  password_reset_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token_hash
+  }
+  account_activation_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token_hash
+  }
+  email_change_requests {
+    uuid id PK
+    uuid user_id FK
+    string new_email
+  }
+  access_requests {
+    uuid id PK
+    uuid user_id FK
+    uuid decided_by_id FK
+    string role
+    string status
+  }
+  institution_profiles {
+    uuid id PK
+    uuid user_id FK
+    int export_quota
+  }
+  researcher_affiliations {
+    uuid id PK
+    uuid researcher_id FK
+    uuid institution_id FK
+    string status
+  }
+  companies {
+    uuid id PK
+    string name
+    string status "RegistrationStatus"
+    uuid owner_user_id FK
+    uuid onboarded_by_id FK
+    string tax_id
+    string isin
+    string lei
+    string ticker
+    datetime published_at
+  }
+  esg_reports {
+    uuid id PK
+    uuid company_id FK
+    uuid auditor_id FK
+    uuid previous_report_id FK
+    uuid declared_global_score_proof_id FK
+    string status "ReportStatus"
+    int fiscal_year
+    int version
+    string checksum_sha256
+    float official_score
+    float coverage_rate
+    decimal revenue
+    decimal enterprise_value
+  }
+  extraction_runs {
+    uuid id PK
+    uuid report_id FK
+    string status
+    string docling_version
+    string llm_model
+    string prompt_version
+  }
+  evidence {
+    uuid id PK
+    string document_name
+    int page_start
+    int page_end
+    string excerpt_pdf_path
+  }
+  esg_metrics {
+    uuid id PK
+    uuid report_id FK
+    uuid proof_id FK
+    uuid extraction_run_id FK
+    string pillar "E S G"
+    string metric_code
+    float value
+    string review_status
+    float audited_value
+  }
+  carbon_emissions {
+    uuid id PK
+    uuid report_id FK
+    uuid proof_id FK
+    uuid extraction_run_id FK
+    int scope
+    float tonnes_co2e
+    int pcaf_data_quality
+    string review_status
+  }
+  metric_coverage {
+    uuid id PK
+    uuid report_id FK
+    string metric_code
+    string status
+  }
+  discrepancy_flags {
+    uuid id PK
+    uuid metric_id FK
+    uuid company_id FK
+    string nature
+  }
+  metric_reviews {
+    uuid id PK
+    uuid report_id FK
+    uuid metric_id FK
+    uuid emission_id FK
+    uuid auditor_id FK
+    string decision
+    float original_value
+    float new_value
+  }
+  audit_opinions {
+    uuid id PK
+    uuid report_id FK
+    uuid auditor_id FK
+    string decision
+  }
+  scoring_configs {
+    uuid id PK
+    uuid owner_user_id FK
+    string name
+    int version
+    string content_hash
+  }
+  scores {
+    uuid id PK
+    uuid report_id FK
+    uuid config_id FK
+    float global_score
+    float environmental_score
+    float social_score
+    float governance_score
+  }
+  portfolios {
+    uuid id PK
+    uuid user_id FK
+    string reference_currency
+    float total_esg_score
+    float waci
+    float financed_emissions_tco2e
+  }
+  portfolio_positions {
+    uuid id PK
+    uuid portfolio_id FK
+    uuid company_id FK
+    string match_status
+    decimal outstanding_amount
+    decimal converted_amount
+    decimal weight
+  }
+  projects {
+    uuid id PK
+    uuid institution_id FK
+    string name
+    string status
+  }
+  project_assignments {
+    uuid id PK
+    uuid project_id FK
+    uuid researcher_id FK
+  }
+  project_companies {
+    uuid id PK
+    uuid project_id FK
+    uuid company_id FK
+  }
+  project_documents {
+    uuid id PK
+    uuid project_id FK
+    uuid report_id FK
+  }
+  analyses {
+    uuid id PK
+    uuid project_id FK
+    uuid researcher_id FK
+    uuid previous_analysis_id FK
+    string status
+    int version
+  }
+  analysis_companies {
+    uuid id PK
+    uuid analysis_id FK
+    uuid company_id FK
+    uuid report_id FK
+    uuid score_id FK
+  }
+  reference_datasets {
+    uuid id PK
+    uuid owner_user_id FK
+    string name
+    string licence
+  }
+  reference_dataset_rows {
+    uuid id PK
+    uuid dataset_id FK
+    string isin
+    float total_score
+  }
+  notifications {
+    uuid id PK
+    uuid user_id FK
+    string type
+    bool read
+  }
+  audit_log {
+    uuid id PK
+    uuid actor_id FK
+    string action
+    string resource_type
+    string result
+  }
+
+  users ||--o{ password_reset_tokens : "réinitialise"
+  users ||--o{ account_activation_tokens : "active"
+  users ||--o{ email_change_requests : "change e-mail"
+  users ||--o{ access_requests : "demande"
+  users |o--o| institution_profiles : "profil"
+  users ||--o{ researcher_affiliations : "chercheur / institution"
+  users |o--o{ companies : "possède"
+  users ||--o{ notifications : "reçoit"
+  users |o--o{ audit_log : "acteur"
+  companies ||--o{ esg_reports : "dépose"
+  users |o--o{ esg_reports : "audite"
+  esg_reports |o--o{ esg_reports : "version précédente"
+  esg_reports ||--o{ extraction_runs : "exécutions"
+  esg_reports ||--o{ esg_metrics : "indicateurs"
+  esg_reports ||--o{ carbon_emissions : "émissions"
+  esg_reports ||--o{ metric_coverage : "couverture"
+  esg_reports ||--o{ metric_reviews : "revues"
+  esg_reports ||--o{ audit_opinions : "avis"
+  esg_reports ||--o{ scores : "scores"
+  extraction_runs |o--o{ esg_metrics : "produit"
+  extraction_runs |o--o{ carbon_emissions : "produit"
+  evidence ||--o{ esg_metrics : "prouve"
+  evidence ||--o{ carbon_emissions : "prouve"
+  esg_metrics ||--o{ discrepancy_flags : "anomalie"
+  companies ||--o{ discrepancy_flags : "concerne"
+  esg_metrics |o--o{ metric_reviews : "revue"
+  carbon_emissions |o--o{ metric_reviews : "revue"
+  users ||--o{ audit_opinions : "rend"
+  scoring_configs ||--o{ scores : "méthode"
+  users |o--o{ scoring_configs : "personnalise"
+  users ||--o{ portfolios : "détient"
+  portfolios ||--o{ portfolio_positions : "lignes"
+  companies |o--o{ portfolio_positions : "investie"
+  users ||--o{ projects : "institution"
+  projects ||--o{ project_assignments : "affecte"
+  users ||--o{ project_assignments : "chercheur"
+  projects ||--o{ project_companies : "périmètre"
+  companies ||--o{ project_companies : "étudiée"
+  projects ||--o{ project_documents : "documents"
+  esg_reports ||--o{ project_documents : "joint"
+  projects ||--o{ analyses : "analyses"
+  users ||--o{ analyses : "rédige"
+  analyses |o--o{ analyses : "version précédente"
+  analyses ||--o{ analysis_companies : "porte sur"
+  companies ||--o{ analysis_companies : "analysée"
+  scores |o--o{ analysis_companies : "référence"
+  users ||--o{ reference_datasets : "importe"
+  reference_datasets ||--o{ reference_dataset_rows : "lignes"

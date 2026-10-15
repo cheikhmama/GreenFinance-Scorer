@@ -1,0 +1,48 @@
+---
+title: Schéma BD (4/5) — Portefeuilles investisseurs
+---
+erDiagram
+  users {
+    uuid id PK
+    string role "INVESTOR"
+  }
+  companies {
+    uuid id PK
+    string isin
+    string ticker
+    string status
+    datetime published_at
+  }
+  portfolios {
+    uuid id PK
+    uuid user_id FK
+    string name
+    string reference_currency "MRU USD EUR"
+    datetime created_at
+    bool archived
+    float total_esg_score
+    float waci
+    float financed_emissions_tco2e
+    datetime computed_at
+    string config_hash
+  }
+  portfolio_positions {
+    uuid id PK
+    uuid portfolio_id FK
+    uuid company_id FK "null si non rapprochée"
+    string identifier_type "ISIN TICKER"
+    string identifier_raw
+    string match_status "MATCHED UNMATCHED AMBIGUOUS"
+    decimal outstanding_amount
+    string currency
+    decimal fx_rate_used
+    decimal converted_amount
+    decimal weight
+    string duration_type
+    datetime start_date
+    datetime end_date
+  }
+
+  users ||--o{ portfolios : "détient"
+  portfolios ||--o{ portfolio_positions : "lignes"
+  companies |o--o{ portfolio_positions : "investie"

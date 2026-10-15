@@ -1,6 +1,8 @@
 import uuid
+from typing import cast
 
 import pymupdf
+from docling_core.types.doc.document import DoclingDocument
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
@@ -32,6 +34,19 @@ from app.ingestion.models import (
 from app.ingestion.schemas import ExtractionEntreprise, IndicateurExtrait
 from app.investor.entreprises import couverture_publique
 from app.main import app
+
+
+class _IndexSimule:
+    """Index sémantique simulé : la recherche (_build_context) est elle-même remplacée."""
+
+    def __init__(self, *_a, **_k) -> None:
+        pass
+
+    def ajouter(self, *_a, **_k) -> int:
+        return 0
+
+    def en_dictionnaire(self) -> dict:
+        return {}
 
 client = TestClient(app, base_url="https://testserver")
 
@@ -549,8 +564,8 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
     def _echec(*_args, **_kwargs):
         raise RuntimeError("docling indisponible pour ce test")
 
-    monkeypatch.setattr("app.ingestion.extractor.docling_pipeline.convert_pdf", _echec)
-    # _get_embed_model().encode(...) s'exécute désormais AVANT convert_pdf (Phase 5 §9,
+    monkeypatch.setattr("app.ingestion.extractor.docling_pipeline.convertir_rapport", _echec)
+    # _get_embed_model().encode(...) s'exécute désormais AVANT la conversion Docling (Phase 5 §9,
     # contournement d'un conflit d'initialisation natif Docling/PaddleOCR + PyTorch) -- sans ce
     # mock, ce test censé échouer vite au niveau Docling chargeait pour de vrai le modèle bge-m3
     # avant même d'atteindre le point qu'il teste. Même stub minimal que le test voisin
@@ -584,32 +599,28 @@ def test_pipeline_echec_docling_marque_extraction_erreur_sans_terminee_le(sessio
 
 
 def _simuler_pipeline_extraction(
-    monkeypatch, extraction: ExtractionEntreprise, document: object | None = None
+    monkeypatch, extraction: ExtractionEntreprise, document: DoclingDocument | None = None
 ) -> None:
     """Remplace Docling, l'indexation, le modèle d'embedding, le LLM et la génération de preuve
     par des doubles : run_extraction_pipeline ne dépend plus que de `extraction`, la réponse
     simulée du LLM (un seul passage, la relance groupée est court-circuitée)."""
     from app.ingestion import extractor
-    from app.ingestion.docling_pipeline import ConversionResult
+    from app.ingestion.docling_pipeline import RapportConverti
 
-    fake_conversion = ConversionResult(
-        # Double minimal par défaut : la localisation des preuves (tâche 5.5) échoue alors sans
-        # conséquence ; un test qui la vérifie passe une vraie sortie Docling.
-        document=document if document is not None else object(),  # type: ignore[arg-type]
-        status="ok",
-        errors=[],
-        pages_docling=5,
-        pages_pymupdf=5,
-        pages_correspondent=True,
+    # Conversion par lots simulée : la localisation des preuves (tâche 5.5) lit la page
+    # dans ce document ; un double minimal la fait échouer sans conséquence.
+    document_simule = document if document is not None else cast(DoclingDocument, object())
+    fake_conversion = RapportConverti(
+        pages_total=5,
+        pages_ocr=0,
         elapsed_s=0.1,
+        document_de_la_page=lambda _page: document_simule,
     )
     monkeypatch.setattr(
-        "app.ingestion.extractor.docling_pipeline.convert_pdf", lambda *_a, **_k: fake_conversion
+        "app.ingestion.extractor.docling_pipeline.convertir_rapport",
+        lambda *_a, **_k: fake_conversion,
     )
-    monkeypatch.setattr(
-        "app.ingestion.extractor.docling_pipeline.persist_docling_json", lambda *_a, **_k: None
-    )
-    monkeypatch.setattr("app.ingestion.extractor._build_search_index", lambda *_a, **_k: {})
+    monkeypatch.setattr("app.ingestion.extractor.IndexIncremental", _IndexSimule)
 
     class _FakeEmbedModel:
         """Stub minimal : app/ingestion/extractor.py::run_extraction_pipeline appelle désormais
@@ -757,24 +768,22 @@ def test_pipeline_relance_llm_pour_les_codes_manquants_persiste_le_statut_couver
     (jamais un par code, voir extractor.py) ; si ce 2e appel fournit une citation explicite de
     non-divulgation, le code passe à ABSENT_CONFIRME plutôt que de rester NON_TROUVE."""
     from app.ingestion import extractor
-    from app.ingestion.docling_pipeline import ConversionResult
+    from app.ingestion.docling_pipeline import RapportConverti
 
-    fake_conversion = ConversionResult(
-        document=object(),  # type: ignore[arg-type]  # double minimal, jamais inspecté comme un vrai DoclingDocument ici
-        status="ok",
-        errors=[],
-        pages_docling=5,
-        pages_pymupdf=5,
-        pages_correspondent=True,
+    # Conversion par lots simulée : la localisation des preuves (tâche 5.5) lit la page
+    # dans ce document ; un double minimal la fait échouer sans conséquence.
+    document_simule = cast(DoclingDocument, object())
+    fake_conversion = RapportConverti(
+        pages_total=5,
+        pages_ocr=0,
         elapsed_s=0.1,
+        document_de_la_page=lambda _page: document_simule,
     )
     monkeypatch.setattr(
-        "app.ingestion.extractor.docling_pipeline.convert_pdf", lambda *_a, **_k: fake_conversion
+        "app.ingestion.extractor.docling_pipeline.convertir_rapport",
+        lambda *_a, **_k: fake_conversion,
     )
-    monkeypatch.setattr(
-        "app.ingestion.extractor.docling_pipeline.persist_docling_json", lambda *_a, **_k: None
-    )
-    monkeypatch.setattr("app.ingestion.extractor._build_search_index", lambda *_a, **_k: {})
+    monkeypatch.setattr("app.ingestion.extractor.IndexIncremental", _IndexSimule)
 
     class _FakeEmbedModel:
         def encode(self, *_a, **_k):

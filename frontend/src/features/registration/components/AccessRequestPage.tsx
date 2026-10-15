@@ -16,6 +16,7 @@ import {
   LIBELLES_TYPE_INVESTISSEUR,
 } from "@/shared/format/demandeAcces";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
+import { MentionCollecte } from "@/shared/legal/MentionCollecte";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
@@ -110,6 +111,9 @@ export function AccessRequestPage({ profil }: { profil: Profil }) {
               </Alert>
             ) : null}
             <fieldset disabled={envoi.isPending} className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Tous les champs sont obligatoires.
+              </p>
               <FormField
                 control={form.control}
                 name="full_name"
@@ -188,6 +192,7 @@ export function AccessRequestPage({ profil }: { profil: Profil }) {
                 </label>
               </div>
             </fieldset>
+            <MentionCollecte finalite="pour examiner votre demande d’accès et créer votre compte" />
             <Button type="submit" className="h-12 w-full rounded-xl" disabled={envoi.isPending}>
               <Send className="size-4" />
               {envoi.isPending ? "Envoi en cours…" : "Envoyer la demande"}

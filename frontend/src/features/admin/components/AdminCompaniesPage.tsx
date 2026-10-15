@@ -2,11 +2,9 @@ import { useSearchParams } from "react-router-dom";
 import { useScrollToHash } from "@/shared/hooks/useScrollToHash";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { AllCompaniesSection } from "./AllCompaniesSection";
-import { CompaniesToRepublishSection } from "./CompaniesToRepublishSection";
-import { CompanyScoresSection } from "./CompanyScoresSection";
+import { EntreprisesTable } from "./EntreprisesTable";
 import { PendingRegistrationsSection } from "./PendingRegistrationsSection";
-import { PublishableCompaniesSection } from "./PublishableCompaniesSection";
+import { ScoresTable } from "./ScoresTable";
 
 type Onglet = "inscrites" | "publiables" | "a-republier" | "scores";
 const ONGLET_PAR_DEFAUT: Onglet = "inscrites";
@@ -26,7 +24,7 @@ export function AdminCompaniesPage() {
     : ONGLET_PAR_DEFAUT;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader title="Entreprises" />
       <PendingRegistrationsSection />
       <Tabs
@@ -48,16 +46,16 @@ export function AdminCompaniesPage() {
           <TabsTrigger value="scores">Scores ESG</TabsTrigger>
         </TabsList>
         <TabsContent value="inscrites">
-          <AllCompaniesSection />
+          <EntreprisesTable perimetre="toutes" />
         </TabsContent>
         <TabsContent value="publiables">
-          <PublishableCompaniesSection />
+          <EntreprisesTable perimetre="publiables" />
         </TabsContent>
         <TabsContent value="a-republier">
-          <CompaniesToRepublishSection />
+          <EntreprisesTable perimetre="a-republier" />
         </TabsContent>
         <TabsContent value="scores">
-          <CompanyScoresSection />
+          <ScoresTable />
         </TabsContent>
       </Tabs>
     </div>

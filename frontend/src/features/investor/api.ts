@@ -6,10 +6,10 @@ import type {
   BodyImportPortfolioPositions,
   CreerPortefeuilleRequest,
   EntrepriseDetailInvestisseur,
+  EntreprisePublieePublic,
   FermerPositionRequest,
   ModifierPositionRequest,
   PageEntreprisePublieePublic,
-  PagePortefeuilleResume,
   PortefeuilleDetail,
   PortefeuilleResume,
   PortfolioCarbon,
@@ -37,6 +37,7 @@ import {
   restorePortfolio,
   updatePosition,
 } from "@/shared/api/generated/investor/investor";
+import { chargerToutesLesPages, TAILLE_PAGE_TABLE } from "@/shared/api/toutesLesPages";
 
 export const TAILLE_PAGE_INVESTOR = 10;
 
@@ -79,6 +80,18 @@ export function usePublishedCompanies(filtres: {
   });
 }
 
+/** Toutes les entreprises publiées, pour la table de données (tâche 5.18) : recherche, filtres
+ * et tri se font ensuite dans le navigateur. */
+export function useTableEntreprisesPubliees() {
+  return useQuery<EntreprisePublieePublic[], ApiError>({
+    queryKey: [...ENTREPRISES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) =>
+        listPublishedCompanies({ page, page_size: TAILLE_PAGE_TABLE }),
+      ),
+  });
+}
+
 export function useCompanyDetail(entrepriseId: string) {
   return useQuery<EntrepriseDetailInvestisseur, ApiError>({
     queryKey: entrepriseKey(entrepriseId),
@@ -97,23 +110,13 @@ export function useCompareCompanies(entrepriseIds: string[]) {
   });
 }
 
-export function useMyPortfolios(filtres: {
-  archive?: boolean;
-  avecPosition?: boolean;
-  recherche?: string;
-}) {
-  return useInfiniteQuery<PagePortefeuilleResume, ApiError>({
-    queryKey: [...PORTEFEUILLES_KEY, filtres],
-    queryFn: ({ pageParam }) =>
-      listMyPortfolios({
-        archive: filtres.archive,
-        avec_position: filtres.avecPosition,
-        recherche: filtres.recherche || undefined,
-        page: pageParam as number,
-        page_size: TAILLE_PAGE_INVESTOR,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: pageSuivante,
+/** Tous mes portefeuilles, actifs et archivés, pour la table de données (tâche 5.18). La clé
+ * est rangée sous celle des portefeuilles : création, archivage et restauration la rafraîchissent. */
+export function useTablePortefeuilles() {
+  return useQuery<PortefeuilleResume[], ApiError>({
+    queryKey: [...PORTEFEUILLES_KEY, "table"],
+    queryFn: () =>
+      chargerToutesLesPages((page) => listMyPortfolios({ page, page_size: TAILLE_PAGE_TABLE })),
   });
 }
 

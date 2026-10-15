@@ -6,6 +6,7 @@ import { companyRoutes } from "@/features/company/routes";
 import { contactRoutes } from "@/features/contact/routes";
 import { institutionRoutes } from "@/features/institution/routes";
 import { investorRoutes } from "@/features/investor/routes";
+import { legalRoutes } from "@/features/legal/routes";
 import { prototypeRoutes } from "@/features/prototype/routes";
 import { registrationRoutes } from "@/features/registration/routes";
 import { researcherRoutes } from "@/features/researcher/routes";
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
   { path: "/dashboard", element: <DashboardRedirect /> },
   ...authRoutes,
   ...contactRoutes,
+  ...legalRoutes,
   ...registrationRoutes,
   ...adminRoutes,
   ...companyRoutes,

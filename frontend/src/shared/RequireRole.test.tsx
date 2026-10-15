@@ -9,6 +9,7 @@ import { RequireRole } from "./RequireRole";
 
 vi.mock("@/features/auth/api", () => ({
   useCurrentUser: vi.fn(),
+  useLogout: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
 function renderProtectedRoute(mockResult: Partial<UseQueryResult<User, ApiError>>) {
@@ -54,7 +55,25 @@ describe("RequireRole", () => {
       isError: false,
     });
 
-    expect(screen.getByText("Accès non autorisé")).toBeInTheDocument();
+    // Écran 403 lisible : badge, titre, rôle et compte connectés, destination — jamais « ENTERPRISE ».
+    expect(screen.getByText("Accès restreint (403)")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Accès non autorisé" })).toBeInTheDocument();
+    expect(screen.getByText(/ne dispose pas des autorisations/)).toHaveTextContent(
+      "Votre compte actuel (Entreprise — entreprise@example.com) ne dispose pas des autorisations nécessaires pour accéder à l’espace Administrateur.",
+    );
+    expect(screen.getByText("Rôle connecté").nextElementSibling).toHaveTextContent("Entreprise");
+    expect(screen.getByText("Compte").nextElementSibling).toHaveTextContent(
+      "entreprise@example.com",
+    );
+    expect(screen.getByText("Destination demandée").nextElementSibling).toHaveTextContent(
+      "Espace Administrateur",
+    );
+    expect(screen.queryByText(/ENTERPRISE/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Aller à mon espace Entreprise" })).toHaveAttribute(
+      "href",
+      "/company",
+    );
+    expect(screen.getByRole("button", { name: "Changer de compte" })).toBeInTheDocument();
   });
 
   it("affiche le contenu protégé si le rôle correspond", () => {

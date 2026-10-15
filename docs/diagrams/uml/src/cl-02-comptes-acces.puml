@@ -1,0 +1,155 @@
+@startuml cl-02-comptes-acces
+!include _style.iuml
+title Diagramme de classes — Comptes, authentification et accès
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 55
+hide empty methods
+
+enum Role <<enumeration>> {
+  ADMIN
+  ENTERPRISE
+  AUDITOR
+  INVESTOR
+  RESEARCHER
+  INSTITUTION
+}
+
+enum AccessRequestStatus <<enumeration>> {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+class User {
+  - id : UUID
+  - email : str {unique}
+  - name : str [0..1]
+  - avatar_path : str [0..1]
+  - password_hash : str [0..1]
+  - role : Role
+  - active : bool
+  - created_at : datetime
+  - activated_at : datetime [0..1]
+  .. auth/hashing.py ..
+  + {static} hash_password(password : str) : str
+  + verify_password(password : str) : bool
+  .. auth/activation.py ..
+  + envoyer_lien_activation() : void
+  + {static} activer_compte(jeton : str, mot_de_passe : str) : User
+  .. auth/password_reset.py ..
+  + {static} demander_reinitialisation(email : str) : void
+  + {static} reinitialiser_mot_de_passe(jeton : str, mot_de_passe : str) : void
+  .. auth/email_change.py ..
+  + demander_changement_email(nouvel_email : str, mot_de_passe : str) : void
+  + {static} confirmer_changement_email(jeton : str) : User
+  .. auth/revocation.py ..
+  + current_generation() : int
+  + revoke_all_sessions() : int
+  + is_session_revoked(generation : int) : bool
+  .. admin/utilisateurs.py ..
+  + {static} creer_utilisateur(email : str, nom : str, role : Role) : User
+  + renvoyer_lien_activation() : void
+  + desactiver_utilisateur() : User
+  + reactiver_utilisateur() : User
+}
+
+class AccountActivationToken {
+  - token_hash : str
+  - expires_at : datetime
+  - used_at : datetime [0..1]
+}
+class PasswordResetToken {
+  - token_hash : str
+  - expires_at : datetime
+  - used_at : datetime [0..1]
+}
+class EmailChangeRequest {
+  - new_email : str
+  - token_hash : str
+  - expires_at : datetime
+}
+
+class AccessRequest {
+  - role : Role
+  - organization : str
+  - investor_type : InvestorType [0..1]
+  - research_domain : ResearchDomain [0..1]
+  - status : AccessRequestStatus
+  - requested_at : datetime
+  - decided_at : datetime [0..1]
+  - rejection_reason : str [0..1]
+  .. access_requests/service.py ..
+  + {static} demander_acces(demande : AccessRequestCreate) : void
+  + decider_demande(decision : AccessDecision, motif : str) : AccessRequestView
+}
+
+class InstitutionProfile {
+  - export_quota : int
+  .. institution/analyses.py ..
+  + {static} consulter_mon_profil(institution_id : UUID) : InstitutionProfile
+}
+
+class ResearcherAffiliation {
+  - status : AffiliationStatus
+  - invited_at : datetime
+  - responded_at : datetime [0..1]
+  - collaboration_terms : str [0..1]
+  .. institution/chercheurs.py ..
+  + {static} inviter_chercheur(institution_id : UUID, chercheur_id : UUID, conditions : str) : ResearcherAffiliation
+  .. researcher/rattachements.py ..
+  + accepter_invitation(chercheur_id : UUID) : ResearcherAffiliation
+  + refuser_invitation(chercheur_id : UUID) : ResearcherAffiliation
+}
+
+class Notification {
+  - message : str
+  - type : str
+  - resource_id : UUID [0..1]
+  - sent_at : datetime
+  - read : bool
+  .. core/notifications.py ..
+  + {static} notifier(utilisateur_id : UUID, type : str, message : str, ...) : Notification
+  + marquer_lue(utilisateur_id : UUID) : Notification
+}
+
+class AuditLogEntry {
+  - action : str
+  - resource_type : str
+  - resource_id : UUID [0..1]
+  - occurred_at : datetime
+  - result : str
+  - old_value : str [0..1]
+  - new_value : str [0..1]
+  - correlation_id : str [0..1]
+  - ip : str [0..1]
+  .. core/audit.py ..
+  + {static} auditer(acteur_id : UUID, action : str, ressource : str, ...) : AuditLogEntry
+}
+
+User "1" *-- "0..*" AccountActivationToken
+User "1" *-- "0..*" PasswordResetToken
+User "1" *-- "0..*" EmailChangeRequest
+User "1" -- "0..*" AccessRequest : demande >
+User "0..1" -- "0..*" AccessRequest : décide >
+User "1" -- "0..1" InstitutionProfile
+User "1" -- "0..*" ResearcherAffiliation : chercheur >
+User "1" -- "0..*" ResearcherAffiliation : institution >
+User "1" *-- "0..*" Notification
+User "0..1" -- "0..*" AuditLogEntry : acteur >
+
+AccountActivationToken -[hidden]down- PasswordResetToken
+PasswordResetToken -[hidden]down- EmailChangeRequest
+Role -[hidden]down- AccessRequestStatus
+AccessRequest -[hidden]down- Notification
+InstitutionProfile -[hidden]down- ResearcherAffiliation
+ResearcherAffiliation -[hidden]down- AuditLogEntry
+User ..> Role
+AccessRequest ..> AccessRequestStatus
+
+legend bottom left
+  Méthodes : fonctions de service du module indiqué (« .. module .. »).
+  L'objet courant et les paramètres techniques (session, tâches de fond, IP) sont omis.
+  Souligné = opération de classe (création, recherche par jeton).
+endlegend
+@enduml

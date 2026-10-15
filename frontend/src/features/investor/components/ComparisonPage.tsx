@@ -131,11 +131,13 @@ export function ComparisonPage() {
               value={recherche}
               onChange={(event) => setRecherche(event.target.value)}
               placeholder="Rechercher une entreprise par nom ou secteur..."
+              aria-label="Rechercher une entreprise à comparer"
               className="max-w-sm"
             />
             <Select
               value={secteurFiltre ?? ""}
               onChange={(event) => changerSecteur(event.target.value)}
+              aria-label="Filtrer par secteur"
               className="w-56"
             >
               <option value="">Tous les secteurs</option>

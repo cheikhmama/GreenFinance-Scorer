@@ -1,4 +1,5 @@
 import { ChevronRight, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { Fragment, useState } from "react";
 import { Link, NavLink, Outlet, useMatches, useNavigate } from "react-router-dom";
 import { useCurrentUser, useLogout } from "@/features/auth/api";
@@ -8,6 +9,9 @@ import { useTheme } from "@/shared/theme/ThemeProvider";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/cn";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
+import { useRetourFocus } from "@/shared/ui/retour-focus";
+import { Breadcrumbs } from "./Breadcrumbs";
+import type { HandleRoute } from "./handle";
 import { roleNavConfig } from "./roleNav";
 
 /**
@@ -22,13 +26,14 @@ import { roleNavConfig } from "./roleNav";
 export function AppShell() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
-  const confirm = useConfirm();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const retourFocusMenu = useRetourFocus();
   // Une route peut demander toute la largeur via `handle: { pleineLargeur: true }` (tâche 5.7).
   const pleineLargeur = useMatches().some(
-    (match) => (match.handle as { pleineLargeur?: boolean } | undefined)?.pleineLargeur,
+    (match) => (match.handle as HandleRoute | undefined)?.pleineLargeur,
   );
 
   // RequireRole a déjà garanti une session valide avant de monter ce composant ; ce garde-fou ne
@@ -49,25 +54,21 @@ export function AppShell() {
       cancelLabel: "Annuler",
     });
     if (!confirme) return;
-    // Navigation explicite, sans state : laisser RequireRole réagir au cache vidé renverrait vers
-    // /login avec `depuis` figé sur CETTE route protégée — une prochaine connexion (potentiellement
-    // un autre compte, un autre rôle) y serait alors renvoyée de force au lieu de son propre
-    // tableau de bord. `depuis` doit rester réservé à une session perdue en cours de navigation
-    // (voir RequireRole.tsx), jamais à une déconnexion volontaire.
-    await logout.mutateAsync();
-    navigate("/login", { replace: true });
+    // Déconnexion volontaire : aucune page à rouvrir après la prochaine connexion (ce sera
+    // peut-être un autre compte) — contrairement à une session expirée.
+    logout.mutate(undefined, { onSuccess: () => navigate("/login", { replace: true }) });
   }
 
   const sidebar = (
     <>
       <div className="flex h-20 items-center justify-between border-b border-white/10 px-5">
         <span className="flex items-center gap-3">
-          <img src="/favicon.svg" alt="GreenFinance-Scorer" className="size-10 rounded-xl" />
+          <img src="/favicon.svg" alt="" className="size-10 rounded-xl" />
           <span>
             <span className="block text-sm font-semibold tracking-tight text-white">
               GreenFinance
             </span>
-            <span className="block text-xs text-slate-400">ESG Scorer</span>
+            <span className="block text-xs text-sidebar-muted">ESG Scorer</span>
           </span>
         </span>
         <Button
@@ -85,13 +86,13 @@ export function AppShell() {
         className="flex-1 space-y-1 overflow-y-auto px-3 py-6"
         aria-label={`Navigation ${config.label}`}
       >
-        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted">
           Espace {config.label}
         </p>
         {config.items.map((item, i) => (
           <Fragment key={item.to}>
             {item.groupe && item.groupe !== config.items[i - 1]?.groupe ? (
-              <p className="mb-2 mt-5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="mb-2 mt-5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted">
                 {item.groupe}
               </p>
             ) : null}
@@ -103,8 +104,8 @@ export function AppShell() {
                 cn(
                   "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-l-2 border-transparent px-3 text-sm font-medium transition-colors",
                   isActive
-                    ? "border-emerald-400 bg-white/10 font-semibold text-white shadow-sm"
-                    : "text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white",
+                    ? "bg-sidebar-active font-semibold text-white shadow-[inset_3px_0_0_var(--sidebar-accent)]"
+                    : "text-sidebar-foreground hover:bg-white/5 hover:text-white",
                 )
               }
             >
@@ -113,6 +114,26 @@ export function AppShell() {
             </NavLink>
           </Fragment>
         ))}
+      </nav>
+
+      <nav
+        aria-label="Informations légales"
+        className="flex gap-4 border-t border-white/10 px-6 py-3 text-[11px] text-sidebar-muted"
+      >
+        <Link
+          to="/confidentialite"
+          onClick={() => setMobileOpen(false)}
+          className="hover:text-white hover:underline"
+        >
+          Confidentialité
+        </Link>
+        <Link
+          to="/mentions-legales"
+          onClick={() => setMobileOpen(false)}
+          className="hover:text-white hover:underline"
+        >
+          Mentions légales
+        </Link>
       </nav>
 
       {config.profilDansNavigation ? null : (
@@ -124,8 +145,8 @@ export function AppShell() {
               cn(
                 "flex cursor-pointer items-center gap-3 rounded-xl border-l-2 border-transparent p-3 transition-colors",
                 isActive
-                  ? "border-emerald-400 bg-white/10 text-white shadow-sm"
-                  : "text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white",
+                  ? "bg-sidebar-active font-semibold text-white shadow-[inset_3px_0_0_var(--sidebar-accent)]"
+                  : "text-sidebar-foreground hover:bg-white/5 hover:text-white",
               )
             }
           >
@@ -133,15 +154,16 @@ export function AppShell() {
               nom={user.name ?? user.email}
               avatar={user.avatar}
               fallback="icone"
+              decoratif
               className="size-9 shrink-0 text-xs"
             />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-white">
                 {user.name || user.email}
               </span>
-              <span className="block truncate text-[11px] text-slate-400">Profil</span>
+              <span className="block truncate text-[11px] text-sidebar-muted">Profil</span>
             </span>
-            <ChevronRight className="size-4 shrink-0 text-slate-500" />
+            <ChevronRight className="size-4 shrink-0 text-sidebar-muted" />
           </NavLink>
         </div>
       )}
@@ -157,23 +179,26 @@ export function AppShell() {
         Aller au contenu
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-brand-navy lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar lg:flex">
         {sidebar}
       </aside>
 
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-brand-navy/50"
-            aria-label="Fermer le menu"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="relative flex h-full w-72 flex-col bg-brand-navy shadow-2xl">
+      {/* Menu mobile : fenêtre modale Radix (focus piégé, Échap et clic à côté ferment, focus
+          rendu au bouton qui l'a ouvert) — un simple <div> laissait Tab sortir derrière le menu. */}
+      <DialogPrimitive.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-sidebar/50 lg:hidden" />
+          <DialogPrimitive.Content
+            id="menu-mobile"
+            aria-describedby={undefined}
+            {...retourFocusMenu}
+            className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-sidebar shadow-2xl outline-none lg:hidden"
+          >
+            <DialogPrimitive.Title className="sr-only">Menu</DialogPrimitive.Title>
             {sidebar}
-          </aside>
-        </div>
-      ) : null}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
 
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur sm:px-6 lg:px-8">
@@ -183,11 +208,18 @@ export function AppShell() {
             className="lg:hidden"
             onClick={() => setMobileOpen(true)}
             aria-label="Ouvrir le menu"
+            aria-haspopup="dialog"
+            aria-expanded={mobileOpen}
+            aria-controls={mobileOpen ? "menu-mobile" : undefined}
           >
             <Menu />
           </Button>
 
-          <Link to="/dashboard" className="flex items-center gap-2 lg:hidden">
+          <Link
+            to="/dashboard"
+            aria-label="Tableau de bord"
+            className="flex items-center gap-2 lg:hidden"
+          >
             <span className="grid size-8 place-items-center rounded-lg bg-brand-green text-xs font-bold text-primary-foreground">
               GF
             </span>
@@ -219,8 +251,13 @@ export function AppShell() {
 
         <main
           id="app-content"
-          className={cn("mx-auto p-4 sm:p-6", pleineLargeur ? "max-w-none" : "max-w-7xl")}
+          tabIndex={-1}
+          className={cn(
+            "mx-auto p-4 outline-none sm:p-6",
+            pleineLargeur ? "max-w-none" : "max-w-7xl",
+          )}
         >
+          <Breadcrumbs />
           <Outlet />
         </main>
       </div>

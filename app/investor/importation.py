@@ -70,11 +70,6 @@ class _Ligne:
     poids: Decimal | None
 
 
-@dataclass
-class ResultatImport:
-    positions: list[PortfolioPosition]
-
-
 def _nombre(brut: Any, decimale_virgule: bool) -> Decimal | None:
     """Decimal, jamais float (tâche 2.3). ValueError pour un nombre illisible ou non fini."""
     if brut is None or (isinstance(brut, str) and not brut.strip()):

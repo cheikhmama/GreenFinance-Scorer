@@ -23,19 +23,27 @@ function couleurDeterministe(nom: string): string {
  * jamais une image inventée pour une entreprise qui n'a pas de logo (voir la discussion sur les
  * logos synthétiques : un avatar à initiales ne prétend représenter personne). Partagé entre
  * toutes les listes/tableaux/sélections où une entreprise apparaît (voir FRONTEND-ARCHITECTURE.md
- * §2.2) : nom et logo doivent toujours être présentés ensemble. */
+ * §2.2) : nom et logo doivent toujours être présentés ensemble. Le nom étant écrit juste à côté,
+ * le logo est décoratif par défaut (alt vide) : sinon les lecteurs d'écran lisent le nom deux
+ * fois. `decoratif={false}` pour un logo affiché seul (fiche de l'entreprise, logo modifiable). */
 export function CompanyAvatar({
   nom,
   logo,
   className = "size-10",
+  decoratif = true,
 }: {
   nom: string;
   logo: string | null;
   className?: string;
+  decoratif?: boolean;
 }) {
   if (logo) {
     return (
-      <img src={logo} alt={`Logo ${nom}`} className={`${className} rounded-lg object-contain`} />
+      <img
+        src={logo}
+        alt={decoratif ? "" : `Logo ${nom}`}
+        className={`${className} rounded-lg object-contain`}
+      />
     );
   }
   return (

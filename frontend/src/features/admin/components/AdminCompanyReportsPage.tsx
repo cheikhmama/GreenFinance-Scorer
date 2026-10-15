@@ -1,65 +1,93 @@
-import { FileText } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { uneDecimale } from "@/shared/format/etatPosition";
 import { creerSlug, idDepuisSlug } from "@/shared/format/slug";
-import {
-  libelleDateRapport,
-  libelleStatutRapport,
-  variantStatutRapport,
-} from "@/shared/format/statut";
-import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
-import { EmptyState } from "@/shared/ui/empty-state";
+import { libelleTypeRapport } from "@/shared/format/typeRapport";
+import { BackLink } from "@/shared/ui/back-link";
+import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
 import { PageHeader } from "@/shared/ui/page-header";
-import { CardListSkeleton } from "@/shared/ui/skeleton";
-import { useCompanyReports } from "../api";
-import { titreDeclaration } from "@/shared/format/typeRapport";
+import { useCompanyDetail, useCompanyReports } from "../api";
+import { type Ligne, RapportTiroir } from "./RapportsTable";
 
+/** Tous les rapports d'une entreprise (table, tâche 5.17) : exercice, type, version et score ;
+ * statut, dates et actions dans le tiroir partagé avec la page Rapports. */
 export function AdminCompanyReportsPage() {
   const { entrepriseId: segment } = useParams<{ entrepriseId: string }>();
   const entrepriseId = idDepuisSlug(segment ?? "");
+  const { data: entreprise } = useCompanyDetail(entrepriseId);
   const { data: rapports, isLoading, isError } = useCompanyReports(entrepriseId);
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
+
+  const lignes = useMemo<Ligne[] | undefined>(
+    () => rapports?.map((r) => ({ ...r, company_name: entreprise?.name ?? "" })),
+    [rapports, entreprise?.name],
+  );
+
+  const colonnes = useMemo<ColonneTable<Ligne>[]>(
+    () => [
+      {
+        id: "exercice",
+        entete: "Exercice",
+        masquable: false,
+        valeurTri: (r) => r.fiscal_year,
+        cellule: (r) => <span className="font-mono font-semibold">{r.fiscal_year ?? "—"}</span>,
+      },
+      {
+        id: "type",
+        entete: "Type de rapport",
+        valeurTri: (r) => libelleTypeRapport(r.type),
+        cellule: (r) => libelleTypeRapport(r.type),
+      },
+      {
+        id: "version",
+        entete: "Version",
+        alignement: "droite",
+        valeurTri: (r) => r.version,
+        cellule: (r) => <span className="font-mono">{r.version}</span>,
+      },
+      {
+        id: "score",
+        entete: "Score ESG",
+        alignement: "droite",
+        valeurTri: (r) => r.official_global_score ?? null,
+        cellule: (r) => (
+          <span className="font-mono font-semibold">
+            {r.official_global_score != null ? uneDecimale(r.official_global_score) : "—"}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
+  const ouvert = lignes?.find((r) => r.id === ouvertId) ?? null;
 
   return (
-    <div className="space-y-8">
-      <PageHeader title="Rapports de l'entreprise" />
-      <Link
-        to="/admin/entreprises"
-        className="text-sm text-brand-green underline underline-offset-2"
+    <div className="space-y-6">
+      <BackLink
+        to={entrepriseId ? `/admin/entreprises/${creerSlug(entreprise?.name, entrepriseId)}` : "/admin/entreprises"}
       >
-        ← Entreprises
-      </Link>
-
-      {isLoading ? <CardListSkeleton count={3} /> : null}
-      {isError ? <p className="text-destructive">Impossible de charger les rapports.</p> : null}
-      {!isLoading && !isError && rapports && rapports.length === 0 ? (
-        <EmptyState icon={FileText} message="Aucun rapport déposé par cette entreprise." />
-      ) : null}
-      {rapports && rapports.length > 0 ? (
-        <ul className="divide-y rounded-lg border">
-          {rapports.map((rapport) => (
-            <li key={rapport.id} className="flex items-center justify-between gap-4 p-4">
-              <div>
-                <p className="font-medium text-foreground">
-                  {titreDeclaration(rapport)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {libelleDateRapport(rapport)} — version {rapport.version}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={variantStatutRapport(rapport.status)}>
-                  {libelleStatutRapport(rapport.status)}
-                </Badge>
-                <Button asChild size="sm" variant="outline">
-                  <Link to={`/admin/rapports/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
-                    Ouvrir
-                  </Link>
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+        {entreprise?.name ?? "Entreprise"}
+      </BackLink>
+      <PageHeader title="Rapports de l'entreprise" />
+      <DataTable
+        libelle={`Rapports de ${entreprise?.name ?? "l’entreprise"}`}
+        lignes={lignes}
+        colonnes={colonnes}
+        cle={(r) => r.id}
+        rechercheDans={(r) => `${libelleTypeRapport(r.type)} ${r.fiscal_year ?? ""}`}
+        placeholderRecherche="Type, exercice…"
+        filtres={[{ id: "type", libelle: "Type", valeur: (r) => libelleTypeRapport(r.type) }]}
+        triInitial={{ colonne: "exercice", sens: "desc" }}
+        surOuvrir={(r) => setOuvertId(r.id)}
+        libelleLigne={(r) => `${libelleTypeRapport(r.type)} ${r.fiscal_year ?? ""}`}
+        ligneActive={ouvertId}
+        chargement={isLoading}
+        erreur={isError}
+        messageVide="Aucun rapport déposé par cette entreprise."
+        nomExport="rapports-entreprise"
+        memoire="admin-rapports-entreprise"
+      />
+      <RapportTiroir rapport={ouvert} surFermer={() => setOuvertId(null)} />
     </div>
   );
 }

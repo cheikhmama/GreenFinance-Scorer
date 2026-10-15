@@ -16,10 +16,12 @@ export function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
  * pages liste des deux espaces Chercheur/Institution pendant leur chargement. */
 export function CardListSkeleton({ count = 3 }: { count?: number }) {
   return (
-    <div className="space-y-3" aria-hidden="true">
+    <div className="space-y-3" role="status">
+      <span className="sr-only">Chargement…</span>
       {Array.from({ length: count }, (_, index) => (
+        // Les formes elles-mêmes ne portent aucune information : masquées aux lecteurs d'écran.
         // biome-ignore lint/suspicious/noArrayIndexKey: nombre fixe de lignes de squelette, jamais réordonnées
-        <div key={index} className="flex items-center gap-3 rounded-xl border p-4">
+        <div key={index} className="flex items-center gap-3 rounded-xl border p-4" aria-hidden="true">
           <Skeleton className="size-11 shrink-0 rounded-full" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-1/3" />
@@ -35,13 +37,14 @@ export function CardListSkeleton({ count = 3 }: { count?: number }) {
  * que la page finale, au lieu d'un « Chargement... » isolé en haut d'une page vide. */
 export function PageSkeleton() {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="Chargement">
-      <div className="space-y-2">
+    <div className="space-y-6" role="status" aria-busy="true">
+      <span className="sr-only">Chargement…</span>
+      <div className="space-y-2" aria-hidden="true">
         <Skeleton className="h-8 w-1/2" />
         <Skeleton className="h-4 w-1/3" />
       </div>
-      <Skeleton className="h-36 w-full rounded-xl" />
-      <Skeleton className="h-64 w-full rounded-xl" />
+      <Skeleton className="h-36 w-full rounded-xl" aria-hidden="true" />
+      <Skeleton className="h-64 w-full rounded-xl" aria-hidden="true" />
     </div>
   );
 }

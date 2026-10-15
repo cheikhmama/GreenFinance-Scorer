@@ -42,7 +42,7 @@ import type {
   PagePortefeuilleAdmin,
   PageProjetAdmin,
   PageRapportAdminListe,
-  PageUtilisateurPublic,
+  PageUtilisateurAdmin,
   PendingRegistration,
   PerformanceESGAdmin,
   RapportAdminListe,
@@ -80,9 +80,9 @@ export const getListUsersByRoleUrl = (params?: ListUsersByRoleParams,) => {
  * saisie libre de nom/e-mail.
  * @summary Lister les comptes actifs d'un rôle donné (ou tous rôles confondus), avec recherche et pagination
  */
-export const listUsersByRole = async (params?: ListUsersByRoleParams, options?: RequestInit): Promise<PageUtilisateurPublic> => {
+export const listUsersByRole = async (params?: ListUsersByRoleParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageUtilisateurAdmin> => {
 
-  return apiFetch<PageUtilisateurPublic>(getListUsersByRoleUrl(params),
+  return apiFetch<PageUtilisateurAdmin>(getListUsersByRoleUrl(params),
   {
     ...options,
     method: 'GET'
@@ -103,13 +103,21 @@ export const getCreateUserUrl = () => {
 /**
  * @summary Provisionner un compte et lui envoyer un lien d'activation par e-mail
  */
-export const createUser = async (creerUtilisateurRequest: CreerUtilisateurRequest, options?: RequestInit): Promise<UtilisateurCree> => {
+export const createUser = async (creerUtilisateurRequest: CreerUtilisateurRequest, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurCree> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<UtilisateurCree>(getCreateUserUrl(),
   {
@@ -132,7 +140,7 @@ export const getListUsersAwaitingActivationUrl = () => {
 /**
  * @summary Lister les comptes actifs, tous rôles confondus, qui n'ont pas encore cliqué leur lien d'activation
  */
-export const listUsersAwaitingActivation = async ( options?: RequestInit): Promise<UtilisateurPublic[]> => {
+export const listUsersAwaitingActivation = async ( options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic[]> => {
 
   return apiFetch<UtilisateurPublic[]>(getListUsersAwaitingActivationUrl(),
   {
@@ -155,7 +163,7 @@ export const getListUsersRoleOverviewUrl = () => {
 /**
  * @summary Un compte actif par rôle (hors Administrateur) — repère rapide des acteurs de la plateforme
  */
-export const listUsersRoleOverview = async ( options?: RequestInit): Promise<UtilisateurPublic[]> => {
+export const listUsersRoleOverview = async ( options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic[]> => {
 
   return apiFetch<UtilisateurPublic[]>(getListUsersRoleOverviewUrl(),
   {
@@ -178,7 +186,7 @@ export const getResendActivationLinkUrl = (utilisateurId: string,) => {
 /**
  * @summary Régénérer et renvoyer le lien d'activation d'un compte pas encore activé
  */
-export const resendActivationLink = async (utilisateurId: string, options?: RequestInit): Promise<void> => {
+export const resendActivationLink = async (utilisateurId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
 
   return apiFetch<void>(getResendActivationLinkUrl(utilisateurId),
   {
@@ -201,7 +209,7 @@ export const getDeactivateUserUrl = (utilisateurId: string,) => {
 /**
  * @summary Désactiver un compte utilisateur
  */
-export const deactivateUser = async (utilisateurId: string, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const deactivateUser = async (utilisateurId: string, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
   return apiFetch<UtilisateurPublic>(getDeactivateUserUrl(utilisateurId),
   {
@@ -224,7 +232,7 @@ export const getReactivateUserUrl = (utilisateurId: string,) => {
 /**
  * @summary Réactiver un compte utilisateur désactivé
  */
-export const reactivateUser = async (utilisateurId: string, options?: RequestInit): Promise<UtilisateurPublic> => {
+export const reactivateUser = async (utilisateurId: string, options?: Parameters<typeof apiFetch>[1]): Promise<UtilisateurPublic> => {
 
   return apiFetch<UtilisateurPublic>(getReactivateUserUrl(utilisateurId),
   {
@@ -254,7 +262,7 @@ export const getListAllReportsUrl = (params?: ListAllReportsParams,) => {
 /**
  * @summary Lister tous les rapports, tous statuts confondus, avec filtre optionnel sur le statut
  */
-export const listAllReports = async (params?: ListAllReportsParams, options?: RequestInit): Promise<PageRapportAdminListe> => {
+export const listAllReports = async (params?: ListAllReportsParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageRapportAdminListe> => {
 
   return apiFetch<PageRapportAdminListe>(getListAllReportsUrl(params),
   {
@@ -277,7 +285,7 @@ export const getListOverdueReportsUrl = () => {
 /**
  * @summary Lister les rapports affectés à un auditeur au-delà du délai attendu, sans décision rendue
  */
-export const listOverdueReports = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
+export const listOverdueReports = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RapportAdminListe[]> => {
 
   return apiFetch<RapportAdminListe[]>(getListOverdueReportsUrl(),
   {
@@ -300,7 +308,7 @@ export const getListReportsToAssignUrl = () => {
 /**
  * @summary Lister les rapports extraits en attente d'affectation
  */
-export const listReportsToAssign = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
+export const listReportsToAssign = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RapportAdminListe[]> => {
 
   return apiFetch<RapportAdminListe[]>(getListReportsToAssignUrl(),
   {
@@ -323,7 +331,7 @@ export const getListFailedExtractionReportsUrl = () => {
 /**
  * @summary Lister les rapports dont l'extraction automatique a échoué
  */
-export const listFailedExtractionReports = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
+export const listFailedExtractionReports = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RapportAdminListe[]> => {
 
   return apiFetch<RapportAdminListe[]>(getListFailedExtractionReportsUrl(),
   {
@@ -346,7 +354,7 @@ export const getRetryExtractionUrl = (rapportId: string,) => {
 /**
  * @summary Relancer l'extraction d'un rapport en échec ou bloqué
  */
-export const retryExtraction = async (rapportId: string, options?: RequestInit): Promise<RapportESGPublic> => {
+export const retryExtraction = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
 
   return apiFetch<RapportESGPublic>(getRetryExtractionUrl(rapportId),
   {
@@ -370,13 +378,21 @@ export const getAssignReportAuditorUrl = (rapportId: string,) => {
  * @summary Affecter un rapport à un auditeur
  */
 export const assignReportAuditor = async (rapportId: string,
-    affecterAuditeurRequest: AffecterAuditeurRequest, options?: RequestInit): Promise<RapportESGPublic> => {
+    affecterAuditeurRequest: AffecterAuditeurRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RapportESGPublic>(getAssignReportAuditorUrl(rapportId),
   {
@@ -406,7 +422,7 @@ export const getListAuditorWorkloadUrl = (params?: ListAuditorWorkloadParams,) =
 /**
  * @summary Lister la charge de travail (dossiers affectés, en retard, avis rendus) par Auditeur actif
  */
-export const listAuditorWorkload = async (params?: ListAuditorWorkloadParams, options?: RequestInit): Promise<PageChargeAuditeurAdmin> => {
+export const listAuditorWorkload = async (params?: ListAuditorWorkloadParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageChargeAuditeurAdmin> => {
 
   return apiFetch<PageChargeAuditeurAdmin>(getListAuditorWorkloadUrl(params),
   {
@@ -429,7 +445,7 @@ export const getListReportsInValidationUrl = () => {
 /**
  * @summary Lister les rapports en attente de décision, avis d'audit déjà rendu
  */
-export const listReportsInValidation = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
+export const listReportsInValidation = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RapportAdminListe[]> => {
 
   return apiFetch<RapportAdminListe[]>(getListReportsInValidationUrl(),
   {
@@ -452,7 +468,7 @@ export const getListOrphanReportsInValidationUrl = () => {
 /**
  * @summary Lister les rapports en attente de décision mais sans aucun avis d'audit (état incohérent)
  */
-export const listOrphanReportsInValidation = async ( options?: RequestInit): Promise<RapportAdminListe[]> => {
+export const listOrphanReportsInValidation = async ( options?: Parameters<typeof apiFetch>[1]): Promise<RapportAdminListe[]> => {
 
   return apiFetch<RapportAdminListe[]>(getListOrphanReportsInValidationUrl(),
   {
@@ -475,7 +491,7 @@ export const getVerifyReportScorabilityUrl = (rapportId: string,) => {
 /**
  * @summary Vérifier, avant décision, si ce rapport pourra être scoré
  */
-export const verifyReportScorability = async (rapportId: string, options?: RequestInit): Promise<ScoreVerificationAdmin> => {
+export const verifyReportScorability = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ScoreVerificationAdmin> => {
 
   return apiFetch<ScoreVerificationAdmin>(getVerifyReportScorabilityUrl(rapportId),
   {
@@ -498,7 +514,7 @@ export const getRecalculateReportScoreUrl = (rapportId: string,) => {
 /**
  * @summary Recalculer le score d'un rapport validé qui en est dépourvu (état incohérent)
  */
-export const recalculateReportScore = async (rapportId: string, options?: RequestInit): Promise<ScoreRecalculeAdmin> => {
+export const recalculateReportScore = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ScoreRecalculeAdmin> => {
 
   return apiFetch<ScoreRecalculeAdmin>(getRecalculateReportScoreUrl(rapportId),
   {
@@ -521,7 +537,7 @@ export const getGetAdminReportUrl = (rapportId: string,) => {
 /**
  * @summary Consulter le détail complet d'un rapport, quel que soit son statut
  */
-export const getAdminReport = async (rapportId: string, options?: RequestInit): Promise<RapportESGDetail> => {
+export const getAdminReport = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGDetail> => {
 
   return apiFetch<RapportESGDetail>(getGetAdminReportUrl(rapportId),
   {
@@ -544,7 +560,7 @@ export const getGetAdminReportFileUrl = (rapportId: string,) => {
 /**
  * @summary Télécharger le PDF original déposé pour ce rapport
  */
-export const getAdminReportFile = async (rapportId: string, options?: RequestInit): Promise<unknown> => {
+export const getAdminReportFile = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
 
   return apiFetch<unknown>(getGetAdminReportFileUrl(rapportId),
   {
@@ -567,7 +583,7 @@ export const getListReportVersionsUrl = (rapportId: string,) => {
 /**
  * @summary Lister toutes les versions d'un rapport (originale et corrections), dans l'ordre
  */
-export const listReportVersions = async (rapportId: string, options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listReportVersions = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic[]> => {
 
   return apiFetch<RapportESGPublic[]>(getListReportVersionsUrl(rapportId),
   {
@@ -590,7 +606,7 @@ export const getListReportOpinionsUrl = (rapportId: string,) => {
 /**
  * @summary Lister les avis d'audit rendus sur un rapport
  */
-export const listReportOpinions = async (rapportId: string, options?: RequestInit): Promise<AvisAuditAdmin[]> => {
+export const listReportOpinions = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AvisAuditAdmin[]> => {
 
   return apiFetch<AvisAuditAdmin[]>(getListReportOpinionsUrl(rapportId),
   {
@@ -613,7 +629,7 @@ export const getListReportReviewsUrl = (rapportId: string,) => {
 /**
  * @summary Journal des revues de l'Auditeur sur un rapport (lecture seule)
  */
-export const listReportReviews = async (rapportId: string, options?: RequestInit): Promise<MetricReviewEntry[]> => {
+export const listReportReviews = async (rapportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<MetricReviewEntry[]> => {
 
   return apiFetch<MetricReviewEntry[]>(getListReportReviewsUrl(rapportId),
   {
@@ -637,13 +653,21 @@ export const getValidateReportUrl = (rapportId: string,) => {
  * @summary Valider un rapport en attente de décision
  */
 export const validateReport = async (rapportId: string,
-    decisionAdminRequest: DecisionAdminRequest, options?: RequestInit): Promise<RapportESGPublic> => {
+    decisionAdminRequest: DecisionAdminRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RapportESGPublic>(getValidateReportUrl(rapportId),
   {
@@ -667,13 +691,21 @@ export const getRejectReportUrl = (rapportId: string,) => {
  * @summary Rejeter un rapport en attente de décision
  */
 export const rejectReport = async (rapportId: string,
-    decisionAdminRequest: DecisionAdminRequest, options?: RequestInit): Promise<RapportESGPublic> => {
+    decisionAdminRequest: DecisionAdminRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RapportESGPublic>(getRejectReportUrl(rapportId),
   {
@@ -697,13 +729,21 @@ export const getRequestReportCorrectionUrl = (rapportId: string,) => {
  * @summary Renvoyer un rapport en attente de décision vers l'entreprise pour correction
  */
 export const requestReportCorrection = async (rapportId: string,
-    decisionAdminRequest: DecisionAdminRequest, options?: RequestInit): Promise<RapportESGPublic> => {
+    decisionAdminRequest: DecisionAdminRequest, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<RapportESGPublic>(getRequestReportCorrectionUrl(rapportId),
   {
@@ -733,7 +773,7 @@ export const getListAllCompaniesUrl = (params?: ListAllCompaniesParams,) => {
 /**
  * @summary Lister toutes les entreprises avec un résumé de statut (dépôts, dernier statut, compte lié)
  */
-export const listAllCompanies = async (params?: ListAllCompaniesParams, options?: RequestInit): Promise<PageEntrepriseAdmin> => {
+export const listAllCompanies = async (params?: ListAllCompaniesParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntrepriseAdmin> => {
 
   return apiFetch<PageEntrepriseAdmin>(getListAllCompaniesUrl(params),
   {
@@ -763,7 +803,7 @@ export const getListPublishableCompaniesUrl = (params?: ListPublishableCompanies
 /**
  * @summary Lister les entreprises ayant au moins un rapport validé, pas encore publiées
  */
-export const listPublishableCompanies = async (params?: ListPublishableCompaniesParams, options?: RequestInit): Promise<PageEntreprisePublic> => {
+export const listPublishableCompanies = async (params?: ListPublishableCompaniesParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntreprisePublic> => {
 
   return apiFetch<PageEntreprisePublic>(getListPublishableCompaniesUrl(params),
   {
@@ -793,7 +833,7 @@ export const getListCompaniesToRepublishUrl = (params?: ListCompaniesToRepublish
 /**
  * @summary Lister les entreprises publiées dont un rapport a été validé après la dernière publication
  */
-export const listCompaniesToRepublish = async (params?: ListCompaniesToRepublishParams, options?: RequestInit): Promise<PageEntreprisePublic> => {
+export const listCompaniesToRepublish = async (params?: ListCompaniesToRepublishParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntreprisePublic> => {
 
   return apiFetch<PageEntreprisePublic>(getListCompaniesToRepublishUrl(params),
   {
@@ -823,7 +863,7 @@ export const getListCompaniesWithScoreUrl = (params?: ListCompaniesWithScorePara
 /**
  * @summary Lister les entreprises publiées avec leur score ESG admissible, filtrable par secteur/pays
  */
-export const listCompaniesWithScore = async (params?: ListCompaniesWithScoreParams, options?: RequestInit): Promise<PageEntrepriseAvecScoreAdmin> => {
+export const listCompaniesWithScore = async (params?: ListCompaniesWithScoreParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageEntrepriseAvecScoreAdmin> => {
 
   return apiFetch<PageEntrepriseAvecScoreAdmin>(getListCompaniesWithScoreUrl(params),
   {
@@ -847,13 +887,21 @@ export const getUpdateCompanyIdentifiersUrl = (companyId: string,) => {
  * @summary Renseigner l'ISIN, le LEI ou le ticker d'une entreprise
  */
 export const updateCompanyIdentifiers = async (companyId: string,
-    companyIdentifiersRequest: CompanyIdentifiersRequest, options?: RequestInit): Promise<CompanyIdentifiers> => {
+    companyIdentifiersRequest: CompanyIdentifiersRequest, options?: Parameters<typeof apiFetch>[1]): Promise<CompanyIdentifiers> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<CompanyIdentifiers>(getUpdateCompanyIdentifiersUrl(companyId),
   {
@@ -877,13 +925,21 @@ export const getOnboardCompanyUrl = (companyId: string,) => {
  * @summary Valider ou refuser l'inscription d'une entreprise
  */
 export const onboardCompany = async (companyId: string,
-    companyOnboardingRequest: CompanyOnboardingRequest, options?: RequestInit): Promise<CompanyOnboardingResult> => {
+    companyOnboardingRequest: CompanyOnboardingRequest, options?: Parameters<typeof apiFetch>[1]): Promise<CompanyOnboardingResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<CompanyOnboardingResult>(getOnboardCompanyUrl(companyId),
   {
@@ -906,7 +962,7 @@ export const getListPendingRegistrationsUrl = () => {
 /**
  * @summary Inscriptions d'entreprises en attente de décision (la plus ancienne d'abord)
  */
-export const listPendingRegistrations = async ( options?: RequestInit): Promise<PendingRegistration[]> => {
+export const listPendingRegistrations = async ( options?: Parameters<typeof apiFetch>[1]): Promise<PendingRegistration[]> => {
 
   return apiFetch<PendingRegistration[]>(getListPendingRegistrationsUrl(),
   {
@@ -929,7 +985,7 @@ export const getGetCompanyKycUrl = (companyId: string,) => {
 /**
  * @summary Contrôles KYC d'une inscription (GLEIF, domaine du contact, lettre de mandat)
  */
-export const getCompanyKyc = async (companyId: string, options?: RequestInit): Promise<KycReport> => {
+export const getCompanyKyc = async (companyId: string, options?: Parameters<typeof apiFetch>[1]): Promise<KycReport> => {
 
   return apiFetch<KycReport>(getGetCompanyKycUrl(companyId),
   {
@@ -952,7 +1008,7 @@ export const getGetCompanyMandateLetterUrl = (companyId: string,) => {
 /**
  * @summary Télécharger la lettre de mandat d'une inscription
  */
-export const getCompanyMandateLetter = async (companyId: string, options?: RequestInit): Promise<Blob> => {
+export const getCompanyMandateLetter = async (companyId: string, options?: Parameters<typeof apiFetch>[1]): Promise<Blob> => {
 
   return apiFetch<Blob>(getGetCompanyMandateLetterUrl(companyId),
   {
@@ -975,7 +1031,7 @@ export const getPublishCompanyUrl = (entrepriseId: string,) => {
 /**
  * @summary Publier une entreprise
  */
-export const publishCompany = async (entrepriseId: string, options?: RequestInit): Promise<EntreprisePublic> => {
+export const publishCompany = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePublic> => {
 
   return apiFetch<EntreprisePublic>(getPublishCompanyUrl(entrepriseId),
   {
@@ -998,7 +1054,7 @@ export const getSuspendCompanyUrl = (entrepriseId: string,) => {
 /**
  * @summary Suspendre une entreprise (bloque tout nouveau dépôt de rapport)
  */
-export const suspendCompany = async (entrepriseId: string, options?: RequestInit): Promise<EntreprisePublic> => {
+export const suspendCompany = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePublic> => {
 
   return apiFetch<EntreprisePublic>(getSuspendCompanyUrl(entrepriseId),
   {
@@ -1021,7 +1077,7 @@ export const getReactivateCompanyUrl = (entrepriseId: string,) => {
 /**
  * @summary Réactiver une entreprise suspendue
  */
-export const reactivateCompany = async (entrepriseId: string, options?: RequestInit): Promise<EntreprisePublic> => {
+export const reactivateCompany = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntreprisePublic> => {
 
   return apiFetch<EntreprisePublic>(getReactivateCompanyUrl(entrepriseId),
   {
@@ -1044,7 +1100,7 @@ export const getGetCompanyAdminUrl = (entrepriseId: string,) => {
 /**
  * @summary Consulter le profil complet d'une entreprise, quel que soit son statut
  */
-export const getCompanyAdmin = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseAdmin> => {
+export const getCompanyAdmin = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseAdmin> => {
 
   return apiFetch<EntrepriseAdmin>(getGetCompanyAdminUrl(entrepriseId),
   {
@@ -1068,13 +1124,21 @@ export const getUpdateCompanyProfileUrl = (entrepriseId: string,) => {
  * @summary Mettre à jour l'identité d'une entreprise (nom, secteur, pays)
  */
 export const updateCompanyProfile = async (entrepriseId: string,
-    modifierEntrepriseAdminRequest: ModifierEntrepriseAdminRequest, options?: RequestInit): Promise<EntrepriseAdmin> => {
+    modifierEntrepriseAdminRequest: ModifierEntrepriseAdminRequest, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseAdmin> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<EntrepriseAdmin>(getUpdateCompanyProfileUrl(entrepriseId),
   {
@@ -1098,7 +1162,7 @@ export const getUploadCompanyLogoUrl = (entrepriseId: string,) => {
  * @summary Ajouter ou remplacer le logo d'une entreprise
  */
 export const uploadCompanyLogo = async (entrepriseId: string,
-    bodyUploadCompanyLogo: BodyUploadCompanyLogo, options?: RequestInit): Promise<EntrepriseAdmin> => {
+    bodyUploadCompanyLogo: BodyUploadCompanyLogo, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseAdmin> => {
     const formData = new FormData();
 formData.append(`fichier`, bodyUploadCompanyLogo.fichier);
 
@@ -1123,7 +1187,7 @@ export const getDeleteCompanyLogoUrl = (entrepriseId: string,) => {
 /**
  * @summary Retirer le logo d'une entreprise
  */
-export const deleteCompanyLogo = async (entrepriseId: string, options?: RequestInit): Promise<EntrepriseAdmin> => {
+export const deleteCompanyLogo = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<EntrepriseAdmin> => {
 
   return apiFetch<EntrepriseAdmin>(getDeleteCompanyLogoUrl(entrepriseId),
   {
@@ -1146,7 +1210,7 @@ export const getListAdminCompanyReportsUrl = (entrepriseId: string,) => {
 /**
  * @summary Lister tous les rapports déposés par une entreprise
  */
-export const listAdminCompanyReports = async (entrepriseId: string, options?: RequestInit): Promise<RapportESGPublic[]> => {
+export const listAdminCompanyReports = async (entrepriseId: string, options?: Parameters<typeof apiFetch>[1]): Promise<RapportESGPublic[]> => {
 
   return apiFetch<RapportESGPublic[]>(getListAdminCompanyReportsUrl(entrepriseId),
   {
@@ -1176,7 +1240,7 @@ export const getListAuditLogUrl = (params?: ListAuditLogParams,) => {
 /**
  * @summary Consulter le journal d'audit (connexions, changements de rôle, désactivations...)
  */
-export const listAuditLog = async (params?: ListAuditLogParams, options?: RequestInit): Promise<PageJournalAuditPublic> => {
+export const listAuditLog = async (params?: ListAuditLogParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageJournalAuditPublic> => {
 
   return apiFetch<PageJournalAuditPublic>(getListAuditLogUrl(params),
   {
@@ -1199,7 +1263,7 @@ export const getListAuditLogActionCountsUrl = () => {
 /**
  * @summary Nombre d'entrées existantes par action du journal d'audit
  */
-export const listAuditLogActionCounts = async ( options?: RequestInit): Promise<JournalAuditActionCompte[]> => {
+export const listAuditLogActionCounts = async ( options?: Parameters<typeof apiFetch>[1]): Promise<JournalAuditActionCompte[]> => {
 
   return apiFetch<JournalAuditActionCompte[]>(getListAuditLogActionCountsUrl(),
   {
@@ -1222,7 +1286,7 @@ export const getGetAdminDashboardUrl = () => {
 /**
  * @summary Indicateurs agrégés du tableau de bord Administrateur
  */
-export const getAdminDashboard = async ( options?: RequestInit): Promise<TableauDeBordAdmin> => {
+export const getAdminDashboard = async ( options?: Parameters<typeof apiFetch>[1]): Promise<TableauDeBordAdmin> => {
 
   return apiFetch<TableauDeBordAdmin>(getGetAdminDashboardUrl(),
   {
@@ -1245,7 +1309,7 @@ export const getGetAdminActorsOverviewUrl = () => {
 /**
  * @summary Statistiques agrégées des espaces Auditeur, Investisseur, Chercheur et Institution
  */
-export const getAdminActorsOverview = async ( options?: RequestInit): Promise<ApercuActeursAdmin> => {
+export const getAdminActorsOverview = async ( options?: Parameters<typeof apiFetch>[1]): Promise<ApercuActeursAdmin> => {
 
   return apiFetch<ApercuActeursAdmin>(getGetAdminActorsOverviewUrl(),
   {
@@ -1268,7 +1332,7 @@ export const getGetAdminESGPerformanceUrl = () => {
 /**
  * @summary Score ESG global/E/S/G moyen et couverture, sur le périmètre des entreprises publiées
  */
-export const getAdminESGPerformance = async ( options?: RequestInit): Promise<PerformanceESGAdmin> => {
+export const getAdminESGPerformance = async ( options?: Parameters<typeof apiFetch>[1]): Promise<PerformanceESGAdmin> => {
 
   return apiFetch<PerformanceESGAdmin>(getGetAdminESGPerformanceUrl(),
   {
@@ -1298,7 +1362,7 @@ export const getListPortfoliosAdminUrl = (params?: ListPortfoliosAdminParams,) =
 /**
  * @summary Lister tous les portefeuilles non archivés, tous Investisseurs confondus
  */
-export const listPortfoliosAdmin = async (params?: ListPortfoliosAdminParams, options?: RequestInit): Promise<PagePortefeuilleAdmin> => {
+export const listPortfoliosAdmin = async (params?: ListPortfoliosAdminParams, options?: Parameters<typeof apiFetch>[1]): Promise<PagePortefeuilleAdmin> => {
 
   return apiFetch<PagePortefeuilleAdmin>(getListPortfoliosAdminUrl(params),
   {
@@ -1328,7 +1392,7 @@ export const getListAnalysesAdminUrl = (params?: ListAnalysesAdminParams,) => {
 /**
  * @summary Lister toutes les analyses Chercheur, filtrable par statut
  */
-export const listAnalysesAdmin = async (params?: ListAnalysesAdminParams, options?: RequestInit): Promise<PageAnalyseAdmin> => {
+export const listAnalysesAdmin = async (params?: ListAnalysesAdminParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageAnalyseAdmin> => {
 
   return apiFetch<PageAnalyseAdmin>(getListAnalysesAdminUrl(params),
   {
@@ -1358,7 +1422,7 @@ export const getListProjectsAdminUrl = (params?: ListProjectsAdminParams,) => {
 /**
  * @summary Lister tous les projets Institution, filtrable par statut
  */
-export const listProjectsAdmin = async (params?: ListProjectsAdminParams, options?: RequestInit): Promise<PageProjetAdmin> => {
+export const listProjectsAdmin = async (params?: ListProjectsAdminParams, options?: Parameters<typeof apiFetch>[1]): Promise<PageProjetAdmin> => {
 
   return apiFetch<PageProjetAdmin>(getListProjectsAdminUrl(params),
   {
@@ -1381,7 +1445,7 @@ export const getListReportExtractionRunsUrl = (reportId: string,) => {
 /**
  * @summary Exécutions du pipeline d'extraction d'un rapport (Docling, modèle LLM, prompt)
  */
-export const listReportExtractionRuns = async (reportId: string, options?: RequestInit): Promise<ExtractionRunPublic[]> => {
+export const listReportExtractionRuns = async (reportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ExtractionRunPublic[]> => {
 
   return apiFetch<ExtractionRunPublic[]>(getListReportExtractionRunsUrl(reportId),
   {
@@ -1404,7 +1468,7 @@ export const getGetReportFinancialsUrl = (reportId: string,) => {
 /**
  * @summary Données financières PCAF de l'exercice d'un rapport (chiffre d'affaires, EVIC)
  */
-export const getReportFinancials = async (reportId: string, options?: RequestInit): Promise<ReportFinancials> => {
+export const getReportFinancials = async (reportId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ReportFinancials> => {
 
   return apiFetch<ReportFinancials>(getGetReportFinancialsUrl(reportId),
   {
@@ -1428,13 +1492,21 @@ export const getUpdateReportFinancialsUrl = (reportId: string,) => {
  * @summary Renseigner le chiffre d'affaires et l'EVIC de l'exercice d'un rapport (PCAF)
  */
 export const updateReportFinancials = async (reportId: string,
-    reportFinancialsRequest: ReportFinancialsRequest, options?: RequestInit): Promise<ReportFinancials> => {
+    reportFinancialsRequest: ReportFinancialsRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ReportFinancials> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return apiFetch<ReportFinancials>(getUpdateReportFinancialsUrl(reportId),
   {

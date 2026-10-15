@@ -60,7 +60,7 @@ L’authentification frontend utilise les routes de connexion, de lecture de ses
 
 ### 2.1. Framework, langage et architecture de l’API
 
-Le backend est développé en **Python**, avec une contrainte de projet `>=3.11` et une image Docker Python 3.11. Ce langage réunit, dans un même environnement, la logique métier, les accès aux données et les bibliothèques de traitement documentaire. [R01, R18]
+Le backend est développé en **Python**, avec une contrainte de projet `>=3.12` et une image Docker Python 3.12. Ce langage réunit, dans un même environnement, la logique métier, les accès aux données et les bibliothèques de traitement documentaire. [R01, R18]
 
 **FastAPI** expose les routes HTTP et orchestre l’injection des sessions de base de données, de l’utilisateur connecté et des permissions. **Uvicorn** exécute l’application selon l’interface ASGI. **Starlette**, dépendance de FastAPI également importée directement pour certains middlewares, fournit des composants HTTP et de gestion des requêtes. Cet ensemble permet d’articuler les contrats d’API, la validation et les contrôles d’accès au niveau des routes. [R06]
 
@@ -247,11 +247,11 @@ En développement, le **proxy Vite** redirige `/api/v1` vers `http://localhost:8
 
 ### 7.1. Docker et Docker Compose
 
-**Docker** fournit un environnement Linux reproductible pour le backend et ses bibliothèques natives. Le `Dockerfile` utilise `python:3.11-slim`, installe les bibliothèques système nécessaires au traitement documentaire et exécute `uv sync --frozen` à partir du verrou de dépendances. Les paquets système comprennent notamment `libgl1`, `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1`, `libgomp1` et `libxcb1`. Ils satisfont les besoins d’exécution de la chaîne OCR et des composants graphiques. [R18]
+**Docker** fournit un environnement Linux reproductible pour le backend et ses bibliothèques natives. Le `Dockerfile` utilise `python:3.12-slim`, installe les bibliothèques système nécessaires au traitement documentaire et exécute `uv sync --frozen` à partir du verrou de dépendances. Les paquets système comprennent notamment `libgl1`, `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1`, `libgomp1` et `libxcb1`. Ils satisfont les besoins d’exécution de la chaîne OCR et des composants graphiques. [R18]
 
 **Docker Compose** déclare trois services : `api`, `db` et `redis`. L’API est exposée sur le port 8000, PostgreSQL sur 5432 et Redis sur 6379. Des contrôles de santé avec `pg_isready` et `redis-cli ping` ordonnent le démarrage des dépendances. Le volume nommé `pgdata` conserve les données PostgreSQL, tandis que le montage de `./storage` conserve les rapports et preuves de l’API. [R18]
 
-L’image Redis est étiquetée `redis:7-alpine` et l’image de base `pgvector/pgvector:pg16`. Ces étiquettes décrivent une famille de versions ; elles ne fixent pas un digest ou une version corrective exacte. Les versions relevées des outils locaux Docker et Compose figurent dans le tableau de synthèse, sans être assimilées aux versions des services conteneurisés.
+L’image Redis est étiquetée `redis:8-alpine` et l’image de base `pgvector/pgvector:pg16`. Ces étiquettes décrivent une famille de versions ; elles ne fixent pas un digest ou une version corrective exacte. Les versions relevées des outils locaux Docker et Compose figurent dans le tableau de synthèse, sans être assimilées aux versions des services conteneurisés.
 
 ### 7.2. Configuration des environnements
 
@@ -355,7 +355,7 @@ Le tableau ci-dessous reprend les technologies dont un usage applicatif, un rôl
 
 | Technologie | Version | Rôle | Justification de son utilisation |
 | --- | --- | --- | --- |
-| Python | >=3.11 (C) ; 3.11.9 (L) | Langage backend | Réunir API, calcul et traitement documentaire. |
+| Python | >=3.12 (C) ; 3.12.13 (L) | Langage backend | Réunir API, calcul et traitement documentaire. |
 | FastAPI | 0.141.1 (V) | API REST | Relier routes, validation et injection de dépendances. |
 | Uvicorn | 0.52.1 (V) | Serveur ASGI | Exécuter l’application FastAPI. |
 | Starlette | 1.6.0 (V) | Composants HTTP et middlewares | Fournir les primitives de traitement des requêtes. |
@@ -399,7 +399,7 @@ Le tableau ci-dessous reprend les technologies dont un usage applicatif, un rôl
 | Technologie | Version | Rôle | Justification de son utilisation |
 | --- | --- | --- | --- |
 | Docker / Docker Compose | 29.7.2 / 5.4.0 (L) | Conteneurs et services locaux | Reproduire l’environnement de l’API et des données. |
-| Image Python slim | python:3.11-slim (C) | Base du conteneur API | Fournir Python et les dépendances système nécessaires. |
+| Image Python slim | python:3.12-slim (C) | Base du conteneur API | Fournir Python et les dépendances système nécessaires. |
 | Bibliothèques système Linux | Non figées dans apt | Support OCR et natif | Satisfaire les besoins des composants documentaires. |
 | uv | 0.11.14 (L) | Dépendances et exécution Python | Installer l’environnement à partir de uv.lock. |
 | Hatchling | N/D ; backend déclaré | Construction du paquet Python | Définir l’assemblage de l’application. |

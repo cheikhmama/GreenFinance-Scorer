@@ -1,5 +1,6 @@
 import random
 import uuid
+from typing import Any
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -113,7 +114,7 @@ def test_score_hors_bornes_rejete_en_base(session, champ: str, valeur_invalide: 
     session.add(configuration)
     session.flush()
 
-    valeurs = {
+    valeurs: dict[str, Any] = {
         "global_score": 50.0,
         "environmental_score": 50.0,
         "social_score": 50.0,

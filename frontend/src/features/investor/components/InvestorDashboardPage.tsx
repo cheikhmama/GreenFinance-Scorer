@@ -2,7 +2,7 @@ import { AlertTriangle, Building2, PieChart, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
-import { formatPourcentage, formatScore, variantScore } from "@/shared/format/etatPosition";
+import { formatPourcentage, formatScoreApprecie, variantScore } from "@/shared/format/etatPosition";
 import { creerSlug } from "@/shared/format/slug";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -56,7 +56,7 @@ export function InvestorDashboardPage() {
       {data && data.suspended_followed_companies.length > 0 ? (
         <Card className="border-destructive/30">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-destructive">
+            <CardTitle as="h2" className="flex items-center gap-2 text-base text-destructive">
               <AlertTriangle className="size-4" />
               Entreprises suspendues dans vos positions
             </CardTitle>
@@ -76,7 +76,9 @@ export function InvestorDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-foreground">Publications récentes</CardTitle>
+            <CardTitle as="h2" className="text-base text-foreground">
+              Publications récentes
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {!data || data.recent_publications.length === 0 ? (
@@ -94,7 +96,7 @@ export function InvestorDashboardPage() {
                     <p className="truncate text-xs text-muted-foreground">{entreprise.sector}</p>
                   </div>
                   <Badge variant={variantScore(entreprise.score.global_score)} className="shrink-0">
-                    {formatScore(entreprise.score.global_score)}
+                    {formatScoreApprecie(entreprise.score.global_score)}
                   </Badge>
                 </Link>
               ))
@@ -122,7 +124,9 @@ function RepartitionSecteurCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base text-foreground">Répartition par secteur</CardTitle>
+        <CardTitle as="h2" className="text-base text-foreground">
+          Répartition par secteur
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {!repartition || repartition.length === 0 ? (

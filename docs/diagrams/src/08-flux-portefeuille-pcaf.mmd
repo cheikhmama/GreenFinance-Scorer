@@ -1,0 +1,16 @@
+---
+title: Flux de données — portefeuille investisseur, score ESG agrégé et carbone PCAF
+---
+flowchart LR
+  I["Investisseur<br/>CSV / JSON ou saisie manuelle"] --> IMP["importation.py<br/>validation ligne à ligne<br/>(rejet global si erreur)"]
+  IMP --> M["Rapprochement ISIN / ticker<br/>entreprises publiées et ACTIVE<br/>MATCHED · UNMATCHED · AMBIGUOUS"]
+  M --> FX["fx.py — conversion devise de référence<br/>taux figé à l'import (config/fx/rates.yaml)"]
+  FX --> POS[("portfolio_positions<br/>montant converti · poids")]
+
+  REP[("esg_reports VALIDATED<br/>scores officiels · émissions<br/>EVIC · chiffre d'affaires")] --> AGG
+  REP --> PC
+  POS --> AGG["Agrégation ESG<br/>Σ wᵢ·scoreᵢ / Σ wᵢ<br/>couverture · piliers · méthode mixte"]
+  POS --> PC["carbon.py + carbon/pcaf.py<br/>AFᵢ = montant / EVIC<br/>émissions financées S1+S2, S3 à part<br/>empreinte · WACI · qualité PCAF 1-5"]
+  AGG --> PF[("portfolios<br/>total_esg_score · waci<br/>financed_emissions_tco2e")]
+  PC --> PF
+  PF --> UI["Tableau de bord investisseur<br/>lignes exclues avec motif"]

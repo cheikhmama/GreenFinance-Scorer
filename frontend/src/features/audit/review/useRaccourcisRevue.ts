@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface RaccourcisRevue {
   accepter: () => void;
@@ -44,4 +44,29 @@ export function useRaccourcisRevue(raccourcis: RaccourcisRevue, actifs: boolean)
     window.addEventListener("keydown", surTouche);
     return () => window.removeEventListener("keydown", surTouche);
   }, [actifs]);
+}
+
+const CLE_PREFERENCE = "gfs-raccourcis-revue";
+
+/** Préférence « raccourcis clavier activés » de l'espace de revue, mémorisée sur l'appareil.
+ * Des raccourcis d'une seule lettre doivent pouvoir être désactivés (WCAG 2.1.4) : ils gênent la
+ * commande vocale et les personnes qui frappent une touche par erreur. Activés par défaut ; un
+ * stockage indisponible (navigation privée stricte) garde simplement le défaut. */
+export function usePreferenceRaccourcis(): [boolean, (actifs: boolean) => void] {
+  const [actifs, setActifs] = useState(() => {
+    try {
+      return localStorage.getItem(CLE_PREFERENCE) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  function changer(valeur: boolean) {
+    setActifs(valeur);
+    try {
+      localStorage.setItem(CLE_PREFERENCE, valeur ? "on" : "off");
+    } catch {
+      // Préférence non mémorisée : elle vaut pour la page en cours.
+    }
+  }
+  return [actifs, changer];
 }

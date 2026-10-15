@@ -1,0 +1,48 @@
+---
+title: Flux d'authentification — cookies JWT, CSRF double-soumission, révocation Redis
+---
+sequenceDiagram
+  autonumber
+  actor U as Utilisateur
+  participant SPA as SPA React (client.ts)
+  participant CSRF as CSRFMiddleware
+  participant API as /api/v1/auth
+  participant RL as Rate limit (Redis)
+  participant DB as PostgreSQL
+  participant REV as Révocation (Redis)
+
+  Note over U,DB: Activation du compte (lien e-mail 72 h, usage unique)
+  U->>SPA: Ouvre le lien et choisit un mot de passe
+  SPA->>API: POST /auth/activer-compte
+  API->>DB: Vérifie le hash du jeton, pose password_hash, active = true
+  API-->>SPA: Set-Cookie __Host-access_token + __Host-csrf_token (session ouverte)
+
+  Note over U,REV: Connexion
+  U->>SPA: e-mail + mot de passe
+  SPA->>API: POST /auth/login
+  API->>RL: enforce_login_rate_limit(email, IP)
+  API->>DB: SELECT user WHERE email
+  alt identifiants invalides ou compte inactif
+    API->>RL: register_failed_login_attempt
+    API->>DB: journal d'audit login failure
+    API-->>SPA: 401 invalid_credentials
+  else succès
+    API->>RL: clear_login_attempts
+    API->>DB: journal d'audit login success
+    API->>REV: current_generation(user_id)
+    API-->>SPA: Set-Cookie JWT HS256 (sub, role, gen, exp 12 h) httpOnly SameSite=Lax + cookie CSRF signé
+  end
+
+  Note over SPA,REV: Requête authentifiée mutante
+  SPA->>CSRF: POST / PUT / PATCH / DELETE, credentials include, en-tête X-CSRF-Token
+  CSRF->>CSRF: Origin autorisée et en-tête égal au cookie
+  CSRF->>API: transmet la requête
+  API->>API: get_current_user : decode_access_token
+  API->>REV: is_session_revoked(user_id, gen)
+  API->>DB: utilisateur existant et actif ?
+  API->>API: require_role(...) selon l'espace
+  API-->>SPA: 200 / 401 / 403
+
+  Note over API,REV: Suspension, changement de mot de passe, déconnexion
+  API->>REV: revoke_all_sessions(user_id) : génération + 1
+  API-->>SPA: delete_cookie (logout)

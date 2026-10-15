@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, ChevronDown, Download } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, ArrowRight, Building2, Download } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { EmailVerificationStep } from "@/features/registration/components/EmailVerificationStep";
@@ -13,13 +13,14 @@ import {
 } from "@/features/registration/referentiels";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
+import { MentionCollecte } from "@/shared/legal/MentionCollecte";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Combobox } from "@/shared/ui/combobox";
 import { FileDrop } from "@/shared/ui/file-drop";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
+import { WizardStepper } from "@/shared/ui/wizard";
 import { useRegisterCompany } from "../api";
 import { type CompanyRegistrationForm, companyRegistrationFormSchema } from "../schemas";
 
@@ -42,9 +43,33 @@ type ChampTexte = "company_name" | "contact_name" | "contact_email" | "tax_id";
 
 const CLASSE_CHAMP = "h-11 rounded-xl";
 
+const ETAPES_INSCRIPTION = [
+  { id: "entreprise", titre: "Entreprise" },
+  { id: "contact", titre: "Contact & mandat" },
+  { id: "identifiants", titre: "Identifiants (facultatifs)" },
+] as const;
+type EtapeInscription = (typeof ETAPES_INSCRIPTION)[number]["id"];
+
+const CHAMPS_INSCRIPTION = {
+  entreprise: ["company_name", "sector", "country", "tax_id"],
+  contact: ["contact_name", "contact_email", "mandate_letter"],
+  identifiants: ["lei", "isin", "website"],
+} as const satisfies Record<EtapeInscription, readonly (keyof CompanyRegistrationForm)[]>;
+
+/** Étape qui porte le premier champ en erreur — une règle croisée (adresse / site) n'est connue
+ * qu'à l'envoi, l'utilisateur doit être ramené là où il peut corriger. */
+export function etapeDeLErreur(
+  erreurs: Partial<Record<keyof CompanyRegistrationForm, unknown>>,
+): EtapeInscription | null {
+  for (const { id } of ETAPES_INSCRIPTION) {
+    if (CHAMPS_INSCRIPTION[id].some((champ) => erreurs[champ])) return id;
+  }
+  return null;
+}
+
 /** Inscription publique d'une entreprise (POST /companies/register, tâches 5.2, 5.10) : identité,
- * identifiant fiscal selon le pays, contact et lettre de mandat ; ISIN, LEI et site web dans un
- * bloc facultatif replié (ils accélèrent les contrôles KYC). La réponse est la même que la demande
+ * identifiant fiscal selon le pays, contact et lettre de mandat ; assistant en trois étapes (ISIN,
+ * LEI et site web, facultatifs, à la dernière : ils accélèrent les contrôles KYC). La réponse est la même que la demande
  * aboutisse ou non : la suite arrive par e-mail. */
 export function CompanyRegistrationPage() {
   const register = useRegisterCompany();
@@ -65,11 +90,26 @@ export function CompanyRegistrationPage() {
     },
   });
   const pays = useWatch({ control: form.control, name: "country" });
-  const [complementsOuverts, setComplementsOuverts] = useState(false);
+  const [etape, setEtape] = useState<EtapeInscription>("entreprise");
   const [adresseConfirmee, setAdresseConfirmee] = useState(false);
-  const champsSupplementairesEnErreur = Boolean(
-    form.formState.errors.isin || form.formState.errors.lei || form.formState.errors.website,
-  );
+  const indexEtape = ETAPES_INSCRIPTION.findIndex((e) => e.id === etape);
+  const derniereEtape = indexEtape === ETAPES_INSCRIPTION.length - 1;
+  // Changer d'étape retire du DOM le bouton qui avait le focus (« Suivant », « Précédent ») :
+  // le focus passe au titre de la nouvelle étape, qui est aussi annoncé (WCAG 2.4.3). Pas au
+  // premier affichage, où le focus reste au début de la page.
+  const titreEtape = useRef<HTMLHeadingElement>(null);
+  const etapeAffichee = useRef(etape);
+  useEffect(() => {
+    if (etapeAffichee.current === etape) return;
+    etapeAffichee.current = etape;
+    titreEtape.current?.focus();
+  }, [etape]);
+
+  async function etapeSuivante() {
+    if (await form.trigger([...CHAMPS_INSCRIPTION[etape]])) {
+      setEtape(ETAPES_INSCRIPTION[indexEtape + 1].id);
+    }
+  }
 
   function onSubmit(values: CompanyRegistrationForm) {
     if (register.isPending) return;
@@ -123,123 +163,145 @@ export function CompanyRegistrationPage() {
         />
       ) : (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <form
+            onSubmit={form.handleSubmit(onSubmit, (erreurs) => {
+              const cible = etapeDeLErreur(erreurs);
+              if (cible) setEtape(cible);
+            })}
+            className="space-y-5"
+            noValidate
+          >
+            <WizardStepper etapes={ETAPES_INSCRIPTION} courante={etape} />
             {register.isError ? (
               <Alert variant="destructive">
                 <AlertTitle>Envoi impossible</AlertTitle>
                 <AlertDescription>{messageErreur(register.error)}</AlertDescription>
               </Alert>
             ) : null}
+            <h2 ref={titreEtape} tabIndex={-1} className="text-base font-semibold outline-none">
+              Étape {indexEtape + 1} sur {ETAPES_INSCRIPTION.length} :{" "}
+              {ETAPES_INSCRIPTION[indexEtape].titre}
+            </h2>
+            {derniereEtape ? null : (
+              <p className="text-xs text-muted-foreground">
+                Tous les champs de cette étape sont obligatoires.
+              </p>
+            )}
             <fieldset disabled={register.isPending} className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                {champTexte("company_name", "Nom de l’entreprise", {
-                  autoComplete: "organization",
-                  placeholder: "Raison sociale",
-                })}
-              </div>
-              <FormField
-                control={form.control}
-                name="sector"
-                render={({ field: { value, onChange, ...field } }) => (
-                  <FormItem>
-                    <FormLabel>Secteur d’activité</FormLabel>
-                    <FormControl>
-                      <Combobox
-                        {...field}
-                        value={value}
-                        onValueChange={onChange}
-                        options={OPTIONS_SECTEURS}
-                        searchPlaceholder="Rechercher un secteur…"
-                        emptyText="Aucun secteur ne correspond."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field: { value, onChange, ...field } }) => (
-                  <FormItem>
-                    <FormLabel>Pays</FormLabel>
-                    <FormControl>
-                      <Combobox
-                        {...field}
-                        value={value}
-                        onValueChange={onChange}
-                        options={OPTIONS_PAYS}
-                        searchPlaceholder="Rechercher un pays…"
-                        emptyText="Aucun pays ne correspond."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="sm:col-span-2">
-                {champTexte("tax_id", libelleIdentifiantFiscal(pays ?? ""), {
-                  placeholder: pays ? exempleIdentifiantFiscal(pays) : "Choisissez d’abord le pays",
-                })}
-              </div>
-              {champTexte("contact_name", "Nom & Prénom du responsable", {
-                autoComplete: "name",
-                placeholder: "Prénom Nom",
-              })}
-              {champTexte("contact_email", "E-mail professionnel", {
-                type: "email",
-                autoComplete: "email",
-                placeholder: "nom@entreprise.com",
-              })}
-              <FormField
-                control={form.control}
-                name="mandate_letter"
-                render={({ field: { value, onChange, onBlur, name, ref } }) => (
-                  <FormItem className="sm:col-span-2">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <FormLabel>Lettre de mandat signée (PDF)</FormLabel>
-                      <a
-                        href={MODELE_MANDAT}
-                        download
-                        className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        <Download className="size-3.5" aria-hidden="true" />
-                        Télécharger modèle .docx
-                      </a>
-                    </div>
-                    <FormControl>
-                      <FileDrop
-                        accept="application/pdf"
-                        hint="PDF signé, 5 Mo au maximum"
-                        file={value}
-                        onFile={onChange}
-                        name={name}
-                        ref={ref}
-                        onBlur={onBlur}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Facultatif, replié : ISIN, LEI et site web accélèrent les contrôles KYC (GLEIF,
-                  domaine de l'e-mail). Ouvert d'office si l'un d'eux est en erreur. */}
-              <Collapsible
-                className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4 sm:col-span-2"
-                open={complementsOuverts || champsSupplementairesEnErreur}
-                onOpenChange={setComplementsOuverts}
-              >
-                <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-left text-sm font-medium text-muted-foreground hover:text-foreground">
-                  <span>
-                    Identifiants complémentaires (facultatif — accélère la vérification KYC)
-                  </span>
-                  <ChevronDown
-                    className="size-4 shrink-0 transition group-data-[state=open]:rotate-180"
-                    aria-hidden="true"
+              {etape === "entreprise" ? (
+                <>
+                  <div className="sm:col-span-2">
+                    {champTexte("company_name", "Nom de l’entreprise", {
+                      autoComplete: "organization",
+                      placeholder: "Raison sociale",
+                    })}
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="sector"
+                    render={({ field: { value, onChange, ...field } }) => (
+                      <FormItem>
+                        <FormLabel>Secteur d’activité</FormLabel>
+                        <FormControl>
+                          <Combobox
+                            {...field}
+                            value={value}
+                            onValueChange={onChange}
+                            options={OPTIONS_SECTEURS}
+                            searchPlaceholder="Rechercher un secteur…"
+                            emptyText="Aucun secteur ne correspond."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="grid grid-cols-1 gap-4 pt-3 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field: { value, onChange, ...field } }) => (
+                      <FormItem>
+                        <FormLabel>Pays</FormLabel>
+                        <FormControl>
+                          <Combobox
+                            {...field}
+                            value={value}
+                            onValueChange={onChange}
+                            options={OPTIONS_PAYS}
+                            searchPlaceholder="Rechercher un pays…"
+                            emptyText="Aucun pays ne correspond."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="sm:col-span-2">
+                    {champTexte("tax_id", libelleIdentifiantFiscal(pays ?? ""), {
+                      placeholder: pays
+                        ? exempleIdentifiantFiscal(pays)
+                        : "Choisissez d’abord le pays",
+                    })}
+                  </div>
+                  {/* Champ piège (app/company/registration.py) : hors écran, jamais atteint au clavier
+                      ni annoncé par un lecteur d'écran — seul un robot le remplit. */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -left-[10000px] h-px w-px overflow-hidden"
+                  >
+                    <label>
+                      Fax
+                      <input tabIndex={-1} autoComplete="off" {...form.register("company_fax")} />
+                    </label>
+                  </div>
+                </>
+              ) : null}
+              {etape === "contact" ? (
+                <>
+                  {champTexte("contact_name", "Nom & Prénom du responsable", {
+                    autoComplete: "name",
+                    placeholder: "Prénom Nom",
+                  })}
+                  {champTexte("contact_email", "E-mail professionnel", {
+                    type: "email",
+                    autoComplete: "email",
+                    placeholder: "nom@entreprise.com",
+                  })}
+                  <FormField
+                    control={form.control}
+                    name="mandate_letter"
+                    render={({ field: { value, onChange, onBlur, name, ref } }) => (
+                      <FormItem className="sm:col-span-2">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <FormLabel>Lettre de mandat signée (PDF)</FormLabel>
+                          <a
+                            href={MODELE_MANDAT}
+                            download
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            <Download className="size-3.5" aria-hidden="true" />
+                            Télécharger modèle .docx
+                          </a>
+                        </div>
+                        <FormControl>
+                          <FileDrop
+                            accept="application/pdf"
+                            hint="PDF signé, 5 Mo au maximum"
+                            file={value}
+                            onFile={onChange}
+                            name={name}
+                            ref={ref}
+                            onBlur={onBlur}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              ) : null}
+              {etape === "identifiants" ? (
+                <>
                   <FormField
                     control={form.control}
                     name="lei"
@@ -280,7 +342,7 @@ export function CompanyRegistrationPage() {
                     control={form.control}
                     name="website"
                     render={({ field }) => (
-                      <FormItem className="md:col-span-2">
+                      <FormItem className="sm:col-span-2">
                         <FormLabel className="text-xs">Site web officiel</FormLabel>
                         <FormControl>
                           <Input
@@ -295,25 +357,40 @@ export function CompanyRegistrationPage() {
                       </FormItem>
                     )}
                   />
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Champ piège (app/company/registration.py) : hors écran, jamais atteint au clavier
-                  ni annoncé par un lecteur d'écran — seul un robot le remplit. */}
-              <div
-                aria-hidden="true"
-                className="absolute -left-[10000px] h-px w-px overflow-hidden"
-              >
-                <label>
-                  Fax
-                  <input tabIndex={-1} autoComplete="off" {...form.register("company_fax")} />
-                </label>
-              </div>
+                </>
+              ) : null}
             </fieldset>
-            <Button type="submit" className="h-12 w-full rounded-xl" disabled={register.isPending}>
-              <Building2 className="size-4" />
-              {register.isPending ? "Envoi en cours…" : "Envoyer la demande"}
-            </Button>
+            {derniereEtape ? (
+              <MentionCollecte finalite="pour examiner votre demande d’inscription et créer le compte de votre entreprise" />
+            ) : null}
+            <div className="flex gap-3">
+              {indexEtape > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 rounded-xl"
+                  disabled={register.isPending}
+                  onClick={() => setEtape(ETAPES_INSCRIPTION[indexEtape - 1].id)}
+                >
+                  Précédent
+                </Button>
+              ) : null}
+              {derniereEtape ? (
+                <Button
+                  type="submit"
+                  className="h-12 flex-1 rounded-xl"
+                  disabled={register.isPending}
+                >
+                  <Building2 className="size-4" />
+                  {register.isPending ? "Envoi en cours…" : "Envoyer la demande"}
+                </Button>
+              ) : (
+                <Button type="button" className="h-12 flex-1 rounded-xl" onClick={etapeSuivante}>
+                  Suivant
+                  <ArrowRight className="size-4" />
+                </Button>
+              )}
+            </div>
           </form>
         </Form>
       )}

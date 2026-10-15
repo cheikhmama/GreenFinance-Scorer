@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pymupdf
 import pytest
 from fastapi.testclient import TestClient
-from httpx import Response
+from httpx2 import Response  # type des réponses du TestClient (Starlette 1.6)
 from sqlmodel import col, select
 
 from app.auth.hashing import hash_password

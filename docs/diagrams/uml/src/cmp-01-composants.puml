@@ -1,0 +1,72 @@
+@startuml cmp-01-composants
+!include _style.iuml
+title Diagramme de composants — GreenFinance-Scorer
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 60
+
+package "Frontend (SPA React 19 + Vite)" {
+  [Pages par espace\n(features/*)] as FEAT
+  [Système « Registre »\n(shared/ui, layout)] as UI
+  [Client API généré\n(Orval + TanStack Query)] as CLIENT
+  FEAT --> UI
+  FEAT --> CLIENT
+}
+
+package "Backend (FastAPI)" {
+  interface "REST /api/v1\n(OpenAPI)" as REST
+  [Sous-application api_app\n(CORS, CSRF, CorrelationId)] as APIAPP
+  REST - APIAPP
+
+  package "Espaces (routers)" {
+    [auth] as AUTH
+    [company] as COMP
+    [admin] as ADM
+    [audit] as AUD
+    [investor] as INV
+    [researcher] as RES
+    [institution] as INST
+  }
+  package "Moteurs" {
+    [ingestion\n(extraction)] as ING
+    [scoring] as SCO
+    [carbon\n(PCAF)] as CAR
+    [explainability] as EXP
+  }
+  [core\n(config, DB, sécurité,\nnotifications, stockage)] as CORE
+  [worker\n(queue, jobs arq)] as WRK
+
+  APIAPP --> AUTH
+  APIAPP --> COMP
+  APIAPP --> ADM
+  APIAPP --> AUD
+  APIAPP --> INV
+  APIAPP --> RES
+  APIAPP --> INST
+
+  COMP --> WRK
+  ADM --> WRK
+  ADM --> SCO
+  AUD --> SCO
+  INV --> SCO
+  INV --> CAR
+  RES --> SCO
+  EXP --> SCO
+  WRK --> ING
+  ING --> SCO
+}
+
+database "PostgreSQL\n+ pgvector" as DB
+queue "Redis" as RED
+cloud "Gemini" as GEM
+cloud "GLEIF" as GLEIF
+cloud "SMTP" as SMTP
+
+CLIENT ..> REST : HTTPS + cookies
+CORE --> DB : SQLModel
+CORE --> RED : files, sessions,\nlimitation de débit
+ING --> GEM : tool-calling
+ADM --> GLEIF : KYC
+WRK --> SMTP : e-mails
+@enduml

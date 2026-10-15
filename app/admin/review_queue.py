@@ -26,7 +26,6 @@ from app.core.exceptions import NotFoundError, ValidationError
 from app.core.notifications import notifier
 from app.core.recherche import contient
 from app.ingestion.models import ESGReport
-from app.ingestion.schemas import RapportESGPublic
 from app.scoring.engine import calculer_score, score_officiel
 from app.scoring.models import Score
 
@@ -39,9 +38,11 @@ def avec_entreprises(session: Session, rapports: list[ESGReport]) -> list[Rappor
         if ids
         else {}
     )
+    # Validé directement depuis le modèle : official_global_score n'est lu que sous son alias
+    # `official_score` — un aller-retour par model_dump() le perdait (colonne « Score ESG » vide).
     return [
-        RapportAdminListe.model_validate(
-            {**RapportESGPublic.model_validate(r).model_dump(), "company_name": noms.get(r.company_id, "")}
+        RapportAdminListe.model_validate(r).model_copy(
+            update={"company_name": noms.get(r.company_id, "")}
         )
         for r in rapports
     ]

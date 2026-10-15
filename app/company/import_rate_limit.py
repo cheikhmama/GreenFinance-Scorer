@@ -9,7 +9,6 @@ de proxy pour marteler une cible tierce à volonté.
 
 import uuid
 from collections.abc import Callable
-from typing import TypeVar
 
 import redis
 import structlog
@@ -22,14 +21,13 @@ logger = structlog.get_logger(__name__)
 MAX_IMPORTS = 10
 WINDOW_SECONDS = 60 * 60
 
-T = TypeVar("T")
 
 
 def _key(entreprise_id: uuid.UUID) -> str:
     return f"url_imports:{entreprise_id}"
 
 
-def _guarded(operation: str, call: Callable[[], T]) -> T:
+def _guarded[T](operation: str, call: Callable[[], T]) -> T:
     try:
         return call()
     except redis.RedisError as exc:

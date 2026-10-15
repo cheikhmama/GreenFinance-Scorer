@@ -1,0 +1,33 @@
+---
+title: Cycle de vie d'un rapport ESG (ReportStatus)
+---
+stateDiagram-v2
+  direction LR
+  [*] --> DRAFT: créer session (ENTREPRISE / ADMIN)
+  DRAFT --> EXTRACTING: joindre PDF (analyse brouillon) ou dépôt direct
+  EXTRACTING --> DRAFT: analyse brouillon terminée (checklist) ou échouée
+  EXTRACTING --> AWAITING_ASSIGNMENT: extraction réussie (rapport soumis) + pré-score
+  EXTRACTING --> EXTRACTION_FAILED: échec / délai dépassé
+  EXTRACTION_FAILED --> EXTRACTING: relancer (ADMIN)
+  DRAFT --> AWAITING_ASSIGNMENT: soumettre (verrouillage, submitted_at)
+  DRAFT --> [*]: abandonner
+  AWAITING_ASSIGNMENT --> IN_AUDIT: affecter un auditeur (ADMIN)
+  IN_AUDIT --> PENDING_DECISION: avis d'audit (toutes les valeurs revues)
+  PENDING_DECISION --> VALIDATED: valider (ADMIN) — publication atomique du score
+  PENDING_DECISION --> REJECTED: rejeter (ADMIN)
+  PENDING_DECISION --> REVISION_REQUESTED: demander correction (ADMIN)
+  REVISION_REQUESTED --> EXTRACTING: nouvelle version (version + 1)
+  VALIDATED --> [*]
+  REJECTED --> [*]
+
+  note right of IN_AUDIT
+    Revue append-only (metric_reviews) :
+    ACCEPTED / OVERRIDDEN / NOT_FOUND
+    par l'auditeur affecté uniquement
+  end note
+  note right of VALIDATED
+    Une transaction : verrou, config par hash,
+    calcul, insert scores, official_score,
+    statut, journal, notification ; puis
+    job generate_synthesis_pdf + e-mail
+  end note

@@ -311,19 +311,25 @@ def lister_mes_portefeuilles(
         filtres.append(col(Portfolio.archived) == archive)
     if recherche:
         filtres.append(contient(recherche, Portfolio.name))
-
-    tous = list(
-        session.exec(
-            select(Portfolio).where(*filtres).order_by(col(Portfolio.created_at).desc())
-        ).all()
-    )
-    resumes = [resume_portefeuille(session, p) for p in tous]
     if avec_position is not None:
-        resumes = [r for r in resumes if (r.position_count > 0) == avec_position]
+        # Même définition que PortefeuilleResume.position_count > 0 (toutes positions confondues),
+        # filtrée en SQL : seule la page demandée est ensuite résumée.
+        a_une_position = (
+            select(PortfolioPosition.id)
+            .where(col(PortfolioPosition.portfolio_id) == col(Portfolio.id))
+            .exists()
+        )
+        filtres.append(a_une_position if avec_position else ~a_une_position)
 
-    total = len(resumes)
-    debut = (page - 1) * page_size
-    return resumes[debut : debut + page_size], total
+    total = session.exec(select(func.count()).select_from(Portfolio).where(*filtres)).one()
+    page_portefeuilles = session.exec(
+        select(Portfolio)
+        .where(*filtres)
+        .order_by(col(Portfolio.created_at).desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return [resume_portefeuille(session, p) for p in page_portefeuilles], total
 
 
 def renommer_portefeuille(

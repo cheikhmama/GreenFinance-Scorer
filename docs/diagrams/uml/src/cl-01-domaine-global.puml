@@ -1,0 +1,135 @@
+@startuml cl-01-domaine-global
+!include _style.iuml
+title Diagramme de classes global — modèle du domaine (méthodes principales)
+hide empty fields
+hide circle
+skinparam nodesep 45
+skinparam ranksep 70
+
+' Couleur par domaine (voir la légende). Attributs : voir les diagrammes détaillés.
+class User #E8EEF5 {
+  + activer_compte()
+  + verify_password()
+  + revoke_all_sessions()
+  + desactiver_utilisateur()
+}
+class Notification #E8EEF5 {
+  + notifier()
+  + marquer_lue()
+}
+
+class Company #E6F2E6 {
+  + enregistrer_demande()
+  + decider_inscription()
+  + rapport_kyc()
+  + publier_entreprise()
+  + suspendre_entreprise()
+}
+class ESGReport #E6F2E6 {
+  + ouvrir()
+  + joindre_fichier()
+  + soumettre()
+  + affecter_auditeur()
+  + valider_rapport()
+  + rejeter_rapport()
+  + demander_correction()
+  + creer_correction()
+}
+class ExtractionRun #E6F2E6 {
+  + run_extraction_pipeline()
+  + marquer_echec()
+}
+class Evidence #E6F2E6 {
+  + generate_page_proof()
+}
+class ESGMetric #E6F2E6 {
+  + localiser()
+  + valeur_effective()
+}
+class CarbonEmission #E6F2E6 {
+  + qualite_donnee_pcaf()
+}
+
+class MetricReview #FFF1DC {
+  + enregistrer_revue()
+  + valeurs_non_revues()
+}
+class AuditOpinion #FFF1DC {
+  + soumettre_avis()
+  + pre_score()
+}
+class ScoringConfig #FFF1DC {
+  + enregistrer_configuration()
+  + obtenir_configuration_reference()
+}
+class Score #FFF1DC {
+  + calculer_score()
+  + score_officiel()
+  + expliquer_score()
+}
+
+class Portfolio #F3E8F5 {
+  + creer_portefeuille()
+  + importer_positions()
+  + empreinte_carbone()
+  + archiver_portefeuille()
+}
+class PortfolioPosition #F3E8F5 {
+  + ajouter_position()
+  + fermer_position()
+  + etat_position()
+}
+
+class Project #FDE9E7 {
+  + creer_projet()
+  + affecter_chercheur()
+  + ajouter_entreprise_perimetre()
+  + cloturer_projet()
+}
+class Analysis #FDE9E7 {
+  + creer_analyse()
+  + soumettre_analyse()
+  + valider_analyse()
+  + corriger_analyse()
+}
+class ReferenceDataset #FDE9E7 {
+  + importer()
+  + rapport()
+}
+
+User "1" *-- "0..*" Notification
+User "0..1" -- "0..1" Company : possède >
+User "1" -- "0..*" Portfolio : détient >
+User "1" -- "0..*" Project : pilote >
+User "1" -- "0..*" ReferenceDataset : importe >
+User "0..1" -- "0..*" ESGReport : audite >
+
+Company "1" *-- "0..*" ESGReport : dépose >
+ESGReport "1" *-- "0..*" ExtractionRun
+ESGReport "1" *-- "0..*" ESGMetric
+ESGReport "1" *-- "0..*" CarbonEmission
+Evidence "1" -- "0..*" ESGMetric : prouve >
+Evidence "1" -- "0..*" CarbonEmission : prouve >
+
+ESGReport "1" *-- "0..*" MetricReview
+ESGReport "1" *-- "0..*" AuditOpinion
+ESGReport "1" *-- "0..*" Score
+ScoringConfig "1" -- "0..*" Score : méthode >
+
+Portfolio "1" *-- "0..*" PortfolioPosition
+Company "0..1" -- "0..*" PortfolioPosition : investie >
+
+Project "1" *-- "0..*" Analysis
+Analysis "0..*" -- "0..*" Company : compare >
+
+legend right
+  |= Couleur |= Domaine |
+  |<#E8EEF5>| Comptes et notifications |
+  |<#E6F2E6>| Entreprises, rapports, extraction |
+  |<#FFF1DC>| Audit et scoring |
+  |<#F3E8F5>| Investissement |
+  |<#FDE9E7>| Recherche |
+  Paramètres et attributs : voir les
+  diagrammes de classes détaillés.
+endlegend
+@enduml

@@ -1,0 +1,52 @@
+@startuml seq-02-inscription-entreprise
+!include _style.iuml
+title Diagramme de séquence — Inscription d'une entreprise et onboarding
+autonumber "<b>0."
+
+actor "Représentant\nde l'entreprise" as V
+participant "SPA React" as SPA
+participant "API Entreprise\n/companies" as API
+participant "API Admin\n/admin" as ADM
+actor "Administrateur" as A
+database "PostgreSQL" as DB
+participant "Worker\n(e-mails)" as W
+participant "GLEIF" as GL
+
+V -> SPA : remplit le formulaire\n+ lettre de mandat (PDF)
+SPA -> API : POST /companies/register (multipart)
+activate API
+API -> API : valide identifiants (NIF/SIREN/EIN, ISIN, LEI),\ne-mail professionnel, PDF ≤ 5 Mo
+API -> DB : Company EMAIL_VERIFICATION_PENDING\n+ User ENTERPRISE sans mot de passe
+API -> W : enfiler e-mail (code à 6 chiffres)
+API --> SPA : 202 (même réponse quel que soit le résultat)
+deactivate API
+W -> V : e-mail avec le code
+
+V -> SPA : saisit le code
+SPA -> API : POST /companies/registration/verify-email
+API -> DB : status = PENDING_ONBOARDING,\njeton de suivi, notification admin
+API -> W : e-mail d'accusé + lien de suivi
+
+== Examen par l'administrateur ==
+A -> ADM : GET /admin/companies/{id}/kyc
+ADM -> GL : vérifie LEI et raison sociale (5 s max)
+ADM --> A : contrôles KYC (PASSED / FAILED /\nNOT_VERIFIABLE / NOT_APPLICABLE)
+
+alt informations manquantes
+  A -> ADM : demander des informations (message)
+  ADM -> DB : status = INFO_REQUESTED, nouveau jeton de suivi
+  ADM -> W : e-mail avec la demande
+  V -> API : POST /companies/registration-status/reply\n(nouvelle lettre de mandat)
+  API -> DB : status = PENDING_ONBOARDING
+else approbation
+  A -> ADM : POST /admin/companies/{id}/onboard (approve)
+  ADM -> DB : status = ACTIVE, jeton d'activation (72 h),\njournal d'audit
+  ADM -> W : e-mail d'activation
+  V -> SPA : ouvre le lien, choisit un mot de passe
+  SPA -> SPA : POST /auth/activer-compte\n(session ouverte directement)
+else rejet
+  A -> ADM : POST /admin/companies/{id}/onboard (reject, motif)
+  ADM -> DB : status = REJECTED, compte désactivé
+  ADM -> W : e-mail avec le motif
+end
+@enduml

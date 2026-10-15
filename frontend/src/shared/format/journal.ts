@@ -45,30 +45,6 @@ const VALEURS: Record<string, string> = {
   inactive: "inactif",
 };
 
-/** Choix des filtres du journal : le serveur filtre sur le code exact, jamais sur le libellé.
- * Ordre alphabétique par défaut, avant que les compteurs réels ne soient chargés — voir
- * trierOptionsActionsParNombre pour l'ordre affiché une fois les compteurs disponibles. */
-export const OPTIONS_ACTIONS_JOURNAL = Object.entries(ACTIONS)
-  .map(([value, label]) => ({ value, label }))
-  .sort((a, b) => a.label.localeCompare(b.label, "fr"));
-
-/** Trie les options du filtre Action par nombre d'entrées existantes, décroissant — une action
- * jamais survenue (compteur absent ou à 0) passe en bas plutôt qu'en tête d'un ordre alphabétique
- * qui ne reflète pas ce que le journal contient réellement (égalité : ordre alphabétique). */
-export function trierOptionsActionsParNombre(
-  compteurs: Record<string, number>,
-): { value: string; label: string }[] {
-  return [...OPTIONS_ACTIONS_JOURNAL].sort((a, b) => {
-    const ecart = (compteurs[b.value] ?? 0) - (compteurs[a.value] ?? 0);
-    return ecart !== 0 ? ecart : a.label.localeCompare(b.label, "fr");
-  });
-}
-
-export const OPTIONS_TYPES_RESSOURCE = Object.entries(TYPES_RESSOURCE).map(([value, label]) => ({
-  value,
-  label,
-}));
-
 export function libelleActionJournal(action: string): string {
   return ACTIONS[action] ?? action;
 }
