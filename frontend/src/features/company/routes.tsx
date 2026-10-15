@@ -6,6 +6,7 @@ import { RouteError } from "@/shared/layout/RouteError";
 import { RequireRole } from "@/shared/RequireRole";
 import { CompanyDashboardPage } from "./components/CompanyDashboardPage";
 import { CompanyDeclarationsPage } from "./components/CompanyDeclarationsPage";
+import { ProfileEditSheet } from "./components/ProfileEditSheet";
 import { ProfilePage } from "./components/ProfilePage";
 import { RegistrationStatusPage } from "./components/RegistrationStatusPage";
 import { CorrectionSheet } from "./declaration/CorrectionSheet";
@@ -94,6 +95,7 @@ export const companyEspaceRoutes: RouteObject[] = [
         path: "profile",
         element: <ProfilePage />,
         handle: { fil: "Profil entreprise" } satisfies HandleRoute,
+        children: [{ path: "fiche-publique", element: <ProfileEditSheet /> }],
       },
       // Adresses d'avant la tâche 5.9.
       { path: "rapports", element: <Navigate to="/company/declarations" replace /> },
