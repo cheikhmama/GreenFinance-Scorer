@@ -291,3 +291,20 @@ Decisions taken before starting (2026-10-01):
   - [x] Institution: companies, projects (create dialog kept), analyses (those awaiting a decision sorted first) and researchers (two tabs: my attachments, available researchers with « Inviter » in the drawer).
   - [x] Infinite-scroll list hooks replaced by full-list table hooks where no other screen used them.
   - Checked on the demo: the 13 converted routes render one table and one counter, the first row's drawer opens, no page wider than a phone screen, no console error or failed call; 153 frontend tests pass.
+
+## Phase 6: Hierarchical navigation — foundation + Company pilot
+
+Spec: `docs/superpowers/specs/2026-10-14-frontend-hierarchical-navigation-design.md`; plan:
+`docs/superpowers/plans/2026-10-14-frontend-hierarchical-navigation.md`. Branch
+`feat/refonte-navigation-entreprise`.
+
+- [x] 6.1 Shared primitives: sheet widths, routed sheet, disclosure card, status badge, phase progress, wizard stepper and leave confirmation
+- [x] 6.2 Breadcrumbs from route handles, master-detail layout, route error view
+- [x] 6.3 Company: four-phase status model, query-key factory, list polling while analysing, refresh on new notifications
+- [x] 6.4 Company: pillar → family taxonomy and display allowlist (`MetriqueVue`), leak tests
+- [x] 6.5 Company: nested declaration routes — overview, pillar page, metric sheet
+- [x] 6.6 Company: four-step declaration wizard (replaces the dialog and draft panels)
+- [x] 6.7 Company: correction and public-profile edits as routed sheets
+- [x] 6.8 Company registration as a three-step wizard
+- [ ] 6.9 Backend: drop `proof_text`, `raw_value`, `section`, `proof_boxes` from the company report schema (separate PR, spec §4.2)
+- [ ] 6.10 Other spaces (admin, audit, investor, researcher, institution): one spec each on this foundation
