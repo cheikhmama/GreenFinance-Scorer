@@ -91,7 +91,9 @@ export function ResearcherDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-base">Dernières analyses</CardTitle>
+            <CardTitle as="h2" className="text-base">
+              Dernières analyses
+            </CardTitle>
             <Button asChild variant="link" size="sm">
               <Link to="/researcher/analyses">Toutes les analyses</Link>
             </Button>
@@ -132,7 +134,9 @@ export function ResearcherDashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-base">Mes projets</CardTitle>
+            <CardTitle as="h2" className="text-base">
+              Mes projets
+            </CardTitle>
             <Button asChild variant="link" size="sm">
               <Link to="/researcher/projets">Tous les projets</Link>
             </Button>

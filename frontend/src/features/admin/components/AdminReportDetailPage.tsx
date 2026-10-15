@@ -35,6 +35,7 @@ import {
 } from "../api";
 import { ExtractionRunsCard } from "./ExtractionRunsCard";
 import { ReportFinancialsCard } from "./ReportFinancialsCard";
+import { Label } from "@/shared/ui/label";
 
 /** Fiche de détail Admin d'un rapport — identité de l'entreprise toujours visible en tête (on
  * arrive ici depuis plusieurs points de la plateforme : file d'affectation, file de décision,
@@ -396,7 +397,9 @@ function FormulaireDecision({ rapportId }: { rapportId: string }) {
             {formatPourcentage(verificationScore.coverage_rate * 100)}.
           </p>
         ) : null}
+        <Label htmlFor="commentaire-decision">Commentaire de décision</Label>
         <Textarea
+          id="commentaire-decision"
           placeholder="Commentaire (optionnel pour valider, recommandé pour rejeter ou demander une correction)"
           value={commentaire}
           onChange={(event) => setCommentaire(event.target.value)}

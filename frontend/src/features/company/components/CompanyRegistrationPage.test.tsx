@@ -212,6 +212,16 @@ describe("CompanyRegistrationPage", () => {
     expect(screen.queryByText("Votre nom est requis.")).not.toBeInTheDocument();
   });
 
+  it("changer d’étape met le focus sur le titre de la nouvelle étape", async () => {
+    const user = utilisateur();
+    renderPage();
+    await allerAEtape2(user);
+    expect(screen.getByRole("heading", { name: "Étape 2 sur 3 : Contact & mandat" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Précédent" }));
+    expect(screen.getByRole("heading", { name: "Étape 1 sur 3 : Entreprise" })).toHaveFocus();
+  });
+
   it("exige la lettre de mandat avant tout envoi", async () => {
     renderPage();
     const user = utilisateur();

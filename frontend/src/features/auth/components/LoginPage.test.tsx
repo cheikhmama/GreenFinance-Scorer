@@ -86,7 +86,7 @@ describe("LoginPage", () => {
       "/contact",
     );
     expect(
-      screen.getByRole("link", { name: "GreenFinance-Scorer — connexion" }).querySelector("img"),
+      screen.getByRole("link", { name: /GreenFinance.*— connexion$/ }).querySelector("img"),
     ).toHaveAttribute("src", "/favicon.svg");
   });
 

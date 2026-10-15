@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, Building2, Download } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { EmailVerificationStep } from "@/features/registration/components/EmailVerificationStep";
@@ -13,6 +13,7 @@ import {
 } from "@/features/registration/referentiels";
 import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/shared/layout/AuthLayout";
+import { MentionCollecte } from "@/shared/legal/MentionCollecte";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Combobox } from "@/shared/ui/combobox";
@@ -93,6 +94,16 @@ export function CompanyRegistrationPage() {
   const [adresseConfirmee, setAdresseConfirmee] = useState(false);
   const indexEtape = ETAPES_INSCRIPTION.findIndex((e) => e.id === etape);
   const derniereEtape = indexEtape === ETAPES_INSCRIPTION.length - 1;
+  // Changer d'étape retire du DOM le bouton qui avait le focus (« Suivant », « Précédent ») :
+  // le focus passe au titre de la nouvelle étape, qui est aussi annoncé (WCAG 2.4.3). Pas au
+  // premier affichage, où le focus reste au début de la page.
+  const titreEtape = useRef<HTMLHeadingElement>(null);
+  const etapeAffichee = useRef(etape);
+  useEffect(() => {
+    if (etapeAffichee.current === etape) return;
+    etapeAffichee.current = etape;
+    titreEtape.current?.focus();
+  }, [etape]);
 
   async function etapeSuivante() {
     if (await form.trigger([...CHAMPS_INSCRIPTION[etape]])) {
@@ -167,6 +178,15 @@ export function CompanyRegistrationPage() {
                 <AlertDescription>{messageErreur(register.error)}</AlertDescription>
               </Alert>
             ) : null}
+            <h2 ref={titreEtape} tabIndex={-1} className="text-base font-semibold outline-none">
+              Étape {indexEtape + 1} sur {ETAPES_INSCRIPTION.length} :{" "}
+              {ETAPES_INSCRIPTION[indexEtape].titre}
+            </h2>
+            {derniereEtape ? null : (
+              <p className="text-xs text-muted-foreground">
+                Tous les champs de cette étape sont obligatoires.
+              </p>
+            )}
             <fieldset disabled={register.isPending} className="grid min-w-0 gap-4 sm:grid-cols-2">
               {etape === "entreprise" ? (
                 <>
@@ -340,6 +360,9 @@ export function CompanyRegistrationPage() {
                 </>
               ) : null}
             </fieldset>
+            {derniereEtape ? (
+              <MentionCollecte finalite="pour examiner votre demande d’inscription et créer le compte de votre entreprise" />
+            ) : null}
             <div className="flex gap-3">
               {indexEtape > 0 ? (
                 <Button

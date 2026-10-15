@@ -61,7 +61,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout eyebrow="BIENVENUE SUR GREENFINANCE">
+    <AuthLayout eyebrow="BIENVENUE SUR GREENFINANCE" titreAccessible="Connexion">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}

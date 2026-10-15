@@ -36,16 +36,32 @@ export function formatScore(valeur: number | null): string {
   return valeur === null ? "—" : `${uneDecimale(valeur)}/100`;
 }
 
-/** Seuils d'appréciation d'un score ESG (0-100) pour un badge visuellement remarquable —
- * mêmes seuils que ceux déjà utilisés à l'écran pour la couverture ESG, réutilisés ici pour un
- * score individuel. Un score absent (entreprise sans score calculé) reste neutre. */
+/** Seuils d'appréciation d'un score ESG (0-100) — mêmes seuils que ceux déjà utilisés à l'écran
+ * pour la couverture ESG, réutilisés ici pour un score individuel. Un score absent (entreprise
+ * sans score calculé) n'a pas d'appréciation. */
+export function appreciationScore(valeur: number | null): "élevé" | "moyen" | "faible" | null {
+  if (valeur === null) return null;
+  if (valeur >= 70) return "élevé";
+  if (valeur >= 40) return "moyen";
+  return "faible";
+}
+
+/** Couleur du badge de score. Toujours accompagnée du texte d'appreciationScore : la couleur
+ * seule ne doit jamais porter l'appréciation (WCAG 1.4.1). */
 export function variantScore(
   valeur: number | null,
 ): "secondary" | "success" | "warning" | "destructive" {
-  if (valeur === null) return "secondary";
-  if (valeur >= 70) return "success";
-  if (valeur >= 40) return "warning";
-  return "destructive";
+  const appreciation = appreciationScore(valeur);
+  if (appreciation === "élevé") return "success";
+  if (appreciation === "moyen") return "warning";
+  if (appreciation === "faible") return "destructive";
+  return "secondary";
+}
+
+/** « 66,7/100 · moyen » — score et appréciation en texte, pour les badges colorés. */
+export function formatScoreApprecie(valeur: number | null): string {
+  const appreciation = appreciationScore(valeur);
+  return appreciation ? `${formatScore(valeur)} · ${appreciation}` : formatScore(valeur);
 }
 
 export function formatPourcentage(valeur: number): string {

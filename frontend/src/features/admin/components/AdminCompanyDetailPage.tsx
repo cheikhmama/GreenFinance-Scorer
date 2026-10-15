@@ -81,7 +81,7 @@ function LogoEditor({
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="group relative">
-        <CompanyAvatar nom={nom} logo={logo} className="size-24 text-2xl" />
+        <CompanyAvatar nom={nom} logo={logo} className="size-24 text-2xl" decoratif={false} />
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -96,6 +96,10 @@ function LogoEditor({
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="sr-only"
+          // Ouvert par le bouton visible juste au-dessus : hors de l'ordre de tabulation et de
+          // l'arbre d'accessibilité, sinon un second arrêt sans nom au clavier.
+          tabIndex={-1}
+          aria-hidden="true"
           onChange={choisirFichier}
         />
       </div>

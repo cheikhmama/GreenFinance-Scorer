@@ -296,6 +296,18 @@
   font-weight: 600;
   color: var(--auth-green);
 }
+.auth-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+.auth-footer a.auth-footer-legal {
+  padding-inline: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--auth-copy);
+}
 .auth-footer a:hover {
   background: color-mix(in srgb, var(--auth-green) 10%, transparent);
   text-decoration: underline;

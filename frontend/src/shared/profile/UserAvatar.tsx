@@ -35,14 +35,23 @@ export function UserAvatar({
   avatar,
   className = "size-10",
   fallback = "initiales",
+  decoratif = false,
 }: {
   nom: string;
   avatar: string | null;
   className?: string;
   fallback?: "initiales" | "icone";
+  /** Vrai quand le nom est écrit juste à côté (AppShell) : alt vide, pour ne pas le lire deux fois. */
+  decoratif?: boolean;
 }) {
   if (avatar) {
-    return <img src={avatar} alt={nom} className={`${className} rounded-full object-cover`} />;
+    return (
+      <img
+        src={avatar}
+        alt={decoratif ? "" : nom}
+        className={`${className} rounded-full object-cover`}
+      />
+    );
   }
   if (fallback === "icone") {
     return (

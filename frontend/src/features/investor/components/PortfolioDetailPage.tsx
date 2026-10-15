@@ -23,7 +23,15 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useConfirm } from "@/shared/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/shared/ui/form";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
@@ -167,7 +175,7 @@ export function PortfolioDetailPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Positions</CardTitle>
+          <CardTitle as="h2">Positions</CardTitle>
           {!portefeuille.archived && portefeuille.position_count > 0 ? (
             <Button size="sm" onClick={() => setAjoutOuvert(true)}>
               Créer une position
@@ -664,7 +672,9 @@ function FormulairePosition({
                     type="number"
                     step="0.01"
                     min={0}
-                    aria-invalid={montantInsuffisant}
+                    // Seulement quand le minimum n'est pas atteint : une valeur false écraserait
+                    // l'aria-invalid que FormControl pose pour les erreurs de validation.
+                    {...(montantInsuffisant ? { "aria-invalid": true } : {})}
                     value={field.value}
                     onKeyDown={(event) => {
                       // Bloque la frappe du signe moins à la source — le clamp ci-dessous reste
@@ -679,6 +689,13 @@ function FormulairePosition({
                     }}
                   />
                 </FormControl>
+                {montantInsuffisant && minimumPourDevise !== null ? (
+                  // FormDescription est déjà relié au champ par aria-describedby (FormControl) :
+                  // le motif du bouton désactivé est annoncé et lisible, pas seulement en rouge.
+                  <FormDescription className="text-destructive">
+                    Inférieur au minimum requis ({formatMontant(minimumPourDevise, deviseChoisie)}).
+                  </FormDescription>
+                ) : null}
                 <FormMessage />
               </FormItem>
             )}

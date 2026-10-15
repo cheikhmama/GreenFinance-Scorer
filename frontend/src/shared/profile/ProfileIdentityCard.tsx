@@ -75,6 +75,10 @@ function AvatarEditor({ nom, avatar }: { nom: string; avatar: string | null }) {
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="sr-only"
+          // Ouvert par le bouton visible juste au-dessus : hors de l'ordre de tabulation et de
+          // l'arbre d'accessibilité, sinon un second arrêt sans nom au clavier.
+          tabIndex={-1}
+          aria-hidden="true"
           onChange={choisirFichier}
         />
       </div>

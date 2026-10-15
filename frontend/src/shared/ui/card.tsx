@@ -28,9 +28,16 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/** `as` : niveau de titre quand la carte est une section de la page (h2 sous le h1 de PageHeader,
+ * h3 dans une section) — sans quoi les lecteurs d'écran ne peuvent pas naviguer de section en
+ * section (WCAG 1.3.1). `div` par défaut pour les titres de cartes qui ne structurent pas la page. */
+function CardTitle({
+  className,
+  as: Balise = "div",
+  ...props
+}: React.ComponentProps<"div"> & { as?: "div" | "h2" | "h3" }) {
   return (
-    <div
+    <Balise
       data-slot="card-title"
       className={cn("leading-none font-semibold", className)}
       {...props}

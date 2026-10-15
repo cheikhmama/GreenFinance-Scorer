@@ -2,11 +2,11 @@ import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type * as React from "react";
 import { cn } from "@/shared/ui/cn";
+import { useRetourFocus } from "@/shared/ui/retour-focus";
 
 /* Tiroir latéral de détail (tâche 5.17) : s'ouvre depuis la droite au-dessus de la table, qui
    reste visible dessous ; plein écran au téléphone. Même primitive que Dialog (focus piégé,
-   Échap ferme). Le focus revient au Trigger ; pour un tiroir routé sans Trigger, RouteSheet
-   capture l'élément d'origine et restaure le focus lui-même. */
+   Échap ferme). Le focus revient à l'élément qui l'a ouvert, Trigger ou non (useRetourFocus). */
 function Sheet(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="sheet" {...props} />;
 }
@@ -22,8 +22,11 @@ function SheetContent({
   className,
   children,
   taille = "standard",
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { taille?: keyof typeof LARGEURS }) {
+  const retourFocus = useRetourFocus(onOpenAutoFocus, onCloseAutoFocus);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -32,6 +35,7 @@ function SheetContent({
       />
       <DialogPrimitive.Content
         data-slot="sheet-content"
+        {...retourFocus}
         className={cn(
           "fixed inset-y-0 right-0 z-[60] flex w-full flex-col border-l bg-card shadow-(--shadow-e4) outline-none",
           LARGEURS[taille],

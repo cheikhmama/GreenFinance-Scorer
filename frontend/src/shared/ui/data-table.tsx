@@ -170,7 +170,7 @@ function FiltreMultiple<T>({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-1.5">
         {options.length > 6 ? (
-          <label className="mb-1 flex items-center gap-2 border-b px-2 pb-1.5">
+          <label className="mb-1 flex items-center gap-2 rounded-sm border-b px-2 pb-1.5 focus-within:ring-2 focus-within:ring-ring">
             <Search className="size-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="sr-only">Rechercher dans {filtre.libelle}</span>
             <input
@@ -328,6 +328,7 @@ export function DataTable<T>({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
+      {/* biome-ignore lint/a11y/useSemanticElements: role="search" est le repère ARIA reconnu par tous les lecteurs d'écran ; l'élément <search>, plus récent, ne l'est pas encore partout. */}
       <div role="search" className="flex flex-wrap items-center gap-2">
         <label className="flex h-9 max-w-xs flex-[1_1_15rem] items-center gap-2 rounded-lg border border-input bg-card px-2.5 text-muted-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/25">
           <Search className="size-4 shrink-0" aria-hidden="true" />

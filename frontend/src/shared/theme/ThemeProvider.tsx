@@ -17,7 +17,7 @@ const ThemeContext = createContext<{ theme: Theme; toggleTheme: () => void } | n
 
 /**
  * Pose/retire la classe `dark` sur <html> (voir @custom-variant dark dans index.css) et
- * persiste le choix en localStorage. index.html applique la même lecture de manière synchrone
+ * persiste le choix en localStorage. public/theme-init.js (chargé par index.html) applique la même lecture de manière synchrone
  * avant le montage de React, pour éviter un flash du mauvais thème au chargement — les deux
  * doivent rester alignés sur STORAGE_KEY et la même logique de repli sur prefers-color-scheme.
  */

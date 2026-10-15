@@ -175,6 +175,28 @@ describe("Espace de revue de l’Auditeur — trois volets", () => {
     expect(await screen.findByText("1 / 2 valeur(s) revue(s)")).toBeInTheDocument();
   });
 
+  it("les raccourcis d’une lettre se désactivent, et ce choix est mémorisé", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPage();
+    await screen.findByText("0 / 2 valeur(s) revue(s)");
+    const interrupteur = screen.getByRole("checkbox", { name: "Raccourcis clavier" });
+    expect(interrupteur).toBeChecked();
+
+    await user.click(interrupteur);
+    const avant = valeurCourante().textContent;
+    await user.keyboard("j");
+    await user.keyboard("a");
+    expect(valeurCourante().textContent).toBe(avant);
+    expect(envois("/reviews")).toHaveLength(0);
+
+    unmount();
+    renderPage();
+    await screen.findByText("0 / 2 valeur(s) revue(s)");
+    const relu = screen.getByRole("checkbox", { name: "Raccourcis clavier" });
+    expect(relu).not.toBeChecked();
+    await user.click(relu); // rétablit le défaut pour les tests suivants
+  });
+
   it("E ouvre la correction ; taper dans le champ ne déclenche aucun raccourci", async () => {
     const user = userEvent.setup();
     renderPage();

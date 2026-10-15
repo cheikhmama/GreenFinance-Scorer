@@ -1,80 +1,89 @@
-import { useState } from "react";
+import { ChevronsUpDown } from "lucide-react";
+import { type ComponentProps, useState } from "react";
 import type { EntreprisePublieePublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
-import { Input } from "@/shared/ui/input";
+import { cn } from "@/shared/ui/cn";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/shared/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { usePublishedCompanies } from "../api";
 
-/** Un seul champ recherche + sélection — jamais une saisie séparée d'un choix dans une liste à
- * côté : taper filtre les résultats affichés juste sous le champ, cliquer un résultat confirme
- * la sélection. Toute frappe après une sélection invalide celle-ci jusqu'au prochain clic.
+/** Recherche et sélection d'une entreprise publiée, sur le même gabarit que shared/ui/combobox
+ * (Popover + cmdk) : le bouton déclencheur reçoit l'id et les attributs ARIA de FormControl, donc
+ * le libellé du champ et ses erreurs s'y rattachent ; flèches, Entrée et Échap fonctionnent dans
+ * la liste (WCAG 2.1.1). La recherche se fait côté serveur (shouldFilter={false}) : cmdk ne
+ * refiltre pas les résultats déjà filtrés par l'API.
  *
- * La liste s'affiche dès le focus, même sans rien taper (les toutes premières entreprises
+ * La liste s'affiche dès l'ouverture, même sans rien taper (les toutes premières entreprises
  * publiées) : exiger une frappe avant de montrer quoi que ce soit donnait l'impression qu'aucune
  * entreprise n'était disponible tant qu'on n'avait pas deviné une recherche qui matche — ici on
  * peut aussi bien parcourir que rechercher. */
 export function EntrepriseCombobox({
   onSelect,
   placeholder = "Rechercher une entreprise par nom ou secteur...",
-}: {
+  className,
+  ...triggerProps
+}: Omit<ComponentProps<"button">, "onSelect"> & {
   onSelect: (entreprise: EntreprisePublieePublic) => void;
   placeholder?: string;
 }) {
-  const [texte, setTexte] = useState("");
   const [ouvert, setOuvert] = useState(false);
-  const [confirmee, setConfirmee] = useState(false);
+  const [texte, setTexte] = useState("");
+  const [choisie, setChoisie] = useState<EntreprisePublieePublic | null>(null);
   const rechercheDebattue = useDebouncedValue(texte);
   const { data } = usePublishedCompanies({ recherche: rechercheDebattue });
   const resultats = data?.pages.flatMap((page) => page.items) ?? [];
 
-  function choisir(entreprise: EntreprisePublieePublic) {
-    setTexte(entreprise.name);
-    setConfirmee(true);
-    setOuvert(false);
-    onSelect(entreprise);
-  }
-
   return (
-    <div className="relative">
-      <Input
-        value={texte}
-        onChange={(event) => {
-          setTexte(event.target.value);
-          setConfirmee(false);
-          setOuvert(true);
-        }}
-        onFocus={() => setOuvert(true)}
-        onBlur={() => setOuvert(false)}
-        placeholder={placeholder}
-        autoComplete="off"
-      />
-      {ouvert && !confirmee ? (
-        <div
-          role="listbox"
-          aria-label="Résultats de la recherche d'entreprise"
-          className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md"
-          onMouseDown={(event) => event.preventDefault()}
+    <Popover open={ouvert} onOpenChange={setOuvert}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={ouvert}
+          aria-haspopup="listbox"
+          className={cn(
+            "flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-input bg-transparent px-3 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] dark:bg-input/30",
+            "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
+            className,
+          )}
+          {...triggerProps}
         >
-          {resultats.length === 0 ? (
-            <p className="p-3 text-sm text-muted-foreground">Aucun résultat.</p>
-          ) : (
-            resultats.map((entreprise) => (
-              <button
+          <span className={cn("truncate", !choisie && "text-muted-foreground")}>
+            {choisie?.name ?? placeholder}
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-(--radix-popover-trigger-width) min-w-64 p-0">
+        <Command shouldFilter={false}>
+          <CommandInput
+            value={texte}
+            onValueChange={setTexte}
+            placeholder="Nom ou secteur…"
+            aria-label="Rechercher une entreprise"
+          />
+          <CommandList aria-label="Résultats de la recherche d'entreprise">
+            <CommandEmpty>Aucun résultat.</CommandEmpty>
+            {resultats.map((entreprise) => (
+              <CommandItem
                 key={entreprise.id}
-                type="button"
-                role="option"
-                aria-selected="false"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
-                onClick={() => choisir(entreprise)}
+                value={entreprise.id}
+                onSelect={() => {
+                  setChoisie(entreprise);
+                  setOuvert(false);
+                  onSelect(entreprise);
+                }}
               >
                 <CompanyAvatar nom={entreprise.name} logo={entreprise.logo} className="size-7" />
                 <span className="font-medium text-foreground">{entreprise.name}</span>
                 <span className="text-muted-foreground">{entreprise.sector}</span>
-              </button>
-            ))
-          )}
-        </div>
-      ) : null}
-    </div>
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

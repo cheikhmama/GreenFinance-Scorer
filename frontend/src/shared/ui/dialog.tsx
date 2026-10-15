@@ -3,6 +3,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import * as React from "react"
 
 import { cn } from "@/shared/ui/cn"
+import { useRetourFocus } from "@/shared/ui/retour-focus"
 
 const Dialog = DialogPrimitive.Root
 const DialogTrigger = DialogPrimitive.Trigger
@@ -24,13 +25,17 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
 function DialogContent({
   className,
   children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  const retourFocus = useRetourFocus(onOpenAutoFocus, onCloseAutoFocus)
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        {...retourFocus}
         className={cn(
           "fixed inset-x-0 bottom-0 z-[60] grid max-h-[90vh] w-full gap-4 overflow-y-auto rounded-t-2xl border bg-card p-6 shadow-(--shadow-e4) sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
           className

@@ -14,7 +14,7 @@ import { Skeleton } from "@/shared/ui/skeleton";
 import { useAssignedReport, useAuditPreScore, useAuditReviews, useReviewValue } from "../api";
 import { OpinionDialog } from "./OpinionDialog";
 import { PdfPageViewer } from "./PdfPageViewer";
-import { useRaccourcisRevue } from "./useRaccourcisRevue";
+import { usePreferenceRaccourcis, useRaccourcisRevue } from "./useRaccourcisRevue";
 import { type DecisionRevue, type ModeRevue, ValueDetailPanel } from "./ValueDetailPanel";
 import { prochaineARevoir, type ValeurARevoir, valeursARevoir } from "./valeurs";
 
@@ -71,6 +71,7 @@ export function AuditReviewPage() {
     );
   }
 
+  const [raccourcisActifs, setRaccourcisActifs] = usePreferenceRaccourcis();
   useRaccourcisRevue(
     {
       accepter: () => {
@@ -85,7 +86,7 @@ export function AuditReviewPage() {
       suivante: () => aller((position + 1) % valeurs.length),
       precedente: () => aller((position - 1 + valeurs.length) % valeurs.length),
     },
-    valeurs.length > 0 && !avisOuvert,
+    raccourcisActifs && valeurs.length > 0 && !avisOuvert,
   );
 
   if (dossier.isPending) {
@@ -141,19 +142,39 @@ export function AuditReviewPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <p className="hidden items-center gap-1 text-xs text-brand-grey md:flex">
-            <Keyboard className="size-4" aria-hidden="true" />A accepter · E corriger · N non
-            trouvée · J/K suivante/précédente
-          </p>
+          <div className="flex flex-col gap-1 text-xs text-brand-grey">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-brand-green"
+                checked={raccourcisActifs}
+                onChange={(event) => setRaccourcisActifs(event.target.checked)}
+              />
+              <Keyboard className="size-4" aria-hidden="true" />
+              Raccourcis clavier
+            </label>
+            {raccourcisActifs ? (
+              <span className="hidden md:block">
+                A accepter · E corriger · N non trouvée · J/K suivante/précédente
+              </span>
+            ) : null}
+          </div>
           {modifiable ? (
-            <Button
-              onClick={() => setAvisOuvert(true)}
-              disabled={restantes > 0}
-              title={restantes > 0 ? `${restantes} valeur(s) à revoir avant l’avis` : undefined}
-            >
-              <ClipboardCheck className="size-4" aria-hidden="true" />
-              Rendre l’avis
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                onClick={() => setAvisOuvert(true)}
+                disabled={restantes > 0}
+                aria-describedby={restantes > 0 ? "avis-condition" : undefined}
+              >
+                <ClipboardCheck className="size-4" aria-hidden="true" />
+                Rendre l’avis
+              </Button>
+              {restantes > 0 ? (
+                <span id="avis-condition" className="text-xs text-brand-grey">
+                  {restantes} valeur(s) à revoir avant l’avis
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </header>

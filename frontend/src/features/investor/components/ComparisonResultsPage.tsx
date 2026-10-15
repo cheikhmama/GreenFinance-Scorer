@@ -6,7 +6,7 @@ import type {
   IndicateurESGDetail,
 } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { CompanyAvatar } from "@/shared/esg/CompanyAvatar";
-import { formatScore, variantScore } from "@/shared/format/etatPosition";
+import { formatScoreApprecie, variantScore } from "@/shared/format/etatPosition";
 import { libelleIndicateur, libelleScope } from "@/shared/format/indicateurs";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -89,7 +89,7 @@ export function ComparisonResultsPage() {
                     <p className="truncate font-medium text-foreground">{entreprise.name}</p>
                   </div>
                   <Badge variant={variantScore(entreprise.score.global_score)}>
-                    Score global : {formatScore(entreprise.score.global_score)}
+                    Score global : {formatScoreApprecie(entreprise.score.global_score)}
                   </Badge>
                 </CardContent>
               </Card>

@@ -213,6 +213,7 @@ function CompaniesPicker({
     <div className="space-y-2">
       <Input
         placeholder="Rechercher une entreprise du périmètre..."
+        aria-label="Rechercher une entreprise du périmètre"
         value={recherche}
         onChange={(event) => setRecherche(event.target.value)}
       />
