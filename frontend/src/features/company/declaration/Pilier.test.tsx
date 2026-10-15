@@ -163,4 +163,60 @@ describe("Pilier (niveau 4) et indicateur (niveau 5)", () => {
       await screen.findByRole("dialog", { name: "Indicateur introuvable" }),
     ).toBeInTheDocument();
   });
+
+  it("deux lignes de même code (exercices différents) : le tiroir montre les deux", async () => {
+    const ligne = (id: string, valeur: number, annee: number, page: number) => ({
+      id,
+      pillar: "SOCIAL",
+      metric_code: "effectif_total",
+      value: valeur,
+      unit: "personnes",
+      method: "RAPPORTEE",
+      proof: { ...preuve, page_start: page, page_end: page },
+      raw_value: null,
+      section: null,
+      proof_text: null,
+      value_year: annee,
+      confidence: null,
+    });
+    servir(
+      rapport({
+        carbon_data: [],
+        metrics: [ligne("a", 1111, 2024, 10), ligne("b", 2222, 2025, 20)],
+      }),
+    );
+    renderCompany(`/company/declarations/${ID}/social/effectifs-diversite/effectif_total`);
+    const tiroir = await screen.findByRole("dialog");
+    expect(within(tiroir).getByRole("region", { name: "Exercice 2024" })).toHaveTextContent(
+      "1 111",
+    );
+    expect(within(tiroir).getByRole("region", { name: "Exercice 2025" })).toHaveTextContent(
+      "2 222",
+    );
+    const liens = within(tiroir).getAllByRole("link");
+    expect(liens.map((l) => l.getAttribute("href"))).toEqual([
+      `/api/v1/company/rapports/${ID}/fichier#page=10`,
+      `/api/v1/company/rapports/${ID}/fichier#page=20`,
+    ]);
+  });
+
+  it("indicateur d’un autre pilier : tiroir « introuvable »", async () => {
+    servir(rapport());
+    renderCompany(`/company/declarations/${ID}/social/emissions-ges/scope_1`);
+    expect(
+      await screen.findByRole("dialog", { name: "Indicateur introuvable" }),
+    ).toBeInTheDocument();
+  });
+
+  it("famille inconnue : alerte, familles du pilier toujours listées, pas de redirection", async () => {
+    servir(rapport());
+    const { router } = renderCompany(`/company/declarations/${ID}/environnement/famille-inconnue`);
+    expect(
+      await screen.findByText("Cette famille d’indicateurs n’existe pas dans ce pilier."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Émissions GES/ })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(
+      `/company/declarations/${ID}/environnement/famille-inconnue`,
+    );
+  });
 });
