@@ -2,15 +2,11 @@ import { Download, Info, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RapportESGPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import {
-  libelleStatutRapportEntreprise,
-  variantStatutRapportEntreprise,
-} from "@/shared/format/statut";
 import { creerSlug } from "@/shared/format/slug";
+import { libelleStatutRapportEntreprise } from "@/shared/format/statut";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
@@ -27,16 +23,13 @@ import {
 } from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useActualisationSurNotification, useCompanyReports } from "../api";
+import { StatutDeclaration } from "../declaration/StatutDeclaration";
 import { libelleExercice, separerDeclarations } from "../session/etat";
 import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
 import { SessionStepper } from "../session/SessionStepper";
 
 function StatutEntreprise({ rapport }: { rapport: RapportESGPublic }) {
-  return (
-    <Badge variant={variantStatutRapportEntreprise(rapport.status)}>
-      {libelleStatutRapportEntreprise(rapport.status)}
-    </Badge>
-  );
+  return <StatutDeclaration rapport={rapport} />;
 }
 
 function date(iso: string | null) {
@@ -130,7 +123,9 @@ export function CompanyDeclarationsPage() {
                           <StatutEntreprise rapport={rapport} />
                         </div>
                         <Button asChild variant="outline" size="sm">
-                          <Link to={`/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`}>
+                          <Link
+                            to={`/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`}
+                          >
                             Ouvrir
                           </Link>
                         </Button>
@@ -291,7 +286,11 @@ function Historique({ rapports }: { rapports: RapportESGPublic[] }) {
             </SheetBody>
             <SheetFooter>
               <Button asChild size="sm">
-                <Link to={`/company/declarations/${creerSlug(titreDeclaration(ouvert), ouvert.id)}`}>Voir la déclaration</Link>
+                <Link
+                  to={`/company/declarations/${creerSlug(titreDeclaration(ouvert), ouvert.id)}`}
+                >
+                  Voir la déclaration
+                </Link>
               </Button>
             </SheetFooter>
           </SheetContent>

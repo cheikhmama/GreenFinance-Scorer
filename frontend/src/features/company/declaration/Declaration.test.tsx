@@ -1,10 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfirmProvider } from "@/shared/ui/confirm-dialog";
-import { CompanyReportDetailPage } from "./CompanyReportDetailPage";
+import { renderCompany } from "../test/renderCompany";
 
 const ID = "77777777-7777-7777-7777-777777777777";
 const SHA = "a".repeat(64);
@@ -53,19 +50,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 function renderPage() {
-  return render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <ConfirmProvider>
-        <MemoryRouter initialEntries={[`/company/declarations/${ID}`]}>
-          <Routes>
-            <Route path="/company/declarations/:rapportId" element={<CompanyReportDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </ConfirmProvider>
-    </QueryClientProvider>,
-  );
+  return renderCompany(`/company/declarations/${ID}`);
+}
+
+/** Compteur de notifications non lues, lu par useActualisationSurNotification. */
+function notifications(url: unknown) {
+  return String(url).includes("/notifications")
+    ? Response.json({ items: [], total: 0, page: 1, page_size: 1 })
+    : null;
+}
+
+function progression() {
+  return screen.getByRole("list", { name: "Progression" }).querySelector("[aria-current='step']");
 }
 
 function appels(methode: string, suffixe: string) {
@@ -78,6 +74,8 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
   it("affiche la liste de complétude sans valeurs, puis soumet et donne le reçu", async () => {
     let etat = rapport();
     fetchMock.mockImplementation(async (url, init) => {
+      const notif = notifications(url);
+      if (notif) return notif;
       const chemin = String(url);
       if (chemin.endsWith("/checklist")) return Response.json(LISTE);
       if (init?.method === "POST" && chemin.endsWith("/submit")) {
@@ -109,7 +107,7 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     expect(within(liste).getByText("Émissions carbone")).toBeInTheDocument();
     expect(within(liste).getByText("3 / 5 trouvé(s)")).toBeInTheDocument();
     expect(within(liste).getByText("· 3 manquant(s)")).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Préparation");
+    expect(progression()).toHaveTextContent("Déposé");
     expect(screen.queryByText("Indicateurs ESG")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Déclaration verrouillée" }),
@@ -131,9 +129,10 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     const bandeau = await screen.findByRole("region", { name: "Déclaration verrouillée" });
     expect(bandeau).toHaveTextContent(/Soumis le 2 septembre 2026 à \d{2}:30 — lecture seule/);
     expect(bandeau).toHaveTextContent(SHA);
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Examen");
+    expect(progression()).toHaveTextContent("En cours d’examen");
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
-    expect(screen.getByText("En cours d'examen")).toBeInTheDocument();
+    // Badge de l'en-tête + phase courante de la progression.
+    expect(screen.getAllByText("En cours d’examen")).toHaveLength(2);
   });
 
   it("joint le PDF d’un brouillon vide et suit l’analyse sans le verrouiller", async () => {
@@ -144,6 +143,8 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
       checksum_sha256: null,
     });
     fetchMock.mockImplementation(async (url, init) => {
+      const notif = notifications(url);
+      if (notif) return notif;
       if (init?.method === "POST" && String(url).endsWith("/file")) {
         etat = rapport({ status: "EXTRACTING", extraction_finished_at: null });
         return Response.json({ ...etat, report_type: "RAPPORT_ESG", official_score: null });
@@ -170,14 +171,19 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     const corps = envoi?.[1]?.body;
     expect(corps).toBeInstanceOf(FormData);
     expect(((corps as FormData).get("file") as File).name).toBe("rapport-2025.pdf");
-    expect(screen.getByText("En cours d'examen")).toBeInTheDocument();
+    expect(progression()).toHaveTextContent("Analyse en cours");
+    expect(
+      screen.queryByRole("navigation", { name: "Sections de la déclaration" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/Analyse du fichier/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
   });
 
   it("signale un échec d’analyse et propose de joindre à nouveau le fichier", async () => {
-    fetchMock.mockImplementation(async () =>
-      Response.json(rapport({ extraction_error: "docling_conversion_echouee" })),
+    fetchMock.mockImplementation(
+      async (url) =>
+        notifications(url) ??
+        Response.json(rapport({ extraction_error: "docling_conversion_echouee" })),
     );
     renderPage();
 
@@ -251,22 +257,24 @@ const SOUMIS = {
 
 describe("Espace Entreprise — déclaration soumise ou décidée", () => {
   it("validée : score officiel par pilier, synthèse PDF, examen dit terminé", async () => {
-    fetchMock.mockImplementation(async () =>
-      Response.json(
-        rapport({
-          ...SOUMIS,
-          status: "VALIDATED",
-          synthesis_available: true,
-          official_score: {
-            global_score: 71.4,
-            environmental_score: 68.2,
-            social_score: 74.9,
-            governance_score: 72,
-            coverage_rate: 0.86,
-            config_version: 3,
-          },
-        }),
-      ),
+    fetchMock.mockImplementation(
+      async (url) =>
+        notifications(url) ??
+        Response.json(
+          rapport({
+            ...SOUMIS,
+            status: "VALIDATED",
+            synthesis_available: true,
+            official_score: {
+              global_score: 71.4,
+              environmental_score: 68.2,
+              social_score: 74.9,
+              governance_score: 72,
+              coverage_rate: 0.86,
+              config_version: 3,
+            },
+          }),
+        ),
     );
     renderPage();
 
@@ -286,38 +294,121 @@ describe("Espace Entreprise — déclaration soumise ou décidée", () => {
     );
   });
 
-  it("valeurs extraites : libellés lisibles, nombres au format français, page source", async () => {
-    fetchMock.mockImplementation(async () =>
-      Response.json(rapport({ ...SOUMIS, status: "IN_AUDIT" })),
+  it("en examen : verrouillée, sans score ni table, aucun code technique", async () => {
+    fetchMock.mockImplementation(
+      async (url) =>
+        notifications(url) ?? Response.json(rapport({ ...SOUMIS, status: "IN_AUDIT" })),
     );
     renderPage();
 
-    const [indicateurs, carbone] = await screen.findAllByRole("table");
-    const ligneEau = within(indicateurs).getByRole("row", { name: /consommation/i });
-    expect(ligneEau).toHaveTextContent("Environnement");
-    expect(ligneEau).toHaveTextContent("125 400 m³");
-    expect(ligneEau).toHaveTextContent("Publiée");
-    expect(ligneEau).toHaveTextContent("p. 44");
-    const ligneConseil = within(indicateurs).getByRole("row", {
-      name: /Part de femmes au conseil/,
-    });
-    expect(ligneConseil).toHaveTextContent("33,3 %");
-    expect(ligneConseil).toHaveTextContent("p. 58–59");
-    expect(carbone).toHaveTextContent("18 450,2 tCO₂e");
+    expect(
+      await screen.findByRole("region", { name: "Déclaration verrouillée" }),
+    ).toHaveTextContent("pendant l’examen");
+    expect(progression()).toHaveTextContent("En cours d’examen");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/RAPPORTEE|ENVIRONNEMENT|femmes_conseil/);
-    expect(screen.getByRole("region", { name: "Déclaration verrouillée" })).toHaveTextContent(
-      "pendant l’examen",
-    );
     expect(screen.queryByRole("region", { name: "Score officiel" })).not.toBeInTheDocument();
   });
 
   it("correction demandée : l’exercice proposé est celui de la déclaration", async () => {
-    fetchMock.mockImplementation(async () =>
-      Response.json(rapport({ ...SOUMIS, status: "REVISION_REQUESTED", fiscal_year: 2023 })),
+    fetchMock.mockImplementation(
+      async (url) =>
+        notifications(url) ??
+        Response.json(rapport({ ...SOUMIS, status: "REVISION_REQUESTED", fiscal_year: 2023 })),
     );
     renderPage();
 
     expect(await screen.findByLabelText("Exercice")).toHaveValue(2023);
     expect(screen.getByLabelText("Fichier PDF corrigé")).toBeInTheDocument();
+    expect(progression()).toHaveTextContent("En cours d’examen");
+  });
+});
+
+describe("Déclaration — niveau 3 (synthèse)", () => {
+  function soumis(surcharges: Record<string, unknown> = {}) {
+    return rapport({
+      status: "VALIDATED",
+      submitted_at: "2026-09-02T10:30:00Z",
+      official_score: {
+        global_score: 64.2,
+        environmental_score: 58,
+        social_score: 71,
+        governance_score: 66,
+        coverage_rate: 0.8,
+        config_version: 2,
+      },
+      metrics: [
+        {
+          id: "m1",
+          pillar: "GOUVERNANCE",
+          metric_code: "taille_conseil",
+          value: 12,
+          unit: "count",
+          method: "RAPPORTEE",
+          proof: {
+            id: "p",
+            document_name: "r.pdf",
+            year: 2025,
+            total_pages: 9,
+            page_start: 4,
+            page_end: 4,
+            excerpt_pdf_path: "x",
+          },
+          raw_value: null,
+          section: null,
+          proof_text: null,
+          value_year: 2025,
+          confidence: "ELEVE",
+          review_status: "ACCEPTED",
+          audited_value: null,
+        },
+      ],
+      coverage: {
+        total_targets: 3,
+        found: 1,
+        missing_codes: ["femmes_conseil_pourcentage", "scope_1"],
+      },
+      ...surcharges,
+    });
+  }
+
+  it("fil d’Ariane, phase, score et un accès par pilier — aucune table", async () => {
+    fetchMock.mockImplementation(async (url) => notifications(url) ?? Response.json(soumis()));
+    renderCompany(`/company/declarations/${ID}`);
+
+    const fil = await screen.findByRole("navigation", { name: "Fil d’Ariane" });
+    expect(within(fil).getByRole("link", { name: "Tableau de bord" })).toBeInTheDocument();
+    expect(within(fil).getByRole("link", { name: "Mes déclarations" })).toBeInTheDocument();
+
+    expect(await screen.findByText("Validé & publié")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Score officiel" })).toHaveTextContent("64,2");
+
+    const rail = screen.getByRole("navigation", { name: "Sections de la déclaration" });
+    expect(within(rail).getByRole("link", { name: /Gouvernance/ })).toHaveTextContent("1/2");
+    expect(within(rail).getByRole("link", { name: /Environnement/ })).toHaveTextContent("0/1");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("déclaration introuvable : message contextualisé et retour à la liste", async () => {
+    fetchMock.mockImplementation(
+      async (url) =>
+        notifications(url) ??
+        Response.json(
+          { error: { code: "not_found", message: "Rapport introuvable.", correlation_id: "abc" } },
+          { status: 404 },
+        ),
+    );
+    renderCompany(`/company/declarations/${ID}`);
+    expect(await screen.findByText("Déclaration introuvable")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Retour à mes déclarations" })).toHaveAttribute(
+      "href",
+      "/company/declarations",
+    );
+  });
+
+  it("anciennes adresses redirigées", async () => {
+    fetchMock.mockImplementation(async (url) => notifications(url) ?? Response.json(soumis()));
+    const { router } = renderCompany(`/company/rapports/${ID}`);
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/company/declarations/${ID}`));
   });
 });

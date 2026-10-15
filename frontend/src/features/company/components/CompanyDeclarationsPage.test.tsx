@@ -87,7 +87,7 @@ describe("Espace Entreprise — Mes déclarations", () => {
     const enCours = await screen.findByRole("region", { name: "En cours" });
     expect(within(enCours).getByText("FY2025")).toBeInTheDocument();
     expect(within(enCours).queryByText("FY2023")).not.toBeInTheDocument();
-    expect(within(enCours).getByText("Brouillon")).toBeInTheDocument();
+    expect(within(enCours).getByText("Déposé")).toBeInTheDocument();
     expect(within(enCours).getAllByRole("list", { name: "Étapes de la déclaration" })).toHaveLength(
       1,
     );
