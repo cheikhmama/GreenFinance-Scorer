@@ -57,7 +57,7 @@ const CHAMPS_INSCRIPTION = {
 
 /** Étape qui porte le premier champ en erreur — une règle croisée (adresse / site) n'est connue
  * qu'à l'envoi, l'utilisateur doit être ramené là où il peut corriger. */
-function etapeDeLErreur(
+export function etapeDeLErreur(
   erreurs: Partial<Record<keyof CompanyRegistrationForm, unknown>>,
 ): EtapeInscription | null {
   for (const { id } of ETAPES_INSCRIPTION) {

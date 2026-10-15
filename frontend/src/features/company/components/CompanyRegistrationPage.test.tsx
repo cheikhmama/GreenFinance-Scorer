@@ -3,7 +3,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CompanyRegistrationPage } from "./CompanyRegistrationPage";
+import { CompanyRegistrationPage, etapeDeLErreur } from "./CompanyRegistrationPage";
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -253,6 +253,60 @@ describe("CompanyRegistrationPage", () => {
       ),
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("conserve les valeurs en changeant d’étape et les envoie à l’étape 3", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
+    const user = userEvent.setup();
+    renderPage();
+    await remplirEtape1(user);
+    await remplirEtape2(user);
+    await user.click(await screen.findByRole("button", { name: "Précédent" }));
+    await user.click(await screen.findByRole("button", { name: "Précédent" }));
+
+    expect(screen.getByLabelText("Nom de l’entreprise")).toHaveValue("Minière du Nord");
+    expect(screen.getByRole("combobox", { name: "Pays" })).toHaveTextContent("Mauritanie");
+    expect(screen.getByRole("textbox", { name: "NIF" })).toHaveValue("12345678");
+
+    await user.click(screen.getByRole("button", { name: "Suivant" }));
+    expect(await screen.findByLabelText("Nom & Prénom du responsable")).toHaveValue("Aïcha Ba");
+    expect(screen.getByLabelText("E-mail professionnel")).toHaveValue("aicha@miniere.mr");
+    expect(screen.getByText("mandat.pdf")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Suivant" }));
+    await user.click(await screen.findByRole("button", { name: /Envoyer la demande/ }));
+    await screen.findByText(/Un code à 6 chiffres a été envoyé à/);
+    const corps = fetchMock.mock.calls[0][1]?.body as FormData;
+    expect(corps.get("company_name")).toBe("Minière du Nord");
+    expect(corps.get("contact_email")).toBe("aicha@miniere.mr");
+    expect((corps.get("mandate_letter") as File).name).toBe("mandat.pdf");
+  });
+
+  it.each([
+    ["Code ISIN", "XX", "Un ISIN compte 12 caractères (ex. MR…)."],
+    ["Code LEI (Legal Entity Identifier)", "123", "Un LEI compte 20 caractères."],
+  ])(
+    "%s invalide à l’envoi : reste à l’étape 3 avec le message",
+    async (champ, saisie, message) => {
+      const user = userEvent.setup();
+      renderPage();
+      await remplirEtape1(user);
+      await remplirEtape2(user);
+      await user.type(await screen.findByLabelText(champ), saisie);
+      await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
+
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: "Étapes" })).toHaveTextContent("Étape 3 sur 3");
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("etapeDeLErreur désigne l’étape du premier champ en erreur", () => {
+    // Aucun chemin réaliste par l’interface : « Suivant » valide l’étape 1 avant de la quitter.
+    expect(etapeDeLErreur({ tax_id: {}, contact_email: {} })).toBe("entreprise");
+    expect(etapeDeLErreur({ website: {}, mandate_letter: {} })).toBe("contact");
+    expect(etapeDeLErreur({ lei: {} })).toBe("identifiants");
+    expect(etapeDeLErreur({})).toBeNull();
   });
 
   it("signale un code faux et permet d’en redemander un après le délai", async () => {
