@@ -1,9 +1,16 @@
 /* IBM Plex Sans : substitut web le plus proche d'Aptos (identité de marque définie
    dans docs/Presentation_GreenFinance_Scorer.md) — sans-serif corporate de gabarit et
-   de graisse comparables, Aptos n'étant pas distribuée en police web. Doit précéder
-   @import "tailwindcss" : la spec CSS exige que les @import passent avant toute autre
-   règle (au-delà de @charset/@layer, que Tailwind introduit). */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+   de graisse comparables, Aptos n'étant pas distribuée en police web. Auto-hébergée
+   (@fontsource, embarquée dans le build) plutôt que chargée depuis Google Fonts : aucune
+   adresse IP de visiteur transmise à un tiers hors UE (RGPD), et compatible avec la CSP
+   font-src 'self' de deploy/Caddyfile. Doit précéder @import "tailwindcss" : la spec CSS
+   exige que les @import passent avant toute autre règle. */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 @import "tailwindcss";
 
 /* Bascule du mode sombre par classe plutôt que par prefers-color-scheme (comportement par

@@ -15,6 +15,7 @@ from sqlmodel import col, select
 from app.auth.activation import ACTIVATION_TOKEN_TTL, envoyer_lien_activation
 from app.auth.models import AccountActivationToken, User
 from app.company.models import Company
+from app.core import storage
 from app.core.database import utcnow
 from app.core.enums import RegistrationStatus, Role
 from app.core.models import AuditLogEntry, Notification
@@ -133,6 +134,10 @@ def test_reponse_a_une_demande_dinformations(session, _envoi_simule) -> None:
     relue = session.get(Company, entreprise.id)
     assert relue is not None
     assert relue.mandate_letter_path not in (None, ancienne_lettre)
+    # Minimisation (RGPD) : la lettre remplacée est supprimée du stockage, la nouvelle conservée.
+    assert ancienne_lettre is not None
+    assert not storage.resolve_path(ancienne_lettre).exists()
+    assert storage.resolve_path(relue.mandate_letter_path).exists()
     assert relue.info_response_message == "Version signée jointe."
     assert session.exec(
         select(Notification).where(

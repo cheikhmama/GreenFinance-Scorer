@@ -33,6 +33,7 @@ import uuid
 import redis
 import structlog
 from fastapi import BackgroundTasks
+from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, and_, col, or_, select
 
@@ -58,7 +59,7 @@ from app.core.exceptions import (
 )
 from app.core.notifications import notifier
 from app.core.redis import get_redis_client, incrementer_fenetre
-from app.core.storage import save_bytes
+from app.core.storage import delete_file, save_bytes
 
 logger = structlog.get_logger(__name__)
 
@@ -207,6 +208,26 @@ def _demande_existante(
     return _CONFLIT
 
 
+def _remplacer_mandat(session: Session, entreprise: Company, contenu: bytes) -> None:
+    """Enregistre la nouvelle lettre de mandat et supprime du stockage celle qu'elle remplace
+    (minimisation des données, RGPD art. 5) — seulement une fois la transaction validée : un
+    échec avant le commit laisse l'ancienne lettre en place, toujours référencée par la ligne."""
+    ancienne = entreprise.mandate_letter_path
+    entreprise.mandate_letter_path = _enregistrer_mandat(entreprise.id, contenu)
+    entreprise.mandate_letter_uploaded_at = utcnow()
+    if ancienne is not None and ancienne != entreprise.mandate_letter_path:
+
+        def _supprimer_ancienne(_session: Session) -> None:
+            try:
+                delete_file(ancienne)
+            except OSError:
+                logger.warning(
+                    "mandat_remplace_non_supprime", company_id=str(entreprise.id)
+                )
+
+        event.listen(session, "after_commit", _supprimer_ancienne, once=True)
+
+
 def _enregistrer_mandat(entreprise_id: uuid.UUID, contenu: bytes) -> str:
     # Nom entièrement déterminé par le serveur, comme pour les rapports.
     chemin = f"mandats/{entreprise_id}/{uuid.uuid4()}.pdf"
@@ -321,10 +342,7 @@ def enregistrer_demande(
     session.add(entreprise)
     session.flush()
     code = emettre_code(entreprise)
-    entreprise.mandate_letter_path = _enregistrer_mandat(
-        entreprise.id, lettre_de_mandat
-    )
-    entreprise.mandate_letter_uploaded_at = utcnow()
+    _remplacer_mandat(session, entreprise, lettre_de_mandat)
     session.add(entreprise)
 
     # Geste libre-service : personne n'est encore connecté, mais l'acteur reste identifiable —
@@ -433,10 +451,7 @@ def repondre_demande_infos(
             code="transition_invalide",
         )
     valider_pdf(lettre_de_mandat, taille_max=TAILLE_MAX_MANDAT_OCTETS)
-    entreprise.mandate_letter_path = _enregistrer_mandat(
-        entreprise.id, lettre_de_mandat
-    )
-    entreprise.mandate_letter_uploaded_at = utcnow()
+    _remplacer_mandat(session, entreprise, lettre_de_mandat)
     entreprise.info_response_message = message
     entreprise.status = RegistrationStatus.PENDING_ONBOARDING
     session.add(entreprise)

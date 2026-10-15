@@ -37,3 +37,8 @@ def resolve_path(stored_path: str) -> Path:
     if target != base and base not in target.parents:
         raise ValueError(f"Chemin de stockage hors de STORAGE_PATH : {stored_path!r}")
     return target
+
+
+def delete_file(stored_path: str) -> None:
+    """Supprime un fichier stocké ; absent, ne fait rien (suppression idempotente)."""
+    resolve_path(stored_path).unlink(missing_ok=True)
