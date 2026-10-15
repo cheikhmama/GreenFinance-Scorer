@@ -1,4 +1,5 @@
 import { Navigate, type RouteObject, useParams } from "react-router-dom";
+import { libellePilier } from "@/shared/format/indicateurs";
 import { AppShell } from "@/shared/layout/AppShell";
 import type { HandleRoute } from "@/shared/layout/handle";
 import { RouteError } from "@/shared/layout/RouteError";
@@ -9,7 +10,10 @@ import { ProfilePage } from "./components/ProfilePage";
 import { RegistrationStatusPage } from "./components/RegistrationStatusPage";
 import { DeclarationLayout } from "./declaration/DeclarationLayout";
 import { FilDeclaration } from "./declaration/FilDeclaration";
+import { MetricSheet } from "./declaration/MetricSheet";
 import { OverviewPage } from "./declaration/OverviewPage";
+import { PillarPage } from "./declaration/PillarPage";
+import { libelleFamille, pilierDepuisSlug } from "./esg/taxonomie";
 
 /** Anciennes adresses d'un rapport (avant la tâche 5.9) : liens d'e-mails et favoris restent bons. */
 function AncienneDeclaration() {
@@ -38,7 +42,32 @@ export const companyEspaceRoutes: RouteObject[] = [
             handle: {
               fil: (params) => <FilDeclaration segment={params.rapportId ?? ""} />,
             } satisfies HandleRoute,
-            children: [{ element: <OverviewPage />, children: [{ index: true }] }],
+            children: [
+              { element: <OverviewPage />, children: [{ index: true }] },
+              {
+                path: ":pilier",
+                element: <PillarPage />,
+                errorElement: <RouteError />,
+                handle: {
+                  fil: (params) => {
+                    const pilier = pilierDepuisSlug(params.pilier);
+                    return pilier ? libellePilier(pilier) : "Section";
+                  },
+                } satisfies HandleRoute,
+                children: [
+                  {
+                    path: ":famille",
+                    handle: {
+                      fil: (params) => {
+                        const pilier = pilierDepuisSlug(params.pilier);
+                        return (pilier && libelleFamille(pilier, params.famille)) ?? "Famille";
+                      },
+                    } satisfies HandleRoute,
+                    children: [{ path: ":code", element: <MetricSheet /> }],
+                  },
+                ],
+              },
+            ],
           },
         ],
       },
