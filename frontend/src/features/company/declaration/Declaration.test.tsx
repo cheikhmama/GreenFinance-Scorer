@@ -122,6 +122,9 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     expect(recu).toHaveTextContent("rapport-2025.pdf");
     expect(appels("POST", "/submit")).toHaveLength(1);
     expect(appels("POST", "/submit")[0]?.[0]).toBe(`/api/v1/reports/${ID}/submit`);
+    // Le statut bascule (rail des piliers) : le reçu reste le même élément, monté.
+    await screen.findByRole("navigation", { name: "Sections de la déclaration" });
+    expect(recu).toBeInTheDocument();
 
     await user.click(within(recu).getByRole("link", { name: "Terminer" }));
     const bandeau = await screen.findByRole("region", { name: "Déclaration verrouillée" });

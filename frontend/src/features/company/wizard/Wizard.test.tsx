@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { renderCompany } from "../test/renderCompany";
 
 const ID = "88888888-8888-8888-8888-888888888888";
@@ -160,6 +161,43 @@ describe("Nouvelle déclaration — assistant", () => {
     expect(appels("POST", "/reports")).toHaveLength(0);
   });
 
+  it("devise retirée après saisie d’un montant invalide : création sans montant", async () => {
+    serveur(null);
+    const user = userEvent.setup();
+    renderCompany("/company/declarations/nouvelle/finances");
+    await user.selectOptions(await screen.findByLabelText("Devise"), "EUR");
+    await user.type(await screen.findByLabelText("Valeur d’entreprise (EVIC)"), "-5");
+    await user.selectOptions(screen.getByLabelText("Devise"), "");
+    await user.click(screen.getByRole("button", { name: "Créer le brouillon" }));
+    await waitFor(() => expect(appels("POST", "/reports")).toHaveLength(1));
+    const corps = JSON.parse(String(appels("POST", "/reports")[0][1]?.body));
+    expect(corps).not.toHaveProperty("revenue");
+    expect(corps).not.toHaveProperty("enterprise_value");
+    expect(corps).not.toHaveProperty("currency");
+  });
+
+  it("saisie modifiée : quitter l’assistant demande confirmation ; Suivant et la création non", async () => {
+    serveur(null);
+    const user = userEvent.setup();
+    const { router } = renderCompany("/company/declarations/nouvelle/exercice");
+    await user.selectOptions(await screen.findByLabelText("Type de rapport"), "RAPPORT_ANNUEL");
+    // (b) exercice -> finances : jamais de confirmation.
+    await user.click(screen.getByRole("button", { name: "Suivant" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/company/declarations/nouvelle/finances"),
+    );
+    expect(screen.queryByText("Abandonner la saisie ?")).not.toBeInTheDocument();
+    // (a) sortie vers une route extérieure : confirmation, puis reste sur place.
+    void router.navigate("/company/declarations");
+    expect(await screen.findByText("Abandonner la saisie ?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continuer la saisie" }));
+    expect(router.state.location.pathname).toBe("/company/declarations/nouvelle/finances");
+    // (c) création réussie : pas de confirmation.
+    await user.click(screen.getByRole("button", { name: "Créer le brouillon" }));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/\/brouillon\/document$/));
+    expect(screen.queryByText("Abandonner la saisie ?")).not.toBeInTheDocument();
+  });
+
   it("une déclaration déjà en cours bloque aussi l’adresse directe", async () => {
     serveur(null, [brouillon()]);
     renderCompany("/company/declarations/nouvelle/exercice");
@@ -196,6 +234,9 @@ describe("Brouillon — document puis vérification", () => {
     const recu = await screen.findByRole("region", { name: "Reçu de soumission" });
     expect(recu).toHaveTextContent(SHA);
     expect(appels("POST", "/submit")).toHaveLength(1);
+    // Le statut bascule (rail des piliers) : le reçu reste le même élément, monté.
+    await screen.findByRole("navigation", { name: "Sections de la déclaration" });
+    expect(recu).toBeInTheDocument();
   });
 
   it("vérification demandée pendant l’analyse : renvoyée au document (Review Focus 3)", async () => {
@@ -208,9 +249,14 @@ describe("Brouillon — document puis vérification", () => {
   });
 
   it("analyse en échec : cause dite, nouveau fichier possible", async () => {
-    serveur(brouillon({ source_file: "x.pdf", extraction_error: "pdf_illisible" }));
+    serveur(brouillon({ source_file: "x.pdf", extraction_error: "docling_conversion_echouee" }));
     renderCompany(`/company/declarations/${ID}/brouillon/document`);
     expect(await screen.findByText("Le fichier n’a pas pu être lu")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        `${libelleCauseExtraction("docling_conversion_echouee")}. Joignez de nouveau le fichier.`,
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Analyser ce fichier" })).toBeInTheDocument();
   });
 });

@@ -96,10 +96,15 @@ function Formulaire({
     },
   });
   const devise = form.watch("currency");
+  // isDirty n'est calculé par react-hook-form que s'il est lu au rendu : on le garde dans une ref
+  // que le prédicat de navigation relit.
+  const { isDirty } = form.formState;
+  const saisieModifiee = useRef(false);
+  saisieModifiee.current = isDirty;
   useConfirmationAbandon(
     (prochaine) =>
       !departAutorise.current &&
-      form.formState.isDirty &&
+      saisieModifiee.current &&
       !prochaine.pathname.startsWith("/company/declarations/nouvelle"),
   );
 
@@ -213,7 +218,14 @@ function Formulaire({
                         <Select
                           {...field}
                           value={field.value ?? ""}
-                          onChange={(event) => field.onChange(event.target.value || undefined)}
+                          onChange={(event) => {
+                            field.onChange(event.target.value || undefined);
+                            if (!event.target.value) {
+                              // Montants masqués : ils ne doivent plus bloquer la validation.
+                              form.resetField("revenue");
+                              form.resetField("enterprise_value");
+                            }
+                          }}
                         >
                           <option value="">Aucune donnée financière</option>
                           {DEVISES.map((d) => (
