@@ -40,8 +40,9 @@ async function choisir(
 
 const MANDAT = new File(["%PDF-1.4"], "mandat.pdf", { type: "application/pdf" });
 
-async function remplirEtEnvoyer({ avecMandat = true, pays = "MR", identifiant = "12345678" } = {}) {
-  const user = userEvent.setup();
+type Utilisateur = ReturnType<typeof userEvent.setup>;
+
+async function remplirEtape1(user: Utilisateur, { pays = "MR", identifiant = "12345678" } = {}) {
   await user.type(screen.getByLabelText("Nom de l’entreprise"), "Minière du Nord");
   await choisir(user, "Secteur d’activité", "mines", "Mines et extraction");
   await choisir(user, "Pays", NOMS_PAYS[pays], NOMS_PAYS[pays]);
@@ -49,12 +50,28 @@ async function remplirEtEnvoyer({ avecMandat = true, pays = "MR", identifiant = 
     screen.getByRole("textbox", { name: /NIF|SIREN|EIN|Identifiant fiscal/ }),
     identifiant,
   );
-  await user.type(screen.getByLabelText("Nom & Prénom du responsable"), "Aïcha Ba");
+  await user.click(screen.getByRole("button", { name: "Suivant" }));
+}
+
+async function remplirEtape2(user: Utilisateur, { avecMandat = true } = {}) {
+  await user.type(await screen.findByLabelText("Nom & Prénom du responsable"), "Aïcha Ba");
   await user.type(screen.getByLabelText("E-mail professionnel"), "aicha@miniere.mr");
   if (avecMandat) {
     await user.upload(screen.getByLabelText("Lettre de mandat signée (PDF)"), MANDAT);
   }
-  await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
+  await user.click(screen.getByRole("button", { name: "Suivant" }));
+}
+
+/** Parcourt les étapes ; n'envoie que si une étape précédente n'a pas bloqué. */
+async function remplirEtEnvoyer(
+  options: { avecMandat?: boolean; pays?: string; identifiant?: string } = {},
+) {
+  const user = userEvent.setup();
+  await remplirEtape1(user, options);
+  if (!screen.queryByLabelText("Nom & Prénom du responsable")) return user;
+  await remplirEtape2(user, options);
+  const envoyer = screen.queryByRole("button", { name: /Envoyer la demande/ });
+  if (envoyer) await user.click(envoyer);
   return user;
 }
 
@@ -146,21 +163,36 @@ describe("CompanyRegistrationPage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("formulaire épuré : ni ISIN ni LEI visibles, mais repliés en facultatif", async () => {
+  it("ISIN, LEI et site web sur l’étape 3, marqués facultatifs", async () => {
     const user = userEvent.setup();
     renderPage();
 
     expect(screen.queryByLabelText("Code ISIN")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Site web officiel")).not.toBeInTheDocument();
     expect(screen.queryByText(/Présentez votre entreprise/)).not.toBeInTheDocument();
+
+    await remplirEtape1(user);
     expect(screen.getByRole("link", { name: /Télécharger modèle \.docx/ })).toHaveAttribute(
       "href",
       "/modeles/lettre-de-mandat.docx",
     );
+    await remplirEtape2(user);
 
-    await user.click(screen.getByRole("button", { name: /Identifiants complémentaires/ }));
-    expect(screen.getByLabelText("Code ISIN")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Code ISIN")).toBeInTheDocument();
     expect(screen.getByLabelText("Code LEI (Legal Entity Identifier)")).toBeInTheDocument();
     expect(screen.getByLabelText("Site web officiel")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Étapes" })).toHaveTextContent(
+      "Identifiants (facultatifs)",
+    );
+  });
+
+  it("trois étapes ; « Suivant » ne vérifie que l’étape affichée", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(screen.getByRole("navigation", { name: "Étapes" })).toHaveTextContent("Étape 1 sur 3");
+    await user.click(screen.getByRole("button", { name: "Suivant" }));
+    expect(await screen.findByText("Le nom de l’entreprise est requis.")).toBeInTheDocument();
+    expect(screen.queryByText("Votre nom est requis.")).not.toBeInTheDocument();
   });
 
   it("exige la lettre de mandat avant tout envoi", async () => {
@@ -189,9 +221,10 @@ describe("CompanyRegistrationPage", () => {
   it("refuse une messagerie grand public dès la saisie", async () => {
     const user = userEvent.setup();
     renderPage();
+    await remplirEtape1(user);
 
-    await user.type(screen.getByLabelText("E-mail professionnel"), "aicha@gmail.com");
-    await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
+    await user.type(await screen.findByLabelText("E-mail professionnel"), "aicha@gmail.com");
+    await user.click(screen.getByRole("button", { name: "Suivant" }));
 
     expect(
       await screen.findByText(
@@ -201,14 +234,19 @@ describe("CompanyRegistrationPage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("exige une adresse sur le domaine du site web quand il est donné", async () => {
+  it("erreur d’adresse trouvée à l’envoi : retour à l’étape Contact avec le message (Review Focus 4)", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("button", { name: /Identifiants complémentaires/ }));
-    await user.type(screen.getByLabelText("Site web officiel"), "https://www.autre-groupe.mr");
+    await remplirEtape1(user);
+    await remplirEtape2(user);
+    await user.type(
+      await screen.findByLabelText("Site web officiel"),
+      "https://www.autre-groupe.mr",
+    );
+    await user.click(screen.getByRole("button", { name: /Envoyer la demande/ }));
 
-    await remplirEtEnvoyer(); // adresse aicha@miniere.mr
-
+    expect(await screen.findByLabelText("E-mail professionnel")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Étapes" })).toHaveTextContent("Étape 2 sur 3");
     expect(
       await screen.findByText(
         "L'adresse doit appartenir au domaine du site web (autre-groupe.mr).",
