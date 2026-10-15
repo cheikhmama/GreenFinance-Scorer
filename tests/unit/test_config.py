@@ -14,6 +14,10 @@ _CHAMPS_REQUIS_VALIDES = {
     # Explicite : le .env local du développeur peut viser Mailpit (`plain`, tâche 5.11), interdit
     # en production — ces tests ne doivent pas en dépendre.
     "smtp_security": "starttls",
+    # Explicites aussi : le .env local vise le serveur Vite (http://localhost:5174), refusé en
+    # production.
+    "cors_allowed_origins": "https://esg.exemple.org",
+    "frontend_base_url": "https://esg.exemple.org",
 }
 
 
@@ -97,3 +101,35 @@ def test_smtp_connection_settings_are_bounded(field, value) -> None:
     champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "development", field: value}
     with pytest.raises(ValueError):
         Settings(**champs)  # type: ignore[arg-type]  # dict[str,str] vs BaseSettings' propres kwargs (_cli_*, _secrets_dir...)
+
+
+@pytest.mark.parametrize("champ", ["cors_allowed_origins", "frontend_base_url"])
+@pytest.mark.parametrize(
+    "valeur",
+    ["http://localhost:5174", "https://esg.exemple.org/", "https://esg.exemple.org/app", "esg.exemple.org"],
+)
+def test_production_rejects_a_non_https_origin(champ, valeur) -> None:
+    champs = {**_CHAMPS_REQUIS_VALIDES, "environment": "production", champ: valeur}
+    with pytest.raises(ValueError, match=champ.upper()):
+        Settings(**champs)  # type: ignore[arg-type]  # dict[str,str] vs BaseSettings' propres kwargs (_cli_*, _secrets_dir...)
+
+
+def test_production_accepts_several_https_origins_and_localhost_trial() -> None:
+    champs = {
+        **_CHAMPS_REQUIS_VALIDES,
+        "environment": "production",
+        "cors_allowed_origins": "https://esg.exemple.org, https://localhost",
+    }
+
+    Settings(**champs)  # type: ignore[arg-type]  # ne lève pas — essai Caddy sans domaine
+
+
+def test_development_tolerates_http_localhost_origins() -> None:
+    champs = {
+        **_CHAMPS_REQUIS_VALIDES,
+        "environment": "development",
+        "cors_allowed_origins": "http://localhost:5174",
+        "frontend_base_url": "http://localhost:5174",
+    }
+
+    Settings(**champs)  # type: ignore[arg-type]  # ne lève pas

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Response
 
-from app.api.router import api_app
+from app.api.router import api_app, urls_documentation
 
 # Importés pour leur effet de bord : enregistrer chaque table dans le
 # registre SQLAlchemy avant qu'une route ne déclenche la configuration des
@@ -42,7 +42,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
+    **urls_documentation(settings.environment),
+)
 register_exception_handlers(app)
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(SecurityHeadersMiddleware, hsts=settings.environment == "production")

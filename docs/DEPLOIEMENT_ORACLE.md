@@ -49,8 +49,11 @@ cp .env.example .env
 
 Dans `.env` :
 
-- `ENVIRONMENT=production`, `SECRET_KEY` (au moins 32 octets aléatoires), `FRONTEND_BASE_URL` et
-  `CORS_ALLOWED_ORIGINS` sur le domaine public, ainsi que `SMTP_*`.
+- `ENVIRONMENT=production`, `SECRET_KEY` (au moins 32 octets aléatoires), ainsi que `SMTP_*`.
+- `FRONTEND_BASE_URL=https://<DOMAINE>` et `CORS_ALLOWED_ORIGINS=https://<DOMAINE>` : exactement
+  le domaine public, en `https://`, sans chemin ni « / » final. Toute autre valeur (par exemple
+  `http://localhost:5174` recopié de `.env.example`) bloque le démarrage en production : le contrôle
+  d'origine CSRF rejetterait sinon chaque action d'un utilisateur connecté.
 - LLM :
   - `LLM_PROVIDER=openai_compat`
   - `LLM_BASE_URL=https://api.groq.com/openai/v1`
@@ -82,6 +85,18 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps   # api « healthy »
 docker stats --no-stream                                             # mémoire par service
 ```
+
+Premier compte Administrateur : une base neuve n'en a aucun, et l'interface ne permet pas d'en
+créer un sans être déjà Administrateur. La commande demande le mot de passe au clavier (12
+caractères au moins) et refuse dès qu'un Administrateur existe :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api \
+  python -m app.admin.creer_premier_admin admin@domaine.tld "Prénom Nom"
+```
+
+Ne jamais lancer `scripts/seed_demo.py` sur la base de production : il crée des comptes de
+démonstration au mot de passe connu.
 
 Vérification de bout en bout : déposer un rapport depuis l'espace Entreprise, attendre qu'il
 quitte l'état « extraction en cours », puis lire les mesures de son exécution (elles ne sont pas
@@ -152,3 +167,47 @@ En local (développement), `.mcp.json.example` lance le même service avec le se
 
 Le service partage le budget mémoire du worker d'extraction : sur la VM, ne le lancer que quand
 celui-ci est inactif.
+
+## 7. Sauvegardes
+
+Deux volumes portent toutes les données : `pgdata` (la base) et `storage` (rapports déposés, lettres
+de mandat, preuves, PDF de synthèse). Sans sauvegarde, la perte du volume de démarrage de la VM les
+emporte. Le nom réel des volumes est préfixé par celui du projet Compose (le dossier : ici
+`greenfinance_pgdata`, `greenfinance_storage`) ; le vérifier avec `docker volume ls`.
+
+Script `/opt/greenfinance-backup.sh` (lancé depuis le dossier du dépôt) :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+cd /home/ubuntu/greenfinance
+DEST=/var/backups/greenfinance
+JOUR=$(date +%F)
+mkdir -p "$DEST"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db \
+  pg_dump -U greenfinance -Fc greenfinance > "$DEST/db-$JOUR.dump"
+docker run --rm -v greenfinance_storage:/s:ro -v "$DEST":/b alpine \
+  tar czf "/b/storage-$JOUR.tgz" -C /s .
+find "$DEST" -type f -mtime +14 -delete   # 14 jours de rétention locale
+```
+
+Planification quotidienne (`sudo crontab -e`) :
+
+```
+30 3 * * * /opt/greenfinance-backup.sh >> /var/log/greenfinance-backup.log 2>&1
+```
+
+Une copie sur la VM ne protège pas de la perte de la VM : copier aussi `$DEST` hors de la VM (OCI
+Object Storage, 20 Go inclus dans l'offre Always Free, par exemple avec `oci os object bulk-upload`
+ou `rclone`).
+
+Restauration (à tester une fois avant la mise en service, sur une base vide) :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop api worker worker-extraction
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db \
+  pg_restore -U greenfinance -d greenfinance --clean --if-exists < db-AAAA-MM-JJ.dump
+docker run --rm -v greenfinance_storage:/s -v "$PWD":/b alpine \
+  sh -c "rm -rf /s/* && tar xzf /b/storage-AAAA-MM-JJ.tgz -C /s"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml start api worker worker-extraction
+```

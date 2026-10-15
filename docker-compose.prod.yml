@@ -14,6 +14,14 @@
 # Le pic du worker d'extraction dépend de la taille d'un lot (EXTRACTION_PAGES_PAR_LOT), pas de la
 # longueur du rapport ; chaque exécution enregistre le sien (ExtractionRun.pic_memoire_mo).
 
+# Rotation des journaux Docker (pilote json-file, sans limite par défaut) : 5 × 10 Mo par service,
+# pour que les journaux JSON de production ne remplissent jamais le volume de démarrage de la VM.
+x-journaux: &journaux
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 x-environnement-prod: &environnement-prod
   DATABASE_URL: postgresql+psycopg://greenfinance:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}@db:5432/greenfinance
   REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD requis}@redis:6379/0
@@ -23,9 +31,11 @@ x-environnement-prod: &environnement-prod
 
 services:
   migrate:
+    logging: *journaux
     environment: *environnement-prod
 
   api:
+    logging: *journaux
     command:
       ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--workers", "2"]
     environment: *environnement-prod
@@ -39,6 +49,7 @@ services:
       retries: 3
 
   worker:
+    logging: *journaux
     environment: *environnement-prod
     restart: unless-stopped
     mem_limit: 768m
@@ -52,6 +63,7 @@ services:
       start_period: 1m
 
   worker-extraction:
+    logging: *journaux
     environment:
       <<: *environnement-prod
       # Threads de calcul alignés sur cpus : au-delà, Docling, ONNX Runtime et torch se disputent
@@ -75,6 +87,7 @@ services:
   # Outil MCP lancé sur la VM (profil « mcp ») : mêmes réglages de production que les autres
   # services — sans eux, la validation des réglages refuserait l'URL de base d'exemple de .env.
   mcp:
+    logging: *journaux
     environment:
       <<: *environnement-prod
       EXTRACTION_THREADS: "3"
@@ -83,6 +96,7 @@ services:
       TOKENIZERS_PARALLELISM: "false"
 
   caddy:
+    logging: *journaux
     build:
       context: ./frontend
     environment:
@@ -102,6 +116,7 @@ services:
     cpus: 0.25
 
   db:
+    logging: *journaux
     command: ["postgres", "-c", "shared_buffers=512MB", "-c", "work_mem=16MB"]
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
@@ -110,6 +125,7 @@ services:
     cpus: 1
 
   redis:
+    logging: *journaux
     command:
       [
         "redis-server",

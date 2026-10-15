@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -145,6 +146,21 @@ class Settings(BaseSettings):
                     f"{nom} contient encore une valeur d'exemple de .env.example — "
                     "interdit quand ENVIRONMENT=production."
                 )
+
+        # Le contrôle d'origine CSRF (app/auth/csrf.py) compare scheme://hôte exactement : une
+        # valeur restée sur http://localhost:5174 (.env.example) ou terminée par « / » rejetterait
+        # en 403 chaque requête mutante connectée, sans autre symptôme au démarrage.
+        for nom, valeur in {
+            "CORS_ALLOWED_ORIGINS": self.cors_allowed_origins,
+            "FRONTEND_BASE_URL": self.frontend_base_url,
+        }.items():
+            for origine in (o.strip() for o in valeur.split(",") if o.strip()):
+                parties = urlsplit(origine)
+                if parties.scheme != "https" or not parties.netloc or parties.path or parties.query:
+                    raise ValueError(
+                        f"{nom} doit contenir des origines https://hôte, sans chemin ni « / » "
+                        f"final (reçu : {origine!r}) — exigé quand ENVIRONMENT=production."
+                    )
         return self
 
 

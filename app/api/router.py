@@ -11,6 +11,8 @@ Chaque module métier enregistre son router ici, même vide de route pour
 l'instant — les routes réelles arrivent au fil des étapes 9 à 17.
 """
 
+from typing import TypedDict
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -79,7 +81,28 @@ OPENAPI_TAGS = [
     {"name": "institution", "description": "Espace Institution — Étape 17."},
 ]
 
-api_app = FastAPI(title="GreenFinance-Scorer API", version="v1", openapi_tags=OPENAPI_TAGS)
+
+class UrlsDocumentation(TypedDict):
+    docs_url: str | None
+    redoc_url: str | None
+    openapi_url: str | None
+
+
+def urls_documentation(environment: str) -> UrlsDocumentation:
+    """Swagger, ReDoc et le schéma OpenAPI restent servis en développement, jamais en production :
+    ils publieraient la carte complète de l'API. scripts/export_openapi.py appelle
+    api_app.openapi() directement et n'en dépend pas."""
+    if environment == "production":
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+api_app = FastAPI(
+    title="GreenFinance-Scorer API",
+    version="v1",
+    openapi_tags=OPENAPI_TAGS,
+    **urls_documentation(get_settings().environment),
+)
 register_exception_handlers(api_app)
 api_app.add_middleware(CorrelationIdMiddleware)
 api_app.add_middleware(
