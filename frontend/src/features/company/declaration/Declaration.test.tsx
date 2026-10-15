@@ -108,29 +108,29 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
     expect(within(liste).getByText("3 / 5 trouvé(s)")).toBeInTheDocument();
     expect(within(liste).getByText("· 3 manquant(s)")).toBeInTheDocument();
     expect(progression()).toHaveTextContent("Déposé");
+    // Le rail est celui de l’assistant tant que le brouillon n’est pas soumis.
+    expect(screen.getByRole("navigation", { name: "Étapes" })).toBeInTheDocument();
     expect(screen.queryByText("Indicateurs ESG")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Déclaration verrouillée" }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Soumettre" }));
-    const dialogue = await screen.findByRole("dialog");
-    expect(dialogue).toHaveTextContent(SHA);
-    expect(dialogue).toHaveTextContent("12 indicateur(s) trouvé(s) sur 19");
-    await user.click(within(dialogue).getByRole("button", { name: "Confirmer la soumission" }));
-
-    expect(await within(dialogue).findByText("Reçu de soumission")).toBeInTheDocument();
-    expect(dialogue).toHaveTextContent(SHA);
-    expect(dialogue).toHaveTextContent("rapport-2025.pdf");
+    await user.click(screen.getByRole("checkbox", { name: /verrouillée/ }));
+    await user.click(screen.getByRole("button", { name: "Soumettre la déclaration" }));
+    const recu = await screen.findByRole("region", { name: "Reçu de soumission" });
+    expect(recu).toHaveTextContent(SHA);
+    expect(recu).toHaveTextContent("rapport-2025.pdf");
     expect(appels("POST", "/submit")).toHaveLength(1);
     expect(appels("POST", "/submit")[0]?.[0]).toBe(`/api/v1/reports/${ID}/submit`);
 
-    await user.click(within(dialogue).getByRole("button", { name: "Terminer" }));
+    await user.click(within(recu).getByRole("link", { name: "Terminer" }));
     const bandeau = await screen.findByRole("region", { name: "Déclaration verrouillée" });
     expect(bandeau).toHaveTextContent(/Soumis le 2 septembre 2026 à \d{2}:30 — lecture seule/);
     expect(bandeau).toHaveTextContent(SHA);
     expect(progression()).toHaveTextContent("En cours d’examen");
-    expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Soumettre la déclaration" }),
+    ).not.toBeInTheDocument();
     // Badge de l'en-tête + phase courante de la progression.
     expect(screen.getAllByText("En cours d’examen")).toHaveLength(2);
   });
@@ -176,7 +176,9 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
       screen.queryByRole("navigation", { name: "Sections de la déclaration" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/Analyse du fichier/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Soumettre la déclaration" }),
+    ).not.toBeInTheDocument();
   });
 
   it("signale un échec d’analyse et propose de joindre à nouveau le fichier", async () => {
@@ -189,7 +191,9 @@ describe("Espace Entreprise — préparer, soumettre et verrouiller une déclara
 
     expect(await screen.findByText("Le fichier n’a pas pu être lu")).toBeInTheDocument();
     expect(screen.getByLabelText("Remplacer le fichier")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Soumettre" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Soumettre la déclaration" }),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(appels("GET", "/checklist")).toHaveLength(0));
   });
 });

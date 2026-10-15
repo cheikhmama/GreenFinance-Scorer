@@ -126,11 +126,12 @@ describe("Espace Entreprise — tableau de bord", () => {
     const session = screen.getByRole("region", { name: "Session active" });
     expect(within(session).getByRole("heading", { name: "FY2025" })).toBeInTheDocument();
     expect(within(session).getByText("Brouillon ouvert le 01/09/2026")).toBeInTheDocument();
-    expect(within(session).getByText("Statut : Brouillon")).toBeInTheDocument();
+    expect(within(session).getByText("Déposé")).toBeInTheDocument();
     expect(await within(session).findByText("18/22 indicateurs détectés")).toBeInTheDocument();
-    expect(within(session).getByRole("link", { name: /Voir le suivi/ })).toHaveAttribute(
+    // Fichier analysé : « Reprendre » mène à l’étape Vérification de l’assistant.
+    expect(within(session).getByRole("link", { name: /Reprendre/ })).toHaveAttribute(
       "href",
-      "/company/declarations",
+      "/company/declarations/rapport-esg-exercice-2025-brouillon/brouillon/verification",
     );
 
     const score = screen.getByRole("region", { name: "Dernier score officiel" });
@@ -139,6 +140,18 @@ describe("Espace Entreprise — tableau de bord", () => {
     expect(score).toHaveTextContent("Taux de couverture : 88 %");
     // Deux cartes, pas de tableau ni de liste de fichiers.
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("brouillon sans fichier analysé : « Reprendre » mène à l’étape Document", async () => {
+    servir({
+      rapports: [{ ...BROUILLON, source_file: null, extraction_finished_at: null }],
+    });
+    renderPage();
+    const session = await screen.findByRole("region", { name: "Session active" });
+    expect(await within(session).findByRole("link", { name: /Reprendre/ })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/brouillon\/document$/),
+    );
   });
 
   it("ne garde dans l’activité que la transmission et la publication du score", async () => {
@@ -163,11 +176,11 @@ describe("Espace Entreprise — tableau de bord", () => {
   });
 
   it.each([
-    ["EXTRACTING", null],
-    ["AWAITING_ASSIGNMENT", "2026-09-02T10:00:00Z"],
-    ["IN_AUDIT", "2026-09-02T10:00:00Z"],
-    ["PENDING_DECISION", "2026-09-02T10:00:00Z"],
-  ])("regroupe %s sous « En cours d’examen », sans jargon interne", async (statut, soumis) => {
+    ["EXTRACTING", null, "Analyse en cours"],
+    ["AWAITING_ASSIGNMENT", "2026-09-02T10:00:00Z", "En cours d’examen"],
+    ["IN_AUDIT", "2026-09-02T10:00:00Z", "En cours d’examen"],
+    ["PENDING_DECISION", "2026-09-02T10:00:00Z", "En cours d’examen"],
+  ])("affiche la phase de %s sans jargon interne", async (statut, soumis, phase) => {
     servir({
       rapports: [
         rapportListe("session", {
@@ -182,7 +195,7 @@ describe("Espace Entreprise — tableau de bord", () => {
     renderPage();
 
     const session = await screen.findByRole("region", { name: "Session active" });
-    expect(within(session).getByText("Statut : En cours d'examen")).toBeInTheDocument();
+    expect(within(session).getByText(phase)).toBeInTheDocument();
     for (const jargon of [
       /Analyse du fichier/,
       /affecté à un auditeur/i,

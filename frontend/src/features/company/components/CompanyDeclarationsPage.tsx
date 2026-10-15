@@ -2,7 +2,7 @@ import { Download, Info, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RapportESGPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
-import { phaseDeclaration } from "@/shared/format/phaseDeclaration";
+import { PHASES_DECLARATION, phaseDeclaration } from "@/shared/format/phaseDeclaration";
 import { creerSlug } from "@/shared/format/slug";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { type ColonneTable, DataTable } from "@/shared/ui/data-table";
+import { PhaseProgress } from "@/shared/ui/phase-progress";
 import {
   Sheet,
   SheetBody,
@@ -24,12 +25,14 @@ import {
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useActualisationSurNotification, useCompanyReports } from "../api";
 import { StatutDeclaration } from "../declaration/StatutDeclaration";
-import { libelleExercice, separerDeclarations } from "../session/etat";
-import { NewDeclarationDialog } from "../session/NewDeclarationDialog";
-import { SessionStepper } from "../session/SessionStepper";
+import { etapeReprise, libelleExercice, separerDeclarations } from "../session/etat";
 
 function StatutEntreprise({ rapport }: { rapport: RapportESGPublic }) {
   return <StatutDeclaration rapport={rapport} />;
+}
+
+function base(rapport: RapportESGPublic) {
+  return `/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`;
 }
 
 function date(iso: string | null) {
@@ -49,25 +52,26 @@ function score(rapport: RapportESGPublic) {
 export function CompanyDeclarationsPage() {
   useActualisationSurNotification();
   const { data: rapports, isPending, isError } = useCompanyReports();
-  const [creation, setCreation] = useState(false);
   const { enCours, historique, sessionBloquante } = separerDeclarations(rapports ?? []);
-  const exercicesValides = (rapports ?? [])
-    .filter((r) => r.status === "VALIDATED" && r.fiscal_year !== null)
-    .map((r) => r.fiscal_year as number);
 
   return (
     <PageShell
       title="Mes déclarations"
       description="Préparez, soumettez et suivez vos déclarations ESG par exercice."
       actions={
-        <Button
-          onClick={() => setCreation(true)}
-          disabled={!rapports || sessionBloquante !== undefined}
-          aria-describedby={sessionBloquante ? "raison-blocage" : undefined}
-        >
-          <Plus />
-          Nouvelle déclaration
-        </Button>
+        sessionBloquante !== undefined || !rapports ? (
+          <Button disabled aria-describedby={sessionBloquante ? "raison-blocage" : undefined}>
+            <Plus />
+            Nouvelle déclaration
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link to="nouvelle/exercice">
+              <Plus />
+              Nouvelle déclaration
+            </Link>
+          </Button>
+        )
       }
     >
       {sessionBloquante ? (
@@ -81,13 +85,6 @@ export function CompanyDeclarationsPage() {
             </p>
           </AlertDescription>
         </Alert>
-      ) : null}
-      {rapports ? (
-        <NewDeclarationDialog
-          open={creation}
-          onOpenChange={setCreation}
-          exercicesExclus={exercicesValides}
-        />
       ) : null}
 
       {isPending ? <Skeleton className="h-40 w-full" /> : null}
@@ -124,13 +121,20 @@ export function CompanyDeclarationsPage() {
                         </div>
                         <Button asChild variant="outline" size="sm">
                           <Link
-                            to={`/company/declarations/${creerSlug(titreDeclaration(rapport), rapport.id)}`}
+                            to={
+                              rapport.submitted_at === null
+                                ? `${base(rapport)}/brouillon/${etapeReprise(rapport)}`
+                                : base(rapport)
+                            }
                           >
                             Ouvrir
                           </Link>
                         </Button>
                       </div>
-                      <SessionStepper rapport={rapport} />
+                      <PhaseProgress
+                        etapes={PHASES_DECLARATION}
+                        courante={phaseDeclaration(rapport).index}
+                      />
                     </CardContent>
                   </Card>
                 </li>

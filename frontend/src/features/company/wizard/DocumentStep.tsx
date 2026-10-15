@@ -1,56 +1,44 @@
-import { FileUp, Loader2, Send } from "lucide-react";
+import { FileUp, Loader2 } from "lucide-react";
 import { type SyntheticEvent, useId, useState } from "react";
+import { Link } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
-import type {
-  GroupeCompletude,
-  RapportESGDetail,
-} from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import type { RapportESGDetail } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { FileDrop } from "@/shared/ui/file-drop";
 import { Label } from "@/shared/ui/label";
-import { Skeleton } from "@/shared/ui/skeleton";
 import { useAttachDraftFile } from "../api";
 import { fichierBrouillonSchema } from "../schemas";
-import { CompletenessChecklist } from "./CompletenessChecklist";
-import type { EtatBrouillon } from "./etat";
+import { etatBrouillon } from "../session/etat";
 
-/** Préparation d'une déclaration (tâche 5.8) : joindre le PDF, suivre son analyse, lire la liste
- * de complétude, puis soumettre. */
-export function DraftPanel({
-  rapport,
-  etat,
-  groupes,
-  chargementListe,
-  onSoumettre,
-}: {
-  rapport: RapportESGDetail;
-  etat: EtatBrouillon;
-  groupes: GroupeCompletude[] | undefined;
-  chargementListe: boolean;
-  onSoumettre: () => void;
-}) {
+/** Étape 3 (spec §3.1) : joindre le PDF ; son analyse tourne en arrière-plan — on peut quitter
+ * la page et revenir, la phase reste visible partout (tableau de bord, liste, en-tête). */
+export function DocumentStep({ rapport }: { rapport: RapportESGDetail }) {
+  const etat = etatBrouillon(rapport);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Préparation de la déclaration</CardTitle>
+        <CardTitle>Document</CardTitle>
         <CardDescription>
-          Rien n’est transmis avant la soumission. Joignez le PDF du rapport : sa lecture indique
-          quels indicateurs attendus y ont été trouvés.
+          Joignez le PDF du rapport : sa lecture indique quels indicateurs attendus y figurent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {etat === "ANALYSE" ? (
-          <p className="flex items-center gap-2 text-sm text-foreground" aria-live="polite">
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Lecture de « {rapport.original_filename ?? "votre fichier"} » en cours — la liste de
-            complétude s’affiche dès qu’elle est terminée.
-          </p>
+          <div className="space-y-2" aria-live="polite">
+            <p className="flex items-center gap-2 text-sm text-foreground">
+              <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+              Lecture de « {rapport.original_filename ?? "votre fichier"} » en cours — vous pouvez
+              quitter cette page, l’analyse continue.
+            </p>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <div className="h-full w-1/3 rounded-full bg-primary motion-safe:animate-pulse" />
+            </div>
+          </div>
         ) : null}
-
-        {etat === "ECHEC" ? (
+        {etat === "ECHEC" && rapport.extraction_error ? (
           <Alert variant="destructive">
             <AlertTitle>
               {rapport.extraction_error === "quota_llm_epuise"
@@ -62,15 +50,6 @@ export function DraftPanel({
             </AlertDescription>
           </Alert>
         ) : null}
-
-        {etat === "PRET" ? (
-          chargementListe || !groupes ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <CompletenessChecklist groupes={groupes} />
-          )
-        ) : null}
-
         {etat !== "ANALYSE" ? (
           <JoindreFichier
             rapportId={rapport.id}
@@ -80,15 +59,15 @@ export function DraftPanel({
             bouton={etat === "SANS_FICHIER" ? "Joindre et analyser" : "Analyser ce fichier"}
           />
         ) : null}
-
-        <div className="flex flex-wrap gap-2 border-t pt-4">
-          {etat === "PRET" ? (
-            <Button onClick={onSoumettre}>
-              <Send className="size-4" aria-hidden="true" />
-              Soumettre
+        {etat === "PRET" ? (
+          <div className="flex justify-end border-t pt-4">
+            <Button asChild>
+              <Link to="../verification" relative="path">
+                Suivant
+              </Link>
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileWarning } from "lucide-react";
-import { useState } from "react";
 import { Link, Outlet, useParams } from "react-router-dom";
 import { ApiError } from "@/shared/api/errors";
 import { PHASES_DECLARATION, phaseDeclaration } from "@/shared/format/phaseDeclaration";
@@ -12,16 +11,12 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { PhaseProgress } from "@/shared/ui/phase-progress";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { rapportQueryOptions, useActualisationSurNotification, useReportChecklist } from "../api";
-import { etatBrouillon, libelleExercice } from "../session/etat";
-import { SubmitDialog } from "../session/SubmitDialog";
+import { WizardStepper } from "@/shared/ui/wizard";
+import { rapportQueryOptions, useActualisationSurNotification } from "../api";
+import { libelleExercice } from "../session/etat";
+import { ETAPES_DECLARATION } from "../wizard/etapes";
 import { RailDeclaration } from "./RailDeclaration";
 import { StatutDeclaration } from "./StatutDeclaration";
-
-/** Contexte transmis par `<Outlet />` aux pages d'une déclaration. */
-export interface ContexteDeclaration {
-  ouvrirSoumission: () => void;
-}
 
 function Introuvable() {
   return (
@@ -41,19 +36,14 @@ function Introuvable() {
 }
 
 /** Niveau 3 (spec §2.2) : en-tête de la déclaration, sa phase, puis rail des piliers + détail.
- * Une seule requête pour tous les niveaux inférieurs (rapportQueryOptions). Le dialogue de
- * soumission est monté ici, hors de la partie qui change de forme à la soumission : le reçu
- * reste affiché quand le brouillon devient une déclaration soumise (la tâche 10 le remplace). */
+ * Une seule requête pour tous les niveaux inférieurs (rapportQueryOptions). Un seul
+ * `MasterDetailLayout` pour le brouillon (rail = étapes) comme pour la déclaration soumise (rail =
+ * piliers) : à la soumission le détail reste monté et le reçu de l'étape « Vérification »
+ * survit au changement de statut. */
 export function DeclarationLayout() {
-  const { rapportId: segment = "", pilier } = useParams();
+  const { rapportId: segment = "", pilier, etape } = useParams();
   const { data: rapport, isPending, error } = useQuery(rapportQueryOptions(idDepuisSlug(segment)));
   useActualisationSurNotification();
-  const [soumissionOuverte, setSoumissionOuverte] = useState(false);
-  const etat = rapport ? etatBrouillon(rapport) : null;
-  const liste = useReportChecklist(
-    rapport?.id ?? "",
-    etat === "PRET" ? (rapport?.extraction_finished_at ?? null) : null,
-  );
 
   if (isPending) {
     return (
@@ -82,7 +72,7 @@ export function DeclarationLayout() {
           libelle: phase.libelle,
           ton: phase.ton === "danger" ? ("danger" as const) : ("attention" as const),
         };
-  const contexte: ContexteDeclaration = { ouvrirSoumission: () => setSoumissionOuverte(true) };
+  const brouillon = rapport.submitted_at === null;
 
   return (
     <div className="space-y-6">
@@ -110,24 +100,19 @@ export function DeclarationLayout() {
         }
       />
       <PhaseProgress etapes={PHASES_DECLARATION} courante={phase.index} branche={branche} />
-      {/* Un brouillon, même en analyse ou en échec, n’a pas encore de piliers à parcourir. */}
-      {rapport.submitted_at === null ? (
-        <Outlet context={contexte} />
-      ) : (
-        <MasterDetailLayout
-          railLabel="Sections de la déclaration"
-          detailActif={pilier !== undefined}
-          rail={<RailDeclaration rapport={rapport} />}
-        >
-          <Outlet context={contexte} />
-        </MasterDetailLayout>
-      )}
-      <SubmitDialog
-        rapport={rapport}
-        groupes={liste.data ?? []}
-        open={soumissionOuverte}
-        onOpenChange={setSoumissionOuverte}
-      />
+      <MasterDetailLayout
+        railLabel={brouillon ? undefined : "Sections de la déclaration"}
+        detailActif={!brouillon && pilier !== undefined}
+        rail={
+          brouillon ? (
+            <WizardStepper etapes={ETAPES_DECLARATION} courante={etape ?? "document"} />
+          ) : (
+            <RailDeclaration rapport={rapport} />
+          )
+        }
+      >
+        <Outlet />
+      </MasterDetailLayout>
     </div>
   );
 }

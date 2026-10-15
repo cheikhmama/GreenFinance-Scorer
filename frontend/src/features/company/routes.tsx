@@ -14,6 +14,8 @@ import { MetricSheet } from "./declaration/MetricSheet";
 import { OverviewPage } from "./declaration/OverviewPage";
 import { PillarPage } from "./declaration/PillarPage";
 import { libelleFamille, pilierDepuisSlug } from "./esg/taxonomie";
+import { DraftStepPage } from "./wizard/DraftStepPage";
+import { NewDeclarationWizard } from "./wizard/NewDeclarationWizard";
 
 /** Anciennes adresses d'un rapport (avant la tâche 5.9) : liens d'e-mails et favoris restent bons. */
 function AncienneDeclaration() {
@@ -35,6 +37,12 @@ export const companyEspaceRoutes: RouteObject[] = [
         handle: { fil: "Mes déclarations" } satisfies HandleRoute,
         children: [
           { index: true, element: <CompanyDeclarationsPage /> },
+          { path: "nouvelle", element: <Navigate to="exercice" replace /> },
+          {
+            path: "nouvelle/:etape",
+            element: <NewDeclarationWizard />,
+            handle: { fil: "Nouvelle déclaration" } satisfies HandleRoute,
+          },
           {
             path: ":rapportId",
             element: <DeclarationLayout />,
@@ -44,6 +52,13 @@ export const companyEspaceRoutes: RouteObject[] = [
             } satisfies HandleRoute,
             children: [
               { element: <OverviewPage />, children: [{ index: true }] },
+              {
+                path: "brouillon/:etape",
+                element: <DraftStepPage />,
+                handle: {
+                  fil: (p) => (p.etape === "verification" ? "Vérification" : "Document"),
+                } satisfies HandleRoute,
+              },
               {
                 path: ":pilier",
                 element: <PillarPage />,
