@@ -8,6 +8,7 @@ import { CompanyDashboardPage } from "./components/CompanyDashboardPage";
 import { CompanyDeclarationsPage } from "./components/CompanyDeclarationsPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { RegistrationStatusPage } from "./components/RegistrationStatusPage";
+import { CorrectionSheet } from "./declaration/CorrectionSheet";
 import { DeclarationLayout } from "./declaration/DeclarationLayout";
 import { FilDeclaration } from "./declaration/FilDeclaration";
 import { MetricSheet } from "./declaration/MetricSheet";
@@ -51,7 +52,10 @@ export const companyEspaceRoutes: RouteObject[] = [
               fil: (params) => <FilDeclaration segment={params.rapportId ?? ""} />,
             } satisfies HandleRoute,
             children: [
-              { element: <OverviewPage />, children: [{ index: true }] },
+              {
+                element: <OverviewPage />,
+                children: [{ index: true }, { path: "correction", element: <CorrectionSheet /> }],
+              },
               {
                 path: "brouillon/:etape",
                 element: <DraftStepPage />,

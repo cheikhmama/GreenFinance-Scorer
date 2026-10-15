@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
-import { Link, Navigate, Outlet, useParams } from "react-router-dom";
+import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { libelleCauseExtraction } from "@/shared/format/causeExtraction";
 import { libellePilier } from "@/shared/format/indicateurs";
 import { idDepuisSlug } from "@/shared/format/slug";
@@ -11,7 +11,6 @@ import { PILIERS } from "../esg/taxonomie";
 import { metriquesDuRapport } from "../esg/vueMetrique";
 import { etapeReprise } from "../session/etat";
 import { LockBanner } from "../session/LockBanner";
-import { FormulaireCorrection } from "./FormulaireCorrection";
 import { resumePilier } from "./resume";
 import { arrondi, ScoreOfficiel } from "./ScoreOfficiel";
 
@@ -22,6 +21,7 @@ const DECISIONS = ["VALIDATED", "REJECTED", "REVISION_REQUESTED"];
  * de l'assistant où il s'était arrêté. */
 export function OverviewPage() {
   const { rapportId: segment = "" } = useParams();
+  const location = useLocation();
   const { data: rapport } = useQuery(rapportQueryOptions(idDepuisSlug(segment)));
   if (!rapport) return null; // DeclarationLayout gère chargement et erreur.
   if (rapport.submitted_at === null) {
@@ -55,8 +55,13 @@ export function OverviewPage() {
           — affiché séparément, il n’entre pas dans le score calculé.
         </p>
       ) : null}
-      {rapport.status === "REVISION_REQUESTED" ? (
-        <FormulaireCorrection rapportId={rapport.id} exercice={rapport.fiscal_year} />
+      {(location.state as { correctionEnvoyee?: boolean } | null)?.correctionEnvoyee ? (
+        <Alert role="status" className="border-primary/20 bg-secondary/60">
+          <AlertTitle>Nouvelle version déposée</AlertTitle>
+          <AlertDescription>
+            Votre correction a été envoyée et sera traitée comme un nouveau rapport.
+          </AlertDescription>
+        </Alert>
       ) : null}
       <ul className="grid gap-4 sm:grid-cols-3">
         {PILIERS.map(({ slug, pilier }) => {

@@ -88,6 +88,11 @@ export function DeclarationLayout() {
         action={
           <>
             <StatutDeclaration rapport={rapport} />
+            {rapport.status === "REVISION_REQUESTED" ? (
+              <Button asChild size="sm">
+                <Link to={`/company/declarations/${segment}/correction`}>Corriger</Link>
+              </Button>
+            ) : null}
             {rapport.synthesis_available ? (
               <Button asChild variant="outline" size="sm">
                 <a href={`/api/v1/company/rapports/${rapport.id}/synthese/fichier`}>

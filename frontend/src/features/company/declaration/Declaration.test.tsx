@@ -316,19 +316,6 @@ describe("Espace Entreprise — déclaration soumise ou décidée", () => {
     expect(document.body.textContent).not.toMatch(/RAPPORTEE|ENVIRONNEMENT|femmes_conseil/);
     expect(screen.queryByRole("region", { name: "Score officiel" })).not.toBeInTheDocument();
   });
-
-  it("correction demandée : l’exercice proposé est celui de la déclaration", async () => {
-    fetchMock.mockImplementation(
-      async (url) =>
-        notifications(url) ??
-        Response.json(rapport({ ...SOUMIS, status: "REVISION_REQUESTED", fiscal_year: 2023 })),
-    );
-    renderPage();
-
-    expect(await screen.findByLabelText("Exercice")).toHaveValue(2023);
-    expect(screen.getByLabelText("Fichier PDF corrigé")).toBeInTheDocument();
-    expect(progression()).toHaveTextContent("En cours d’examen");
-  });
 });
 
 describe("Déclaration — niveau 3 (synthèse)", () => {
