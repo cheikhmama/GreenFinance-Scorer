@@ -1415,6 +1415,31 @@ def test_lister_rapports_echec_extraction_filtre_correctement(session) -> None:
     assert str(qualifiant.id) not in ids
 
 
+def test_lister_tous_les_rapports_expose_le_score_officiel(session) -> None:
+    """La colonne « Score ESG » de la table Rapports lit official_global_score : un rapport validé
+    doit le porter, un rapport non validé non (jamais un 0 fabriqué)."""
+    admin = _create_utilisateur(session, Role.ADMIN)
+    entreprise, _ = _create_entreprise_avec_utilisateur(session)
+    valide = _create_rapport(
+        session,
+        entreprise.id,
+        status=ReportStatus.VALIDATED,
+        extraction_finished_at=utcnow(),
+        official_score=72.5,
+    )
+    en_audit = _create_rapport(
+        session, entreprise.id, status=ReportStatus.IN_AUDIT, extraction_finished_at=utcnow()
+    )
+
+    authed_client = _login(admin.email, "s3cret-pass")
+    response = authed_client.get("/api/v1/admin/rapports", params={"page_size": 100})
+
+    assert response.status_code == 200
+    scores = {item["id"]: item["official_global_score"] for item in response.json()["items"]}
+    assert scores[str(valide.id)] == 72.5
+    assert scores[str(en_audit.id)] is None
+
+
 def test_lister_rapports_orphelins_en_validation(session) -> None:
     """Un rapport EN_VALIDATION sans aucun avis d'audit est un état incohérent, inatteignable via
     l'API seule (voir app/admin/review_queue.py::_rapport_en_validation) mais qui doit rester
