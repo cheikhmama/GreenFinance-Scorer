@@ -2,8 +2,8 @@ import { Download, Info, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RapportESGPublic } from "@/shared/api/generated/greenFinanceScorerAPI.schemas";
+import { phaseDeclaration } from "@/shared/format/phaseDeclaration";
 import { creerSlug } from "@/shared/format/slug";
-import { libelleStatutRapportEntreprise } from "@/shared/format/statut";
 import { libelleTypeRapport, titreDeclaration } from "@/shared/format/typeRapport";
 import { PageShell } from "@/shared/layout/PageShell";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -168,8 +168,8 @@ function Historique({ rapports }: { rapports: RapportESGPublic[] }) {
         id: "statut",
         entete: "Statut",
         alignement: "centre",
-        valeurTri: (r) => libelleStatutRapportEntreprise(r.status),
-        valeurExport: (r) => libelleStatutRapportEntreprise(r.status),
+        valeurTri: (r) => phaseDeclaration(r).libelle,
+        valeurExport: (r) => phaseDeclaration(r).libelle,
         cellule: (r) => <StatutEntreprise rapport={r} />,
       },
       {
@@ -208,7 +208,7 @@ function Historique({ rapports }: { rapports: RapportESGPublic[] }) {
           {
             id: "statut",
             libelle: "Statut",
-            valeur: (r) => libelleStatutRapportEntreprise(r.status),
+            valeur: (r) => phaseDeclaration(r).libelle,
           },
           { id: "type", libelle: "Type", valeur: (r) => libelleTypeRapport(r.type) },
         ]}

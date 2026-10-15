@@ -108,8 +108,17 @@ describe("Espace Entreprise — Mes déclarations", () => {
     const lignes = within(historique).getAllByRole("row").slice(1);
     expect(lignes).toHaveLength(2);
     expect(lignes[0]).toHaveTextContent("FY2024");
-    expect(lignes[0]).toHaveTextContent("Validé");
+    expect(lignes[0]).toHaveTextContent("Validé & publié");
     expect(lignes[0]).toHaveTextContent("74,5/100");
+
+    // Le filtre « Statut » parle le même vocabulaire de phases que le badge.
+    const filtreStatut = screen
+      .getAllByRole("button", { name: "Statut" })
+      .find((bouton) => bouton.hasAttribute("aria-haspopup"));
+    await userEvent.setup().click(filtreStatut as HTMLElement);
+    expect(screen.getByRole("checkbox", { name: "Validé & publié" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Validé" })).not.toBeInTheDocument();
+    await userEvent.setup().keyboard("{Escape}");
 
     // Couverture, empreinte et synthèse vivent dans le tiroir de la ligne.
     await userEvent
@@ -118,6 +127,7 @@ describe("Espace Entreprise — Mes déclarations", () => {
         within(lignes[0] as HTMLElement).getByRole("button", { name: /Voir le détail de FY2024/ }),
       );
     const tiroir = await screen.findByRole("dialog");
+    expect(tiroir).toHaveTextContent("Validé & publié");
     expect(tiroir).toHaveTextContent("Couverture88 %");
     // Empreinte tronquée : 8 premiers et 4 derniers caractères, complète au survol.
     expect(within(tiroir).getByTitle(SHA)).toHaveTextContent("ffffffff…ffff");
